@@ -65,11 +65,16 @@ async function runMigrations() {
 // ---------------------------------------------------------------------------
 // POST /api/sync/run — trigger a full Lightspeed sync on demand
 // ---------------------------------------------------------------------------
+let syncRunning = false;
+
 app.post('/api/sync/run', async (req, res) => {
   if (!process.env.LIGHTSPEED_REFRESH_TOKEN) {
     return res.status(400).json({ error: 'LIGHTSPEED_REFRESH_TOKEN is not set. Complete the OAuth2 flow at /oauth/start first.' });
   }
-  // Spawn sync as a child process, streaming output to stdout AND log buffer
+  if (syncRunning) {
+    return res.status(409).json({ status: 'sync already running' });
+  }
+  syncRunning = true;
   res.json({ status: 'sync started' });
   const { spawn } = require('child_process');
   const child = spawn('node', ['sync.js', '--once'], { cwd: __dirname });
@@ -81,6 +86,7 @@ app.post('/api/sync/run', async (req, res) => {
   child.stdout.on('data', capture);
   child.stderr.on('data', capture);
   child.on('close', code => {
+    syncRunning = false;
     const msg = `[sync/run] exited with code ${code}`;
     console.log(msg);
     appendLog(msg);
