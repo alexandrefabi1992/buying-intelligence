@@ -1,11 +1,100 @@
 require('dotenv').config();
 const express = require('express');
+const axios   = require('axios');
 const { Pool } = require('pg');
 
 const app  = express();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(express.json());
+
+// ---------------------------------------------------------------------------
+// OAuth2 flow — one-time setup to obtain a refresh_token
+//
+// 1. Open http://localhost:{PORT}/oauth/start in your browser
+// 2. Authorise the app on the Lightspeed consent screen
+// 3. Lightspeed redirects to /oauth/callback — your refresh_token is shown
+// 4. Copy it into .env as LIGHTSPEED_REFRESH_TOKEN
+//
+// Requires in .env: LIGHTSPEED_CLIENT_ID, LIGHTSPEED_CLIENT_SECRET
+// LIGHTSPEED_REDIRECT_URI must match what is registered in the Lightspeed
+// developer portal (default: http://localhost:{PORT}/oauth/callback).
+// ---------------------------------------------------------------------------
+const AUTHORIZE_URL = 'https://cloud.lightspeedapp.com/oauth/authorize.php';
+const TOKEN_URL     = 'https://cloud.lightspeedapp.com/oauth/access_token.php';
+
+app.get('/oauth/start', (req, res) => {
+  const redirectUri = process.env.LIGHTSPEED_REDIRECT_URI
+    ?? `http://localhost:${process.env.PORT ?? 3000}/oauth/callback`;
+
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id:     process.env.LIGHTSPEED_CLIENT_ID,
+    redirect_uri:  redirectUri,
+  });
+
+  res.redirect(`${AUTHORIZE_URL}?${params}`);
+});
+
+app.get('/oauth/callback', async (req, res, next) => {
+  try {
+    const { code, error } = req.query;
+
+    if (error) {
+      return res.status(400).send(`<pre>Lightspeed returned an error:\n${error}</pre>`);
+    }
+    if (!code) {
+      return res.status(400).send('<pre>Missing authorization code.</pre>');
+    }
+
+    const redirectUri = process.env.LIGHTSPEED_REDIRECT_URI
+      ?? `http://localhost:${process.env.PORT ?? 3000}/oauth/callback`;
+
+    const { data } = await axios.post(TOKEN_URL, new URLSearchParams({
+      client_id:     process.env.LIGHTSPEED_CLIENT_ID,
+      client_secret: process.env.LIGHTSPEED_CLIENT_SECRET,
+      code,
+      grant_type:    'authorization_code',
+      redirect_uri:  redirectUri,
+    }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+
+    const { access_token, refresh_token, expires_in } = data;
+
+    console.log('\n========== LIGHTSPEED TOKENS ==========');
+    console.log('refresh_token :', refresh_token);
+    console.log('access_token  :', access_token);
+    console.log('expires_in    :', expires_in, 'seconds');
+    console.log('=======================================\n');
+
+    res.send(`
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>OAuth2 Success</title>
+<style>
+  body { font-family: monospace; max-width: 700px; margin: 60px auto; padding: 0 20px; }
+  h1   { color: #2d7d46; }
+  .token-box { background: #f4f4f4; border: 1px solid #ccc; padding: 16px;
+               border-radius: 6px; word-break: break-all; }
+  label { font-weight: bold; display: block; margin-top: 16px; }
+  .note { color: #555; margin-top: 24px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+  <h1>Authorization successful</h1>
+  <p>Copy the <strong>refresh_token</strong> into your <code>.env</code> file
+     as <code>LIGHTSPEED_REFRESH_TOKEN</code>.</p>
+
+  <label>refresh_token</label>
+  <div class="token-box">${refresh_token}</div>
+
+  <label>access_token (short-lived, ${expires_in}s)</label>
+  <div class="token-box">${access_token}</div>
+
+  <p class="note">Both tokens have also been printed to the server console.</p>
+</body>
+</html>`);
+  } catch (err) { next(err); }
+});
 
 // ---------------------------------------------------------------------------
 // /api/nos — Never-Out-of-Stock candidates
