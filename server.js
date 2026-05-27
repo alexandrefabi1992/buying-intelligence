@@ -1,3 +1,8 @@
+process.on('SIGTERM', () => process.exit(0));
+process.on('SIGINT',  () => process.exit(0));
+
+console.log('[startup] Node process started, pid=%d', process.pid);
+
 try {
 
 require('dotenv').config();
@@ -382,9 +387,9 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: err.message });
 });
 
-const PORT = process.env.PORT ?? 3000;
-console.log(`process.env.PORT = ${process.env.PORT}`);
-app.listen(PORT, '0.0.0.0', () => console.log(`Buying Intelligence API listening on 0.0.0.0:${PORT}`));
+const PORT = parseInt(process.env.PORT ?? '3000', 10);
+console.log('[startup] PORT=%d DATABASE_URL=%s', PORT, process.env.DATABASE_URL ? 'set' : 'NOT SET');
+app.listen(PORT, '0.0.0.0', () => console.log('[startup] Listening on 0.0.0.0:%d', PORT));
 
 } catch (err) {
   console.error('Fatal error during startup:', err);
