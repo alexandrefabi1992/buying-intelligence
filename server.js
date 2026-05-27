@@ -88,6 +88,7 @@ app.get('/oauth/start', (req, res) => {
     response_type: 'code',
     client_id:     process.env.LIGHTSPEED_CLIENT_ID,
     redirect_uri:  redirectUri,
+    scope:         'employee:all',
   });
 
   res.redirect(`${AUTHORIZE_URL}?${params}`);
