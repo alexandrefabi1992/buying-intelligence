@@ -3,7 +3,9 @@ const axios = require('axios');
 const { Pool } = require('pg');
 const cron = require('node-cron');
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const poolConfig = { connectionString: process.env.DATABASE_URL };
+if (process.env.DATABASE_URL) poolConfig.ssl = { rejectUnauthorized: false };
+const pool = new Pool(poolConfig);
 
 const BASE_URL = `https://api.lightspeedapp.com/API/V3/Account/${process.env.LIGHTSPEED_ACCOUNT_ID}`;
 const TOKEN_URL = 'https://cloud.lightspeedapp.com/oauth/access_token.php';
@@ -39,24 +41,32 @@ async function apiClient() {
 }
 
 // ---------------------------------------------------------------------------
-// Paginated fetch — yields each page's item array
+// Paginated fetch — cursor-based via the `next` URL in each response
+// Lightspeed V3 dropped offset pagination as of 2024.
 // ---------------------------------------------------------------------------
 async function* paginate(client, resource, params = {}) {
-  let offset = 0;
-  while (true) {
-    const { data } = await client.get(`/${resource}.json`, {
-      params: { ...params, limit: LIMIT, offset },
-    });
+  // First request uses the resource path + query params
+  let response = await client.get(`/${resource}.json`, {
+    params: { ...params, limit: LIMIT },
+  });
 
-    const wrapper = data[resource] ?? data[Object.keys(data).find(k => k !== '@attributes')];
+  while (true) {
+    const { data } = response;
+    const key     = Object.keys(data).find(k => k !== '@attributes');
+    const wrapper = key ? data[key] : null;
     const items   = Array.isArray(wrapper) ? wrapper : wrapper ? [wrapper] : [];
-    const count   = Number(data['@attributes']?.count ?? items.length);
 
     if (items.length === 0) break;
     yield items;
 
-    offset += LIMIT;
-    if (offset >= count) break;
+    const next = data['@attributes']?.next;
+    if (!next) break;
+
+    // Refresh token if it has expired before fetching the next page
+    const token = await getAccessToken();
+    response = await axios.get(next, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
   }
 }
 
