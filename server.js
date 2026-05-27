@@ -55,14 +55,13 @@ app.post('/api/sync/run', async (req, res) => {
   if (!process.env.LIGHTSPEED_REFRESH_TOKEN) {
     return res.status(400).json({ error: 'LIGHTSPEED_REFRESH_TOKEN is not set. Complete the OAuth2 flow at /oauth/start first.' });
   }
-  // Run sync in background so the request returns immediately
+  // Spawn sync as a child process, streaming its output directly to our stdout
   res.json({ status: 'sync started' });
-  const { execFile } = require('child_process');
-  execFile('node', ['sync.js', '--once'], { cwd: __dirname }, (err, stdout, stderr) => {
-    if (err) console.error('[sync/run] Error:', err.message);
-    if (stdout) console.log('[sync/run]', stdout.trim());
-    if (stderr) console.error('[sync/run]', stderr.trim());
-  });
+  const { spawn } = require('child_process');
+  const child = spawn('node', ['sync.js', '--once'], { cwd: __dirname });
+  child.stdout.on('data', d => process.stdout.write(d));
+  child.stderr.on('data', d => process.stderr.write(d));
+  child.on('close', code => console.log(`[sync/run] exited with code ${code}`));
 });
 
 // ---------------------------------------------------------------------------
