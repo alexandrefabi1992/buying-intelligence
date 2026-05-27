@@ -1,12 +1,22 @@
+try {
+
 require('dotenv').config();
 const express = require('express');
 const axios   = require('axios');
 const { Pool } = require('pg');
 
 const app  = express();
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// Railway PostgreSQL requires SSL; skip cert verification for self-signed certs
+const poolConfig = { connectionString: process.env.DATABASE_URL };
+if (process.env.DATABASE_URL) {
+  poolConfig.ssl = { rejectUnauthorized: false };
+}
+const pool = new Pool(poolConfig);
 
 app.use(express.json());
+
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 // ---------------------------------------------------------------------------
 // OAuth2 flow — one-time setup to obtain a refresh_token
@@ -373,4 +383,10 @@ app.use((err, req, res, _next) => {
 });
 
 const PORT = process.env.PORT ?? 3000;
+console.log(`process.env.PORT = ${process.env.PORT}`);
 app.listen(PORT, '0.0.0.0', () => console.log(`Buying Intelligence API listening on 0.0.0.0:${PORT}`));
+
+} catch (err) {
+  console.error('Fatal error during startup:', err);
+  process.exit(1);
+}
