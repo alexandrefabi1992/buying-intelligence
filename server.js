@@ -11,6 +11,8 @@ require('dotenv').config();
 const express = require('express');
 const axios   = require('axios');
 const { Pool } = require('pg');
+const fs      = require('fs');
+const path    = require('path');
 
 const app  = express();
 
@@ -24,6 +26,44 @@ const pool = new Pool(poolConfig);
 app.use(express.json());
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
+// ---------------------------------------------------------------------------
+// Auto-migration — apply schema.sql on every startup (all statements use
+// IF NOT EXISTS / ON CONFLICT so it is safe to run repeatedly)
+// ---------------------------------------------------------------------------
+async function runMigrations() {
+  const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
+  // Split on statement-ending semicolons, skip empty chunks
+  const statements = sql.split(/;\s*\n/).map(s => s.trim()).filter(Boolean);
+  for (const stmt of statements) {
+    try {
+      await pool.query(stmt);
+    } catch (err) {
+      // CONCURRENTLY index creation fails inside a transaction; skip safely
+      if (!err.message.includes('already exists')) {
+        console.error('[migration] Error on statement:', err.message);
+      }
+    }
+  }
+  console.log('[migration] Schema up to date');
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/sync/run — trigger a full Lightspeed sync on demand
+// ---------------------------------------------------------------------------
+app.post('/api/sync/run', async (req, res) => {
+  if (!process.env.LIGHTSPEED_REFRESH_TOKEN) {
+    return res.status(400).json({ error: 'LIGHTSPEED_REFRESH_TOKEN is not set. Complete the OAuth2 flow at /oauth/start first.' });
+  }
+  // Run sync in background so the request returns immediately
+  res.json({ status: 'sync started' });
+  const { execFile } = require('child_process');
+  execFile('node', ['sync.js', '--once'], { cwd: __dirname }, (err, stdout, stderr) => {
+    if (err) console.error('[sync/run] Error:', err.message);
+    if (stdout) console.log('[sync/run]', stdout.trim());
+    if (stderr) console.error('[sync/run]', stderr.trim());
+  });
+});
 
 // ---------------------------------------------------------------------------
 // OAuth2 flow — one-time setup to obtain a refresh_token
@@ -391,7 +431,10 @@ app.use((err, req, res, _next) => {
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 console.log('[startup] PORT=%d DATABASE_URL=%s', PORT, process.env.DATABASE_URL ? 'set' : 'NOT SET');
-app.listen(PORT, '0.0.0.0', () => console.log('[startup] Listening on 0.0.0.0:%d', PORT));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log('[startup] Listening on 0.0.0.0:%d', PORT);
+  runMigrations().catch(err => console.error('[migration] Fatal:', err.message));
+});
 
 } catch (err) {
   console.error('Fatal error during startup:', err);
