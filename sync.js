@@ -87,6 +87,15 @@ async function upsertShops(client, rows) {
 
 async function upsertProducts(client, rows) {
   for (const item of rows) {
+    // Relations (Category/Department/Manufacturer) may or may not be loaded;
+    // fall back to raw ID fields so the upsert works without load_relations.
+    const category     = item.Category?.name     ?? item.categoryID     ?? null;
+    const department   = item.Department?.name   ?? item.departmentID   ?? null;
+    const manufacturer = item.Manufacturer?.name ?? item.manufacturerID ?? null;
+    const defaultPrice = item.Prices?.ItemPrice?.[0]?.amount
+                      ?? item.defaultPrice
+                      ?? null;
+
     await pool.query(
       `INSERT INTO products(item_id, matrix_id, description, ean, upc, manufacturer, brand,
          category, department, default_cost, default_price, archived, raw)
@@ -98,9 +107,9 @@ async function upsertProducts(client, rows) {
       [
         item.itemID, item.itemMatrixID ?? null,
         item.description, item.ean ?? null, item.upc ?? null,
-        item.manufacturerID ?? null, item.Manufacturer?.name ?? null,
-        item.Category?.name ?? null, item.Department?.name ?? null,
-        item.defaultCost ?? null, item.Prices?.ItemPrice?.[0]?.amount ?? null,
+        manufacturer, null,
+        category, department,
+        item.defaultCost ?? null, defaultPrice,
         item.archived === 'true', item,
       ],
     );
@@ -199,9 +208,7 @@ async function runSync() {
 
   // 2. Items (products)
   console.log('[sync] Fetching items…');
-  for await (const page of paginate(client, 'Item', {
-    load_relations: JSON.stringify(['Category', 'Department', 'Manufacturer', 'Prices']),
-  })) {
+  for await (const page of paginate(client, 'Item')) {
     await upsertProducts(client, page);
   }
 
@@ -257,7 +264,15 @@ async function runSync() {
 // Entrypoint: cron (every Monday at 07:00) or one-shot via --once flag
 // ---------------------------------------------------------------------------
 if (process.argv.includes('--once')) {
-  runSync().catch(err => { console.error(err); process.exit(1); });
+  runSync().catch(err => {
+    // Log the Lightspeed API error message cleanly if available
+    if (err.response?.data?.message) {
+      console.error('[sync] API error:', err.response.data.message);
+    } else {
+      console.error('[sync] Error:', err.message);
+    }
+    process.exit(1);
+  });
 } else {
   console.log('[sync] Scheduler started — runs every Monday at 07:00');
   // Cron expression: minute=0 hour=7 dayOfWeek=1 (Monday)
