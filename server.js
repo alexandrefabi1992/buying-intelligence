@@ -28,6 +28,20 @@ app.use(express.json());
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 // ---------------------------------------------------------------------------
+// In-memory log ring buffer — last 500 lines from sync processes
+// ---------------------------------------------------------------------------
+const LOG_BUFFER_SIZE = 500;
+const logBuffer = [];
+function appendLog(line) {
+  logBuffer.push({ ts: new Date().toISOString(), line: line.trimEnd() });
+  if (logBuffer.length > LOG_BUFFER_SIZE) logBuffer.shift();
+}
+
+app.get('/api/logs', (_req, res) => {
+  res.json({ count: logBuffer.length, logs: logBuffer });
+});
+
+// ---------------------------------------------------------------------------
 // Auto-migration — apply schema.sql on every startup (all statements use
 // IF NOT EXISTS / ON CONFLICT so it is safe to run repeatedly)
 // ---------------------------------------------------------------------------
@@ -55,13 +69,22 @@ app.post('/api/sync/run', async (req, res) => {
   if (!process.env.LIGHTSPEED_REFRESH_TOKEN) {
     return res.status(400).json({ error: 'LIGHTSPEED_REFRESH_TOKEN is not set. Complete the OAuth2 flow at /oauth/start first.' });
   }
-  // Spawn sync as a child process, streaming its output directly to our stdout
+  // Spawn sync as a child process, streaming output to stdout AND log buffer
   res.json({ status: 'sync started' });
   const { spawn } = require('child_process');
   const child = spawn('node', ['sync.js', '--once'], { cwd: __dirname });
-  child.stdout.on('data', d => process.stdout.write(d));
-  child.stderr.on('data', d => process.stderr.write(d));
-  child.on('close', code => console.log(`[sync/run] exited with code ${code}`));
+  const capture = chunk => {
+    const text = chunk.toString();
+    process.stdout.write(text);
+    text.split('\n').filter(Boolean).forEach(appendLog);
+  };
+  child.stdout.on('data', capture);
+  child.stderr.on('data', capture);
+  child.on('close', code => {
+    const msg = `[sync/run] exited with code ${code}`;
+    console.log(msg);
+    appendLog(msg);
+  });
 });
 
 // ---------------------------------------------------------------------------
