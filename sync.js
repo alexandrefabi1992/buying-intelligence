@@ -208,8 +208,11 @@ async function runSync() {
 
   // 2. Items (products)
   console.log('[sync] Fetching items…');
+  let itemCount = 0;
   for await (const page of paginate(client, 'Item')) {
     await upsertProducts(client, page);
+    itemCount += page.length;
+    console.log(`[sync] Items upserted: ${itemCount}`);
   }
 
   // 3. ItemMatrix (update matrix_id mapping via products already inserted)
