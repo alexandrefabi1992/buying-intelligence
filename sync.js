@@ -135,23 +135,25 @@ async function upsertProducts(client, rows) {
 
 async function upsertInventory(client, rows) {
   for (const is of rows) {
-    // Use WHERE EXISTS to silently skip orphaned ItemShop records whose
-    // item_id has no matching product (e.g. deleted or filtered-out items).
-    await pool.query(
-      `INSERT INTO inventory(item_id, shop_id, qty_on_hand, qty_on_order, reorder_point, reorder_level, raw)
-       SELECT $1,$2,$3,$4,$5,$6,$7
-       WHERE EXISTS (SELECT 1 FROM products WHERE item_id = $1)
-         AND EXISTS (SELECT 1 FROM shops   WHERE shop_id  = $2)
-       ON CONFLICT(item_id, shop_id) DO UPDATE
-         SET qty_on_hand=$3, qty_on_order=$4, reorder_point=$5, reorder_level=$6,
-             raw=$7, synced_at=now()`,
-      [
-        is.itemID, is.shopID,
-        is.qoh ?? 0, is.qoo ?? 0,
-        is.reorderPoint ?? null, is.reorderLevel ?? null,
-        is,
-      ],
-    );
+    try {
+      await pool.query(
+        `INSERT INTO inventory(item_id, shop_id, qty_on_hand, qty_on_order, reorder_point, reorder_level, raw)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT(item_id, shop_id) DO UPDATE
+           SET qty_on_hand=$3, qty_on_order=$4, reorder_point=$5, reorder_level=$6,
+               raw=$7, synced_at=now()`,
+        [
+          is.itemID, is.shopID,
+          is.qoh ?? 0, is.qoo ?? 0,
+          is.reorderPoint ?? null, is.reorderLevel ?? null,
+          is,
+        ],
+      );
+    } catch (err) {
+      // Skip orphaned records referencing shops/products not in our DB
+      if (err.code === '23503') continue;
+      throw err;
+    }
   }
 }
 
