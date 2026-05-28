@@ -124,6 +124,7 @@ async function upsertInventory(client, rows) {
       `INSERT INTO inventory(item_id, shop_id, qty_on_hand, qty_on_order, reorder_point, reorder_level, raw)
        SELECT $1,$2,$3,$4,$5,$6,$7
        WHERE EXISTS (SELECT 1 FROM products WHERE item_id = $1)
+         AND EXISTS (SELECT 1 FROM shops   WHERE shop_id  = $2)
        ON CONFLICT(item_id, shop_id) DO UPDATE
          SET qty_on_hand=$3, qty_on_order=$4, reorder_point=$5, reorder_level=$6,
              raw=$7, synced_at=now()`,
@@ -218,18 +219,7 @@ async function runSync() {
     console.log(`[sync] Items upserted: ${itemCount}`);
   }
 
-  // 3. ItemMatrix (update matrix_id mapping via products already inserted)
-  console.log('[sync] Fetching item matrices…');
-  for await (const page of paginate(client, 'ItemMatrix')) {
-    // ItemMatrix itself is metadata; product rows already carry matrixID from Item
-    // Store raw for reference
-    for (const m of page) {
-      await pool.query(
-        `UPDATE products SET raw = raw || $2::jsonb WHERE matrix_id = $1`,
-        [m.itemMatrixID, JSON.stringify({ matrix: m })],
-      );
-    }
-  }
+  // 3. ItemMatrix — skipped; matrix_id is already stored on each product row
 
   // 4. ItemShop (inventory)
   console.log('[sync] Fetching inventory (ItemShop)…');
@@ -242,7 +232,6 @@ async function runSync() {
   for await (const page of paginate(client, 'Sale', {
     load_relations: JSON.stringify(['SaleLines']),
     completed_time: `>,${since}`,
-    sort:           'completedTime',
   })) {
     await upsertSales(client, page);
     for (const sale of page) {
