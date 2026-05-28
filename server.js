@@ -30,7 +30,7 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 // ---------------------------------------------------------------------------
 // In-memory log ring buffer — last 500 lines from sync processes
 // ---------------------------------------------------------------------------
-const LOG_BUFFER_SIZE = 500;
+const LOG_BUFFER_SIZE = 2000;
 const logBuffer = [];
 function appendLog(line) {
   logBuffer.push({ ts: new Date().toISOString(), line: line.trimEnd() });
