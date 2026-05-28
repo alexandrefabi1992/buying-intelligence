@@ -32,12 +32,32 @@ async function getAccessToken() {
   return cachedToken;
 }
 
+const API_TIMEOUT = 60_000; // 60s — prevent infinite hangs on slow endpoints
+
 async function apiClient() {
   const token = await getAccessToken();
   return axios.create({
     baseURL: BASE_URL,
+    timeout: API_TIMEOUT,
     headers: { Authorization: `Bearer ${token}` },
   });
+}
+
+// Fetch a URL with up to 3 retries on timeout or 5xx
+async function fetchWithRetry(url, headers, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await axios.get(url, { headers, timeout: API_TIMEOUT });
+    } catch (err) {
+      const retriable = err.code === 'ECONNABORTED' || (err.response?.status ?? 0) >= 500;
+      if (retriable && attempt < retries) {
+        console.log(`[sync] Retry ${attempt}/${retries - 1} for ${url}`);
+        await new Promise(r => setTimeout(r, 2000 * attempt));
+      } else {
+        throw err;
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -62,11 +82,8 @@ async function* paginate(client, resource, params = {}) {
     const next = data['@attributes']?.next;
     if (!next) break;
 
-    // Refresh token if it has expired before fetching the next page
     const token = await getAccessToken();
-    response = await axios.get(next, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    response = await fetchWithRetry(next, { Authorization: `Bearer ${token}` });
   }
 }
 
@@ -223,9 +240,13 @@ async function runSync() {
 
   // 4. ItemShop (inventory)
   console.log('[sync] Fetching inventory (ItemShop)…');
+  let invCount = 0;
   for await (const page of paginate(client, 'ItemShop')) {
     await upsertInventory(client, page);
+    invCount += page.length;
+    if (invCount % 1000 === 0) console.log(`[sync] Inventory upserted: ${invCount}`);
   }
+  console.log(`[sync] Inventory done: ${invCount} records`);
 
   // 5. Sales (with embedded SaleLines)
   console.log(`[sync] Fetching sales since ${since}…`);
