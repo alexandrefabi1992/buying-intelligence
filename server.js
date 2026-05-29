@@ -59,6 +59,16 @@ async function runMigrations() {
       }
     }
   }
+  // Additive migration: sync_state table for checkpoint resumption
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sync_state (
+      step            VARCHAR(50) PRIMARY KEY,
+      next_url        TEXT,
+      processed_count INTEGER DEFAULT 0,
+      started_at      TIMESTAMPTZ DEFAULT now(),
+      updated_at      TIMESTAMPTZ DEFAULT now()
+    )
+  `);
   console.log('[migration] Schema up to date');
 }
 

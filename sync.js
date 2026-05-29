@@ -61,14 +61,45 @@ async function fetchWithRetry(url, headers, retries = 3) {
 }
 
 // ---------------------------------------------------------------------------
-// Paginated fetch — cursor-based via the `next` URL in each response
+// Checkpoint helpers — persist cursor position so syncs can resume
+// ---------------------------------------------------------------------------
+async function getCheckpoint(step) {
+  const { rows } = await pool.query(
+    'SELECT next_url, processed_count FROM sync_state WHERE step = $1',
+    [step],
+  );
+  return rows[0] ?? null;
+}
+
+async function saveCheckpoint(step, nextUrl, processedCount) {
+  await pool.query(
+    `INSERT INTO sync_state(step, next_url, processed_count, updated_at)
+     VALUES ($1, $2, $3, now())
+     ON CONFLICT(step) DO UPDATE
+       SET next_url = $2, processed_count = $3, updated_at = now()`,
+    [step, nextUrl, processedCount],
+  );
+}
+
+async function clearCheckpoint(step) {
+  await pool.query('DELETE FROM sync_state WHERE step = $1', [step]);
+}
+
+// ---------------------------------------------------------------------------
+// Paginated fetch — cursor-based via the `next` URL in each response.
+// Yields { items, nextUrl } per page. Pass resumeUrl to continue a prior run.
 // Lightspeed V3 dropped offset pagination as of 2024.
 // ---------------------------------------------------------------------------
-async function* paginate(client, resource, params = {}) {
-  // First request uses the resource path + query params
-  let response = await client.get(`/${resource}.json`, {
-    params: { ...params, limit: LIMIT },
-  });
+async function* paginate(client, resource, params = {}, resumeUrl = null) {
+  let response;
+  if (resumeUrl) {
+    const token = await getAccessToken();
+    response = await fetchWithRetry(resumeUrl, { Authorization: `Bearer ${token}` });
+  } else {
+    response = await client.get(`/${resource}.json`, {
+      params: { ...params, limit: LIMIT },
+    });
+  }
 
   while (true) {
     const { data } = response;
@@ -77,13 +108,14 @@ async function* paginate(client, resource, params = {}) {
     const items   = Array.isArray(wrapper) ? wrapper : wrapper ? [wrapper] : [];
 
     if (items.length === 0) break;
-    yield items;
 
-    const next = data['@attributes']?.next;
-    if (!next) break;
+    const nextUrl = data['@attributes']?.next ?? null;
+    yield { items, nextUrl };
+
+    if (!nextUrl) break;
 
     const token = await getAccessToken();
-    response = await fetchWithRetry(next, { Authorization: `Bearer ${token}` });
+    response = await fetchWithRetry(nextUrl, { Authorization: `Bearer ${token}` });
   }
 }
 
@@ -220,56 +252,76 @@ async function runSync() {
   console.log(`[sync] Starting — ${new Date().toISOString()}`);
   const client = await apiClient();
 
-  const daysBack   = parseInt(process.env.SYNC_DAYS_BACK ?? '90', 10);
-  const since      = new Date(Date.now() - daysBack * 86_400_000).toISOString();
+  const daysBack = parseInt(process.env.SYNC_DAYS_BACK ?? '90', 10);
+  const since    = new Date(Date.now() - daysBack * 86_400_000).toISOString();
 
   // 1. Shops
-  console.log('[sync] Fetching shops…');
-  for await (const page of paginate(client, 'Shop')) {
-    await upsertShops(client, page);
+  const shopCp = await getCheckpoint('shops');
+  if (shopCp) console.log('[sync] Resuming shops from checkpoint…');
+  else        console.log('[sync] Fetching shops…');
+  for await (const { items, nextUrl } of paginate(client, 'Shop', {}, shopCp?.next_url)) {
+    await upsertShops(client, items);
+    if (nextUrl) await saveCheckpoint('shops', nextUrl, 0);
   }
+  await clearCheckpoint('shops');
 
   // 2. Items (products)
-  console.log('[sync] Fetching items…');
-  let itemCount = 0;
-  for await (const page of paginate(client, 'Item')) {
-    await upsertProducts(client, page);
-    itemCount += page.length;
+  const itemCp = await getCheckpoint('items');
+  let itemCount = itemCp?.processed_count ?? 0;
+  if (itemCp) console.log(`[sync] Resuming items from checkpoint at ${itemCount}…`);
+  else        console.log('[sync] Fetching items…');
+  for await (const { items, nextUrl } of paginate(client, 'Item', {}, itemCp?.next_url)) {
+    await upsertProducts(client, items);
+    itemCount += items.length;
     console.log(`[sync] Items upserted: ${itemCount}`);
+    if (nextUrl) await saveCheckpoint('items', nextUrl, itemCount);
   }
+  await clearCheckpoint('items');
 
   // 3. ItemMatrix — skipped; matrix_id is already stored on each product row
 
   // 4. ItemShop (inventory)
-  console.log('[sync] Fetching inventory (ItemShop)…');
-  let invCount = 0;
-  for await (const page of paginate(client, 'ItemShop')) {
-    await upsertInventory(client, page);
-    invCount += page.length;
+  const invCp = await getCheckpoint('inventory');
+  let invCount = invCp?.processed_count ?? 0;
+  if (invCp) console.log(`[sync] Resuming inventory from checkpoint at ${invCount}…`);
+  else       console.log('[sync] Fetching inventory (ItemShop)…');
+  for await (const { items, nextUrl } of paginate(client, 'ItemShop', {}, invCp?.next_url)) {
+    await upsertInventory(client, items);
+    invCount += items.length;
     if (invCount % 1000 === 0) console.log(`[sync] Inventory upserted: ${invCount}`);
+    if (nextUrl) await saveCheckpoint('inventory', nextUrl, invCount);
   }
   console.log(`[sync] Inventory done: ${invCount} records`);
+  await clearCheckpoint('inventory');
 
   // 5. Sales (with embedded SaleLines)
-  console.log(`[sync] Fetching sales since ${since}…`);
-  for await (const page of paginate(client, 'Sale', {
+  const salesCp = await getCheckpoint('sales');
+  if (salesCp) console.log('[sync] Resuming sales from checkpoint…');
+  else         console.log(`[sync] Fetching sales since ${since}…`);
+  for await (const { items, nextUrl } of paginate(client, 'Sale', {
     load_relations: JSON.stringify(['SaleLines']),
     completed_time: `>,${since}`,
-  })) {
-    await upsertSales(client, page);
-    for (const sale of page) {
+  }, salesCp?.next_url)) {
+    await upsertSales(client, items);
+    for (const sale of items) {
       const lines = sale.SaleLines?.SaleLine;
       if (!lines) continue;
       const lineArr = Array.isArray(lines) ? lines : [lines];
       await upsertSaleLines(client, lineArr, sale.completedTime);
     }
+    if (nextUrl) await saveCheckpoint('sales', nextUrl, 0);
   }
+  await clearCheckpoint('sales');
 
   // 6. Orders
-  console.log('[sync] Fetching orders…');
-  for await (const page of paginate(client, 'Order')) {
-    await upsertOrders(client, page);
+  const ordersCp = await getCheckpoint('orders');
+  if (ordersCp) console.log('[sync] Resuming orders from checkpoint…');
+  else          console.log('[sync] Fetching orders…');
+  for await (const { items, nextUrl } of paginate(client, 'Order', {}, ordersCp?.next_url)) {
+    await upsertOrders(client, items);
+    if (nextUrl) await saveCheckpoint('orders', nextUrl, 0);
   }
+  await clearCheckpoint('orders');
 
   // Refresh materialized view
   console.log('[sync] Refreshing sales velocity view…');

@@ -108,3 +108,12 @@ WHERE sl.completed_time IS NOT NULL
 GROUP BY sl.item_id, sl.shop_id, date_trunc('week', sl.completed_time);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_velocity ON mv_sales_velocity(item_id, shop_id, week);
+
+-- Sync checkpoint — persists cursor position across restarts
+CREATE TABLE IF NOT EXISTS sync_state (
+  step            VARCHAR(50) PRIMARY KEY,
+  next_url        TEXT,
+  processed_count INTEGER DEFAULT 0,
+  started_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now()
+);
