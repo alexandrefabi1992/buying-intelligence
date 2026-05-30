@@ -28,6 +28,67 @@ app.use(express.json());
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 // ---------------------------------------------------------------------------
+// GET /api/test/token-rotation — verify refresh token rotation persists to DB
+// Forces two consecutive token refreshes and shows before/after DB state.
+// Safe to call even while a sync is running (sync has its own cached token).
+// ---------------------------------------------------------------------------
+app.get('/api/test/token-rotation', async (req, res, next) => {
+  const TOKEN_URL = 'https://cloud.lightspeedapp.com/oauth/access_token.php';
+  const results   = [];
+
+  async function dbRefreshToken() {
+    const { rows } = await pool.query(
+      "SELECT next_url, updated_at FROM sync_state WHERE step = 'refresh_token'",
+    );
+    return rows[0] ? { token: mask(rows[0].next_url), updated_at: rows[0].updated_at } : null;
+  }
+
+  function mask(t) {
+    return t ? `${t.slice(0, 6)}…${t.slice(-6)}` : null;
+  }
+
+  async function forceRefresh(label, refreshToken) {
+    const { data } = await axios.post(TOKEN_URL, new URLSearchParams({
+      client_id:     process.env.LIGHTSPEED_CLIENT_ID,
+      client_secret: process.env.LIGHTSPEED_CLIENT_SECRET,
+      refresh_token: refreshToken,
+      grant_type:    'refresh_token',
+    }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+
+    const newRefresh = data.refresh_token;
+    if (newRefresh) {
+      await pool.query(
+        `INSERT INTO sync_state(step, next_url, updated_at)
+         VALUES ('refresh_token', $1, now())
+         ON CONFLICT(step) DO UPDATE SET next_url = $1, updated_at = now()`,
+        [newRefresh],
+      );
+    }
+    return { label, access_token: mask(data.access_token), new_refresh_token: mask(newRefresh), rotated: !!newRefresh };
+  }
+
+  try {
+    const before = await dbRefreshToken();
+    const startToken = before?.token
+      ? (await pool.query("SELECT next_url FROM sync_state WHERE step='refresh_token'")).rows[0].next_url
+      : process.env.LIGHTSPEED_REFRESH_TOKEN;
+
+    results.push({ step: 'before', db: before });
+
+    const r1 = await forceRefresh('refresh_1', startToken);
+    results.push(r1);
+    results.push({ step: 'after_refresh_1', db: await dbRefreshToken() });
+
+    const r1Token = (await pool.query("SELECT next_url FROM sync_state WHERE step='refresh_token'")).rows[0]?.next_url;
+    const r2 = await forceRefresh('refresh_2', r1Token);
+    results.push(r2);
+    results.push({ step: 'after_refresh_2', db: await dbRefreshToken() });
+
+    res.json({ ok: true, rotation_persisted: r1.rotated && r2.rotated, steps: results });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // In-memory log ring buffer — last 500 lines from sync processes
 // ---------------------------------------------------------------------------
 const LOG_BUFFER_SIZE = 2000;
