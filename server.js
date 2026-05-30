@@ -617,6 +617,17 @@ app.get('/api/admin/query', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/admin/refresh-view — force refresh mv_sales_velocity
+// ---------------------------------------------------------------------------
+app.post('/api/admin/refresh-view', async (req, res, next) => {
+  try {
+    await pool.query('REFRESH MATERIALIZED VIEW mv_sales_velocity');
+    const { rows } = await pool.query('SELECT COUNT(*) FROM mv_sales_velocity');
+    res.json({ ok: true, mv_sales_velocity_count: rows[0].count });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // Error handler
 // ---------------------------------------------------------------------------
 app.use((err, req, res, _next) => {
