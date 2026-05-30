@@ -407,7 +407,7 @@ async function runSync() {
       else           console.log(`[sync] Fetching sales since ${since}…`);
       for await (const { items, nextUrl } of paginate(client, 'Sale', {
         load_relations: JSON.stringify(['SaleLines']),
-        completed_time: `>,${since}`,
+        completeTime: `>,${since}`,
       }, cps.sales?.next_url)) {
         await upsertSales(client, items);
         for (const sale of items) {
