@@ -595,6 +595,26 @@ app.get('/api/sync/checkpoints', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/query — run a whitelisted COUNT query (debug only)
+// ---------------------------------------------------------------------------
+app.get('/api/admin/query', async (req, res, next) => {
+  try {
+    const ALLOWED = [
+      'SELECT COUNT(*) FROM sale_lines',
+      'SELECT COUNT(*) FROM mv_sales_velocity',
+      'SELECT COUNT(*) FROM sales',
+      'SELECT COUNT(*) FROM products',
+      'SELECT COUNT(*) FROM inventory',
+      'SELECT COUNT(*) FROM shops',
+    ];
+    const q = (req.query.q ?? '').trim();
+    if (!ALLOWED.includes(q)) return res.status(400).json({ error: 'query not whitelisted', allowed: ALLOWED });
+    const { rows } = await pool.query(q);
+    res.json({ query: q, count: rows[0].count });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // Error handler
 // ---------------------------------------------------------------------------
 app.use((err, req, res, _next) => {
