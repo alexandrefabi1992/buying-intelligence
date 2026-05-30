@@ -148,19 +148,22 @@ function cpLabel(cp) {
 
 // ---------------------------------------------------------------------------
 // Paginated fetch — cursor-based. Yields { items, nextUrl } per page.
+// Always calls getAccessToken() for every request (including the first) so
+// the keepalive-rotated token is used. The axios `client` arg is kept for
+// signature compatibility but NOT used for HTTP calls — the client instance
+// has the initial token baked in and would be stale after a long prior step.
 // ---------------------------------------------------------------------------
 async function* paginate(client, resource, params = {}, resumeUrl = null) {
-  let response;
-  if (resumeUrl) {
-    const token = await getAccessToken();
-    response = await fetchWithRetry(resumeUrl, { Authorization: `Bearer ${token}` });
-  } else {
-    response = await client.get(`/${resource}.json`, {
-      params: { ...params, limit: LIMIT },
-    });
-  }
+  // Build the first URL directly from BASE_URL so we always get a fresh token
+  const firstUrl = resumeUrl
+    ?? `${BASE_URL}/${resource}.json?${new URLSearchParams({ ...params, limit: String(LIMIT) })}`;
+
+  let url = firstUrl;
 
   while (true) {
+    const token    = await getAccessToken();
+    const response = await fetchWithRetry(url, { Authorization: `Bearer ${token}` });
+
     const { data } = response;
     const key     = Object.keys(data).find(k => k !== '@attributes');
     const wrapper = key ? data[key] : null;
@@ -172,9 +175,7 @@ async function* paginate(client, resource, params = {}, resumeUrl = null) {
     yield { items, nextUrl };
 
     if (!nextUrl) break;
-
-    const token = await getAccessToken();
-    response = await fetchWithRetry(nextUrl, { Authorization: `Bearer ${token}` });
+    url = nextUrl;
   }
 }
 
