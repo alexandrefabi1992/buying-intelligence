@@ -12,12 +12,12 @@ const TOKEN_URL = 'https://cloud.lightspeedapp.com/oauth/access_token.php';
 const LIMIT = 200;
 
 // ---------------------------------------------------------------------------
-// OAuth2 — exchange refresh token for a short-lived access token.
-// Lightspeed rotates refresh tokens on every refresh, so we persist the
-// latest one in PostgreSQL (sync_state step='refresh_token') to survive
-// long-running syncs and process restarts.
+// OAuth2 — access token cache + rotation-safe refresh token persistence.
+// Lightspeed rotates the refresh_token on every exchange; we persist the
+// latest one in sync_state(step='refresh_token'). If the DB token is stale
+// (already consumed by another process), we fall back to the env var.
 // ---------------------------------------------------------------------------
-let cachedToken = null;
+let cachedToken    = null;
 let tokenExpiresAt = 0;
 
 async function getCurrentRefreshToken() {
@@ -38,29 +38,46 @@ async function saveRefreshToken(token) {
      ON CONFLICT(step) DO UPDATE SET next_url = $1, updated_at = now()`,
     [token],
   );
+  console.log('[sync] Token refreshed and persisted to DB');
 }
 
-async function getAccessToken() {
-  if (cachedToken && Date.now() < tokenExpiresAt - 30_000) return cachedToken;
-
-  const refreshToken = await getCurrentRefreshToken();
+async function fetchToken(refreshToken) {
   const { data } = await axios.post(TOKEN_URL, new URLSearchParams({
     client_id:     process.env.LIGHTSPEED_CLIENT_ID,
     client_secret: process.env.LIGHTSPEED_CLIENT_SECRET,
     refresh_token: refreshToken,
     grant_type:    'refresh_token',
   }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+  return data;
+}
+
+async function getAccessToken() {
+  if (cachedToken && Date.now() < tokenExpiresAt - 30_000) return cachedToken;
+
+  const dbToken  = await getCurrentRefreshToken();
+  const envToken = process.env.LIGHTSPEED_REFRESH_TOKEN;
+
+  let data;
+  try {
+    data = await fetchToken(dbToken);
+  } catch (firstErr) {
+    // DB token may have been consumed — fall back to env var as last resort
+    if (dbToken !== envToken) {
+      console.log('[sync] DB refresh token rejected, falling back to env var…');
+      data = await fetchToken(envToken);
+    } else {
+      throw firstErr;
+    }
+  }
 
   cachedToken    = data.access_token;
   tokenExpiresAt = Date.now() + data.expires_in * 1000;
-
-  // Persist the new refresh token issued by Lightspeed (rotation)
   if (data.refresh_token) await saveRefreshToken(data.refresh_token);
 
   return cachedToken;
 }
 
-const API_TIMEOUT = 60_000; // 60s — prevent infinite hangs on slow endpoints
+const API_TIMEOUT = 60_000;
 
 async function apiClient() {
   const token = await getAccessToken();
@@ -71,7 +88,6 @@ async function apiClient() {
   });
 }
 
-// Fetch a URL with up to 3 retries on timeout or 5xx
 async function fetchWithRetry(url, headers, retries = 3) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -89,7 +105,7 @@ async function fetchWithRetry(url, headers, retries = 3) {
 }
 
 // ---------------------------------------------------------------------------
-// Checkpoint helpers — persist cursor position so syncs can resume
+// Checkpoint helpers
 // ---------------------------------------------------------------------------
 async function getCheckpoint(step) {
   const { rows } = await pool.query(
@@ -109,14 +125,29 @@ async function saveCheckpoint(step, nextUrl, processedCount) {
   );
 }
 
+// Mark a step as fully completed — skipped on resume
+async function markStepCompleted(step, processedCount = 0) {
+  await pool.query(
+    `INSERT INTO sync_state(step, next_url, processed_count, updated_at)
+     VALUES ($1, 'COMPLETED', $2, now())
+     ON CONFLICT(step) DO UPDATE
+       SET next_url = 'COMPLETED', processed_count = $2, updated_at = now()`,
+    [step, processedCount],
+  );
+}
+
 async function clearCheckpoint(step) {
   await pool.query('DELETE FROM sync_state WHERE step = $1', [step]);
 }
 
+function cpLabel(cp) {
+  if (!cp) return 'pending';
+  if (cp.next_url === 'COMPLETED') return `completed (${cp.processed_count})`;
+  return `resuming at offset ${cp.processed_count}`;
+}
+
 // ---------------------------------------------------------------------------
-// Paginated fetch — cursor-based via the `next` URL in each response.
-// Yields { items, nextUrl } per page. Pass resumeUrl to continue a prior run.
-// Lightspeed V3 dropped offset pagination as of 2024.
+// Paginated fetch — cursor-based. Yields { items, nextUrl } per page.
 // ---------------------------------------------------------------------------
 async function* paginate(client, resource, params = {}, resumeUrl = null) {
   let response;
@@ -164,8 +195,6 @@ async function upsertShops(client, rows) {
 
 async function upsertProducts(client, rows) {
   for (const item of rows) {
-    // Relations (Category/Department/Manufacturer) may or may not be loaded;
-    // fall back to raw ID fields so the upsert works without load_relations.
     const category     = item.Category?.name     ?? item.categoryID     ?? null;
     const department   = item.Department?.name   ?? item.departmentID   ?? null;
     const manufacturer = item.Manufacturer?.name ?? item.manufacturerID ?? null;
@@ -210,8 +239,7 @@ async function upsertInventory(client, rows) {
         ],
       );
     } catch (err) {
-      // Skip orphaned records referencing shops/products not in our DB
-      if (err.code === '23503') continue;
+      if (err.code === '23503') continue; // orphaned ItemShop — silently skip
       throw err;
     }
   }
@@ -276,102 +304,144 @@ async function upsertOrders(client, rows) {
 // ---------------------------------------------------------------------------
 // Main sync
 // ---------------------------------------------------------------------------
+const SYNC_STEPS = ['shops', 'items', 'inventory', 'sales', 'orders'];
+
 async function runSync() {
   console.log(`[sync] Starting — ${new Date().toISOString()}`);
-  const client = await apiClient();
 
+  // Force immediate token refresh + persist new refresh_token before any work
+  tokenExpiresAt = 0;
+  await getAccessToken();
+
+  const client = await apiClient();
   const daysBack = parseInt(process.env.SYNC_DAYS_BACK ?? '90', 10);
   const since    = new Date(Date.now() - daysBack * 86_400_000).toISOString();
 
-  // Proactively refresh the access token every 25 min so it never goes stale
-  // between Lightspeed page fetches (inventory can run 4-5h with no API calls).
-  // JavaScript is single-threaded so zeroing tokenExpiresAt is race-free.
-  const TOKEN_KEEPALIVE_MS = 25 * 60 * 1000;
+  // Keepalive: force token refresh every 5 min to survive long inventory phases
   const keepalive = setInterval(async () => {
     try {
-      tokenExpiresAt = 0; // force refresh on next getAccessToken() call
+      tokenExpiresAt = 0;
       await getAccessToken();
       console.log('[sync] Token keepalive: refreshed');
     } catch (err) {
       console.error('[sync] Token keepalive failed:', err.message);
     }
-  }, TOKEN_KEEPALIVE_MS);
+  }, 5 * 60 * 1000);
 
   try {
+    // Load all checkpoints upfront
+    const cps = {};
+    for (const step of SYNC_STEPS) cps[step] = await getCheckpoint(step);
 
-  // 1. Shops
-  const shopCp = await getCheckpoint('shops');
-  if (shopCp) console.log('[sync] Resuming shops from checkpoint…');
-  else        console.log('[sync] Fetching shops…');
-  for await (const { items, nextUrl } of paginate(client, 'Shop', {}, shopCp?.next_url)) {
-    await upsertShops(client, items);
-    if (nextUrl) await saveCheckpoint('shops', nextUrl, 0);
-  }
-  await clearCheckpoint('shops');
-
-  // 2. Items (products)
-  const itemCp = await getCheckpoint('items');
-  let itemCount = itemCp?.processed_count ?? 0;
-  if (itemCp) console.log(`[sync] Resuming items from checkpoint at ${itemCount}…`);
-  else        console.log('[sync] Fetching items…');
-  for await (const { items, nextUrl } of paginate(client, 'Item', {}, itemCp?.next_url)) {
-    await upsertProducts(client, items);
-    itemCount += items.length;
-    console.log(`[sync] Items upserted: ${itemCount}`);
-    if (nextUrl) await saveCheckpoint('items', nextUrl, itemCount);
-  }
-  await clearCheckpoint('items');
-
-  // 3. ItemMatrix — skipped; matrix_id is already stored on each product row
-
-  // 4. ItemShop (inventory)
-  const invCp = await getCheckpoint('inventory');
-  let invCount = invCp?.processed_count ?? 0;
-  if (invCp) console.log(`[sync] Resuming inventory from checkpoint at ${invCount}…`);
-  else       console.log('[sync] Fetching inventory (ItemShop)…');
-  for await (const { items, nextUrl } of paginate(client, 'ItemShop', {}, invCp?.next_url)) {
-    await upsertInventory(client, items);
-    invCount += items.length;
-    if (invCount % 1000 === 0) console.log(`[sync] Inventory upserted: ${invCount}`);
-    if (nextUrl) await saveCheckpoint('inventory', nextUrl, invCount);
-  }
-  console.log(`[sync] Inventory done: ${invCount} records`);
-  await clearCheckpoint('inventory');
-
-  // 5. Sales (with embedded SaleLines)
-  const salesCp = await getCheckpoint('sales');
-  if (salesCp) console.log('[sync] Resuming sales from checkpoint…');
-  else         console.log(`[sync] Fetching sales since ${since}…`);
-  for await (const { items, nextUrl } of paginate(client, 'Sale', {
-    load_relations: JSON.stringify(['SaleLines']),
-    completed_time: `>,${since}`,
-  }, salesCp?.next_url)) {
-    await upsertSales(client, items);
-    for (const sale of items) {
-      const lines = sale.SaleLines?.SaleLine;
-      if (!lines) continue;
-      const lineArr = Array.isArray(lines) ? lines : [lines];
-      await upsertSaleLines(client, lineArr, sale.completedTime);
+    // If the last step completed in the previous run, this is a fresh run — clear all
+    if (cps.orders?.next_url === 'COMPLETED') {
+      console.log('[sync] Previous run fully completed. Clearing checkpoints for fresh run.');
+      for (const step of SYNC_STEPS) {
+        await clearCheckpoint(step);
+        cps[step] = null;
+      }
     }
-    if (nextUrl) await saveCheckpoint('sales', nextUrl, 0);
-  }
-  await clearCheckpoint('sales');
 
-  // 6. Orders
-  const ordersCp = await getCheckpoint('orders');
-  if (ordersCp) console.log('[sync] Resuming orders from checkpoint…');
-  else          console.log('[sync] Fetching orders…');
-  for await (const { items, nextUrl } of paginate(client, 'Order', {}, ordersCp?.next_url)) {
-    await upsertOrders(client, items);
-    if (nextUrl) await saveCheckpoint('orders', nextUrl, 0);
-  }
-  await clearCheckpoint('orders');
+    // Print checkpoint status summary
+    const statusLine = SYNC_STEPS.map(s => `${s}=${cpLabel(cps[s])}`).join(', ');
+    console.log(`[sync] Checkpoint status: ${statusLine}`);
 
-  // Refresh materialized view
-  console.log('[sync] Refreshing sales velocity view…');
-  await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_sales_velocity');
+    // ── 1. Shops ──────────────────────────────────────────────────────────
+    if (cps.shops?.next_url === 'COMPLETED') {
+      console.log('[sync] shops: skipping (already completed)');
+    } else {
+      if (cps.shops) console.log('[sync] Resuming shops from checkpoint…');
+      else           console.log('[sync] Fetching shops…');
+      let shopCount = 0;
+      for await (const { items, nextUrl } of paginate(client, 'Shop', {}, cps.shops?.next_url)) {
+        await upsertShops(client, items);
+        shopCount += items.length;
+        if (nextUrl) await saveCheckpoint('shops', nextUrl, shopCount);
+      }
+      await markStepCompleted('shops', shopCount);
+    }
 
-  console.log(`[sync] Done — ${new Date().toISOString()}`);
+    // ── 2. Items (products) ───────────────────────────────────────────────
+    if (cps.items?.next_url === 'COMPLETED') {
+      console.log('[sync] items: skipping (already completed)');
+    } else {
+      let itemCount = cps.items?.processed_count ?? 0;
+      if (cps.items) console.log(`[sync] Resuming items from checkpoint at ${itemCount}…`);
+      else           console.log('[sync] Fetching items…');
+      for await (const { items, nextUrl } of paginate(client, 'Item', {}, cps.items?.next_url)) {
+        await upsertProducts(client, items);
+        itemCount += items.length;
+        console.log(`[sync] Items upserted: ${itemCount}`);
+        if (nextUrl) await saveCheckpoint('items', nextUrl, itemCount);
+      }
+      await markStepCompleted('items', itemCount);
+    }
+
+    // ── 3. ItemMatrix — skipped; matrix_id stored on each product row ─────
+
+    // ── 4. Inventory (ItemShop) ───────────────────────────────────────────
+    if (cps.inventory?.next_url === 'COMPLETED') {
+      console.log('[sync] inventory: skipping (already completed)');
+    } else {
+      let invCount = cps.inventory?.processed_count ?? 0;
+      if (cps.inventory) console.log(`[sync] Resuming inventory from checkpoint at ${invCount}…`);
+      else               console.log('[sync] Fetching inventory (ItemShop)…');
+      for await (const { items, nextUrl } of paginate(client, 'ItemShop', {}, cps.inventory?.next_url)) {
+        await upsertInventory(client, items);
+        invCount += items.length;
+        if (invCount % 1000 === 0)  console.log(`[sync] Inventory upserted: ${invCount}`);
+        // Checkpoint every 10,000 records to limit DB writes on high-volume step
+        if (nextUrl && invCount % 10_000 === 0) await saveCheckpoint('inventory', nextUrl, invCount);
+      }
+      console.log(`[sync] Inventory done: ${invCount} records`);
+      await markStepCompleted('inventory', invCount);
+    }
+
+    // ── 5. Sales (with embedded SaleLines) ───────────────────────────────
+    if (cps.sales?.next_url === 'COMPLETED') {
+      console.log('[sync] sales: skipping (already completed)');
+    } else {
+      let salesCount = cps.sales?.processed_count ?? 0;
+      if (cps.sales) console.log(`[sync] Resuming sales from checkpoint at ${salesCount}…`);
+      else           console.log(`[sync] Fetching sales since ${since}…`);
+      for await (const { items, nextUrl } of paginate(client, 'Sale', {
+        load_relations: JSON.stringify(['SaleLines']),
+        completed_time: `>,${since}`,
+      }, cps.sales?.next_url)) {
+        await upsertSales(client, items);
+        for (const sale of items) {
+          const lines = sale.SaleLines?.SaleLine;
+          if (!lines) continue;
+          const lineArr = Array.isArray(lines) ? lines : [lines];
+          await upsertSaleLines(client, lineArr, sale.completedTime);
+        }
+        salesCount += items.length;
+        // Checkpoint every 10,000 records
+        if (nextUrl && salesCount % 10_000 === 0) await saveCheckpoint('sales', nextUrl, salesCount);
+      }
+      await markStepCompleted('sales', salesCount);
+    }
+
+    // ── 6. Orders ─────────────────────────────────────────────────────────
+    if (cps.orders?.next_url === 'COMPLETED') {
+      console.log('[sync] orders: skipping (already completed)');
+    } else {
+      let ordersCount = cps.orders?.processed_count ?? 0;
+      if (cps.orders) console.log(`[sync] Resuming orders from checkpoint at ${ordersCount}…`);
+      else            console.log('[sync] Fetching orders…');
+      for await (const { items, nextUrl } of paginate(client, 'Order', {}, cps.orders?.next_url)) {
+        await upsertOrders(client, items);
+        ordersCount += items.length;
+        if (nextUrl) await saveCheckpoint('orders', nextUrl, ordersCount);
+      }
+      await markStepCompleted('orders', ordersCount);
+    }
+
+    // ── Refresh materialized view ─────────────────────────────────────────
+    console.log('[sync] Refreshing sales velocity view…');
+    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_sales_velocity');
+
+    console.log(`[sync] Done — ${new Date().toISOString()}`);
 
   } finally {
     clearInterval(keepalive);
@@ -383,7 +453,6 @@ async function runSync() {
 // ---------------------------------------------------------------------------
 if (process.argv.includes('--once')) {
   runSync().catch(err => {
-    // Log the Lightspeed API error message cleanly if available
     if (err.response?.data?.message) {
       console.error('[sync] API error:', err.response.data.message);
     } else {
@@ -393,7 +462,6 @@ if (process.argv.includes('--once')) {
   });
 } else {
   console.log('[sync] Scheduler started — runs every Monday at 07:00');
-  // Cron expression: minute=0 hour=7 dayOfWeek=1 (Monday)
   cron.schedule('0 7 * * 1', () => {
     runSync().catch(err => console.error('[sync] Error:', err));
   });
