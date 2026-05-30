@@ -522,6 +522,50 @@ app.get('/api/budget', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/token/status — show current refresh token state in DB vs env var
+// ---------------------------------------------------------------------------
+app.get('/api/token/status', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT next_url, updated_at FROM sync_state WHERE step = 'refresh_token'",
+    );
+    const dbRow    = rows[0] ?? null;
+    const dbToken  = dbRow?.next_url ?? null;
+    const envToken = process.env.LIGHTSPEED_REFRESH_TOKEN ?? null;
+    const mask     = t => t ? `${t.slice(0, 6)}…${t.slice(-6)}` : null;
+    res.json({
+      db_token:        mask(dbToken),
+      db_updated_at:   dbRow?.updated_at ?? null,
+      env_token:       mask(envToken),
+      tokens_match:    dbToken === envToken,
+      db_is_primary:   !!dbToken,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/sync/checkpoints — full sync_state table (excluding token row)
+// ---------------------------------------------------------------------------
+app.get('/api/sync/checkpoints', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT step, next_url, processed_count, started_at, updated_at
+       FROM sync_state
+       WHERE step != 'refresh_token'
+       ORDER BY updated_at DESC NULLS LAST`,
+    );
+    const formatted = rows.map(r => ({
+      step:            r.step,
+      status:          r.next_url === 'COMPLETED' ? 'completed' : r.next_url ? 'in_progress' : 'pending',
+      next_url:        r.next_url === 'COMPLETED' ? null : r.next_url,
+      processed_count: r.processed_count,
+      updated_at:      r.updated_at,
+    }));
+    res.json({ count: formatted.length, checkpoints: formatted });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // Error handler
 // ---------------------------------------------------------------------------
 app.use((err, req, res, _next) => {
