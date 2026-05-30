@@ -12,23 +12,51 @@ const TOKEN_URL = 'https://cloud.lightspeedapp.com/oauth/access_token.php';
 const LIMIT = 200;
 
 // ---------------------------------------------------------------------------
-// OAuth2 — exchange refresh token for a short-lived access token
+// OAuth2 — exchange refresh token for a short-lived access token.
+// Lightspeed rotates refresh tokens on every refresh, so we persist the
+// latest one in PostgreSQL (sync_state step='refresh_token') to survive
+// long-running syncs and process restarts.
 // ---------------------------------------------------------------------------
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
+async function getCurrentRefreshToken() {
+  try {
+    const { rows } = await pool.query(
+      "SELECT next_url FROM sync_state WHERE step = 'refresh_token'",
+    );
+    return rows[0]?.next_url ?? process.env.LIGHTSPEED_REFRESH_TOKEN;
+  } catch {
+    return process.env.LIGHTSPEED_REFRESH_TOKEN;
+  }
+}
+
+async function saveRefreshToken(token) {
+  await pool.query(
+    `INSERT INTO sync_state(step, next_url, updated_at)
+     VALUES ('refresh_token', $1, now())
+     ON CONFLICT(step) DO UPDATE SET next_url = $1, updated_at = now()`,
+    [token],
+  );
+}
+
 async function getAccessToken() {
   if (cachedToken && Date.now() < tokenExpiresAt - 30_000) return cachedToken;
 
+  const refreshToken = await getCurrentRefreshToken();
   const { data } = await axios.post(TOKEN_URL, new URLSearchParams({
     client_id:     process.env.LIGHTSPEED_CLIENT_ID,
     client_secret: process.env.LIGHTSPEED_CLIENT_SECRET,
-    refresh_token: process.env.LIGHTSPEED_REFRESH_TOKEN,
+    refresh_token: refreshToken,
     grant_type:    'refresh_token',
   }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
 
-  cachedToken     = data.access_token;
-  tokenExpiresAt  = Date.now() + data.expires_in * 1000;
+  cachedToken    = data.access_token;
+  tokenExpiresAt = Date.now() + data.expires_in * 1000;
+
+  // Persist the new refresh token issued by Lightspeed (rotation)
+  if (data.refresh_token) await saveRefreshToken(data.refresh_token);
+
   return cachedToken;
 }
 
