@@ -265,7 +265,7 @@ async function upsertSales(client, rows) {
            SET shop_id=$2, completed_time=$5, total=$6, discount=$7, tax=$8, raw=$9, synced_at=now()`,
         [
           s.saleID, s.shopID ?? null, s.registerID ?? null, s.customerID ?? null,
-          s.completedTime ?? null,
+          s.completeTime ?? s.completedTime ?? null,
           numOrNull(s.calcTotal), numOrNull(s.calcDiscount), numOrNull(s.calcTax),
           s,
         ],
@@ -433,7 +433,9 @@ async function runSync() {
           const lines = sale.SaleLines?.SaleLine;
           if (!lines) continue;
           const lineArr = Array.isArray(lines) ? lines : [lines];
-          await upsertSaleLines(client, lineArr, sale.completedTime);
+          // Lightspeed uses completeTime (no 'd') in the response object
+          const ct = sale.completeTime ?? sale.completedTime ?? null;
+          await upsertSaleLines(client, lineArr, ct);
         }
         salesCount += items.length;
         // Checkpoint every 10,000 records
