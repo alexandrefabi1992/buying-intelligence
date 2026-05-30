@@ -522,6 +522,35 @@ app.get('/api/budget', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/admin/checkpoint — manually upsert a sync_state row
+// Body: { step, status: "completed"|"pending", processed_count? }
+// ---------------------------------------------------------------------------
+app.post('/api/admin/checkpoint', async (req, res, next) => {
+  try {
+    const { step, status, processed_count = 0 } = req.body;
+    if (!step) return res.status(400).json({ error: 'step is required' });
+
+    if (status === 'pending') {
+      await pool.query('DELETE FROM sync_state WHERE step = $1', [step]);
+      return res.json({ ok: true, step, action: 'deleted' });
+    }
+
+    const nextUrl = status === 'completed' ? 'COMPLETED' : null;
+    await pool.query(
+      `INSERT INTO sync_state(step, next_url, processed_count, updated_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT(step) DO UPDATE
+         SET next_url = $2, processed_count = $3, updated_at = now()`,
+      [step, nextUrl, processed_count],
+    );
+    const { rows } = await pool.query(
+      'SELECT * FROM sync_state WHERE step = $1', [step],
+    );
+    res.json({ ok: true, row: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/token/status — show current refresh token state in DB vs env var
 // ---------------------------------------------------------------------------
 app.get('/api/token/status', async (req, res, next) => {
