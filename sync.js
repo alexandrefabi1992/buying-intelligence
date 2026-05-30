@@ -283,6 +283,22 @@ async function runSync() {
   const daysBack = parseInt(process.env.SYNC_DAYS_BACK ?? '90', 10);
   const since    = new Date(Date.now() - daysBack * 86_400_000).toISOString();
 
+  // Proactively refresh the access token every 25 min so it never goes stale
+  // between Lightspeed page fetches (inventory can run 4-5h with no API calls).
+  // JavaScript is single-threaded so zeroing tokenExpiresAt is race-free.
+  const TOKEN_KEEPALIVE_MS = 25 * 60 * 1000;
+  const keepalive = setInterval(async () => {
+    try {
+      tokenExpiresAt = 0; // force refresh on next getAccessToken() call
+      await getAccessToken();
+      console.log('[sync] Token keepalive: refreshed');
+    } catch (err) {
+      console.error('[sync] Token keepalive failed:', err.message);
+    }
+  }, TOKEN_KEEPALIVE_MS);
+
+  try {
+
   // 1. Shops
   const shopCp = await getCheckpoint('shops');
   if (shopCp) console.log('[sync] Resuming shops from checkpoint…');
@@ -356,6 +372,10 @@ async function runSync() {
   await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_sales_velocity');
 
   console.log(`[sync] Done — ${new Date().toISOString()}`);
+
+  } finally {
+    clearInterval(keepalive);
+  }
 }
 
 // ---------------------------------------------------------------------------
