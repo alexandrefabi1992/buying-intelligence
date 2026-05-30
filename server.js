@@ -24,6 +24,7 @@ if (process.env.DATABASE_URL) {
 const pool = new Pool(poolConfig);
 
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
