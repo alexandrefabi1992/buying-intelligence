@@ -180,6 +180,15 @@ async function* paginate(client, resource, params = {}, resumeUrl = null) {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function numOrNull(v) {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
+// ---------------------------------------------------------------------------
 // Upsert helpers
 // ---------------------------------------------------------------------------
 async function upsertShops(client, rows) {
@@ -248,39 +257,49 @@ async function upsertInventory(client, rows) {
 
 async function upsertSales(client, rows) {
   for (const s of rows) {
-    await pool.query(
-      `INSERT INTO sales(sale_id, shop_id, register_id, customer_id, completed_time, total, discount, tax, raw)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       ON CONFLICT(sale_id) DO UPDATE
-         SET shop_id=$2, completed_time=$5, total=$6, discount=$7, tax=$8, raw=$9, synced_at=now()`,
-      [
-        s.saleID, s.shopID ?? null, s.registerID ?? null, s.customerID ?? null,
-        s.completedTime ?? null,
-        s.calcTotal ?? null, s.calcDiscount ?? null, s.calcTax ?? null,
-        s,
-      ],
-    );
+    try {
+      await pool.query(
+        `INSERT INTO sales(sale_id, shop_id, register_id, customer_id, completed_time, total, discount, tax, raw)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         ON CONFLICT(sale_id) DO UPDATE
+           SET shop_id=$2, completed_time=$5, total=$6, discount=$7, tax=$8, raw=$9, synced_at=now()`,
+        [
+          s.saleID, s.shopID ?? null, s.registerID ?? null, s.customerID ?? null,
+          s.completedTime ?? null,
+          numOrNull(s.calcTotal), numOrNull(s.calcDiscount), numOrNull(s.calcTax),
+          s,
+        ],
+      );
+    } catch (err) {
+      if (err.code === '23503') continue;
+      throw err;
+    }
   }
 }
 
 async function upsertSaleLines(client, rows, completedTime) {
   for (const sl of rows) {
-    await pool.query(
-      `INSERT INTO sale_lines(sale_line_id, sale_id, item_id, shop_id,
-         unit_price, unit_cost, qty, discount, tax, completed_time, raw)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-       ON CONFLICT(sale_line_id) DO UPDATE
-         SET item_id=$3, shop_id=$4, unit_price=$5, unit_cost=$6, qty=$7,
-             discount=$8, tax=$9, completed_time=$10, raw=$11, synced_at=now()`,
-      [
-        sl.saleLineID, sl.saleID ?? null,
-        sl.itemID ?? null, sl.shopID ?? null,
-        sl.unitPrice ?? null, sl.unitCost ?? null,
-        sl.unitQuantity ?? null, sl.discountAmount ?? null, sl.tax ?? null,
-        completedTime ?? null,
-        sl,
-      ],
-    );
+    try {
+      await pool.query(
+        `INSERT INTO sale_lines(sale_line_id, sale_id, item_id, shop_id,
+           unit_price, unit_cost, qty, discount, tax, completed_time, raw)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         ON CONFLICT(sale_line_id) DO UPDATE
+           SET item_id=$3, shop_id=$4, unit_price=$5, unit_cost=$6, qty=$7,
+               discount=$8, tax=$9, completed_time=$10, raw=$11, synced_at=now()`,
+        [
+          sl.saleLineID, sl.saleID ?? null,
+          sl.itemID ?? null, sl.shopID ?? null,
+          numOrNull(sl.unitPrice), numOrNull(sl.unitCost),
+          numOrNull(sl.unitQuantity), numOrNull(sl.discountAmount), numOrNull(sl.tax),
+          completedTime ?? null,
+          sl,
+        ],
+      );
+    } catch (err) {
+      if (err.code === '23503') continue;
+      throw err;
+    }
   }
 }
 
@@ -296,7 +315,7 @@ async function upsertOrders(client, rows) {
         o.orderID, o.shopID ?? null, o.vendorID ?? null,
         o.orderStatus ?? null,
         o.orderDate ?? null, o.eta ?? null,
-        o.total ?? null, o,
+        numOrNull(o.total), o,
       ],
     );
   }
