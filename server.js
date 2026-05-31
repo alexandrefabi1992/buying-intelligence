@@ -714,6 +714,8 @@ app.get('/api/admin/products-audit', async (req, res, next) => {
         COUNT(category)                                   AS has_category,
         COUNT(department)                                 AS has_department,
         COUNT(manufacturer)                               AS has_manufacturer,
+        COUNT(tags)                                       AS has_tags,
+        COUNT(image_url)                                  AS has_image_url,
         COUNT(matrix_id) FILTER (WHERE matrix_id != '0') AS has_matrix_id,
         COUNT(default_cost)                               AS has_default_cost,
         COUNT(default_price)                              AS has_default_price,
@@ -734,14 +736,9 @@ app.get('/api/admin/products-audit', async (req, res, next) => {
     // Full sample row with raw keys list
     const { rows: fullSample } = await pool.query(`
       SELECT item_id, matrix_id, description, brand, category, department,
-             manufacturer, default_cost, default_price, ean, upc, archived,
+             manufacturer, tags, image_url,
+             default_cost, default_price, ean, upc, archived,
              array(SELECT jsonb_object_keys(raw) ORDER BY 1) AS raw_keys,
-             raw->'ItemTag'   AS raw_item_tag,
-             raw->'Tags'      AS raw_tags,
-             raw->'Category'  AS raw_category,
-             raw->'Brand'     AS raw_brand,
-             raw->'Manufacturer' AS raw_manufacturer,
-             raw->'season'    AS raw_season,
              raw->>'categoryID'   AS category_id,
              raw->>'departmentID' AS department_id
       FROM products
@@ -763,6 +760,76 @@ app.get('/api/admin/products-audit', async (req, res, next) => {
       null_audit: nulls[0],
       sample_rows: fullSample,
       category_sample: catSample,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/admin/validate — post-sync data validation
+// ---------------------------------------------------------------------------
+app.get('/api/admin/validate', async (req, res, next) => {
+  try {
+    const [nosCount, imageCount, topManufacturers, categories, sampleFull] = await Promise.all([
+      // 1. Articles avec tag NOS
+      pool.query(`
+        SELECT COUNT(*) AS nos_items,
+               COUNT(DISTINCT manufacturer) AS nos_manufacturers
+        FROM products
+        WHERE tags ILIKE '%NOS%'
+          AND archived = false
+      `),
+      // 2. Articles avec image_url
+      pool.query(`
+        SELECT COUNT(*) AS with_image,
+               COUNT(*) FILTER (WHERE image_url IS NULL) AS without_image,
+               ROUND(COUNT(image_url) * 100.0 / NULLIF(COUNT(*), 0), 1) AS pct_with_image
+        FROM products WHERE archived = false
+      `),
+      // 3. Top 20 manufacturers par nb d'articles vendus (via sale_lines)
+      pool.query(`
+        SELECT p.manufacturer,
+               COUNT(DISTINCT p.item_id)  AS nb_articles,
+               ROUND(SUM(sl.qty)::numeric, 0) AS units_sold
+        FROM products p
+        JOIN sale_lines sl ON sl.item_id = p.item_id
+        WHERE p.manufacturer IS NOT NULL
+          AND sl.completed_time >= now() - interval '52 weeks'
+        GROUP BY p.manufacturer
+        ORDER BY units_sold DESC
+        LIMIT 20
+      `),
+      // 4. Catégories distinctes (niveau feuille du fullPath)
+      pool.query(`
+        SELECT category,
+               COUNT(DISTINCT item_id) AS nb_articles
+        FROM products
+        WHERE category IS NOT NULL
+          AND archived = false
+        GROUP BY category
+        ORDER BY nb_articles DESC
+        LIMIT 50
+      `),
+      // 5. 3 exemples complets
+      pool.query(`
+        SELECT p.item_id, p.description, p.manufacturer, p.category,
+               p.tags, p.image_url, p.default_cost, p.default_price, p.archived
+        FROM products p
+        WHERE p.tags IS NOT NULL
+          AND p.image_url IS NOT NULL
+          AND p.manufacturer IS NOT NULL
+          AND p.category IS NOT NULL
+          AND p.archived = false
+        ORDER BY p.item_id
+        LIMIT 3
+      `),
+    ]);
+
+    res.json({
+      nos:          { ...nosCount.rows[0] },
+      images:       { ...imageCount.rows[0] },
+      top_manufacturers: topManufacturers.rows,
+      categories:   categories.rows,
+      sample_full:  sampleFull.rows,
     });
   } catch (err) { next(err); }
 });
