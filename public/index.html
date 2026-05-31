@@ -19,21 +19,16 @@
     .mfr-row   { cursor: pointer; }
     .mfr-row:hover td { background-color: #f0f7ff !important; }
     .cat-row td { background-color: #f8fafc; }
-    /* Compact number input — hide spinners */
-    .pct-input {
-      width: 3.2rem; text-align: right;
-      border: 1px solid #e5e7eb; border-radius: 4px;
-      padding: 1px 4px; font-size: 0.7rem;
-      -moz-appearance: textfield;
-    }
-    .pct-input::-webkit-outer-spin-button,
-    .pct-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    .pct-input:focus { outline: none; border-color: #3b82f6; }
+    .pct-input { width:3.2rem; text-align:right; border:1px solid #e5e7eb; border-radius:4px; padding:1px 4px; font-size:0.7rem; -moz-appearance:textfield; }
+    .pct-input::-webkit-outer-spin-button, .pct-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+    .pct-input:focus { outline:none; border-color:#3b82f6; }
+    /* Filter toggle buttons */
+    .tog-btn { transition: all 0.1s; }
+    .tog-btn.active { background:#dbeafe; border-color:#3b82f6; color:#1d4ed8; font-weight:600; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans text-sm text-gray-800">
 
-<!-- Header -->
 <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
   <div class="flex items-center gap-3">
     <svg class="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -45,7 +40,6 @@
   <div id="syncStatus" class="text-xs text-gray-400">Chargement…</div>
 </header>
 
-<!-- Tabs -->
 <nav class="bg-white border-b border-gray-200 px-6 flex gap-6">
   <button class="tab py-3 tab-active"   data-tab="budget">Budget</button>
   <button class="tab py-3 tab-inactive" data-tab="nos">NOS</button>
@@ -54,21 +48,61 @@
   <button class="tab py-3 tab-inactive" data-tab="transfers">Transferts</button>
 </nav>
 
-<!-- Content -->
 <main class="p-6 max-w-7xl mx-auto">
 
   <!-- ── BUDGET ──────────────────────────────────────────────────── -->
   <section id="tab-budget">
 
     <!-- Combined total banner -->
-    <div id="budgetBanner" class="hidden mb-6 p-4 bg-gray-900 rounded-xl flex items-center justify-between">
+    <div id="budgetBanner" class="hidden mb-4 p-4 bg-gray-900 rounded-xl flex items-center justify-between">
       <div>
         <div class="text-sm text-gray-300 mb-0.5">Budget d'achat total (NOS + Saisonnier)</div>
-        <div class="text-xs text-gray-500">Cliquer sur une marque pour ajuster le % de croissance</div>
+        <div class="text-xs text-gray-500">Ajuster le % de croissance par marque ci-dessous</div>
       </div>
       <div class="flex flex-col items-end gap-1">
-        <div id="budgetBaseTotal"  class="text-2xl font-bold text-white"></div>
-        <div id="budgetAdjTotal"   class="hidden text-sm font-semibold"></div>
+        <div id="budgetBaseTotal" class="text-2xl font-bold text-white"></div>
+        <div id="budgetAdjTotal" class="hidden text-sm font-semibold"></div>
+      </div>
+    </div>
+
+    <!-- ── Filter bar ── -->
+    <div class="bg-white border border-gray-200 rounded-xl p-4 mb-5">
+      <div class="flex flex-wrap gap-x-8 gap-y-4 items-start">
+
+        <!-- Boutiques -->
+        <div>
+          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Boutiques</div>
+          <div id="shopCheckboxes" class="flex flex-col gap-1"></div>
+        </div>
+
+        <!-- Collections -->
+        <div>
+          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Collections</div>
+          <div id="collButtons" class="flex flex-col gap-1.5"></div>
+        </div>
+
+        <!-- Grandeurs -->
+        <div>
+          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Grandeurs</div>
+          <div class="text-[10px] text-gray-400 mb-1.5">Lettres</div>
+          <div id="letterSizeButtons" class="flex flex-wrap gap-1 mb-3"></div>
+          <div class="text-[10px] text-gray-400 mb-1.5">Numériques</div>
+          <div id="numSizeButtons" class="flex flex-wrap gap-1"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="ml-auto self-end flex flex-col items-end gap-2">
+          <div id="filterBadge" class="text-xs text-blue-600 font-medium hidden"></div>
+          <button id="budgetApply"
+            class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors">
+            Appliquer
+          </button>
+          <button id="budgetReset"
+            class="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs rounded-lg transition-colors">
+            Réinitialiser
+          </button>
+        </div>
+
       </div>
     </div>
 
@@ -335,23 +369,23 @@ const LS_KEY    = 'buying_hypothesis';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
-  nos:        { data: [], filtered: [], page: 0, weeks: 4 },
-  seasonal:   { data: [], filtered: [], page: 0, weeks: 8 },
+  nos:        { data: [], filtered: [], page: 0 },
+  seasonal:   { data: [], filtered: [], page: 0 },
   sizes:      { data: [], filtered: [], page: 0 },
   budgetNos:  { data: [], expanded: new Set(), multipliers: {} },
   budgetSeas: { data: [], expanded: new Set(), multipliers: {} },
-  shops:      [],
+  // Active filter state (applied on "Appliquer" click)
+  filters:    { shops: new Set(), collections: new Set(), sizes: new Set() },
 };
 
 // ── Utilities ─────────────────────────────────────────────────────────────
-const fmt  = n => n == null ? '—' : Number(n).toLocaleString('fr-CA', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const fmtC = n => n == null ? '—' : Number(n).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const fmt   = n => n == null ? '—' : Number(n).toLocaleString('fr-CA', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const fmtC  = n => n == null ? '—' : Number(n).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const fmtDiff = n => (n >= 0 ? '+' : '') + Number(n).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 function escHtml(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
 function coverBadge(w) {
   const v = parseFloat(w);
   if (v === 0) return `<span class="badge cover-0">0 sem.</span>`;
@@ -362,31 +396,21 @@ function coverBadge(w) {
 // ── Hypothesis persistence ────────────────────────────────────────────────
 function loadMultipliers() {
   try {
-    const saved = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}');
-    state.budgetNos.multipliers  = saved.budgetNos  ?? {};
-    state.budgetSeas.multipliers = saved.budgetSeas ?? {};
-  } catch {
-    state.budgetNos.multipliers  = {};
-    state.budgetSeas.multipliers = {};
-  }
+    const s = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}');
+    state.budgetNos.multipliers  = s.budgetNos  ?? {};
+    state.budgetSeas.multipliers = s.budgetSeas ?? {};
+  } catch { state.budgetNos.multipliers = {}; state.budgetSeas.multipliers = {}; }
 }
-
 let _saveTimer;
 function saveMultipliers() {
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify({
-        budgetNos:  state.budgetNos.multipliers,
-        budgetSeas: state.budgetSeas.multipliers,
-      }));
-    } catch {}
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ budgetNos: state.budgetNos.multipliers, budgetSeas: state.budgetSeas.multipliers })); } catch {}
   }, 400);
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
 const tabLoaded = {};
-
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.className = 'tab py-3 tab-inactive');
@@ -397,7 +421,6 @@ document.querySelectorAll('.tab').forEach(btn => {
     if (!tabLoaded[id]) { tabLoaded[id] = true; loadTab(id); }
   });
 });
-
 function loadTab(id) {
   if (id === 'budget')    loadBudget();
   if (id === 'nos')       loadNos();
@@ -411,8 +434,7 @@ async function loadSyncStatus() {
   try {
     const r = await fetch(`${BASE}/api/sync/checkpoints`);
     const d = await r.json();
-    const latest = d.checkpoints?.filter(c => c.status === 'completed')
-      .sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at))[0];
+    const latest = d.checkpoints?.filter(c => c.status === 'completed').sort((a,b) => new Date(b.updated_at)-new Date(a.updated_at))[0];
     if (latest) {
       const dt = new Date(latest.updated_at).toLocaleString('fr-CA', { dateStyle:'short', timeStyle:'short' });
       document.getElementById('syncStatus').textContent = `Dernier sync : ${dt}`;
@@ -420,28 +442,108 @@ async function loadSyncStatus() {
   } catch {}
 }
 
+// ── Filter bar bootstrap ──────────────────────────────────────────────────
+const SHOPS = [
+  { id: '2', name: 'Boutique Fan Club' },
+  { id: '5', name: "Boutique Filles d'Ève" },
+  { id: '8', name: 'Boutique Pour lui' },
+  { id: '1', name: 'Boutique Valérie Simon' },
+  { id: '6', name: 'Saint-Bruno' },
+  { id: '9', name: 'Saint-Sauveur' },
+];
+const COLLECTIONS = [
+  { code: 'p26', label: 'P26 — Printemps 2026' },
+  { code: 'a26', label: 'A26 — Automne 2026' },
+  { code: 'p25', label: 'P25 — Printemps 2025' },
+  { code: 'a25', label: 'A25 — Automne 2025' },
+  { code: 'p24', label: 'P24 — Printemps 2024' },
+  { code: 'a24', label: 'A24 — Automne 2024' },
+];
+const LETTER_SIZES  = ['XS','S','M','L','XL','XXL'];
+const NUMERIC_SIZES = [34,36,38,40,42,44,46,48,50,52,54,56];
+
+function buildFilterBar() {
+  // Boutiques — checkboxes
+  const shopDiv = document.getElementById('shopCheckboxes');
+  SHOPS.forEach(({ id, name }) => {
+    const lbl = document.createElement('label');
+    lbl.className = 'flex items-center gap-1.5 text-xs cursor-pointer select-none';
+    lbl.innerHTML = `<input type="checkbox" class="shop-cb rounded" value="${id}"> ${escHtml(name)}`;
+    shopDiv.appendChild(lbl);
+  });
+
+  // Collections — toggle buttons
+  const collDiv = document.getElementById('collButtons');
+  COLLECTIONS.forEach(({ code, label }) => {
+    const btn = document.createElement('button');
+    btn.className = 'tog-btn text-left px-3 py-1 rounded text-xs border border-gray-200 text-gray-600';
+    btn.dataset.val = code;
+    btn.dataset.group = 'coll';
+    btn.textContent = label;
+    collDiv.appendChild(btn);
+  });
+
+  // Letter sizes — toggle buttons
+  const lsDiv = document.getElementById('letterSizeButtons');
+  LETTER_SIZES.forEach(sz => {
+    const btn = document.createElement('button');
+    btn.className = 'tog-btn px-2.5 py-1 rounded text-xs border border-gray-200 text-gray-600';
+    btn.dataset.val = sz;
+    btn.dataset.group = 'size';
+    btn.textContent = sz;
+    lsDiv.appendChild(btn);
+  });
+
+  // Numeric sizes — toggle buttons
+  const nsDiv = document.getElementById('numSizeButtons');
+  NUMERIC_SIZES.forEach(sz => {
+    const btn = document.createElement('button');
+    btn.className = 'tog-btn px-2.5 py-1 rounded text-xs border border-gray-200 text-gray-600';
+    btn.dataset.val = sz;
+    btn.dataset.group = 'size';
+    btn.textContent = sz;
+    nsDiv.appendChild(btn);
+  });
+
+  // Toggle button click → add/remove active class
+  document.querySelectorAll('.tog-btn').forEach(btn => {
+    btn.addEventListener('click', () => btn.classList.toggle('active'));
+  });
+}
+
+function readFilterSelections() {
+  const shops = [...document.querySelectorAll('.shop-cb:checked')].map(el => el.value);
+  const colls = [...document.querySelectorAll('.tog-btn[data-group="coll"].active')].map(el => el.dataset.val);
+  const sizes = [...document.querySelectorAll('.tog-btn[data-group="size"].active')].map(el => el.dataset.val);
+  return { shops, colls, sizes };
+}
+
+function buildQuerySuffix(extraParams = {}) {
+  const { shops, colls, sizes } = readFilterSelections();
+  const p = { ...extraParams };
+  if (shops.length) p.shops       = shops.join(',');
+  if (colls.length) p.collections = colls.join(',');
+  if (sizes.length) p.sizes       = sizes.join(',');
+  const qs = new URLSearchParams(p).toString();
+  return qs ? '?' + qs : '';
+}
+
+function updateFilterBadge() {
+  const { shops, colls, sizes } = readFilterSelections();
+  const count = shops.length + colls.length + sizes.length;
+  const badge = document.getElementById('filterBadge');
+  if (count > 0) {
+    badge.textContent = `${count} filtre${count > 1 ? 's' : ''} actif${count > 1 ? 's' : ''}`;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
 // ── BUDGET — config ────────────────────────────────────────────────────────
 const BUDGET_CFG = {
-  budgetNos:  {
-    refField:   'reference_units_12w',
-    color:      'text-blue-700',
-    catBg:      '#eff6ff',
-    bodyId:     'budgetNosBody',
-    searchId:   'budgetNosSearch',
-    totalId:    'budgetNosTotal',
-    loaderId:   'budgetNosLoader',
-    label:      'NOS',
-  },
-  budgetSeas: {
-    refField:   'reference_units_sold',
-    color:      'text-amber-700',
-    catBg:      '#fffbeb',
-    bodyId:     'budgetSeasBody',
-    searchId:   'budgetSeasSearch',
-    totalId:    'budgetSeasTotal',
-    loaderId:   'budgetSeasLoader',
-    label:      'Saisonnier',
-  },
+  budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetNosSearch',  totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS' },
+  budgetSeas: { refField:'reference_units_sold', color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'budgetSeasSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier' },
 };
 
 // ── Budget: render one table ───────────────────────────────────────────────
@@ -453,16 +555,14 @@ function renderBudgetTable(key) {
 
   const rows = [];
   for (const m of visible) {
-    const isOpen   = expanded.has(m.manufacturer);
-    const hasCats  = m.by_category?.length > 0;
-    const chevron  = hasCats ? `<span style="font-size:10px;color:#9ca3af">${isOpen ? '▼' : '▶'}</span>` : '';
-    const pct      = Math.round(((multipliers[m.manufacturer] ?? 1) - 1) * 100);
+    const isOpen  = expanded.has(m.manufacturer);
+    const hasCats = m.by_category?.length > 0;
+    const chevron = hasCats ? `<span style="font-size:10px;color:#9ca3af">${isOpen ? '▼' : '▶'}</span>` : '';
+    const pct     = Math.round(((multipliers[m.manufacturer] ?? 1) - 1) * 100);
     const adjusted = m.proposed_budget * (1 + pct / 100);
-    const hasAdj   = Math.abs(pct) > 0;
+    const hasAdj  = Math.abs(pct) > 0;
     const adjColor = pct > 0 ? 'color:#059669' : 'color:#dc2626';
-    const adjHtml  = hasAdj
-      ? `<span style="font-size:11px;${adjColor};font-weight:600"> → ${fmtC(adjusted)}</span>`
-      : '';
+    const adjHtml = hasAdj ? `<span style="font-size:11px;${adjColor};font-weight:600"> → ${fmtC(adjusted)}</span>` : '';
 
     rows.push(`
       <tr class="mfr-row" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
@@ -473,14 +573,9 @@ function renderBudgetTable(key) {
         <td class="px-3 py-2.5 text-right">${fmt(m[refField])}</td>
         <td class="px-3 py-2.5 text-right font-semibold ${color}">${fmtC(m.proposed_budget)}</td>
         <td class="px-3 py-2.5 text-right" style="white-space:nowrap">
-          <input
-            class="pct-input"
-            type="number" min="-99" max="500" step="1"
-            value="${pct || ''}"
-            placeholder="0"
-            data-mfr="${escHtml(m.manufacturer)}"
-            data-key="${key}"
-            data-base="${m.proposed_budget}"
+          <input class="pct-input" type="number" min="-99" max="500" step="1"
+            value="${pct || ''}" placeholder="0"
+            data-mfr="${escHtml(m.manufacturer)}" data-key="${key}" data-base="${m.proposed_budget}"
           ><span class="text-gray-400 text-[10px] ml-0.5">%</span>${adjHtml}
         </td>
       </tr>`);
@@ -502,178 +597,129 @@ function renderBudgetTable(key) {
   }
 
   const tbody = document.getElementById(bodyId);
-  tbody.innerHTML = rows.join('') ||
-    `<tr><td colspan="7" class="text-center py-8 text-gray-400">Aucun résultat</td></tr>`;
+  tbody.innerHTML = rows.join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">Aucun résultat</td></tr>`;
 
-  // Click: expand/collapse (skip when clicking on the input)
   tbody.addEventListener('click', e => {
     if (e.target.tagName === 'INPUT') return;
     const tr = e.target.closest('tr.mfr-row');
     if (!tr) return;
-    const mfr = tr.dataset.mfr;
-    const k   = tr.dataset.key;
-    if (state[k].expanded.has(mfr)) state[k].expanded.delete(mfr);
-    else state[k].expanded.add(mfr);
+    const mfr = tr.dataset.mfr, k = tr.dataset.key;
+    if (state[k].expanded.has(mfr)) state[k].expanded.delete(mfr); else state[k].expanded.add(mfr);
     renderBudgetTable(k);
-  }, { once: true }); // replaced on each render; use capture once to avoid stacking
+  }, { once: true });
 
-  // Input: live multiplier edit
   tbody.addEventListener('input', e => {
     const inp = e.target;
     if (!inp.classList.contains('pct-input')) return;
-    const mfr  = inp.dataset.mfr;
-    const k    = inp.dataset.key;
+    const mfr = inp.dataset.mfr, k = inp.dataset.key;
     const base = parseFloat(inp.dataset.base);
     const pct  = parseFloat(inp.value) || 0;
-
     state[k].multipliers[mfr] = 1 + pct / 100;
-
-    // Update only the adj display span in the same td (no full re-render → focus preserved)
-    const td = inp.closest('td');
-    let adjSpan = td.querySelector('.adj-live');
-    if (!adjSpan) {
-      adjSpan = document.createElement('span');
-      adjSpan.className = 'adj-live';
-      td.appendChild(adjSpan);
-    }
-    if (Math.abs(pct) < 0.01) {
-      adjSpan.textContent = '';
-      adjSpan.style = '';
-    } else {
+    let adjSpan = inp.closest('td').querySelector('.adj-live');
+    if (!adjSpan) { adjSpan = document.createElement('span'); adjSpan.className = 'adj-live'; inp.closest('td').appendChild(adjSpan); }
+    if (Math.abs(pct) < 0.01) { adjSpan.textContent = ''; adjSpan.style = ''; }
+    else {
       adjSpan.textContent = ` → ${fmtC(base * (1 + pct / 100))}`;
       adjSpan.style.cssText = `font-size:11px;font-weight:600;${pct > 0 ? 'color:#059669' : 'color:#dc2626'}`;
     }
-
     updateAllBudgetTotals();
     saveMultipliers();
   });
 }
 
-// ── Budget: totals (base + adjusted) ──────────────────────────────────────
+// ── Budget: totals ─────────────────────────────────────────────────────────
 function updateAllBudgetTotals() {
-  let grandBase = 0;
-  let grandAdj  = 0;
-
+  let grandBase = 0, grandAdj = 0;
   for (const key of ['budgetNos', 'budgetSeas']) {
-    const { data, multipliers, label } = { ...state[key], label: BUDGET_CFG[key].label };
+    const { data, multipliers } = state[key];
     if (!data.length) continue;
-
     const base = data.reduce((s, m) => s + m.proposed_budget, 0);
     const adj  = data.reduce((s, m) => s + m.proposed_budget * (multipliers[m.manufacturer] ?? 1), 0);
-    grandBase += base;
-    grandAdj  += adj;
-
-    const diff    = adj - base;
-    const hasAdj  = Math.abs(diff) > 0.01;
-    const count   = data.length;
-
-    let text = `${label} : ${fmtC(base)} · ${count} marques`;
-    if (hasAdj) {
-      const c = diff >= 0 ? 'color:#d97706' : 'color:#dc2626';
-      text += ` <span style="${c};font-size:11px">(ajusté : ${fmtC(adj)}, ${fmtDiff(diff)})</span>`;
-    }
-    document.getElementById(BUDGET_CFG[key].totalId).innerHTML = text;
+    grandBase += base; grandAdj += adj;
+    const diff = adj - base, hasAdj = Math.abs(diff) > 0.01;
+    let html = `${BUDGET_CFG[key].label} : ${fmtC(base)} · ${data.length} marques`;
+    if (hasAdj) html += ` <span style="${diff>=0?'color:#d97706':'color:#dc2626'};font-size:11px">(ajusté : ${fmtC(adj)}, ${fmtDiff(diff)})</span>`;
+    document.getElementById(BUDGET_CFG[key].totalId).innerHTML = html;
   }
-
-  // Combined banner
-  const hasGrandAdj = Math.abs(grandAdj - grandBase) > 0.01;
   if (grandBase > 0) {
     document.getElementById('budgetBaseTotal').textContent = fmtC(grandBase);
     document.getElementById('budgetBanner').classList.remove('hidden');
     const adjEl = document.getElementById('budgetAdjTotal');
-    if (hasGrandAdj) {
-      const diff = grandAdj - grandBase;
+    const diff  = grandAdj - grandBase;
+    if (Math.abs(diff) > 0.01) {
       adjEl.textContent = `Ajusté : ${fmtC(grandAdj)} (${fmtDiff(diff)})`;
       adjEl.className = `text-sm font-semibold ${diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
       adjEl.classList.remove('hidden');
-    } else {
-      adjEl.classList.add('hidden');
-    }
+    } else { adjEl.classList.add('hidden'); }
   }
 }
 
-// ── Budget: load both panels ───────────────────────────────────────────────
-async function loadBudget() {
-  showLoader('budgetNos', true);
-  showLoader('budgetSeas', true);
-
-  const [nosR, seasR] = await Promise.allSettled([
-    fetch(`${BASE}/api/budget/nos?weeks=${document.getElementById('budgetNosWeeks').value}`).then(r => r.json()),
-    fetch(`${BASE}/api/budget/saisonnier?weeks=${document.getElementById('budgetSeasWeeks').value}`).then(r => r.json()),
-  ]);
-
-  showLoader('budgetNos', false);
-  if (nosR.status === 'fulfilled') {
-    state.budgetNos.data = nosR.value.by_manufacturer ?? [];
-    renderBudgetTable('budgetNos');
-  } else {
-    document.getElementById('budgetNosBody').innerHTML =
-      `<tr><td colspan="7" class="text-center py-8 text-red-500">${nosR.reason?.message ?? 'Erreur'}</td></tr>`;
-  }
-
-  showLoader('budgetSeas', false);
-  if (seasR.status === 'fulfilled') {
-    const d = seasR.value;
-    state.budgetSeas.data = d.by_manufacturer ?? [];
-    if (d.reference_period) {
-      const opts = { day: 'numeric', month: 'long' };
+// ── Budget: fetch both panels ──────────────────────────────────────────────
+async function fetchBudgetPanel(key, endpoint, weeksParam) {
+  showLoader(key, true);
+  try {
+    const qs = buildQuerySuffix({ weeks: weeksParam });
+    const d  = await fetch(`${BASE}${endpoint}${qs}`).then(r => r.json());
+    state[key].data     = d.by_manufacturer ?? [];
+    state[key].expanded = new Set();
+    renderBudgetTable(key);
+    if (key === 'budgetSeas' && d.reference_period) {
+      const opts = { day:'numeric', month:'long' };
       const from = new Date(d.reference_period.from + 'T12:00:00').toLocaleDateString('fr-CA', opts);
       const to   = new Date(d.reference_period.to   + 'T12:00:00').toLocaleDateString('fr-CA', opts);
       document.getElementById('budgetSeasPeriod').textContent = `Réf. : ${from} – ${to}`;
     }
-    renderBudgetTable('budgetSeas');
-  } else {
-    document.getElementById('budgetSeasBody').innerHTML =
-      `<tr><td colspan="7" class="text-center py-8 text-red-500">${seasR.reason?.message ?? 'Erreur'}</td></tr>`;
+  } catch (e) {
+    document.getElementById(BUDGET_CFG[key].bodyId).innerHTML =
+      `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
   }
+  showLoader(key, false);
+}
 
+async function loadBudget() {
+  const nosWeeks  = document.getElementById('budgetNosWeeks').value;
+  const seasWeeks = document.getElementById('budgetSeasWeeks').value;
+  await Promise.all([
+    fetchBudgetPanel('budgetNos',  '/api/budget/nos',         nosWeeks),
+    fetchBudgetPanel('budgetSeas', '/api/budget/saisonnier',  seasWeeks),
+  ]);
   updateAllBudgetTotals();
 }
+
+// ── Filter bar events ─────────────────────────────────────────────────────
+document.getElementById('budgetApply').addEventListener('click', () => {
+  updateFilterBadge();
+  loadBudget();
+});
+
+document.getElementById('budgetReset').addEventListener('click', () => {
+  document.querySelectorAll('.shop-cb').forEach(cb => cb.checked = false);
+  document.querySelectorAll('.tog-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById('filterBadge').classList.add('hidden');
+  loadBudget();
+});
 
 // ── Budget weeks sliders ──────────────────────────────────────────────────
 (function () {
   const nosSlider  = document.getElementById('budgetNosWeeks');
   const seasSlider = document.getElementById('budgetSeasWeeks');
-
   nosSlider.addEventListener('input',  () => { document.getElementById('budgetNosWeeksLabel').textContent  = nosSlider.value; });
   seasSlider.addEventListener('input', () => { document.getElementById('budgetSeasWeeksLabel').textContent = seasSlider.value; });
-
-  let nosTimer, seasTimer;
-
+  let nt, st;
   nosSlider.addEventListener('change', () => {
-    clearTimeout(nosTimer);
-    nosTimer = setTimeout(async () => {
-      showLoader('budgetNos', true);
-      try {
-        const d = await fetch(`${BASE}/api/budget/nos?weeks=${nosSlider.value}`).then(r => r.json());
-        state.budgetNos.data = d.by_manufacturer ?? [];
-        state.budgetNos.expanded = new Set();
-        renderBudgetTable('budgetNos');
-        updateAllBudgetTotals();
-      } finally { showLoader('budgetNos', false); }
+    clearTimeout(nt);
+    nt = setTimeout(async () => {
+      await fetchBudgetPanel('budgetNos', '/api/budget/nos', nosSlider.value);
+      updateAllBudgetTotals();
     }, 300);
   });
-
   seasSlider.addEventListener('change', () => {
-    clearTimeout(seasTimer);
-    seasTimer = setTimeout(async () => {
-      showLoader('budgetSeas', true);
-      try {
-        const d = await fetch(`${BASE}/api/budget/saisonnier?weeks=${seasSlider.value}`).then(r => r.json());
-        state.budgetSeas.data = d.by_manufacturer ?? [];
-        state.budgetSeas.expanded = new Set();
-        if (d.reference_period) {
-          const opts = { day: 'numeric', month: 'long' };
-          const from = new Date(d.reference_period.from + 'T12:00:00').toLocaleDateString('fr-CA', opts);
-          const to   = new Date(d.reference_period.to   + 'T12:00:00').toLocaleDateString('fr-CA', opts);
-          document.getElementById('budgetSeasPeriod').textContent = `Réf. : ${from} – ${to}`;
-        }
-        renderBudgetTable('budgetSeas');
-        updateAllBudgetTotals();
-      } finally { showLoader('budgetSeas', false); }
+    clearTimeout(st);
+    st = setTimeout(async () => {
+      await fetchBudgetPanel('budgetSeas', '/api/budget/saisonnier', seasSlider.value);
+      updateAllBudgetTotals();
     }, 300);
   });
-
   document.getElementById('budgetNosSearch').addEventListener('input',  () => renderBudgetTable('budgetNos'));
   document.getElementById('budgetSeasSearch').addEventListener('input', () => renderBudgetTable('budgetSeas'));
 })();
@@ -682,30 +728,19 @@ async function loadBudget() {
 async function loadNos() {
   showLoader('nos', true);
   try {
-    const weeks = document.getElementById('nosWeeks').value;
-    const r = await fetch(`${BASE}/api/nos?weeks=${weeks}`);
+    const r = await fetch(`${BASE}/api/nos?weeks=${document.getElementById('nosWeeks').value}`);
     const d = await r.json();
     state.nos.data = d.items;
     populateShopFilter(d.items, 'nosShop');
     filterAndRenderNos();
-  } catch (e) {
-    document.getElementById('nosBody').innerHTML =
-      `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
-  }
+  } catch (e) { document.getElementById('nosBody').innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`; }
   showLoader('nos', false);
 }
-
 function filterAndRenderNos() {
-  const shop   = document.getElementById('nosShop').value;
-  const search = document.getElementById('nosSearch').value.toLowerCase();
-  state.nos.filtered = state.nos.data.filter(r =>
-    (!shop   || r.shop_id === shop) &&
-    (!search || r.description?.toLowerCase().includes(search) || String(r.category).includes(search))
-  );
-  state.nos.page = 0;
-  renderNosPage();
+  const shop = document.getElementById('nosShop').value, search = document.getElementById('nosSearch').value.toLowerCase();
+  state.nos.filtered = state.nos.data.filter(r => (!shop || r.shop_id === shop) && (!search || r.description?.toLowerCase().includes(search) || String(r.category).includes(search)));
+  state.nos.page = 0; renderNosPage();
 }
-
 function renderNosPage() {
   const { filtered, page } = state.nos;
   const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -727,30 +762,19 @@ function renderNosPage() {
 async function loadSeasonal() {
   showLoader('seasonal', true);
   try {
-    const weeks = document.getElementById('seasWeeks').value;
-    const r = await fetch(`${BASE}/api/seasonal?weeks_ahead=${weeks}`);
+    const r = await fetch(`${BASE}/api/seasonal?weeks_ahead=${document.getElementById('seasWeeks').value}`);
     const d = await r.json();
     state.seasonal.data = d.recommendations;
     populateShopFilter(d.recommendations, 'seasShop');
     filterAndRenderSeasonal();
-  } catch (e) {
-    document.getElementById('seasBody').innerHTML =
-      `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
-  }
+  } catch (e) { document.getElementById('seasBody').innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`; }
   showLoader('seasonal', false);
 }
-
 function filterAndRenderSeasonal() {
-  const shop   = document.getElementById('seasShop').value;
-  const search = document.getElementById('seasSearch').value.toLowerCase();
-  state.seasonal.filtered = state.seasonal.data.filter(r =>
-    (!shop   || r.shop_id === shop) &&
-    (!search || r.description?.toLowerCase().includes(search))
-  );
-  state.seasonal.page = 0;
-  renderSeasonalPage();
+  const shop = document.getElementById('seasShop').value, search = document.getElementById('seasSearch').value.toLowerCase();
+  state.seasonal.filtered = state.seasonal.data.filter(r => (!shop || r.shop_id === shop) && (!search || r.description?.toLowerCase().includes(search)));
+  state.seasonal.page = 0; renderSeasonalPage();
 }
-
 function renderSeasonalPage() {
   const { filtered, page } = state.seasonal;
   const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -777,24 +801,14 @@ async function loadSizes() {
     state.sizes.data = d.size_curves;
     populateShopFilter(d.size_curves, 'sizesShop');
     filterAndRenderSizes();
-  } catch (e) {
-    document.getElementById('sizesBody').innerHTML =
-      `<tr><td colspan="6" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
-  }
+  } catch (e) { document.getElementById('sizesBody').innerHTML = `<tr><td colspan="6" class="text-center py-8 text-red-500">${e.message}</td></tr>`; }
   showLoader('sizes', false);
 }
-
 function filterAndRenderSizes() {
-  const shop   = document.getElementById('sizesShop').value;
-  const search = document.getElementById('sizesSearch').value.toLowerCase();
-  state.sizes.filtered = state.sizes.data.filter(r =>
-    (!shop   || r.shop_id === shop) &&
-    (!search || r.description?.toLowerCase().includes(search))
-  );
-  state.sizes.page = 0;
-  renderSizesPage();
+  const shop = document.getElementById('sizesShop').value, search = document.getElementById('sizesSearch').value.toLowerCase();
+  state.sizes.filtered = state.sizes.data.filter(r => (!shop || r.shop_id === shop) && (!search || r.description?.toLowerCase().includes(search)));
+  state.sizes.page = 0; renderSizesPage();
 }
-
 function renderSizesPage() {
   const { filtered, page } = state.sizes;
   const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -817,8 +831,7 @@ async function loadTransfers() {
   try {
     const r = await fetch(`${BASE}/api/transfers`);
     const d = await r.json();
-    document.getElementById('transfersCount').textContent =
-      d.count > 0 ? `${d.count.toLocaleString()} transferts recommandés` : '';
+    document.getElementById('transfersCount').textContent = d.count > 0 ? `${d.count.toLocaleString()} transferts recommandés` : '';
     if (d.count === 0) {
       document.getElementById('transfersEmpty').classList.remove('hidden');
       document.getElementById('transfersBody').innerHTML = '';
@@ -832,82 +845,59 @@ async function loadTransfers() {
           <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(t.qty)}</td>
         </tr>`).join('');
     }
-  } catch (e) {
-    document.getElementById('transfersBody').innerHTML =
-      `<tr><td colspan="4" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
-  }
+  } catch (e) { document.getElementById('transfersBody').innerHTML = `<tr><td colspan="4" class="text-center py-8 text-red-500">${e.message}</td></tr>`; }
   showLoader('transfers', false);
 }
 
 // ── Pager ─────────────────────────────────────────────────────────────────
 function renderPager(key, total) {
-  const pages = Math.ceil(total / PAGE_SIZE);
-  const page  = state[key].page;
+  const pages = Math.ceil(total / PAGE_SIZE), page = state[key].page;
   const pager = document.getElementById(`${key}Pager`);
   if (pages <= 1) { pager.classList.add('hidden'); return; }
   pager.classList.remove('hidden');
-  document.getElementById(`${key}Page`).textContent =
-    `Page ${page + 1} / ${pages} (${total.toLocaleString()})`;
+  document.getElementById(`${key}Page`).textContent = `Page ${page+1} / ${pages} (${total.toLocaleString()})`;
   document.getElementById(`${key}Prev`).disabled = page === 0;
   document.getElementById(`${key}Next`).disabled = page >= pages - 1;
 }
-
 function bindPager(key, renderFn) {
-  document.getElementById(`${key}Prev`).addEventListener('click', () => {
-    if (state[key].page > 0) { state[key].page--; renderFn(); }
-  });
-  document.getElementById(`${key}Next`).addEventListener('click', () => {
-    const pages = Math.ceil(state[key].filtered.length / PAGE_SIZE);
-    if (state[key].page < pages - 1) { state[key].page++; renderFn(); }
-  });
+  document.getElementById(`${key}Prev`).addEventListener('click', () => { if (state[key].page > 0) { state[key].page--; renderFn(); } });
+  document.getElementById(`${key}Next`).addEventListener('click', () => { const p = Math.ceil(state[key].filtered.length / PAGE_SIZE); if (state[key].page < p-1) { state[key].page++; renderFn(); } });
 }
 
 // ── Shop filter helper ────────────────────────────────────────────────────
 function populateShopFilter(items, selectId) {
-  const sel      = document.getElementById(selectId);
+  const sel = document.getElementById(selectId);
   const existing = new Set([...sel.options].map(o => o.value).filter(Boolean));
-  [...new Map(items.map(i => [i.shop_id, i.shop_name])).entries()]
-    .sort((a,b) => a[1].localeCompare(b[1]))
-    .forEach(([id, name]) => {
-      if (existing.has(id)) return;
-      const o = document.createElement('option');
-      o.value = id; o.textContent = name;
-      sel.appendChild(o);
-    });
+  [...new Map(items.map(i => [i.shop_id, i.shop_name])).entries()].sort((a,b) => a[1].localeCompare(b[1]))
+    .forEach(([id, name]) => { if (existing.has(id)) return; const o = document.createElement('option'); o.value=id; o.textContent=name; sel.appendChild(o); });
 }
 
 // ── Loader ────────────────────────────────────────────────────────────────
-function showLoader(key, show) {
-  const el = document.getElementById(`${key}Loader`);
-  if (el) el.classList.toggle('hidden', !show);
-}
+function showLoader(key, show) { const el = document.getElementById(`${key}Loader`); if (el) el.classList.toggle('hidden', !show); }
 
-// ── Event bindings — NOS tab ──────────────────────────────────────────────
+// ── Event bindings ────────────────────────────────────────────────────────
 const nosWeeks = document.getElementById('nosWeeks');
-nosWeeks.addEventListener('input', () => { document.getElementById('nosWeeksLabel').textContent = nosWeeks.value; });
-let nosDebounce;
-nosWeeks.addEventListener('change', () => { clearTimeout(nosDebounce); nosDebounce = setTimeout(() => { state.nos.data = []; loadNos(); }, 200); });
+nosWeeks.addEventListener('input', () => document.getElementById('nosWeeksLabel').textContent = nosWeeks.value);
+let nosD, seasD, sizD;
+nosWeeks.addEventListener('change', () => { clearTimeout(nosD); nosD = setTimeout(() => { state.nos.data=[]; loadNos(); }, 200); });
 document.getElementById('nosShop').addEventListener('change', filterAndRenderNos);
-document.getElementById('nosSearch').addEventListener('input', () => { clearTimeout(nosDebounce); nosDebounce = setTimeout(filterAndRenderNos, 250); });
+document.getElementById('nosSearch').addEventListener('input', () => { clearTimeout(nosD); nosD = setTimeout(filterAndRenderNos, 250); });
 bindPager('nos', renderNosPage);
 
-// ── Event bindings — Seasonal tab ─────────────────────────────────────────
 const seasWeeks = document.getElementById('seasWeeks');
-seasWeeks.addEventListener('input', () => { document.getElementById('seasWeeksLabel').textContent = seasWeeks.value; });
-let seasDebounce;
-seasWeeks.addEventListener('change', () => { clearTimeout(seasDebounce); seasDebounce = setTimeout(() => { state.seasonal.data = []; loadSeasonal(); }, 200); });
+seasWeeks.addEventListener('input', () => document.getElementById('seasWeeksLabel').textContent = seasWeeks.value);
+seasWeeks.addEventListener('change', () => { clearTimeout(seasD); seasD = setTimeout(() => { state.seasonal.data=[]; loadSeasonal(); }, 200); });
 document.getElementById('seasShop').addEventListener('change', filterAndRenderSeasonal);
-document.getElementById('seasSearch').addEventListener('input', () => { clearTimeout(seasDebounce); seasDebounce = setTimeout(filterAndRenderSeasonal, 250); });
+document.getElementById('seasSearch').addEventListener('input', () => { clearTimeout(seasD); seasD = setTimeout(filterAndRenderSeasonal, 250); });
 bindPager('seasonal', renderSeasonalPage);
 
-// ── Event bindings — Sizes tab ────────────────────────────────────────────
 document.getElementById('sizesShop').addEventListener('change', filterAndRenderSizes);
-let sizesDebounce;
-document.getElementById('sizesSearch').addEventListener('input', () => { clearTimeout(sizesDebounce); sizesDebounce = setTimeout(filterAndRenderSizes, 250); });
+document.getElementById('sizesSearch').addEventListener('input', () => { clearTimeout(sizD); sizD = setTimeout(filterAndRenderSizes, 250); });
 bindPager('sizes', renderSizesPage);
 
 // ── Init ──────────────────────────────────────────────────────────────────
 loadMultipliers();
+buildFilterBar();
 loadSyncStatus();
 tabLoaded['budget'] = true;
 loadBudget();

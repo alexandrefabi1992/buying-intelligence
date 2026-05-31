@@ -313,6 +313,9 @@ app.get('/api/nos', async (req, res, next) => {
       WHERE v.avg_weekly_units > 0
         AND (i.qty_on_hand + i.qty_on_order) / v.avg_weekly_units < $1
         AND p.archived = false
+        AND p.category    NOT ILIKE 'Alt%ration%'
+        AND p.description NOT ILIKE '%shopify%'
+        AND NOT (p.default_cost = 0 AND p.default_price = 0)
       ORDER BY weeks_of_cover ASC NULLS LAST, suggested_order_qty DESC
     `, [weeks]);
     res.json({ weeks_threshold: weeks, count: rows.length, items: rows });
@@ -445,8 +448,14 @@ app.get('/api/seasonal', async (req, res, next) => {
 app.get('/api/sizes', async (req, res, next) => {
   try {
     const { matrix_id, shop_id } = req.query;
-    const conditions = ['p.matrix_id IS NOT NULL', 'p.archived = false'];
-    const params     = [];
+    const conditions = [
+      'p.matrix_id IS NOT NULL',
+      'p.archived = false',
+      "p.category    NOT ILIKE 'Alt%ration%'",
+      "p.description NOT ILIKE '%shopify%'",
+      'NOT (p.default_cost = 0 AND p.default_price = 0)',
+    ];
+    const params = [];
 
     if (matrix_id) { params.push(matrix_id); conditions.push(`p.matrix_id = $${params.length}`); }
     if (shop_id)   { params.push(shop_id);   conditions.push(`sl.shop_id = $${params.length}`); }
@@ -593,7 +602,17 @@ function buildManufacturerTree(rows, refField) {
 // ---------------------------------------------------------------------------
 app.get('/api/budget/nos', async (req, res, next) => {
   try {
-    const weeks = parseInt(req.query.weeks ?? '4', 10);
+    const weeks  = parseInt(req.query.weeks ?? '4', 10);
+    const params = [weeks]; // $1
+
+    const shops = req.query.shops       ? req.query.shops.split(',').filter(Boolean)                                  : null;
+    const colls = req.query.collections ? req.query.collections.split(',').map(s => s.toLowerCase().trim()).filter(Boolean) : null;
+    const sizes = req.query.sizes       ? req.query.sizes.split(',').filter(Boolean)                                  : null;
+
+    let shopCond = '', collCond = '', sizeCond = '';
+    if (shops?.length) { params.push(shops);                                          shopCond = `AND i.shop_id = ANY($${params.length})`; }
+    if (colls?.length) { params.push(colls);                                          collCond = `AND string_to_array(lower(coalesce(p.tags,'')), ',') && $${params.length}::text[]`; }
+    if (sizes?.length) { params.push('\\y(' + sizes.join('|') + ')\\y');             sizeCond = `AND p.description ~* $${params.length}`; }
 
     const { rows } = await pool.query(`
       WITH velocity AS (
@@ -620,18 +639,24 @@ app.get('/api/budget/nos', async (req, res, next) => {
         WHERE p.tags ILIKE '%nos%'
           AND p.archived = false
           AND v.avg_weekly_units > 0
+          AND p.category    NOT ILIKE 'Alt%ration%'
+          AND p.description NOT ILIKE '%shopify%'
+          AND NOT (p.default_cost = 0 AND p.default_price = 0)
+          ${shopCond}
+          ${collCond}
+          ${sizeCond}
       )
       SELECT
         manufacturer,
         category,
-        COUNT(DISTINCT item_id)::int                      AS items_count,
-        ROUND(SUM(current_stock),           0)::float8   AS remaining_stock_units,
-        ROUND(SUM(ref_units_12w),           0)::float8   AS reference_units_12w,
-        ROUND(SUM(shortage_units * unit_cost), 2)::float8 AS proposed_budget
+        COUNT(DISTINCT item_id)::int                       AS items_count,
+        ROUND(SUM(current_stock),              0)::float8  AS remaining_stock_units,
+        ROUND(SUM(ref_units_12w),              0)::float8  AS reference_units_12w,
+        ROUND(SUM(shortage_units * unit_cost), 2)::float8  AS proposed_budget
       FROM shortage
       GROUP BY manufacturer, category
       ORDER BY manufacturer, proposed_budget DESC
-    `, [weeks]);
+    `, params);
 
     const byManufacturer = buildManufacturerTree(rows, 'reference_units_12w');
     const total = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
@@ -655,10 +680,24 @@ app.get('/api/budget/nos', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/budget/saisonnier', async (req, res, next) => {
   try {
-    const weeks = parseInt(req.query.weeks ?? '8', 10);
+    const weeks  = parseInt(req.query.weeks ?? '8', 10);
+    const params = [weeks]; // $1
+
+    const shops = req.query.shops       ? req.query.shops.split(',').filter(Boolean)                                  : null;
+    const colls = req.query.collections ? req.query.collections.split(',').map(s => s.toLowerCase().trim()).filter(Boolean) : null;
+    const sizes = req.query.sizes       ? req.query.sizes.split(',').filter(Boolean)                                  : null;
+
+    let shopCondSL = '', shopCondInv = '', collCond = '', sizeCond = '';
+    if (shops?.length) {
+      params.push(shops);
+      const n = params.length;
+      shopCondSL  = `AND sl.shop_id = ANY($${n})`;
+      shopCondInv = `AND shop_id    = ANY($${n})`;
+    }
+    if (colls?.length) { params.push(colls);                                          collCond = `AND string_to_array(lower(coalesce(p.tags,'')), ',') && $${params.length}::text[]`; }
+    if (sizes?.length) { params.push('\\y(' + sizes.join('|') + ')\\y');             sizeCond = `AND p.description ~* $${params.length}`; }
 
     const [rangeResult, budgetResult] = await Promise.all([
-      // Data coverage check — tells buyer how far back the sales history goes
       pool.query(`
         SELECT
           MIN(completed_time)::date AS min_date,
@@ -678,12 +717,15 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
                                      + ($1 || ' weeks')::interval
             AND sl.qty > 0
             AND sl.completed_time IS NOT NULL
+            ${shopCondSL}
           GROUP BY sl.item_id
         ),
         stock AS (
           SELECT item_id,
                  SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS current_stock
           FROM inventory
+          WHERE 1=1
+            ${shopCondInv}
           GROUP BY item_id
         )
         SELECT
@@ -702,9 +744,14 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
         WHERE (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')
           AND p.archived = false
           AND p.default_cost > 0
+          AND p.category    NOT ILIKE 'Alt%ration%'
+          AND p.description NOT ILIKE '%shopify%'
+          AND NOT (p.default_cost = 0 AND p.default_price = 0)
+          ${collCond}
+          ${sizeCond}
         GROUP BY p.manufacturer, p.category
         ORDER BY p.manufacturer, proposed_budget DESC
-      `, [weeks]),
+      `, params),
     ]);
 
     const range    = rangeResult.rows[0];
