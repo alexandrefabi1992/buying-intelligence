@@ -609,6 +609,10 @@ app.get('/api/admin/query', async (req, res, next) => {
       'SELECT COUNT(*) FROM shops',
       'SELECT COUNT(*) FROM sale_lines WHERE completed_time IS NOT NULL',
       'SELECT COUNT(*) FROM sales WHERE completed_time IS NOT NULL',
+      "SELECT item_id, raw->'Tags' AS tags FROM products WHERE raw->'Tags' IS NOT NULL LIMIT 3",
+      "SELECT item_id, raw->>'Tags' AS tags FROM products WHERE raw->>'Tags' IS NOT NULL AND raw->>'Tags' != 'false' LIMIT 5",
+      "SELECT COUNT(*) FROM products WHERE raw->'Tags' IS NOT NULL",
+      "SELECT raw->'Tags' AS tags FROM products WHERE raw->'Tags' != 'false' AND raw->'Tags' IS NOT NULL LIMIT 3",
     ];
     const q = (req.query.q ?? '').trim();
     if (!ALLOWED.includes(q)) return res.status(400).json({ error: 'query not whitelisted', allowed: ALLOWED });
