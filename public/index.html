@@ -90,6 +90,13 @@
           <div id="numSizeButtons" class="flex flex-wrap gap-1"></div>
         </div>
 
+        <!-- Marque -->
+        <div>
+          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Marque</div>
+          <input id="budgetMfrSearch" type="text" placeholder="ex: Brax, Eton…"
+            class="border border-gray-300 rounded px-2 py-1 text-xs w-36">
+        </div>
+
         <!-- Actions -->
         <div class="ml-auto self-end flex flex-col items-end gap-2">
           <div id="filterBadge" class="text-xs text-blue-600 font-medium hidden"></div>
@@ -120,11 +127,6 @@
             <span class="text-xs text-gray-400">semaines</span>
           </div>
         </div>
-        <div class="flex-1">
-          <label class="block text-xs text-gray-500 mb-1">Filtrer</label>
-          <input id="budgetNosSearch" type="text" placeholder="ex: Brax, Eton…"
-            class="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-xs">
-        </div>
         <div id="budgetNosTotal" class="text-base font-bold text-blue-700 self-end"></div>
       </div>
       <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -133,12 +135,12 @@
             <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
               <tr>
                 <th class="px-3 py-2 w-6"></th>
-                <th class="px-3 py-2 text-left">Manufacturer</th>
+                <th class="px-3 py-2 text-left">Marque</th>
                 <th class="px-3 py-2 text-right">Articles</th>
-                <th class="px-3 py-2 text-right">Stock actuel</th>
-                <th class="px-3 py-2 text-right">Vél. 12 sem.</th>
-                <th class="px-3 py-2 text-right">Budget proposé</th>
-                <th class="px-3 py-2 text-right">Croissance %</th>
+                <th class="px-3 py-2 text-right">Stock en main</th>
+                <th class="px-3 py-2 text-right">Unités vendues (12 sem.)</th>
+                <th class="px-3 py-2 text-right">Budget suggéré $</th>
+                <th class="px-3 py-2 text-right">Ajustement %</th>
               </tr>
             </thead>
             <tbody id="budgetNosBody" class="divide-y divide-gray-100"></tbody>
@@ -153,19 +155,20 @@
       <div class="flex flex-wrap items-end gap-4 mb-3">
         <div>
           <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 mb-2">
-            Saisonnier — Même période l'an passé
+            Saisonnier — Ventes de la saison de référence
           </span>
           <div class="flex items-center gap-2">
-            <label class="text-xs text-gray-500">Horizon saison :</label>
-            <input type="range" id="budgetSeasWeeks" min="1" max="26" value="8" class="w-28">
-            <span id="budgetSeasWeeksLabel" class="font-semibold text-amber-700 w-5">8</span>
-            <span class="text-xs text-gray-400">semaines</span>
+            <label class="text-xs text-gray-500">Saison de référence :</label>
+            <select id="budgetSeasSeason"
+              class="border border-gray-300 rounded px-2 py-1 text-xs font-semibold text-amber-700 bg-white">
+              <option value="p26">P26 — Printemps 2026</option>
+              <option value="a26">A26 — Automne 2026</option>
+              <option value="p25" selected>P25 — Printemps 2025</option>
+              <option value="a25">A25 — Automne 2025</option>
+              <option value="p24">P24 — Printemps 2024</option>
+              <option value="a24">A24 — Automne 2024</option>
+            </select>
           </div>
-        </div>
-        <div class="flex-1">
-          <label class="block text-xs text-gray-500 mb-1">Filtrer</label>
-          <input id="budgetSeasSearch" type="text" placeholder="ex: Marc Cain…"
-            class="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-xs">
         </div>
         <div class="flex flex-col items-end self-end gap-1">
           <div id="budgetSeasTotal" class="text-base font-bold text-amber-700"></div>
@@ -178,12 +181,12 @@
             <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
               <tr>
                 <th class="px-3 py-2 w-6"></th>
-                <th class="px-3 py-2 text-left">Manufacturer</th>
+                <th class="px-3 py-2 text-left">Marque</th>
                 <th class="px-3 py-2 text-right">Articles</th>
-                <th class="px-3 py-2 text-right">Stock actuel</th>
-                <th class="px-3 py-2 text-right">Ventes LY</th>
-                <th class="px-3 py-2 text-right">Budget proposé</th>
-                <th class="px-3 py-2 text-right">Croissance %</th>
+                <th class="px-3 py-2 text-right">Stock en main</th>
+                <th class="px-3 py-2 text-right">Unités vendues (réf.)</th>
+                <th class="px-3 py-2 text-right">Budget suggéré $</th>
+                <th class="px-3 py-2 text-right">Ajustement %</th>
               </tr>
             </thead>
             <tbody id="budgetSeasBody" class="divide-y divide-gray-100"></tbody>
@@ -463,12 +466,19 @@ const LETTER_SIZES  = ['XS','S','M','L','XL','XXL'];
 const NUMERIC_SIZES = [34,36,38,40,42,44,46,48,50,52,54,56];
 
 function buildFilterBar() {
-  // Boutiques — checkboxes
+  // Boutiques — checkboxes (DOM API to avoid innerHTML parsing edge cases)
   const shopDiv = document.getElementById('shopCheckboxes');
   SHOPS.forEach(({ id, name }) => {
     const lbl = document.createElement('label');
     lbl.className = 'flex items-center gap-1.5 text-xs cursor-pointer select-none';
-    lbl.innerHTML = `<input type="checkbox" class="shop-cb rounded" value="${id}"> ${escHtml(name)}`;
+    const cb = document.createElement('input');
+    cb.type      = 'checkbox';
+    cb.className = 'shop-cb accent-blue-600';
+    cb.value     = id;
+    const txt = document.createElement('span');
+    txt.textContent = name;
+    lbl.appendChild(cb);
+    lbl.appendChild(txt);
     shopDiv.appendChild(lbl);
   });
 
@@ -542,8 +552,8 @@ function updateFilterBadge() {
 
 // ── BUDGET — config ────────────────────────────────────────────────────────
 const BUDGET_CFG = {
-  budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetNosSearch',  totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS' },
-  budgetSeas: { refField:'reference_units_sold', color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'budgetSeasSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier' },
+  budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetMfrSearch', totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS' },
+  budgetSeas: { refField:'reference_units_sold', color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'budgetMfrSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier' },
 };
 
 // ── Budget: render one table ───────────────────────────────────────────────
@@ -598,33 +608,43 @@ function renderBudgetTable(key) {
 
   const tbody = document.getElementById(bodyId);
   tbody.innerHTML = rows.join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">Aucun résultat</td></tr>`;
+}
 
-  tbody.addEventListener('click', e => {
-    if (e.target.tagName === 'INPUT') return;
-    const tr = e.target.closest('tr.mfr-row');
-    if (!tr) return;
-    const mfr = tr.dataset.mfr, k = tr.dataset.key;
-    if (state[k].expanded.has(mfr)) state[k].expanded.delete(mfr); else state[k].expanded.add(mfr);
-    renderBudgetTable(k);
-  }, { once: true });
+// ── Budget: attach table event listeners once at startup ───────────────────
+// Using event delegation on each static tbody — stays valid across innerHTML
+// replacements. NOT called inside renderBudgetTable to avoid stacking.
+function bindBudgetTableListeners() {
+  for (const key of ['budgetNos', 'budgetSeas']) {
+    const tbody = document.getElementById(BUDGET_CFG[key].bodyId);
 
-  tbody.addEventListener('input', e => {
-    const inp = e.target;
-    if (!inp.classList.contains('pct-input')) return;
-    const mfr = inp.dataset.mfr, k = inp.dataset.key;
-    const base = parseFloat(inp.dataset.base);
-    const pct  = parseFloat(inp.value) || 0;
-    state[k].multipliers[mfr] = 1 + pct / 100;
-    let adjSpan = inp.closest('td').querySelector('.adj-live');
-    if (!adjSpan) { adjSpan = document.createElement('span'); adjSpan.className = 'adj-live'; inp.closest('td').appendChild(adjSpan); }
-    if (Math.abs(pct) < 0.01) { adjSpan.textContent = ''; adjSpan.style = ''; }
-    else {
-      adjSpan.textContent = ` → ${fmtC(base * (1 + pct / 100))}`;
-      adjSpan.style.cssText = `font-size:11px;font-weight:600;${pct > 0 ? 'color:#059669' : 'color:#dc2626'}`;
-    }
-    updateAllBudgetTotals();
-    saveMultipliers();
-  });
+    tbody.addEventListener('click', e => {
+      if (e.target.tagName === 'INPUT') return;
+      const tr = e.target.closest('tr.mfr-row');
+      if (!tr) return;
+      const mfr = tr.dataset.mfr, k = tr.dataset.key;
+      if (state[k].expanded.has(mfr)) state[k].expanded.delete(mfr);
+      else state[k].expanded.add(mfr);
+      renderBudgetTable(k);
+    });
+
+    tbody.addEventListener('input', e => {
+      const inp = e.target;
+      if (!inp.classList.contains('pct-input')) return;
+      const mfr = inp.dataset.mfr, k = inp.dataset.key;
+      const base = parseFloat(inp.dataset.base);
+      const pct  = parseFloat(inp.value) || 0;
+      state[k].multipliers[mfr] = 1 + pct / 100;
+      let adjSpan = inp.closest('td').querySelector('.adj-live');
+      if (!adjSpan) { adjSpan = document.createElement('span'); adjSpan.className = 'adj-live'; inp.closest('td').appendChild(adjSpan); }
+      if (Math.abs(pct) < 0.01) { adjSpan.textContent = ''; adjSpan.style = ''; }
+      else {
+        adjSpan.textContent = ` → ${fmtC(base * (1 + pct / 100))}`;
+        adjSpan.style.cssText = `font-size:11px;font-weight:600;${pct > 0 ? 'color:#059669' : 'color:#dc2626'}`;
+      }
+      updateAllBudgetTotals();
+      saveMultipliers();
+    });
+  }
 }
 
 // ── Budget: totals ─────────────────────────────────────────────────────────
@@ -655,19 +675,17 @@ function updateAllBudgetTotals() {
 }
 
 // ── Budget: fetch both panels ──────────────────────────────────────────────
-async function fetchBudgetPanel(key, endpoint, weeksParam) {
+async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
   showLoader(key, true);
   try {
-    const qs = buildQuerySuffix({ weeks: weeksParam });
+    const qs = buildQuerySuffix(extraParams);
     const d  = await fetch(`${BASE}${endpoint}${qs}`).then(r => r.json());
     state[key].data     = d.by_manufacturer ?? [];
     state[key].expanded = new Set();
     renderBudgetTable(key);
-    if (key === 'budgetSeas' && d.reference_period) {
-      const opts = { day:'numeric', month:'long' };
-      const from = new Date(d.reference_period.from + 'T12:00:00').toLocaleDateString('fr-CA', opts);
-      const to   = new Date(d.reference_period.to   + 'T12:00:00').toLocaleDateString('fr-CA', opts);
-      document.getElementById('budgetSeasPeriod').textContent = `Réf. : ${from} – ${to}`;
+    if (key === 'budgetSeas') {
+      document.getElementById('budgetSeasPeriod').textContent =
+        d.season_label ? `Réf. : ${d.season_label}` : '';
     }
   } catch (e) {
     document.getElementById(BUDGET_CFG[key].bodyId).innerHTML =
@@ -677,11 +695,11 @@ async function fetchBudgetPanel(key, endpoint, weeksParam) {
 }
 
 async function loadBudget() {
-  const nosWeeks  = document.getElementById('budgetNosWeeks').value;
-  const seasWeeks = document.getElementById('budgetSeasWeeks').value;
+  const nosWeeks = document.getElementById('budgetNosWeeks').value;
+  const season   = document.getElementById('budgetSeasSeason').value;
   await Promise.all([
-    fetchBudgetPanel('budgetNos',  '/api/budget/nos',         nosWeeks),
-    fetchBudgetPanel('budgetSeas', '/api/budget/saisonnier',  seasWeeks),
+    fetchBudgetPanel('budgetNos',  '/api/budget/nos',        { weeks: nosWeeks }),
+    fetchBudgetPanel('budgetSeas', '/api/budget/saisonnier', { season }),
   ]);
   updateAllBudgetTotals();
 }
@@ -695,33 +713,39 @@ document.getElementById('budgetApply').addEventListener('click', () => {
 document.getElementById('budgetReset').addEventListener('click', () => {
   document.querySelectorAll('.shop-cb').forEach(cb => cb.checked = false);
   document.querySelectorAll('.tog-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById('budgetMfrSearch').value = '';
   document.getElementById('filterBadge').classList.add('hidden');
   loadBudget();
 });
 
-// ── Budget weeks sliders ──────────────────────────────────────────────────
+// ── Budget controls ───────────────────────────────────────────────────────
 (function () {
-  const nosSlider  = document.getElementById('budgetNosWeeks');
-  const seasSlider = document.getElementById('budgetSeasWeeks');
-  nosSlider.addEventListener('input',  () => { document.getElementById('budgetNosWeeksLabel').textContent  = nosSlider.value; });
-  seasSlider.addEventListener('input', () => { document.getElementById('budgetSeasWeeksLabel').textContent = seasSlider.value; });
-  let nt, st;
+  // NOS weeks slider
+  const nosSlider = document.getElementById('budgetNosWeeks');
+  nosSlider.addEventListener('input', () => {
+    document.getElementById('budgetNosWeeksLabel').textContent = nosSlider.value;
+  });
+  let nt;
   nosSlider.addEventListener('change', () => {
     clearTimeout(nt);
     nt = setTimeout(async () => {
-      await fetchBudgetPanel('budgetNos', '/api/budget/nos', nosSlider.value);
+      await fetchBudgetPanel('budgetNos', '/api/budget/nos', { weeks: nosSlider.value });
       updateAllBudgetTotals();
     }, 300);
   });
-  seasSlider.addEventListener('change', () => {
-    clearTimeout(st);
-    st = setTimeout(async () => {
-      await fetchBudgetPanel('budgetSeas', '/api/budget/saisonnier', seasSlider.value);
-      updateAllBudgetTotals();
-    }, 300);
+
+  // Saisonnier season dropdown
+  document.getElementById('budgetSeasSeason').addEventListener('change', async () => {
+    const season = document.getElementById('budgetSeasSeason').value;
+    await fetchBudgetPanel('budgetSeas', '/api/budget/saisonnier', { season });
+    updateAllBudgetTotals();
   });
-  document.getElementById('budgetNosSearch').addEventListener('input',  () => renderBudgetTable('budgetNos'));
-  document.getElementById('budgetSeasSearch').addEventListener('input', () => renderBudgetTable('budgetSeas'));
+
+  // Global manufacturer search — live filter on both tables
+  document.getElementById('budgetMfrSearch').addEventListener('input', () => {
+    renderBudgetTable('budgetNos');
+    renderBudgetTable('budgetSeas');
+  });
 })();
 
 // ── NOS tab ────────────────────────────────────────────────────────────────
@@ -898,6 +922,7 @@ bindPager('sizes', renderSizesPage);
 // ── Init ──────────────────────────────────────────────────────────────────
 loadMultipliers();
 buildFilterBar();
+bindBudgetTableListeners();
 loadSyncStatus();
 tabLoaded['budget'] = true;
 loadBudget();

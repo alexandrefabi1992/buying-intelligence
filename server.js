@@ -698,23 +698,33 @@ app.get('/api/budget/nos', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 // GET /api/budget/saisonnier — Seasonal buying budget by manufacturer + category
 // Filter: products where tags IS NULL OR tags NOT ILIKE '%nos%'
-// Reference demand: units sold in the same N-week window 52 weeks ago
-// Shortage: MAX(0, units_last_year − current_stock_all_shops) × default_cost
-// ?weeks=8 → season horizon in weeks (default 8)
+// Reference demand: units sold during the selected reference season
+// Shortage: MAX(0, season_units − current_stock) × default_cost
+// ?season=p25 → season code (default p25); options: p26,a26,p25,a25,p24,a24
 // ---------------------------------------------------------------------------
+const SEASON_RANGES = {
+  p24: { from: '2024-02-01', to: '2024-09-30', label: 'P24 — Printemps 2024' },
+  a24: { from: '2024-09-01', to: '2025-02-28', label: 'A24 — Automne 2024'   },
+  p25: { from: '2025-02-01', to: '2025-09-30', label: 'P25 — Printemps 2025' },
+  a25: { from: '2025-09-01', to: '2026-02-28', label: 'A25 — Automne 2025'   },
+  p26: { from: '2026-02-01', to: '2026-09-30', label: 'P26 — Printemps 2026' },
+  a26: { from: '2026-09-01', to: '2027-02-28', label: 'A26 — Automne 2026'   },
+};
+
 app.get('/api/budget/saisonnier', async (req, res, next) => {
   try {
-    const weeks  = parseInt(req.query.weeks ?? '8', 10);
+    const seasonCode = (req.query.season ?? 'p25').toLowerCase();
+    const season     = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p25;
 
-    const shops = req.query.shops       ? req.query.shops.split(',').filter(Boolean)                                  : null;
+    const shops = req.query.shops       ? req.query.shops.split(',').filter(Boolean)                                       : null;
     const colls = req.query.collections ? req.query.collections.split(',').map(s => s.toLowerCase().trim()).filter(Boolean) : null;
-    const sizes = req.query.sizes       ? req.query.sizes.split(',').filter(Boolean)                                  : null;
+    const sizes = req.query.sizes       ? req.query.sizes.split(',').filter(Boolean)                                       : null;
 
-    const cacheKey = JSON.stringify({ r: 'saisonnier', weeks, shops, colls, sizes });
+    const cacheKey = JSON.stringify({ r: 'saisonnier', season: seasonCode, shops, colls, sizes });
     const hit = cacheGet(cacheKey);
     if (hit) return res.json({ ...hit, cached: true });
 
-    const params = [weeks]; // $1
+    const params = [season.from, season.to]; // $1 = from, $2 = to
     let shopCondSL = '', shopCondInv = '', collCond = '', sizeCond = '';
     if (shops?.length) {
       params.push(shops);
@@ -725,8 +735,6 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
     if (colls?.length) { params.push(colls);                                          collCond = `AND string_to_array(lower(coalesce(p.tags,'')), ',') && $${params.length}::text[]`; }
     if (sizes?.length) { params.push('\\y(' + sizes.join('|') + ')\\y');             sizeCond = `AND p.description ~* $${params.length}`; }
 
-    // Without shop filter: use pre-aggregated MV (eliminates 412ms inventory HashAggregate).
-    // With shop filter: aggregate only the requested shops inline.
     const stockCTE = shops?.length
       ? `stock AS (
            SELECT item_id,
@@ -737,74 +745,52 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
          )`
       : `stock AS (SELECT item_id, current_stock_all AS current_stock FROM mv_inventory_stock)`;
 
-    const [rangeResult, budgetResult] = await Promise.all([
-      pool.query(`
+    const { rows } = await pool.query(`
+      WITH season_sales AS (
         SELECT
-          MIN(completed_time)::date AS min_date,
-          MAX(completed_time)::date AS max_date,
-          COUNT(*)::int             AS total_lines
-        FROM sale_lines
-        WHERE completed_time IS NOT NULL
-      `),
-      pool.query(`
-        WITH last_year AS (
-          SELECT
-            sl.item_id,
-            SUM(sl.qty) AS units_sold_ly
-          FROM sale_lines sl
-          WHERE sl.completed_time >= now() - INTERVAL '52 weeks'
-            AND sl.completed_time <  now() - INTERVAL '52 weeks'
-                                     + ($1 || ' weeks')::interval
-            AND sl.qty > 0
-            AND sl.completed_time IS NOT NULL
-            ${shopCondSL}
-          GROUP BY sl.item_id
-        ),
-        ${stockCTE}
-        SELECT
-          COALESCE(p.manufacturer, 'Sans marque')    AS manufacturer,
-          COALESCE(p.category,     'Sans catégorie') AS category,
-          COUNT(DISTINCT p.item_id)::int             AS items_count,
-          ROUND(SUM(COALESCE(st.current_stock, 0)), 0)::float8   AS remaining_stock_units,
-          ROUND(SUM(ly.units_sold_ly), 0)::float8                AS reference_units_sold,
-          ROUND(SUM(
-            GREATEST(0, ly.units_sold_ly - COALESCE(st.current_stock, 0))
-            * COALESCE(p.default_cost, 0)
-          ), 2)::float8                              AS proposed_budget
-        FROM products p
-        JOIN last_year ly ON ly.item_id = p.item_id
-        LEFT JOIN stock st ON st.item_id = p.item_id
-        WHERE (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')
-          AND p.archived = false
-          AND p.default_cost > 0
-          AND p.category    NOT ILIKE 'Alt%ration%'
-          AND p.description NOT ILIKE '%shopify%'
-          AND NOT (p.default_cost = 0 AND p.default_price = 0)
-          ${collCond}
-          ${sizeCond}
-        GROUP BY p.manufacturer, p.category
-        ORDER BY p.manufacturer, proposed_budget DESC
-      `, params),
-    ]);
+          sl.item_id,
+          SUM(sl.qty) AS units_sold_season
+        FROM sale_lines sl
+        WHERE sl.completed_time >= $1::date
+          AND sl.completed_time <= $2::date
+          AND sl.qty > 0
+          AND sl.completed_time IS NOT NULL
+          ${shopCondSL}
+        GROUP BY sl.item_id
+      ),
+      ${stockCTE}
+      SELECT
+        COALESCE(p.manufacturer, 'Sans marque')    AS manufacturer,
+        COALESCE(p.category,     'Sans catégorie') AS category,
+        COUNT(DISTINCT p.item_id)::int             AS items_count,
+        ROUND(SUM(COALESCE(st.current_stock, 0)), 0)::float8   AS remaining_stock_units,
+        ROUND(SUM(ss.units_sold_season), 0)::float8            AS reference_units_sold,
+        ROUND(SUM(
+          GREATEST(0, ss.units_sold_season - COALESCE(st.current_stock, 0))
+          * COALESCE(p.default_cost, 0)
+        ), 2)::float8                              AS proposed_budget
+      FROM products p
+      JOIN season_sales ss ON ss.item_id = p.item_id
+      LEFT JOIN stock    st ON st.item_id = p.item_id
+      WHERE (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')
+        AND p.archived = false
+        AND p.default_cost > 0
+        AND p.category    NOT ILIKE 'Alt%ration%'
+        AND p.description NOT ILIKE '%shopify%'
+        AND NOT (p.default_cost = 0 AND p.default_price = 0)
+        ${collCond}
+        ${sizeCond}
+      GROUP BY p.manufacturer, p.category
+      ORDER BY p.manufacturer, proposed_budget DESC
+    `, params);
 
-    const range    = rangeResult.rows[0];
-    const refStart = new Date(Date.now() - 52 * 7 * 24 * 60 * 60 * 1000);
-    const refEnd   = new Date(refStart.getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
-
-    const byManufacturer = buildManufacturerTree(budgetResult.rows, 'reference_units_sold');
+    const byManufacturer = buildManufacturerTree(rows, 'reference_units_sold');
     const total = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
 
     const result = {
-      weeks_horizon:         weeks,
-      reference_period:      {
-        from: refStart.toISOString().slice(0, 10),
-        to:   refEnd.toISOString().slice(0, 10),
-      },
-      sales_data_range:      {
-        min_date:    range.min_date,
-        max_date:    range.max_date,
-        total_lines: range.total_lines,
-      },
+      season_code:           seasonCode,
+      season_label:          season.label,
+      reference_period:      { from: season.from, to: season.to },
       generated_at:          new Date().toISOString(),
       total_proposed_budget: Math.round(total * 100) / 100,
       manufacturer_count:    byManufacturer.length,
