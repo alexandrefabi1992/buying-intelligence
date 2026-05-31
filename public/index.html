@@ -16,9 +16,19 @@
     .cover-0   { background: #fee2e2; color: #991b1b; }
     .cover-low { background: #fef3c7; color: #92400e; }
     .cover-ok  { background: #d1fae5; color: #065f46; }
-    .mfr-row { cursor: pointer; }
+    .mfr-row   { cursor: pointer; }
     .mfr-row:hover td { background-color: #f0f7ff !important; }
     .cat-row td { background-color: #f8fafc; }
+    /* Compact number input — hide spinners */
+    .pct-input {
+      width: 3.2rem; text-align: right;
+      border: 1px solid #e5e7eb; border-radius: 4px;
+      padding: 1px 4px; font-size: 0.7rem;
+      -moz-appearance: textfield;
+    }
+    .pct-input::-webkit-outer-spin-button,
+    .pct-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .pct-input:focus { outline: none; border-color: #3b82f6; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans text-sm text-gray-800">
@@ -50,10 +60,16 @@
   <!-- ── BUDGET ──────────────────────────────────────────────────── -->
   <section id="tab-budget">
 
-    <!-- Combined total banner (shown once both loads complete) -->
+    <!-- Combined total banner -->
     <div id="budgetBanner" class="hidden mb-6 p-4 bg-gray-900 rounded-xl flex items-center justify-between">
-      <div class="text-sm text-gray-300">Budget d'achat total (NOS + Saisonnier)</div>
-      <div id="budgetCombinedTotal" class="text-2xl font-bold text-white"></div>
+      <div>
+        <div class="text-sm text-gray-300 mb-0.5">Budget d'achat total (NOS + Saisonnier)</div>
+        <div class="text-xs text-gray-500">Cliquer sur une marque pour ajuster le % de croissance</div>
+      </div>
+      <div class="flex flex-col items-end gap-1">
+        <div id="budgetBaseTotal"  class="text-2xl font-bold text-white"></div>
+        <div id="budgetAdjTotal"   class="hidden text-sm font-semibold"></div>
+      </div>
     </div>
 
     <!-- NOS panel -->
@@ -71,7 +87,7 @@
           </div>
         </div>
         <div class="flex-1">
-          <label class="block text-xs text-gray-500 mb-1">Filtrer par manufacturer</label>
+          <label class="block text-xs text-gray-500 mb-1">Filtrer</label>
           <input id="budgetNosSearch" type="text" placeholder="ex: Brax, Eton…"
             class="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-xs">
         </div>
@@ -88,7 +104,7 @@
                 <th class="px-3 py-2 text-right">Stock actuel</th>
                 <th class="px-3 py-2 text-right">Vél. 12 sem.</th>
                 <th class="px-3 py-2 text-right">Budget proposé</th>
-                <th class="px-3 py-2 text-right">Ajusté ×</th>
+                <th class="px-3 py-2 text-right">Croissance %</th>
               </tr>
             </thead>
             <tbody id="budgetNosBody" class="divide-y divide-gray-100"></tbody>
@@ -113,7 +129,7 @@
           </div>
         </div>
         <div class="flex-1">
-          <label class="block text-xs text-gray-500 mb-1">Filtrer par manufacturer</label>
+          <label class="block text-xs text-gray-500 mb-1">Filtrer</label>
           <input id="budgetSeasSearch" type="text" placeholder="ex: Marc Cain…"
             class="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-xs">
         </div>
@@ -133,7 +149,7 @@
                 <th class="px-3 py-2 text-right">Stock actuel</th>
                 <th class="px-3 py-2 text-right">Ventes LY</th>
                 <th class="px-3 py-2 text-right">Budget proposé</th>
-                <th class="px-3 py-2 text-right">Ajusté ×</th>
+                <th class="px-3 py-2 text-right">Croissance %</th>
               </tr>
             </thead>
             <tbody id="budgetSeasBody" class="divide-y divide-gray-100"></tbody>
@@ -313,32 +329,59 @@
 </main>
 
 <script>
-const BASE = 'https://buying-intelligence-production.up.railway.app';
+const BASE      = 'https://buying-intelligence-production.up.railway.app';
 const PAGE_SIZE = 50;
+const LS_KEY    = 'buying_hypothesis';
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
   nos:        { data: [], filtered: [], page: 0, weeks: 4 },
   seasonal:   { data: [], filtered: [], page: 0, weeks: 8 },
   sizes:      { data: [], filtered: [], page: 0 },
-  budgetNos:  { data: [], expanded: new Set() },
-  budgetSeas: { data: [], expanded: new Set() },
+  budgetNos:  { data: [], expanded: new Set(), multipliers: {} },
+  budgetSeas: { data: [], expanded: new Set(), multipliers: {} },
   shops:      [],
 };
 
 // ── Utilities ─────────────────────────────────────────────────────────────
 const fmt  = n => n == null ? '—' : Number(n).toLocaleString('fr-CA', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const fmtC = n => n == null ? '—' : Number(n).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const fmtDiff = n => (n >= 0 ? '+' : '') + Number(n).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 function escHtml(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function coverBadge(weeks) {
-  const w = parseFloat(weeks);
-  if (w === 0) return `<span class="badge cover-0">0 sem.</span>`;
-  if (w < 2)   return `<span class="badge cover-low">${fmt(weeks)} sem.</span>`;
-  return `<span class="badge cover-ok">${fmt(weeks)} sem.</span>`;
+function coverBadge(w) {
+  const v = parseFloat(w);
+  if (v === 0) return `<span class="badge cover-0">0 sem.</span>`;
+  if (v < 2)   return `<span class="badge cover-low">${fmt(w)} sem.</span>`;
+  return `<span class="badge cover-ok">${fmt(w)} sem.</span>`;
+}
+
+// ── Hypothesis persistence ────────────────────────────────────────────────
+function loadMultipliers() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}');
+    state.budgetNos.multipliers  = saved.budgetNos  ?? {};
+    state.budgetSeas.multipliers = saved.budgetSeas ?? {};
+  } catch {
+    state.budgetNos.multipliers  = {};
+    state.budgetSeas.multipliers = {};
+  }
+}
+
+let _saveTimer;
+function saveMultipliers() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        budgetNos:  state.budgetNos.multipliers,
+        budgetSeas: state.budgetSeas.multipliers,
+      }));
+    } catch {}
+  }, 400);
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
@@ -377,46 +420,49 @@ async function loadSyncStatus() {
   } catch {}
 }
 
-// ── BUDGET — shared config ─────────────────────────────────────────────────
+// ── BUDGET — config ────────────────────────────────────────────────────────
 const BUDGET_CFG = {
   budgetNos:  {
     refField:   'reference_units_12w',
-    colorClass: 'text-blue-700',
-    catBg:      '#eff6ff',   // blue-50
+    color:      'text-blue-700',
+    catBg:      '#eff6ff',
     bodyId:     'budgetNosBody',
     searchId:   'budgetNosSearch',
     totalId:    'budgetNosTotal',
     loaderId:   'budgetNosLoader',
+    label:      'NOS',
   },
   budgetSeas: {
     refField:   'reference_units_sold',
-    colorClass: 'text-amber-700',
-    catBg:      '#fffbeb',   // amber-50
+    color:      'text-amber-700',
+    catBg:      '#fffbeb',
     bodyId:     'budgetSeasBody',
     searchId:   'budgetSeasSearch',
     totalId:    'budgetSeasTotal',
     loaderId:   'budgetSeasLoader',
+    label:      'Saisonnier',
   },
 };
 
+// ── Budget: render one table ───────────────────────────────────────────────
 function renderBudgetTable(key) {
-  const cfg = BUDGET_CFG[key];
-  const { refField, colorClass, catBg, bodyId, searchId } = cfg;
+  const { refField, color, catBg, bodyId, searchId } = BUDGET_CFG[key];
   const search = document.getElementById(searchId).value.toLowerCase().trim();
-  const { data, expanded } = state[key];
-
+  const { data, expanded, multipliers } = state[key];
   const visible = search ? data.filter(m => m.manufacturer.toLowerCase().includes(search)) : data;
 
   const rows = [];
   for (const m of visible) {
-    const isOpen = expanded.has(m.manufacturer);
-    const hasCats = m.by_category && m.by_category.length > 0;
-    const chevron = hasCats
-      ? `<span style="font-size:10px;color:#9ca3af">${isOpen ? '▼' : '▶'}</span>`
+    const isOpen   = expanded.has(m.manufacturer);
+    const hasCats  = m.by_category?.length > 0;
+    const chevron  = hasCats ? `<span style="font-size:10px;color:#9ca3af">${isOpen ? '▼' : '▶'}</span>` : '';
+    const pct      = Math.round(((multipliers[m.manufacturer] ?? 1) - 1) * 100);
+    const adjusted = m.proposed_budget * (1 + pct / 100);
+    const hasAdj   = Math.abs(pct) > 0;
+    const adjColor = pct > 0 ? 'color:#059669' : 'color:#dc2626';
+    const adjHtml  = hasAdj
+      ? `<span style="font-size:11px;${adjColor};font-weight:600"> → ${fmtC(adjusted)}</span>`
       : '';
-    const adjustedCell = m.hypothesis.multiplier !== 1
-      ? `<span class="${colorClass} font-semibold">${fmtC(m.hypothesis.adjusted_budget)}</span>`
-      : `<span class="text-gray-300">—</span>`;
 
     rows.push(`
       <tr class="mfr-row" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
@@ -425,10 +471,19 @@ function renderBudgetTable(key) {
         <td class="px-3 py-2.5 text-right text-gray-500">${m.items_count}</td>
         <td class="px-3 py-2.5 text-right text-gray-500">${fmt(m.remaining_stock_units)}</td>
         <td class="px-3 py-2.5 text-right">${fmt(m[refField])}</td>
-        <td class="px-3 py-2.5 text-right font-semibold ${colorClass}">${fmtC(m.proposed_budget)}</td>
-        <td class="px-3 py-2.5 text-right">${adjustedCell}</td>
-      </tr>
-    `);
+        <td class="px-3 py-2.5 text-right font-semibold ${color}">${fmtC(m.proposed_budget)}</td>
+        <td class="px-3 py-2.5 text-right" style="white-space:nowrap">
+          <input
+            class="pct-input"
+            type="number" min="-99" max="500" step="1"
+            value="${pct || ''}"
+            placeholder="0"
+            data-mfr="${escHtml(m.manufacturer)}"
+            data-key="${key}"
+            data-base="${m.proposed_budget}"
+          ><span class="text-gray-400 text-[10px] ml-0.5">%</span>${adjHtml}
+        </td>
+      </tr>`);
 
     if (isOpen && hasCats) {
       for (const cat of m.by_category) {
@@ -441,8 +496,7 @@ function renderBudgetTable(key) {
             <td class="px-3 py-1.5 text-right text-gray-400">${fmt(cat[refField])}</td>
             <td class="px-3 py-1.5 text-right text-gray-500">${fmtC(cat.proposed_budget)}</td>
             <td class="px-3 py-1.5"></td>
-          </tr>
-        `);
+          </tr>`);
       }
     }
   }
@@ -451,27 +505,94 @@ function renderBudgetTable(key) {
   tbody.innerHTML = rows.join('') ||
     `<tr><td colspan="7" class="text-center py-8 text-gray-400">Aucun résultat</td></tr>`;
 
-  tbody.querySelectorAll('tr.mfr-row').forEach(tr => {
-    tr.addEventListener('click', () => {
-      const mfr = tr.dataset.mfr;
-      const k   = tr.dataset.key;
-      if (state[k].expanded.has(mfr)) state[k].expanded.delete(mfr);
-      else                             state[k].expanded.add(mfr);
-      renderBudgetTable(k);
-    });
+  // Click: expand/collapse (skip when clicking on the input)
+  tbody.addEventListener('click', e => {
+    if (e.target.tagName === 'INPUT') return;
+    const tr = e.target.closest('tr.mfr-row');
+    if (!tr) return;
+    const mfr = tr.dataset.mfr;
+    const k   = tr.dataset.key;
+    if (state[k].expanded.has(mfr)) state[k].expanded.delete(mfr);
+    else state[k].expanded.add(mfr);
+    renderBudgetTable(k);
+  }, { once: true }); // replaced on each render; use capture once to avoid stacking
+
+  // Input: live multiplier edit
+  tbody.addEventListener('input', e => {
+    const inp = e.target;
+    if (!inp.classList.contains('pct-input')) return;
+    const mfr  = inp.dataset.mfr;
+    const k    = inp.dataset.key;
+    const base = parseFloat(inp.dataset.base);
+    const pct  = parseFloat(inp.value) || 0;
+
+    state[k].multipliers[mfr] = 1 + pct / 100;
+
+    // Update only the adj display span in the same td (no full re-render → focus preserved)
+    const td = inp.closest('td');
+    let adjSpan = td.querySelector('.adj-live');
+    if (!adjSpan) {
+      adjSpan = document.createElement('span');
+      adjSpan.className = 'adj-live';
+      td.appendChild(adjSpan);
+    }
+    if (Math.abs(pct) < 0.01) {
+      adjSpan.textContent = '';
+      adjSpan.style = '';
+    } else {
+      adjSpan.textContent = ` → ${fmtC(base * (1 + pct / 100))}`;
+      adjSpan.style.cssText = `font-size:11px;font-weight:600;${pct > 0 ? 'color:#059669' : 'color:#dc2626'}`;
+    }
+
+    updateAllBudgetTotals();
+    saveMultipliers();
   });
 }
 
-function updateCombinedBanner() {
-  const nosTotal  = state.budgetNos.data.reduce((s, m) => s + m.proposed_budget, 0);
-  const seasTotal = state.budgetSeas.data.reduce((s, m) => s + m.proposed_budget, 0);
-  if (nosTotal + seasTotal > 0) {
-    document.getElementById('budgetCombinedTotal').textContent = fmtC(nosTotal + seasTotal);
+// ── Budget: totals (base + adjusted) ──────────────────────────────────────
+function updateAllBudgetTotals() {
+  let grandBase = 0;
+  let grandAdj  = 0;
+
+  for (const key of ['budgetNos', 'budgetSeas']) {
+    const { data, multipliers, label } = { ...state[key], label: BUDGET_CFG[key].label };
+    if (!data.length) continue;
+
+    const base = data.reduce((s, m) => s + m.proposed_budget, 0);
+    const adj  = data.reduce((s, m) => s + m.proposed_budget * (multipliers[m.manufacturer] ?? 1), 0);
+    grandBase += base;
+    grandAdj  += adj;
+
+    const diff    = adj - base;
+    const hasAdj  = Math.abs(diff) > 0.01;
+    const count   = data.length;
+
+    let text = `${label} : ${fmtC(base)} · ${count} marques`;
+    if (hasAdj) {
+      const c = diff >= 0 ? 'color:#d97706' : 'color:#dc2626';
+      text += ` <span style="${c};font-size:11px">(ajusté : ${fmtC(adj)}, ${fmtDiff(diff)})</span>`;
+    }
+    document.getElementById(BUDGET_CFG[key].totalId).innerHTML = text;
+  }
+
+  // Combined banner
+  const hasGrandAdj = Math.abs(grandAdj - grandBase) > 0.01;
+  if (grandBase > 0) {
+    document.getElementById('budgetBaseTotal').textContent = fmtC(grandBase);
     document.getElementById('budgetBanner').classList.remove('hidden');
+    const adjEl = document.getElementById('budgetAdjTotal');
+    if (hasGrandAdj) {
+      const diff = grandAdj - grandBase;
+      adjEl.textContent = `Ajusté : ${fmtC(grandAdj)} (${fmtDiff(diff)})`;
+      adjEl.className = `text-sm font-semibold ${diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+      adjEl.classList.remove('hidden');
+    } else {
+      adjEl.classList.add('hidden');
+    }
   }
 }
 
-// ── BUDGET load ───────────────────────────────────────────────────────────
+// ── Budget: load both panels ───────────────────────────────────────────────
 async function loadBudget() {
   showLoader('budgetNos', true);
   showLoader('budgetSeas', true);
@@ -483,10 +604,7 @@ async function loadBudget() {
 
   showLoader('budgetNos', false);
   if (nosR.status === 'fulfilled') {
-    const d = nosR.value;
-    state.budgetNos.data = d.by_manufacturer ?? [];
-    document.getElementById('budgetNosTotal').textContent =
-      `NOS : ${fmtC(d.total_proposed_budget)} · ${d.manufacturer_count} marques`;
+    state.budgetNos.data = nosR.value.by_manufacturer ?? [];
     renderBudgetTable('budgetNos');
   } else {
     document.getElementById('budgetNosBody').innerHTML =
@@ -497,8 +615,6 @@ async function loadBudget() {
   if (seasR.status === 'fulfilled') {
     const d = seasR.value;
     state.budgetSeas.data = d.by_manufacturer ?? [];
-    document.getElementById('budgetSeasTotal').textContent =
-      `Saisonnier : ${fmtC(d.total_proposed_budget)} · ${d.manufacturer_count} marques`;
     if (d.reference_period) {
       const opts = { day: 'numeric', month: 'long' };
       const from = new Date(d.reference_period.from + 'T12:00:00').toLocaleDateString('fr-CA', opts);
@@ -511,7 +627,7 @@ async function loadBudget() {
       `<tr><td colspan="7" class="text-center py-8 text-red-500">${seasR.reason?.message ?? 'Erreur'}</td></tr>`;
   }
 
-  updateCombinedBanner();
+  updateAllBudgetTotals();
 }
 
 // ── Budget weeks sliders ──────────────────────────────────────────────────
@@ -519,12 +635,8 @@ async function loadBudget() {
   const nosSlider  = document.getElementById('budgetNosWeeks');
   const seasSlider = document.getElementById('budgetSeasWeeks');
 
-  nosSlider.addEventListener('input', () => {
-    document.getElementById('budgetNosWeeksLabel').textContent = nosSlider.value;
-  });
-  seasSlider.addEventListener('input', () => {
-    document.getElementById('budgetSeasWeeksLabel').textContent = seasSlider.value;
-  });
+  nosSlider.addEventListener('input',  () => { document.getElementById('budgetNosWeeksLabel').textContent  = nosSlider.value; });
+  seasSlider.addEventListener('input', () => { document.getElementById('budgetSeasWeeksLabel').textContent = seasSlider.value; });
 
   let nosTimer, seasTimer;
 
@@ -536,10 +648,8 @@ async function loadBudget() {
         const d = await fetch(`${BASE}/api/budget/nos?weeks=${nosSlider.value}`).then(r => r.json());
         state.budgetNos.data = d.by_manufacturer ?? [];
         state.budgetNos.expanded = new Set();
-        document.getElementById('budgetNosTotal').textContent =
-          `NOS : ${fmtC(d.total_proposed_budget)} · ${d.manufacturer_count} marques`;
         renderBudgetTable('budgetNos');
-        updateCombinedBanner();
+        updateAllBudgetTotals();
       } finally { showLoader('budgetNos', false); }
     }, 300);
   });
@@ -552,8 +662,6 @@ async function loadBudget() {
         const d = await fetch(`${BASE}/api/budget/saisonnier?weeks=${seasSlider.value}`).then(r => r.json());
         state.budgetSeas.data = d.by_manufacturer ?? [];
         state.budgetSeas.expanded = new Set();
-        document.getElementById('budgetSeasTotal').textContent =
-          `Saisonnier : ${fmtC(d.total_proposed_budget)} · ${d.manufacturer_count} marques`;
         if (d.reference_period) {
           const opts = { day: 'numeric', month: 'long' };
           const from = new Date(d.reference_period.from + 'T12:00:00').toLocaleDateString('fr-CA', opts);
@@ -561,16 +669,16 @@ async function loadBudget() {
           document.getElementById('budgetSeasPeriod').textContent = `Réf. : ${from} – ${to}`;
         }
         renderBudgetTable('budgetSeas');
-        updateCombinedBanner();
+        updateAllBudgetTotals();
       } finally { showLoader('budgetSeas', false); }
     }, 300);
   });
 
-  document.getElementById('budgetNosSearch').addEventListener('input', () => renderBudgetTable('budgetNos'));
+  document.getElementById('budgetNosSearch').addEventListener('input',  () => renderBudgetTable('budgetNos'));
   document.getElementById('budgetSeasSearch').addEventListener('input', () => renderBudgetTable('budgetSeas'));
 })();
 
-// ── NOS ───────────────────────────────────────────────────────────────────
+// ── NOS tab ────────────────────────────────────────────────────────────────
 async function loadNos() {
   showLoader('nos', true);
   try {
@@ -578,7 +686,6 @@ async function loadNos() {
     const r = await fetch(`${BASE}/api/nos?weeks=${weeks}`);
     const d = await r.json();
     state.nos.data = d.items;
-    state.nos.weeks = weeks;
     populateShopFilter(d.items, 'nosShop');
     filterAndRenderNos();
   } catch (e) {
@@ -601,8 +708,7 @@ function filterAndRenderNos() {
 
 function renderNosPage() {
   const { filtered, page } = state.nos;
-  const start = page * PAGE_SIZE;
-  const slice = filtered.slice(start, start + PAGE_SIZE);
+  const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   document.getElementById('nosCount').textContent = `${filtered.length.toLocaleString()} articles`;
   document.getElementById('nosBody').innerHTML = slice.map(r => `
     <tr class="transition-colors">
@@ -617,7 +723,7 @@ function renderNosPage() {
   renderPager('nos', filtered.length);
 }
 
-// ── SEASONAL ──────────────────────────────────────────────────────────────
+// ── Seasonal tab ──────────────────────────────────────────────────────────
 async function loadSeasonal() {
   showLoader('seasonal', true);
   try {
@@ -647,8 +753,7 @@ function filterAndRenderSeasonal() {
 
 function renderSeasonalPage() {
   const { filtered, page } = state.seasonal;
-  const start = page * PAGE_SIZE;
-  const slice = filtered.slice(start, start + PAGE_SIZE);
+  const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   document.getElementById('seasCount').textContent = `${filtered.length.toLocaleString()} articles`;
   document.getElementById('seasBody').innerHTML = slice.map(r => `
     <tr class="transition-colors">
@@ -663,7 +768,7 @@ function renderSeasonalPage() {
   renderPager('seasonal', filtered.length);
 }
 
-// ── SIZES ─────────────────────────────────────────────────────────────────
+// ── Sizes tab ─────────────────────────────────────────────────────────────
 async function loadSizes() {
   showLoader('sizes', true);
   try {
@@ -692,8 +797,7 @@ function filterAndRenderSizes() {
 
 function renderSizesPage() {
   const { filtered, page } = state.sizes;
-  const start = page * PAGE_SIZE;
-  const slice = filtered.slice(start, start + PAGE_SIZE);
+  const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   document.getElementById('sizesCount').textContent = `${filtered.length.toLocaleString()} lignes`;
   document.getElementById('sizesBody').innerHTML = slice.map(r => `
     <tr class="transition-colors">
@@ -707,7 +811,7 @@ function renderSizesPage() {
   renderPager('sizes', filtered.length);
 }
 
-// ── TRANSFERS ─────────────────────────────────────────────────────────────
+// ── Transfers tab ─────────────────────────────────────────────────────────
 async function loadTransfers() {
   showLoader('transfers', true);
   try {
@@ -760,17 +864,16 @@ function bindPager(key, renderFn) {
 
 // ── Shop filter helper ────────────────────────────────────────────────────
 function populateShopFilter(items, selectId) {
-  const sel = document.getElementById(selectId);
+  const sel      = document.getElementById(selectId);
   const existing = new Set([...sel.options].map(o => o.value).filter(Boolean));
-  const shops = [...new Map(items.map(i => [i.shop_id, i.shop_name])).entries()]
-    .sort((a,b) => a[1].localeCompare(b[1]));
-  shops.forEach(([id, name]) => {
-    if (!existing.has(id)) {
+  [...new Map(items.map(i => [i.shop_id, i.shop_name])).entries()]
+    .sort((a,b) => a[1].localeCompare(b[1]))
+    .forEach(([id, name]) => {
+      if (existing.has(id)) return;
       const o = document.createElement('option');
       o.value = id; o.textContent = name;
       sel.appendChild(o);
-    }
-  });
+    });
 }
 
 // ── Loader ────────────────────────────────────────────────────────────────
@@ -781,48 +884,30 @@ function showLoader(key, show) {
 
 // ── Event bindings — NOS tab ──────────────────────────────────────────────
 const nosWeeks = document.getElementById('nosWeeks');
-nosWeeks.addEventListener('input', () => {
-  document.getElementById('nosWeeksLabel').textContent = nosWeeks.value;
-});
+nosWeeks.addEventListener('input', () => { document.getElementById('nosWeeksLabel').textContent = nosWeeks.value; });
 let nosDebounce;
-nosWeeks.addEventListener('change', () => {
-  clearTimeout(nosDebounce);
-  nosDebounce = setTimeout(() => { state.nos.data = []; loadNos(); }, 200);
-});
+nosWeeks.addEventListener('change', () => { clearTimeout(nosDebounce); nosDebounce = setTimeout(() => { state.nos.data = []; loadNos(); }, 200); });
 document.getElementById('nosShop').addEventListener('change', filterAndRenderNos);
-document.getElementById('nosSearch').addEventListener('input', () => {
-  clearTimeout(nosDebounce);
-  nosDebounce = setTimeout(filterAndRenderNos, 250);
-});
+document.getElementById('nosSearch').addEventListener('input', () => { clearTimeout(nosDebounce); nosDebounce = setTimeout(filterAndRenderNos, 250); });
 bindPager('nos', renderNosPage);
 
 // ── Event bindings — Seasonal tab ─────────────────────────────────────────
 const seasWeeks = document.getElementById('seasWeeks');
-seasWeeks.addEventListener('input', () => {
-  document.getElementById('seasWeeksLabel').textContent = seasWeeks.value;
-});
+seasWeeks.addEventListener('input', () => { document.getElementById('seasWeeksLabel').textContent = seasWeeks.value; });
 let seasDebounce;
-seasWeeks.addEventListener('change', () => {
-  clearTimeout(seasDebounce);
-  seasDebounce = setTimeout(() => { state.seasonal.data = []; loadSeasonal(); }, 200);
-});
+seasWeeks.addEventListener('change', () => { clearTimeout(seasDebounce); seasDebounce = setTimeout(() => { state.seasonal.data = []; loadSeasonal(); }, 200); });
 document.getElementById('seasShop').addEventListener('change', filterAndRenderSeasonal);
-document.getElementById('seasSearch').addEventListener('input', () => {
-  clearTimeout(seasDebounce);
-  seasDebounce = setTimeout(filterAndRenderSeasonal, 250);
-});
+document.getElementById('seasSearch').addEventListener('input', () => { clearTimeout(seasDebounce); seasDebounce = setTimeout(filterAndRenderSeasonal, 250); });
 bindPager('seasonal', renderSeasonalPage);
 
 // ── Event bindings — Sizes tab ────────────────────────────────────────────
 document.getElementById('sizesShop').addEventListener('change', filterAndRenderSizes);
 let sizesDebounce;
-document.getElementById('sizesSearch').addEventListener('input', () => {
-  clearTimeout(sizesDebounce);
-  sizesDebounce = setTimeout(filterAndRenderSizes, 250);
-});
+document.getElementById('sizesSearch').addEventListener('input', () => { clearTimeout(sizesDebounce); sizesDebounce = setTimeout(filterAndRenderSizes, 250); });
 bindPager('sizes', renderSizesPage);
 
 // ── Init ──────────────────────────────────────────────────────────────────
+loadMultipliers();
 loadSyncStatus();
 tabLoaded['budget'] = true;
 loadBudget();
