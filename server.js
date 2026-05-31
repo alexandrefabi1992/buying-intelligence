@@ -1277,11 +1277,7 @@ app.get('/api/admin/explain', async (req, res, next) => {
           AND sl.completed_time IS NOT NULL
         GROUP BY sl.item_id
       ),
-      stock AS (
-        SELECT item_id, SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS current_stock
-        FROM inventory
-        GROUP BY item_id
-      )
+      stock AS (SELECT item_id, current_stock_all AS current_stock FROM mv_inventory_stock)
       SELECT
         COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
         COALESCE(p.category, 'Sans catégorie')  AS category,
