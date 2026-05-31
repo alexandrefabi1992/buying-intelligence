@@ -505,9 +505,10 @@ async function runSync() {
       await markStepCompleted('orders', ordersCount);
     }
 
-    // ── Refresh materialized view ─────────────────────────────────────────
-    console.log('[sync] Refreshing sales velocity view…');
+    // ── Refresh materialized views ────────────────────────────────────────
+    console.log('[sync] Refreshing materialized views…');
     await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_sales_velocity');
+    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_inventory_stock');
 
     console.log(`[sync] Done — ${new Date().toISOString()}`);
 
