@@ -1189,6 +1189,99 @@ app.get('/api/admin/inspect-filters', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/admin/explain — EXPLAIN ANALYZE on the two slow budget queries
+// ---------------------------------------------------------------------------
+app.get('/api/admin/explain', async (req, res, next) => {
+  try {
+    const nosQuery = `
+      WITH velocity AS (
+        SELECT item_id, shop_id, AVG(units_sold) AS avg_weekly_units
+        FROM mv_sales_velocity
+        WHERE week >= date_trunc('week', now()) - INTERVAL '12 weeks'
+        GROUP BY item_id, shop_id
+      ),
+      shortage AS (
+        SELECT
+          COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+          COALESCE(p.category, 'Sans catégorie')  AS category,
+          p.item_id,
+          COALESCE(i.qty_on_hand, 0) + COALESCE(i.qty_on_order, 0)      AS current_stock,
+          v.avg_weekly_units * 12                                          AS ref_units_12w,
+          GREATEST(0,
+            v.avg_weekly_units * 4
+            - (COALESCE(i.qty_on_hand, 0) + COALESCE(i.qty_on_order, 0))
+          )                                                                AS shortage_units,
+          COALESCE(p.default_cost, 0)                                      AS unit_cost
+        FROM products p
+        JOIN velocity  v ON v.item_id = p.item_id
+        JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = v.shop_id
+        WHERE p.tags ILIKE '%nos%'
+          AND p.archived = false
+          AND v.avg_weekly_units > 0
+          AND p.category    NOT ILIKE 'Alt%ration%'
+          AND p.description NOT ILIKE '%shopify%'
+          AND NOT (p.default_cost = 0 AND p.default_price = 0)
+      )
+      SELECT manufacturer, category,
+             COUNT(DISTINCT item_id)::int            AS items_count,
+             ROUND(SUM(current_stock), 0)::float8    AS remaining_stock_units,
+             ROUND(SUM(ref_units_12w), 0)::float8    AS reference_units_12w,
+             ROUND(SUM(shortage_units * unit_cost), 2)::float8 AS proposed_budget
+      FROM shortage
+      GROUP BY manufacturer, category
+      ORDER BY manufacturer, proposed_budget DESC
+    `;
+
+    const saisQuery = `
+      WITH last_year AS (
+        SELECT sl.item_id, SUM(sl.qty) AS units_sold_ly
+        FROM sale_lines sl
+        WHERE sl.completed_time >= now() - INTERVAL '52 weeks'
+          AND sl.completed_time <  now() - INTERVAL '52 weeks' + ('8 weeks')::interval
+          AND sl.qty > 0
+          AND sl.completed_time IS NOT NULL
+        GROUP BY sl.item_id
+      ),
+      stock AS (
+        SELECT item_id, SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS current_stock
+        FROM inventory
+        GROUP BY item_id
+      )
+      SELECT
+        COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+        COALESCE(p.category, 'Sans catégorie')  AS category,
+        COUNT(DISTINCT p.item_id)::int           AS items_count,
+        ROUND(SUM(COALESCE(st.current_stock, 0)), 0)::float8 AS remaining_stock_units,
+        ROUND(SUM(ly.units_sold_ly), 0)::float8              AS reference_units_sold,
+        ROUND(SUM(
+          GREATEST(0, ly.units_sold_ly - COALESCE(st.current_stock, 0))
+          * COALESCE(p.default_cost, 0)
+        ), 2)::float8 AS proposed_budget
+      FROM products p
+      JOIN last_year ly ON ly.item_id = p.item_id
+      LEFT JOIN stock st ON st.item_id = p.item_id
+      WHERE (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')
+        AND p.archived = false
+        AND p.default_cost > 0
+        AND p.category    NOT ILIKE 'Alt%ration%'
+        AND p.description NOT ILIKE '%shopify%'
+        AND NOT (p.default_cost = 0 AND p.default_price = 0)
+      GROUP BY p.manufacturer, p.category
+      ORDER BY p.manufacturer, proposed_budget DESC
+    `;
+
+    const [nosExpl, saisExpl] = await Promise.all([
+      pool.query(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${nosQuery}`),
+      pool.query(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${saisQuery}`),
+    ]);
+
+    res.json({
+      nos:       nosExpl.rows[0]['QUERY PLAN'],
+      saisonnier: saisExpl.rows[0]['QUERY PLAN'],
+    });
+  } catch (err) { next(err); }
+});
+
 // POST /api/admin/refresh-view — force refresh mv_sales_velocity
 // ---------------------------------------------------------------------------
 app.post('/api/admin/refresh-view', async (req, res, next) => {
