@@ -620,6 +620,54 @@ app.get('/api/admin/query', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/ls-inspect — fetch first page of a Lightspeed reference endpoint
+// Usage: /api/admin/ls-inspect?resource=Category|Department|Manufacturer|ItemTag
+// ---------------------------------------------------------------------------
+app.get('/api/admin/ls-inspect', async (req, res, next) => {
+  try {
+    const resource = req.query.resource;
+    const ALLOWED_RESOURCES = ['Category', 'Department', 'Manufacturer', 'ItemTag'];
+    if (!ALLOWED_RESOURCES.includes(resource)) {
+      return res.status(400).json({ error: 'resource must be one of: ' + ALLOWED_RESOURCES.join(', ') });
+    }
+
+    const BASE_URL = `https://api.lightspeedapp.com/API/V3/Account/${process.env.LIGHTSPEED_ACCOUNT_ID}`;
+    const TOKEN_URL = 'https://cloud.lightspeedapp.com/oauth/access_token.php';
+
+    // Get current refresh token from DB
+    const { rows } = await pool.query("SELECT next_url FROM sync_state WHERE step = 'refresh_token'");
+    const refreshToken = rows[0]?.next_url ?? process.env.LIGHTSPEED_REFRESH_TOKEN;
+
+    // Exchange for access token
+    const tokenResp = await axios.post(TOKEN_URL, new URLSearchParams({
+      client_id:     process.env.LIGHTSPEED_CLIENT_ID,
+      client_secret: process.env.LIGHTSPEED_CLIENT_SECRET,
+      refresh_token: refreshToken,
+      grant_type:    'refresh_token',
+    }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+
+    const accessToken = tokenResp.data.access_token;
+    // Persist rotated refresh token
+    if (tokenResp.data.refresh_token) {
+      await pool.query(
+        `INSERT INTO sync_state(step, next_url, updated_at) VALUES ('refresh_token', $1, now())
+         ON CONFLICT(step) DO UPDATE SET next_url=$1, updated_at=now()`,
+        [tokenResp.data.refresh_token],
+      );
+    }
+
+    // Fetch first page of the resource (limit 5 for inspection)
+    const url = `${BASE_URL}/${resource}.json?limit=5`;
+    const resp = await axios.get(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: 30000,
+    });
+
+    res.json({ resource, url, data: resp.data });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/admin/products-audit — show products table structure + null stats + sample
 // ---------------------------------------------------------------------------
 app.get('/api/admin/products-audit', async (req, res, next) => {
