@@ -113,6 +113,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_velocity      ON mv_sales_velocity(item
 -- Dedicated week index so "WHERE week >= now()-12weeks" uses a range scan (week is 3rd col above)
 CREATE INDEX        IF NOT EXISTS idx_mv_velocity_week  ON mv_sales_velocity(week);
 
+-- Pre-aggregated inventory stock per item across all shops.
+-- Eliminates the 412ms Seq Scan + HashAggregate on 662k inventory rows in /api/budget/saisonnier.
+-- Refreshed CONCURRENTLY after each sync alongside mv_sales_velocity.
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inventory_stock AS
+SELECT
+  item_id,
+  SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS current_stock_all
+FROM inventory
+GROUP BY item_id;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_inventory_stock ON mv_inventory_stock(item_id);
+
 -- Trigram extension for ILIKE '%…%' acceleration on tags
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX IF NOT EXISTS idx_products_tags_gin     ON products USING gin(tags        gin_trgm_ops);

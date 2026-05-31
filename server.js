@@ -725,6 +725,18 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
     if (colls?.length) { params.push(colls);                                          collCond = `AND string_to_array(lower(coalesce(p.tags,'')), ',') && $${params.length}::text[]`; }
     if (sizes?.length) { params.push('\\y(' + sizes.join('|') + ')\\y');             sizeCond = `AND p.description ~* $${params.length}`; }
 
+    // Without shop filter: use pre-aggregated MV (eliminates 412ms inventory HashAggregate).
+    // With shop filter: aggregate only the requested shops inline.
+    const stockCTE = shops?.length
+      ? `stock AS (
+           SELECT item_id,
+                  SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS current_stock
+           FROM inventory
+           WHERE 1=1 ${shopCondInv}
+           GROUP BY item_id
+         )`
+      : `stock AS (SELECT item_id, current_stock_all AS current_stock FROM mv_inventory_stock)`;
+
     const [rangeResult, budgetResult] = await Promise.all([
       pool.query(`
         SELECT
@@ -748,14 +760,7 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
             ${shopCondSL}
           GROUP BY sl.item_id
         ),
-        stock AS (
-          SELECT item_id,
-                 SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS current_stock
-          FROM inventory
-          WHERE 1=1
-            ${shopCondInv}
-          GROUP BY item_id
-        )
+        ${stockCTE}
         SELECT
           COALESCE(p.manufacturer, 'Sans marque')    AS manufacturer,
           COALESCE(p.category,     'Sans catégorie') AS category,
