@@ -109,7 +109,20 @@ FROM sale_lines sl
 WHERE sl.completed_time IS NOT NULL
 GROUP BY sl.item_id, sl.shop_id, date_trunc('week', sl.completed_time);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_velocity ON mv_sales_velocity(item_id, shop_id, week);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_velocity      ON mv_sales_velocity(item_id, shop_id, week);
+-- Dedicated week index so "WHERE week >= now()-12weeks" uses a range scan (week is 3rd col above)
+CREATE INDEX        IF NOT EXISTS idx_mv_velocity_week  ON mv_sales_velocity(week);
+
+-- Trigram extension for ILIKE '%…%' acceleration on tags
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_products_tags_gin     ON products USING gin(tags        gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_products_desc_gin     ON products USING gin(description gin_trgm_ops);
+
+-- Manufacturer index for GROUP BY sort
+CREATE INDEX IF NOT EXISTS idx_products_manufacturer ON products(manufacturer);
+
+-- Partial index: most queries filter archived = false; skip archived rows entirely
+CREATE INDEX IF NOT EXISTS idx_products_active       ON products(item_id) WHERE archived = false;
 
 -- Sync checkpoint — persists cursor position across restarts
 CREATE TABLE IF NOT EXISTS sync_state (
