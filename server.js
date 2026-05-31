@@ -36,6 +36,24 @@ process.on('unhandledRejection', (reason) => {
   console.error('[process] Unhandled rejection:', reason?.message ?? reason);
 });
 
+// ---------------------------------------------------------------------------
+// In-memory TTL cache — 5-minute TTL for slow budget queries
+// Key: JSON string of route + params. Auto-expires on get.
+// ---------------------------------------------------------------------------
+const budgetCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function cacheGet(key) {
+  const entry = budgetCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expires) { budgetCache.delete(key); return null; }
+  return entry.data;
+}
+
+function cacheSet(key, data) {
+  budgetCache.set(key, { data, expires: Date.now() + CACHE_TTL_MS });
+}
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -603,12 +621,16 @@ function buildManufacturerTree(rows, refField) {
 app.get('/api/budget/nos', async (req, res, next) => {
   try {
     const weeks  = parseInt(req.query.weeks ?? '4', 10);
-    const params = [weeks]; // $1
 
     const shops = req.query.shops       ? req.query.shops.split(',').filter(Boolean)                                  : null;
     const colls = req.query.collections ? req.query.collections.split(',').map(s => s.toLowerCase().trim()).filter(Boolean) : null;
     const sizes = req.query.sizes       ? req.query.sizes.split(',').filter(Boolean)                                  : null;
 
+    const cacheKey = JSON.stringify({ r: 'nos', weeks, shops, colls, sizes });
+    const hit = cacheGet(cacheKey);
+    if (hit) return res.json({ ...hit, cached: true });
+
+    const params = [weeks]; // $1
     let shopCond = '', collCond = '', sizeCond = '';
     if (shops?.length) { params.push(shops);                                          shopCond = `AND i.shop_id = ANY($${params.length})`; }
     if (colls?.length) { params.push(colls);                                          collCond = `AND string_to_array(lower(coalesce(p.tags,'')), ',') && $${params.length}::text[]`; }
@@ -661,13 +683,15 @@ app.get('/api/budget/nos', async (req, res, next) => {
     const byManufacturer = buildManufacturerTree(rows, 'reference_units_12w');
     const total = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
 
-    res.json({
+    const result = {
       weeks_target:          weeks,
       generated_at:          new Date().toISOString(),
       total_proposed_budget: Math.round(total * 100) / 100,
       manufacturer_count:    byManufacturer.length,
       by_manufacturer:       byManufacturer,
-    });
+    };
+    cacheSet(cacheKey, result);
+    res.json(result);
   } catch (err) { next(err); }
 });
 
@@ -681,12 +705,16 @@ app.get('/api/budget/nos', async (req, res, next) => {
 app.get('/api/budget/saisonnier', async (req, res, next) => {
   try {
     const weeks  = parseInt(req.query.weeks ?? '8', 10);
-    const params = [weeks]; // $1
 
     const shops = req.query.shops       ? req.query.shops.split(',').filter(Boolean)                                  : null;
     const colls = req.query.collections ? req.query.collections.split(',').map(s => s.toLowerCase().trim()).filter(Boolean) : null;
     const sizes = req.query.sizes       ? req.query.sizes.split(',').filter(Boolean)                                  : null;
 
+    const cacheKey = JSON.stringify({ r: 'saisonnier', weeks, shops, colls, sizes });
+    const hit = cacheGet(cacheKey);
+    if (hit) return res.json({ ...hit, cached: true });
+
+    const params = [weeks]; // $1
     let shopCondSL = '', shopCondInv = '', collCond = '', sizeCond = '';
     if (shops?.length) {
       params.push(shops);
@@ -761,7 +789,7 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
     const byManufacturer = buildManufacturerTree(budgetResult.rows, 'reference_units_sold');
     const total = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
 
-    res.json({
+    const result = {
       weeks_horizon:         weeks,
       reference_period:      {
         from: refStart.toISOString().slice(0, 10),
@@ -776,7 +804,9 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
       total_proposed_budget: Math.round(total * 100) / 100,
       manufacturer_count:    byManufacturer.length,
       by_manufacturer:       byManufacturer,
-    });
+    };
+    cacheSet(cacheKey, result);
+    res.json(result);
   } catch (err) { next(err); }
 });
 
