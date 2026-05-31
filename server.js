@@ -656,14 +656,20 @@ app.get('/api/admin/ls-inspect', async (req, res, next) => {
       );
     }
 
-    // Fetch first page of the resource (limit 5 for inspection)
-    const url = `${BASE_URL}/${resource}.json?limit=5`;
-    const resp = await axios.get(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      timeout: 30000,
-    });
-
-    res.json({ resource, url, data: resp.data });
+    // ItemTag is a relation on Item, not a standalone endpoint
+    let url, resp;
+    if (resource === 'ItemTag') {
+      url = `${BASE_URL}/Item.json?limit=10&load_relations=["ItemTag"]`;
+      resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
+      // Filter to only items that actually have tags
+      const items = resp.data.Item ?? [];
+      const withTags = items.filter(i => i.ItemTag && i.ItemTag !== false && Object.keys(i.ItemTag).length > 0);
+      res.json({ resource, url, note: 'ItemTag is a relation on Item — showing items with tags', items_with_tags: withTags, raw_sample: items.slice(0, 3) });
+    } else {
+      url = `${BASE_URL}/${resource}.json?limit=5`;
+      resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
+      res.json({ resource, url, data: resp.data });
+    }
   } catch (err) { next(err); }
 });
 
