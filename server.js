@@ -660,24 +660,24 @@ app.get('/api/admin/ls-inspect', async (req, res, next) => {
     let url, resp;
     if (resource === 'ItemTag') {
       // Try multiple load_relations formats to find what Lightspeed accepts
-      const formats = [
-        `${BASE_URL}/Item.json?limit=10&load_relations=%5B%22ItemTag%22%5D`,
-        `${BASE_URL}/Item.json?limit=10&load_relations=["ItemTag"]`,
-        `${BASE_URL}/Item.json?limit=10&load_relations=all`,
-      ];
-      const results = [];
-      for (const testUrl of formats) {
-        try {
-          const r = await axios.get(testUrl, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 15000 });
-          const items = r.data.Item ?? [];
-          const sample = items.slice(0, 2).map(i => ({ itemID: i.itemID, description: i.description, ItemTag: i.ItemTag }));
-          results.push({ url: testUrl, status: 'ok', sample });
-          break; // Stop at first working format
-        } catch (e) {
-          results.push({ url: testUrl, status: e.response?.status ?? e.message, body: e.response?.data });
+      // load_relations=all to discover all available relations and tag fields
+      url = `${BASE_URL}/Item.json?limit=5&load_relations=all`;
+      resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
+      const items = resp.data.Item ?? [];
+      // Show full keys available on each item (to find tag-related fields)
+      const keySummary = items.length > 0 ? Object.keys(items[0]).sort() : [];
+      // Show items where any key looks tag-related
+      const tagKeys = keySummary.filter(k => /tag|Tag|label|Label/i.test(k));
+      const sample = items.slice(0, 3).map(i => {
+        const obj = { itemID: i.itemID, description: i.description };
+        tagKeys.forEach(k => { obj[k] = i[k]; });
+        // Also show non-false relation values
+        for (const k of Object.keys(i)) {
+          if (i[k] && typeof i[k] === 'object' && !Array.isArray(i[k])) obj['_rel_' + k] = i[k];
         }
-      }
-      return res.json({ resource, results });
+        return obj;
+      });
+      return res.json({ resource, url, all_keys: keySummary, tag_related_keys: tagKeys, sample });
     } else {
       url = `${BASE_URL}/${resource}.json?limit=5`;
       resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
