@@ -131,6 +131,9 @@ async function runMigrations() {
       updated_at      TIMESTAMPTZ DEFAULT now()
     )
   `);
+  // Additive migration: tags and image_url columns on products
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS tags      TEXT`);
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT`);
   console.log('[migration] Schema up to date');
 }
 
