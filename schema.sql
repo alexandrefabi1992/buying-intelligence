@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS products (
   brand          TEXT,
   category       TEXT,
   department     TEXT,
+  tags           TEXT,
+  image_url      TEXT,
   default_cost   NUMERIC(12,4),
   default_price  NUMERIC(12,4),
   archived       BOOLEAN DEFAULT false,

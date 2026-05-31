@@ -205,26 +205,44 @@ async function upsertShops(client, rows) {
 
 async function upsertProducts(client, rows) {
   for (const item of rows) {
-    const category     = item.Category?.name     ?? item.categoryID     ?? null;
-    const department   = item.Department?.name   ?? item.departmentID   ?? null;
+    // Category: prefer fullPathName from loaded relation, fall back to raw ID
+    const category = item.Category?.fullPathName ?? item.Category?.name ?? item.categoryID ?? null;
+
+    // Manufacturer = brand in clothing context
     const manufacturer = item.Manufacturer?.name ?? item.manufacturerID ?? null;
-    const defaultPrice = item.Prices?.ItemPrice?.[0]?.amount
-                      ?? item.defaultPrice
-                      ?? null;
+
+    // Tags: Tags.tag is a CSV string ("NOS,A26") or false/absent when none
+    const tagsRaw = item.Tags?.tag;
+    const tags = (tagsRaw && tagsRaw !== 'false') ? String(tagsRaw).trim() : null;
+
+    // Image: pick the Image with ordering=0 (or first in array), build Cloudinary URL
+    let imageUrl = null;
+    const imgRelation = item.Images;
+    if (imgRelation && imgRelation !== false && imgRelation !== 'false') {
+      const imgList = imgRelation.Image;
+      const imgs = Array.isArray(imgList) ? imgList : imgList ? [imgList] : [];
+      const primary = imgs.sort((a, b) => Number(a.ordering) - Number(b.ordering))[0];
+      if (primary?.baseImageURL && primary?.publicID) {
+        imageUrl = primary.baseImageURL + primary.publicID;
+      }
+    }
+
+    const defaultPrice = item.Prices?.ItemPrice?.[0]?.amount ?? item.defaultPrice ?? null;
 
     await pool.query(
       `INSERT INTO products(item_id, matrix_id, description, ean, upc, manufacturer, brand,
-         category, department, default_cost, default_price, archived, raw)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         category, department, tags, image_url, default_cost, default_price, archived, raw)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        ON CONFLICT(item_id) DO UPDATE
          SET matrix_id=$2, description=$3, ean=$4, upc=$5, manufacturer=$6, brand=$7,
-             category=$8, department=$9, default_cost=$10, default_price=$11,
-             archived=$12, raw=$13, synced_at=now()`,
+             category=$8, department=$9, tags=$10, image_url=$11,
+             default_cost=$12, default_price=$13, archived=$14, raw=$15, synced_at=now()`,
       [
         item.itemID, item.itemMatrixID ?? null,
         item.description, item.ean ?? null, item.upc ?? null,
         manufacturer, null,
-        category, department,
+        category, item.departmentID ?? null,
+        tags, imageUrl,
         item.defaultCost ?? null, defaultPrice,
         item.archived === 'true', item,
       ],
@@ -388,7 +406,9 @@ async function runSync() {
       let itemCount = cps.items?.processed_count ?? 0;
       if (cps.items) console.log(`[sync] Resuming items from checkpoint at ${itemCount}…`);
       else           console.log('[sync] Fetching items…');
-      for await (const { items, nextUrl } of paginate(client, 'Item', {}, cps.items?.next_url)) {
+      for await (const { items, nextUrl } of paginate(client, 'Item', {
+        load_relations: JSON.stringify(['Tags', 'Category', 'Manufacturer', 'Images']),
+      }, cps.items?.next_url)) {
         await upsertProducts(client, items);
         itemCount += items.length;
         console.log(`[sync] Items upserted: ${itemCount}`);
