@@ -659,7 +659,8 @@ app.get('/api/admin/ls-inspect', async (req, res, next) => {
     // ItemTag is a relation on Item, not a standalone endpoint
     let url, resp;
     if (resource === 'ItemTag') {
-      url = `${BASE_URL}/Item.json?limit=10&load_relations=["ItemTag"]`;
+      const params = new URLSearchParams({ limit: '10', load_relations: '["ItemTag"]' });
+      url = `${BASE_URL}/Item.json?${params}`;
       resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
       // Filter to only items that actually have tags
       const items = resp.data.Item ?? [];
