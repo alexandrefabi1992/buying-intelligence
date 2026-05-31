@@ -197,7 +197,11 @@ async function* paginate(client, resource, params = {}, resumeUrl = null) {
     yield { items, nextUrl: lsNextUrl };
 
     if (!lsNextUrl) break;
-    url = rebuildUrl(resource, params, lsNextUrl);
+    try {
+      url = rebuildUrl(resource, params, lsNextUrl);
+    } catch {
+      url = lsNextUrl; // fallback: use raw URL if rebuild fails
+    }
   }
 }
 
