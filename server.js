@@ -539,6 +539,201 @@ app.get('/api/budget', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// Shared helper: aggregate manufacturer×category rows into a nested tree.
+// Each manufacturer entry gets a `hypothesis` scaffold for future multipliers.
+// refField is the column name carrying the reference-demand figure
+// (differs between NOS and seasonal).
+// ---------------------------------------------------------------------------
+function buildManufacturerTree(rows, refField) {
+  const map = new Map();
+  for (const row of rows) {
+    const budget = parseFloat(row.proposed_budget ?? 0);
+    if (budget <= 0) continue;
+    if (!map.has(row.manufacturer)) {
+      map.set(row.manufacturer, {
+        manufacturer:          row.manufacturer,
+        items_count:           0,
+        remaining_stock_units: 0,
+        [refField]:            0,
+        proposed_budget:       0,
+        hypothesis:            { multiplier: 1.0, adjusted_budget: 0 },
+        by_category:           [],
+      });
+    }
+    const m = map.get(row.manufacturer);
+    m.items_count           += parseInt(row.items_count ?? 0);
+    m.remaining_stock_units += parseFloat(row.remaining_stock_units ?? 0);
+    m[refField]             += parseFloat(row[refField] ?? 0);
+    m.proposed_budget       += budget;
+    m.by_category.push({
+      category:              row.category,
+      items_count:           parseInt(row.items_count ?? 0),
+      remaining_stock_units: parseFloat(row.remaining_stock_units ?? 0),
+      [refField]:            parseFloat(row[refField] ?? 0),
+      proposed_budget:       budget,
+    });
+  }
+  return Array.from(map.values())
+    .map(m => {
+      m.proposed_budget        = Math.round(m.proposed_budget * 100) / 100;
+      m.remaining_stock_units  = Math.round(m.remaining_stock_units);
+      m[refField]              = Math.round(m[refField]);
+      m.hypothesis.adjusted_budget = Math.round(m.proposed_budget * m.hypothesis.multiplier * 100) / 100;
+      return m;
+    })
+    .sort((a, b) => b.proposed_budget - a.proposed_budget);
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/budget/nos — NOS buying budget by manufacturer + category drill-down
+// Filter: products where tags ILIKE '%nos%'
+// Reference demand: 12-week average weekly velocity
+// Shortage: MAX(0, avg_weekly × weeks_target − current_stock) × default_cost
+// ?weeks=4 → coverage target in weeks (default 4)
+// ---------------------------------------------------------------------------
+app.get('/api/budget/nos', async (req, res, next) => {
+  try {
+    const weeks = parseInt(req.query.weeks ?? '4', 10);
+
+    const { rows } = await pool.query(`
+      WITH velocity AS (
+        SELECT item_id, shop_id, AVG(units_sold) AS avg_weekly_units
+        FROM mv_sales_velocity
+        WHERE week >= date_trunc('week', now()) - INTERVAL '12 weeks'
+        GROUP BY item_id, shop_id
+      ),
+      shortage AS (
+        SELECT
+          COALESCE(p.manufacturer, 'Sans marque')                           AS manufacturer,
+          COALESCE(p.category,     'Sans catégorie')                        AS category,
+          p.item_id,
+          COALESCE(i.qty_on_hand, 0) + COALESCE(i.qty_on_order, 0)        AS current_stock,
+          v.avg_weekly_units * 12                                            AS ref_units_12w,
+          GREATEST(0,
+            v.avg_weekly_units * $1
+            - (COALESCE(i.qty_on_hand, 0) + COALESCE(i.qty_on_order, 0))
+          )                                                                  AS shortage_units,
+          COALESCE(p.default_cost, 0)                                       AS unit_cost
+        FROM products p
+        JOIN velocity  v ON v.item_id = p.item_id
+        JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = v.shop_id
+        WHERE p.tags ILIKE '%nos%'
+          AND p.archived = false
+          AND v.avg_weekly_units > 0
+      )
+      SELECT
+        manufacturer,
+        category,
+        COUNT(DISTINCT item_id)::int                      AS items_count,
+        ROUND(SUM(current_stock),           0)::float8   AS remaining_stock_units,
+        ROUND(SUM(ref_units_12w),           0)::float8   AS reference_units_12w,
+        ROUND(SUM(shortage_units * unit_cost), 2)::float8 AS proposed_budget
+      FROM shortage
+      GROUP BY manufacturer, category
+      ORDER BY manufacturer, proposed_budget DESC
+    `, [weeks]);
+
+    const byManufacturer = buildManufacturerTree(rows, 'reference_units_12w');
+    const total = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
+
+    res.json({
+      weeks_target:          weeks,
+      generated_at:          new Date().toISOString(),
+      total_proposed_budget: Math.round(total * 100) / 100,
+      manufacturer_count:    byManufacturer.length,
+      by_manufacturer:       byManufacturer,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/budget/saisonnier — Seasonal buying budget by manufacturer + category
+// Filter: products where tags IS NULL OR tags NOT ILIKE '%nos%'
+// Reference demand: units sold in the same N-week window 52 weeks ago
+// Shortage: MAX(0, units_last_year − current_stock_all_shops) × default_cost
+// ?weeks=8 → season horizon in weeks (default 8)
+// ---------------------------------------------------------------------------
+app.get('/api/budget/saisonnier', async (req, res, next) => {
+  try {
+    const weeks = parseInt(req.query.weeks ?? '8', 10);
+
+    const [rangeResult, budgetResult] = await Promise.all([
+      // Data coverage check — tells buyer how far back the sales history goes
+      pool.query(`
+        SELECT
+          MIN(completed_time)::date AS min_date,
+          MAX(completed_time)::date AS max_date,
+          COUNT(*)::int             AS total_lines
+        FROM sale_lines
+        WHERE completed_time IS NOT NULL
+      `),
+      pool.query(`
+        WITH last_year AS (
+          SELECT
+            sl.item_id,
+            SUM(sl.qty) AS units_sold_ly
+          FROM sale_lines sl
+          WHERE sl.completed_time >= now() - INTERVAL '52 weeks'
+            AND sl.completed_time <  now() - INTERVAL '52 weeks'
+                                     + ($1 || ' weeks')::interval
+            AND sl.qty > 0
+            AND sl.completed_time IS NOT NULL
+          GROUP BY sl.item_id
+        ),
+        stock AS (
+          SELECT item_id,
+                 SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS current_stock
+          FROM inventory
+          GROUP BY item_id
+        )
+        SELECT
+          COALESCE(p.manufacturer, 'Sans marque')    AS manufacturer,
+          COALESCE(p.category,     'Sans catégorie') AS category,
+          COUNT(DISTINCT p.item_id)::int             AS items_count,
+          ROUND(SUM(COALESCE(st.current_stock, 0)), 0)::float8   AS remaining_stock_units,
+          ROUND(SUM(ly.units_sold_ly), 0)::float8                AS reference_units_sold,
+          ROUND(SUM(
+            GREATEST(0, ly.units_sold_ly - COALESCE(st.current_stock, 0))
+            * COALESCE(p.default_cost, 0)
+          ), 2)::float8                              AS proposed_budget
+        FROM products p
+        JOIN last_year ly ON ly.item_id = p.item_id
+        LEFT JOIN stock st ON st.item_id = p.item_id
+        WHERE (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')
+          AND p.archived = false
+          AND p.default_cost > 0
+        GROUP BY p.manufacturer, p.category
+        ORDER BY p.manufacturer, proposed_budget DESC
+      `, [weeks]),
+    ]);
+
+    const range    = rangeResult.rows[0];
+    const refStart = new Date(Date.now() - 52 * 7 * 24 * 60 * 60 * 1000);
+    const refEnd   = new Date(refStart.getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
+
+    const byManufacturer = buildManufacturerTree(budgetResult.rows, 'reference_units_sold');
+    const total = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
+
+    res.json({
+      weeks_horizon:         weeks,
+      reference_period:      {
+        from: refStart.toISOString().slice(0, 10),
+        to:   refEnd.toISOString().slice(0, 10),
+      },
+      sales_data_range:      {
+        min_date:    range.min_date,
+        max_date:    range.max_date,
+        total_lines: range.total_lines,
+      },
+      generated_at:          new Date().toISOString(),
+      total_proposed_budget: Math.round(total * 100) / 100,
+      manufacturer_count:    byManufacturer.length,
+      by_manufacturer:       byManufacturer,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/admin/checkpoint — manually upsert a sync_state row
 // Body: { step, status: "completed"|"pending", processed_count? }
 // ---------------------------------------------------------------------------
