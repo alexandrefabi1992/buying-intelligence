@@ -1088,6 +1088,60 @@ app.get('/api/admin/raw-sample', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/inspect-filters — audit tag tokens, size patterns, parasites
+app.get('/api/admin/inspect-filters', async (req, res, next) => {
+  try {
+    const [tagTokens, descSizes, parasites, shops] = await Promise.all([
+      // Distinct tag tokens and their frequency
+      pool.query(`
+        SELECT tag, COUNT(*) AS cnt
+        FROM (
+          SELECT trim(t) AS tag
+          FROM products, unnest(string_to_array(tags, ',')) AS t
+          WHERE tags IS NOT NULL
+        ) sub
+        WHERE tag != ''
+        GROUP BY tag
+        ORDER BY cnt DESC
+        LIMIT 80
+      `),
+      // Descriptions containing size-like tokens (letters+digits or common sizes)
+      pool.query(`
+        SELECT description, category, manufacturer, tags
+        FROM products
+        WHERE (
+          description ~* '\\y(XS|S|M|L|XL|XXL|XXXL)\\y'
+          OR description ~* '\\y(3[0-9]|4[0-9]|5[0-9])\\y'
+          OR description ~ '[0-9]{2}$'
+        )
+        AND archived = false
+        LIMIT 40
+      `),
+      // Parasite candidates
+      pool.query(`
+        SELECT item_id, description, category, default_cost, default_price, tags
+        FROM products
+        WHERE (
+          category ILIKE '%alt%ration%'
+          OR description ILIKE '%shopify%'
+          OR (default_cost = 0 AND default_price = 0)
+        )
+        AND archived = false
+        LIMIT 30
+      `),
+      // Shops list
+      pool.query(`SELECT shop_id, name FROM shops ORDER BY name`),
+    ]);
+
+    res.json({
+      tag_tokens:      tagTokens.rows,
+      desc_size_sample: descSizes.rows,
+      parasite_sample:  parasites.rows,
+      shops:            shops.rows,
+    });
+  } catch (err) { next(err); }
+});
+
 // POST /api/admin/refresh-view — force refresh mv_sales_velocity
 // ---------------------------------------------------------------------------
 app.post('/api/admin/refresh-view', async (req, res, next) => {
