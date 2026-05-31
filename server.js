@@ -23,6 +23,19 @@ if (process.env.DATABASE_URL) {
 }
 const pool = new Pool(poolConfig);
 
+// Prevent idle client errors from crashing the process.
+// pg emits 'error' on the pool when a background client disconnects
+// unexpectedly (e.g. Railway terminates idle SSL connections). Without
+// a listener, Node.js treats this as an unhandled 'error' event and exits.
+pool.on('error', (err) => {
+  console.error('[pool] Unexpected idle client error:', err.message);
+});
+
+// Log unhandled promise rejections instead of crashing
+process.on('unhandledRejection', (reason) => {
+  console.error('[process] Unhandled rejection:', reason?.message ?? reason);
+});
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
