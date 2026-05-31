@@ -620,6 +620,73 @@ app.get('/api/admin/query', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/products-audit — show products table structure + null stats + sample
+// ---------------------------------------------------------------------------
+app.get('/api/admin/products-audit', async (req, res, next) => {
+  try {
+    // Column-level NULL audit
+    const { rows: nulls } = await pool.query(`
+      SELECT
+        COUNT(*)                                          AS total,
+        COUNT(description)                                AS has_description,
+        COUNT(brand)                                      AS has_brand,
+        COUNT(category)                                   AS has_category,
+        COUNT(department)                                 AS has_department,
+        COUNT(manufacturer)                               AS has_manufacturer,
+        COUNT(matrix_id) FILTER (WHERE matrix_id != '0') AS has_matrix_id,
+        COUNT(default_cost)                               AS has_default_cost,
+        COUNT(default_price)                              AS has_default_price,
+        COUNT(ean)                                        AS has_ean,
+        COUNT(upc)                                        AS has_upc
+      FROM products
+    `);
+
+    // Sample row — pick one with most fields filled
+    const { rows: samples } = await pool.query(`
+      SELECT item_id, matrix_id, description, brand, category, department,
+             manufacturer, default_cost, default_price, ean, upc, archived,
+             jsonb_object_keys(raw) AS raw_key
+      FROM products
+      LIMIT 1
+    `);
+
+    // Full sample row with raw keys list
+    const { rows: fullSample } = await pool.query(`
+      SELECT item_id, matrix_id, description, brand, category, department,
+             manufacturer, default_cost, default_price, ean, upc, archived,
+             array(SELECT jsonb_object_keys(raw) ORDER BY 1) AS raw_keys,
+             raw->'ItemTag'   AS raw_item_tag,
+             raw->'Tags'      AS raw_tags,
+             raw->'Category'  AS raw_category,
+             raw->'Brand'     AS raw_brand,
+             raw->'Manufacturer' AS raw_manufacturer,
+             raw->'season'    AS raw_season,
+             raw->>'categoryID'   AS category_id,
+             raw->>'departmentID' AS department_id
+      FROM products
+      ORDER BY item_id
+      LIMIT 3
+    `);
+
+    // Check what category/brand/manufacturer look like in raw (are they objects?)
+    const { rows: catSample } = await pool.query(`
+      SELECT item_id, category, raw->'Category' AS raw_cat, raw->>'categoryID' AS cat_id
+      FROM products
+      WHERE category IS NOT NULL
+      LIMIT 3
+    `);
+
+    res.json({
+      schema_columns: ['item_id','matrix_id','description','brand','category','department',
+                        'manufacturer','default_cost','default_price','ean','upc','archived','raw','synced_at'],
+      null_audit: nulls[0],
+      sample_rows: fullSample,
+      category_sample: catSample,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/admin/raw-sample — inspect JSONB keys and tag structure in products
 // ---------------------------------------------------------------------------
 app.get('/api/admin/raw-sample', async (req, res, next) => {
