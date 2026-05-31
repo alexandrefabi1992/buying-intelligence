@@ -626,7 +626,7 @@ app.get('/api/admin/query', async (req, res, next) => {
 app.get('/api/admin/ls-inspect', async (req, res, next) => {
   try {
     const resource = req.query.resource;
-    const ALLOWED_RESOURCES = ['Category', 'Department', 'Manufacturer', 'ItemTag'];
+    const ALLOWED_RESOURCES = ['Category', 'Department', 'Manufacturer', 'ItemTag', 'Images'];
     if (!ALLOWED_RESOURCES.includes(resource)) {
       return res.status(400).json({ error: 'resource must be one of: ' + ALLOWED_RESOURCES.join(', ') });
     }
@@ -658,7 +658,18 @@ app.get('/api/admin/ls-inspect', async (req, res, next) => {
 
     // ItemTag is a relation on Item, not a standalone endpoint
     let url, resp;
-    if (resource === 'ItemTag') {
+    if (resource === 'Images') {
+      const params = new URLSearchParams({ limit: '5', load_relations: '["Images"]' });
+      url = `${BASE_URL}/Item.json?${params}`;
+      resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
+      const items = resp.data.Item ?? [];
+      const sample = items.map(i => ({
+        itemID:      i.itemID,
+        description: i.description,
+        Images:      i.Images,
+      }));
+      return res.json({ resource, url, sample });
+    } else if (resource === 'ItemTag') {
       // Try multiple load_relations formats to find what Lightspeed accepts
       // load_relations=all to discover all available relations and tag fields
       url = `${BASE_URL}/Item.json?limit=5&load_relations=all`;
