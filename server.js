@@ -659,13 +659,25 @@ app.get('/api/admin/ls-inspect', async (req, res, next) => {
     // ItemTag is a relation on Item, not a standalone endpoint
     let url, resp;
     if (resource === 'ItemTag') {
-      const params = new URLSearchParams({ limit: '10', load_relations: '["ItemTag"]' });
-      url = `${BASE_URL}/Item.json?${params}`;
-      resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
-      // Filter to only items that actually have tags
-      const items = resp.data.Item ?? [];
-      const withTags = items.filter(i => i.ItemTag && i.ItemTag !== false && Object.keys(i.ItemTag).length > 0);
-      res.json({ resource, url, note: 'ItemTag is a relation on Item — showing items with tags', items_with_tags: withTags, raw_sample: items.slice(0, 3) });
+      // Try multiple load_relations formats to find what Lightspeed accepts
+      const formats = [
+        `${BASE_URL}/Item.json?limit=10&load_relations=%5B%22ItemTag%22%5D`,
+        `${BASE_URL}/Item.json?limit=10&load_relations=["ItemTag"]`,
+        `${BASE_URL}/Item.json?limit=10&load_relations=all`,
+      ];
+      const results = [];
+      for (const testUrl of formats) {
+        try {
+          const r = await axios.get(testUrl, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 15000 });
+          const items = r.data.Item ?? [];
+          const sample = items.slice(0, 2).map(i => ({ itemID: i.itemID, description: i.description, ItemTag: i.ItemTag }));
+          results.push({ url: testUrl, status: 'ok', sample });
+          break; // Stop at first working format
+        } catch (e) {
+          results.push({ url: testUrl, status: e.response?.status ?? e.message, body: e.response?.data });
+        }
+      }
+      return res.json({ resource, results });
     } else {
       url = `${BASE_URL}/${resource}.json?limit=5`;
       resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
