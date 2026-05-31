@@ -153,12 +153,32 @@ function cpLabel(cp) {
 // signature compatibility but NOT used for HTTP calls — the client instance
 // has the initial token baked in and would be stale after a long prior step.
 // ---------------------------------------------------------------------------
-async function* paginate(client, resource, params = {}, resumeUrl = null) {
-  // Build the first URL directly from BASE_URL so we always get a fresh token
-  const firstUrl = resumeUrl
-    ?? `${BASE_URL}/${resource}.json?${new URLSearchParams({ ...params, limit: String(LIMIT) })}`;
+// Rebuild a Lightspeed next-page URL so our original params (e.g. load_relations)
+// are always present. Lightspeed's @attributes.next only carries cursor params
+// (sort, after, limit) — it never echoes back load_relations or filter params.
+function rebuildUrl(resource, params, lightspeedNextUrl) {
+  const parsed    = new URL(lightspeedNextUrl);
+  const after     = parsed.searchParams.get('after');
+  const sortParam = parsed.searchParams.get('sort');
+  const rebuilt   = { ...params, limit: String(LIMIT) };
+  if (sortParam) rebuilt.sort  = sortParam;
+  if (after)     rebuilt.after = after;
+  return `${BASE_URL}/${resource}.json?${new URLSearchParams(rebuilt)}`;
+}
 
-  let url = firstUrl;
+async function* paginate(client, resource, params = {}, resumeUrl = null) {
+  // First URL: if resuming use checkpoint cursor but re-inject original params;
+  // otherwise build fresh from BASE_URL.
+  let url;
+  if (resumeUrl) {
+    try {
+      url = rebuildUrl(resource, params, resumeUrl);
+    } catch {
+      url = resumeUrl; // fallback for malformed URLs
+    }
+  } else {
+    url = `${BASE_URL}/${resource}.json?${new URLSearchParams({ ...params, limit: String(LIMIT) })}`;
+  }
 
   while (true) {
     const token    = await getAccessToken();
@@ -171,11 +191,13 @@ async function* paginate(client, resource, params = {}, resumeUrl = null) {
 
     if (items.length === 0) break;
 
-    const nextUrl = data['@attributes']?.next ?? null;
-    yield { items, nextUrl };
+    const lsNextUrl = data['@attributes']?.next ?? null;
+    // Always save the raw LS next URL as checkpoint (contains the cursor);
+    // but rebuild it with our params before fetching.
+    yield { items, nextUrl: lsNextUrl };
 
-    if (!nextUrl) break;
-    url = nextUrl;
+    if (!lsNextUrl) break;
+    url = rebuildUrl(resource, params, lsNextUrl);
   }
 }
 

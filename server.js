@@ -780,7 +780,7 @@ app.get('/api/admin/validate', async (req, res, next) => {
       `),
       // 2. Articles avec image_url
       pool.query(`
-        SELECT COUNT(*) AS with_image,
+        SELECT COUNT(image_url)                           AS with_image,
                COUNT(*) FILTER (WHERE image_url IS NULL) AS without_image,
                ROUND(COUNT(image_url) * 100.0 / NULLIF(COUNT(*), 0), 1) AS pct_with_image
         FROM products WHERE archived = false
