@@ -609,15 +609,58 @@ app.get('/api/admin/query', async (req, res, next) => {
       'SELECT COUNT(*) FROM shops',
       'SELECT COUNT(*) FROM sale_lines WHERE completed_time IS NOT NULL',
       'SELECT COUNT(*) FROM sales WHERE completed_time IS NOT NULL',
-      "SELECT item_id, raw->'Tags' AS tags FROM products WHERE raw->'Tags' IS NOT NULL LIMIT 3",
-      "SELECT item_id, raw->>'Tags' AS tags FROM products WHERE raw->>'Tags' IS NOT NULL AND raw->>'Tags' != 'false' LIMIT 5",
-      "SELECT COUNT(*) FROM products WHERE raw->'Tags' IS NOT NULL",
-      "SELECT raw->'Tags' AS tags FROM products WHERE raw->'Tags' != 'false' AND raw->'Tags' IS NOT NULL LIMIT 3",
+      "SELECT jsonb_object_keys(raw) AS key FROM products LIMIT 1",
+      "SELECT jsonb_object_keys(raw) AS key FROM products GROUP BY key ORDER BY key",
     ];
     const q = (req.query.q ?? '').trim();
     if (!ALLOWED.includes(q)) return res.status(400).json({ error: 'query not whitelisted', allowed: ALLOWED });
     const { rows } = await pool.query(q);
     res.json({ query: q, count: rows[0].count });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/admin/raw-sample — inspect JSONB keys and tag structure in products
+// ---------------------------------------------------------------------------
+app.get('/api/admin/raw-sample', async (req, res, next) => {
+  try {
+    // Top-level keys present in products.raw
+    const { rows: keys } = await pool.query(`
+      SELECT jsonb_object_keys(raw) AS key, COUNT(*) AS cnt
+      FROM products
+      GROUP BY key ORDER BY cnt DESC
+    `);
+
+    // Sample of the raw field to see tag structure
+    const { rows: samples } = await pool.query(`
+      SELECT item_id, description, raw
+      FROM products
+      WHERE raw IS NOT NULL
+      ORDER BY item_id
+      LIMIT 2
+    `);
+
+    // Try common tag paths
+    const tagPaths = [
+      { path: "raw->'Tags'",       label: "raw->Tags" },
+      { path: "raw->'tag'",        label: "raw->tag" },
+      { path: "raw->'ItemTag'",    label: "raw->ItemTag" },
+      { path: "raw->'itemTags'",   label: "raw->itemTags" },
+      { path: "raw->'Tags'->'tag'", label: "raw->Tags->tag" },
+    ];
+    const tagCounts = {};
+    for (const { path, label } of tagPaths) {
+      const { rows } = await pool.query(
+        `SELECT COUNT(*) FROM products WHERE ${path} IS NOT NULL AND ${path}::text != 'false' AND ${path}::text != 'null'`
+      );
+      tagCounts[label] = rows[0].count;
+    }
+
+    res.json({
+      top_level_keys: keys,
+      tag_path_counts: tagCounts,
+      sample_raw: samples.map(s => ({ item_id: s.item_id, description: s.description, raw: s.raw })),
+    });
   } catch (err) { next(err); }
 });
 
