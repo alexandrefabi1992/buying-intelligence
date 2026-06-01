@@ -24,7 +24,17 @@
     <div id="recoBadge"
          class="px-3 py-1 rounded-full text-white text-xs font-bold tracking-wide flex-shrink-0 hidden"></div>
     <p id="recoLabel" class="text-xs text-gray-400 hidden"></p>
-    <div class="ml-auto flex items-center gap-2 flex-shrink-0">
+    <div class="ml-auto flex items-center gap-3 flex-shrink-0">
+      <label class="text-xs text-gray-500">Saison</label>
+      <select id="seasonFilter" class="border border-gray-300 rounded px-2 py-1 text-sm text-gray-700">
+        <option value="">Auto</option>
+        <option value="p26">P26 — Printemps 2026</option>
+        <option value="a25">A25 — Automne 2025</option>
+        <option value="p25">P25 — Printemps 2025</option>
+        <option value="a24">A24 — Automne 2024</option>
+        <option value="p24">P24 — Printemps 2024</option>
+      </select>
+      <div class="w-px h-5 bg-gray-200"></div>
       <label class="text-xs text-gray-500">Boutique</label>
       <select id="shopFilter" class="border border-gray-300 rounded px-2 py-1 text-sm text-gray-700">
         <option value="">Toutes les boutiques</option>
@@ -43,10 +53,10 @@
     <!-- KPI row -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
       <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
-        <p class="text-xs text-gray-400 mb-1">Sell-through</p>
+        <p class="text-xs text-gray-400 mb-1">Sell-through <span id="kpiSTSeason" class="font-semibold text-gray-600"></span></p>
         <p id="kpiST" class="text-2xl font-bold text-gray-900">—</p>
         <p id="kpiSTRecon" class="text-xs text-amber-600 mt-0.5 hidden font-medium"></p>
-        <p id="kpiSTSub" class="text-xs text-gray-400 mt-0.5">vendus / (vendus + stock)</p>
+        <p id="kpiSTSub" class="text-xs text-gray-400 mt-0.5">vendus depuis début de saison</p>
       </div>
       <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
         <p class="text-xs text-gray-400 mb-1">Vélocité / sem</p>
@@ -163,10 +173,13 @@
     kpiST.textContent = fmtP(p.sell_through_pct);
     kpiST.className   = `text-2xl font-bold ${r.kpiColor}`;
 
+    // Season label in sell-through title
+    document.getElementById('kpiSTSeason').textContent = d.season_code?.toUpperCase() ?? '';
+
     // Transfers context — only show when a shop is selected AND transfers exist
     const txTotal = (p.transfers_sent_out || 0) + (p.transfers_received_in || 0);
     if (d.shop_id && txTotal > 0) {
-      const diff = Math.round((p.sell_through_pct || 0) - (p.sell_through_recon_pct || 0));
+      const diff  = Math.round((p.sell_through_pct || 0) - (p.sell_through_recon_pct || 0));
       const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '=';
       kpiSTRecon.textContent = `Avant transferts : ${fmtP(p.sell_through_recon_pct)} ${arrow}${Math.abs(diff)} pts`;
       kpiSTRecon.classList.remove('hidden');
@@ -175,13 +188,13 @@
         + ` (reçu ${fmt(p.transfers_received_in)}, envoyé ${fmt(p.transfers_sent_out)})`;
     } else {
       kpiSTRecon.classList.add('hidden');
-      kpiSTSub.textContent = 'vendus / (vendus + stock)';
+      kpiSTSub.textContent = `Ventes depuis le ${d.season_from ?? '…'}`;
     }
 
     document.getElementById('kpiVelo').textContent    = fmt(p.weekly_velocity) + ' u.';
     document.getElementById('kpiMargin').textContent  = fmtP(p.avg_margin_pct);
     document.getElementById('kpiStock').textContent   = fmt(p.current_stock)  + ' u.';
-    document.getElementById('kpiRevenue').textContent = fmtC(p.revenue_12w);
+    document.getElementById('kpiRevenue').textContent = fmtC(p.revenue_season ?? p.revenue_12w);
     document.getElementById('kpiItems').textContent   =
       `${fmt(p.total_items)} articles · ${fmt(p.active_items)} actifs`;
 
@@ -285,11 +298,22 @@
   }
 
   // ── Load data ─────────────────────────────────────────────────────────────
-  async function load(shopId = '') {
+  function currentFilters() {
+    return {
+      shopId: document.getElementById('shopFilter').value,
+      season: document.getElementById('seasonFilter').value,
+    };
+  }
+
+  async function load() {
     document.getElementById('loader').classList.remove('hidden');
     document.getElementById('content').classList.add('hidden');
     try {
-      const qs  = shopId ? `?shop_id=${encodeURIComponent(shopId)}` : '';
+      const { shopId, season } = currentFilters();
+      const params = new URLSearchParams();
+      if (shopId) params.set('shop_id', shopId);
+      if (season) params.set('season', season);
+      const qs   = params.toString() ? '?' + params.toString() : '';
       const data = await fetch(`/api/brand/${encodeURIComponent(mfr)}${qs}`).then(r => r.json());
       render(data);
     } catch (e) {
@@ -302,10 +326,10 @@
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
-  document.getElementById('shopFilter').addEventListener('change', e => load(e.target.value));
+  document.getElementById('shopFilter').addEventListener('change', load);
+  document.getElementById('seasonFilter').addEventListener('change', load);
 
   (async () => {
-    // Populate shop dropdown
     try {
       const shops = await fetch('/api/shops').then(r => r.json());
       const sel   = document.getElementById('shopFilter');
@@ -315,7 +339,7 @@
         o.textContent = s.name;
         sel.appendChild(o);
       }
-    } catch (_) { /* dropdown stays with "Toutes les boutiques" */ }
+    } catch (_) {}
 
     await load();
   })();
