@@ -74,7 +74,7 @@
         <p class="text-xs text-gray-400 mt-0.5">qté dispo + en commande</p>
       </div>
       <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
-        <p class="text-xs text-gray-400 mb-1">Revenu (12 sem.)</p>
+        <p class="text-xs text-gray-400 mb-1">Revenu <span id="kpiRevLabel" class="font-semibold text-gray-600"></span></p>
         <p id="kpiRevenue" class="text-2xl font-bold text-gray-900">—</p>
         <p id="kpiItems" class="text-xs text-gray-400 mt-0.5">—</p>
       </div>
@@ -200,7 +200,9 @@
     document.getElementById('kpiVelo').textContent    = fmt(p.weekly_velocity) + ' u.';
     document.getElementById('kpiMargin').textContent  = fmtP(p.avg_margin_pct);
     document.getElementById('kpiStock').textContent   = fmt(p.current_stock)  + ' u.';
-    document.getElementById('kpiRevenue').textContent = fmtC(p.revenue_season ?? p.revenue_12w);
+    document.getElementById('kpiRevLabel').textContent =
+      d.season_code ? `12 sem. ${d.season_code.toUpperCase()}` : '12 sem.';
+    document.getElementById('kpiRevenue').textContent = fmtC(p.revenue_12w);
     document.getElementById('kpiItems').textContent   =
       `${fmt(p.total_items)} articles · ${fmt(p.active_items)} actifs`;
 
