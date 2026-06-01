@@ -577,7 +577,10 @@ function renderBudgetTable(key) {
     rows.push(`
       <tr class="mfr-row" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
         <td class="px-3 py-2.5 text-center">${chevron}</td>
-        <td class="px-3 py-2.5 font-medium text-gray-900">${escHtml(m.manufacturer)}</td>
+        <td class="px-3 py-2.5 font-medium text-gray-900">
+          <span class="mfr-link hover:text-blue-600 hover:underline cursor-pointer"
+                data-mfr="${escHtml(m.manufacturer)}">${escHtml(m.manufacturer)}</span>
+        </td>
         <td class="px-3 py-2.5 text-right text-gray-500">${m.items_count}</td>
         <td class="px-3 py-2.5 text-right text-gray-500">${fmt(m.remaining_stock_units)}</td>
         <td class="px-3 py-2.5 text-right">${fmt(m[refField])}</td>
@@ -619,6 +622,11 @@ function bindBudgetTableListeners() {
 
     tbody.addEventListener('click', e => {
       if (e.target.tagName === 'INPUT') return;
+      // Click on manufacturer name → open brand detail page in new tab
+      if (e.target.classList.contains('mfr-link')) {
+        window.open(`/brand/${encodeURIComponent(e.target.dataset.mfr)}`, '_blank');
+        return;
+      }
       const tr = e.target.closest('tr.mfr-row');
       if (!tr) return;
       const mfr = tr.dataset.mfr, k = tr.dataset.key;
