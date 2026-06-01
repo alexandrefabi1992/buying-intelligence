@@ -194,6 +194,7 @@
   // ── Sales mode toggle (tag | period) ─────────────────────────────────────
   let currentMode = 'tag';
   let lastData = null;
+  let loadSeq = 0; // monotonic counter to drop stale responses
 
   function setMode(mode) {
     currentMode = mode;
@@ -403,6 +404,7 @@
   }
 
   async function load() {
+    const seq = ++loadSeq;
     document.getElementById('loader').classList.remove('hidden');
     document.getElementById('content').classList.add('hidden');
     try {
@@ -412,8 +414,10 @@
       if (season) params.set('season', season);
       const qs   = params.toString() ? '?' + params.toString() : '';
       const data = await fetch(`/api/brand/${encodeURIComponent(mfr)}${qs}`).then(r => r.json());
+      if (seq !== loadSeq) return; // a newer request is in flight — discard this stale response
       render(data);
     } catch (e) {
+      if (seq !== loadSeq) return;
       document.getElementById('loader').innerHTML =
         `<p class="text-red-500 text-sm">${e.message}</p>`;
       return;
