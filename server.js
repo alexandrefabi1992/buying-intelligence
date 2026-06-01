@@ -1111,6 +1111,96 @@ app.get('/api/admin/validate', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/stock-audit?manufacturer=Brax&shop_id=1
+// Diagnose stock discrepancy between Lightspeed and our DB
+// ---------------------------------------------------------------------------
+app.get('/api/admin/stock-audit', async (req, res, next) => {
+  try {
+    const mfr    = req.query.manufacturer || 'Brax';
+    const shopId = req.query.shop_id      || '1';
+
+    const [totals, syncInfo, positiveStock, samples, mvStock] = await Promise.all([
+      // 1. Total stock for this manufacturer at this shop
+      pool.query(`
+        SELECT
+          COUNT(*)                                          AS total_items,
+          SUM(i.qty_on_hand)                               AS total_qty_on_hand,
+          SUM(i.qty_on_order)                              AS total_qty_on_order,
+          SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)) AS total_stock
+        FROM inventory i
+        JOIN products p ON p.item_id = i.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND i.shop_id = $2
+          AND p.archived = false
+      `, [mfr, shopId]),
+
+      // 2. Last sync date for inventory rows of this manufacturer
+      pool.query(`
+        SELECT
+          MAX(i.synced_at)  AS last_synced_at,
+          MIN(i.synced_at)  AS oldest_synced_at,
+          COUNT(*)          AS rows_synced
+        FROM inventory i
+        JOIN products p ON p.item_id = i.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND i.shop_id = $2
+      `, [mfr, shopId]),
+
+      // 3. Count items with qty_on_hand > 0
+      pool.query(`
+        SELECT COUNT(*) AS items_with_stock
+        FROM inventory i
+        JOIN products p ON p.item_id = i.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND i.shop_id = $2
+          AND i.qty_on_hand > 0
+          AND p.archived = false
+      `, [mfr, shopId]),
+
+      // 4. Sample of 10 items with their stock
+      pool.query(`
+        SELECT
+          p.item_id,
+          p.description,
+          p.category,
+          i.qty_on_hand,
+          i.qty_on_order,
+          i.reorder_point,
+          i.synced_at
+        FROM inventory i
+        JOIN products p ON p.item_id = i.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND i.shop_id = $2
+          AND p.archived = false
+        ORDER BY i.qty_on_hand DESC NULLS LAST
+        LIMIT 10
+      `, [mfr, shopId]),
+
+      // 5. Cross-check: what mv_inventory_stock shows (all shops, no shop filter)
+      pool.query(`
+        SELECT
+          SUM(mv.current_stock_all) AS mv_total_stock_all_shops,
+          COUNT(*)                  AS mv_items
+        FROM mv_inventory_stock mv
+        JOIN products p ON p.item_id = mv.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.archived = false
+      `, [mfr]),
+    ]);
+
+    res.json({
+      manufacturer: mfr,
+      shop_id:      shopId,
+      totals:       totals.rows[0],
+      sync_info:    syncInfo.rows[0],
+      positive_stock: positiveStock.rows[0],
+      top_10_by_stock: samples.rows,
+      mv_inventory_stock_all_shops: mvStock.rows[0],
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/admin/raw-sample — inspect JSONB keys and tag structure in products
 // ---------------------------------------------------------------------------
 app.get('/api/admin/raw-sample', async (req, res, next) => {
