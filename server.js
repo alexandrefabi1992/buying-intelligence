@@ -1544,25 +1544,58 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       `, [mfr, stFrom, stTo, seasonTag]);
     }
 
-    const [q1, q2, q3a, q3b, q4, q5, q6] = await Promise.all([
-      q1Promise,
-
-      // Q2 — Stock + margin (all active products of this manufacturer)
-      pool.query(`
+    // Q2 — Stock + margin; current_stock_tag = tag-filtered stock for sell-through denominator
+    // allTime: no tag filter → current_stock_tag = current_stock
+    // !allTime: CASE on p.tags ILIKE seasonTag
+    let q2Promise;
+    if (allTime) {
+      q2Promise = pool.query(`
         SELECT
-          COUNT(DISTINCT p.item_id)::int             AS total_items,
-          ROUND(SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)), 0)::float8
-                                                     AS current_stock,
-          ROUND(AVG(
-            CASE WHEN p.default_price > 0
-                 THEN (p.default_price - p.default_cost) / p.default_price * 100
-                 ELSE NULL END
-          ), 1)::float8                              AS avg_margin_pct
+          COUNT(DISTINCT p.item_id)::int AS total_items,
+          ROUND(SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)), 0)::float8 AS current_stock,
+          ROUND(SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)), 0)::float8 AS current_stock_tag,
+          ROUND(AVG(CASE WHEN p.default_price > 0
+                         THEN (p.default_price - p.default_cost) / p.default_price * 100
+                         ELSE NULL END), 1)::float8 AS avg_margin_pct
         FROM products p
         LEFT JOIN inventory i ON i.item_id = p.item_id ${invJ}
-        WHERE p.manufacturer ILIKE $1
-          AND p.archived = false
-      `, p),
+        WHERE p.manufacturer ILIKE $1 AND p.archived = false
+      `, p);
+    } else if (hasShop) {
+      // $1=mfr $2=shopId $3='%tag%'
+      q2Promise = pool.query(`
+        SELECT
+          COUNT(DISTINCT p.item_id)::int AS total_items,
+          ROUND(SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)), 0)::float8 AS current_stock,
+          ROUND(SUM(CASE WHEN p.tags ILIKE $3
+                         THEN COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0) ELSE 0 END), 0)::float8 AS current_stock_tag,
+          ROUND(AVG(CASE WHEN p.default_price > 0
+                         THEN (p.default_price - p.default_cost) / p.default_price * 100
+                         ELSE NULL END), 1)::float8 AS avg_margin_pct
+        FROM products p
+        LEFT JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = $2
+        WHERE p.manufacturer ILIKE $1 AND p.archived = false
+      `, [mfr, shopId, seasonTag]);
+    } else {
+      // $1=mfr $2='%tag%'
+      q2Promise = pool.query(`
+        SELECT
+          COUNT(DISTINCT p.item_id)::int AS total_items,
+          ROUND(SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)), 0)::float8 AS current_stock,
+          ROUND(SUM(CASE WHEN p.tags ILIKE $2
+                         THEN COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0) ELSE 0 END), 0)::float8 AS current_stock_tag,
+          ROUND(AVG(CASE WHEN p.default_price > 0
+                         THEN (p.default_price - p.default_cost) / p.default_price * 100
+                         ELSE NULL END), 1)::float8 AS avg_margin_pct
+        FROM products p
+        LEFT JOIN inventory i ON i.item_id = p.item_id
+        WHERE p.manufacturer ILIKE $1 AND p.archived = false
+      `, [mfr, seasonTag]);
+    }
+
+    const [q1, q2, q3a, q3b, q4, q5, q6] = await Promise.all([
+      q1Promise,
+      q2Promise,
 
       // Q3a — Weekly sales: current 12 weeks
       pool.query(`
@@ -1662,8 +1695,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       q6Promise,
     ]);
 
-    // For allTime: toggle hidden, use units_sold_season for both modes
-    // For season: mode 1 = tag only, mode 2 = tag + period
+    // Sold units per mode
     const soldTag    = allTime
       ? parseFloat(q1.rows[0]?.units_sold_season) || 0
       : parseFloat(q1.rows[0]?.units_sold_tag)    || 0;
@@ -1671,15 +1703,22 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       ? soldTag
       : parseFloat(q1.rows[0]?.units_sold_tag_period) || 0;
 
-    const stock      = parseFloat(q2.rows[0]?.current_stock) || 0;
-    const receivedIn = parseFloat(q6.rows[0]?.received_in)   || 0;
-    const sentOut    = parseFloat(q6.rows[0]?.sent_out)      || 0;
-    const stockRecon = Math.max(0, stock + sentOut - receivedIn);
+    // Stock: current_stock for display; current_stock_tag for sell-through denominator
+    const stock      = parseFloat(q2.rows[0]?.current_stock)     || 0;
+    const stockTag   = parseFloat(q2.rows[0]?.current_stock_tag) || 0;
 
-    const st             = soldTag    + stock      > 0 ? soldTag    / (soldTag    + stock)      : 0;
-    const stRecon        = soldTag    + stockRecon > 0 ? soldTag    / (soldTag    + stockRecon) : 0;
-    const stPeriod       = soldPeriod + stock      > 0 ? soldPeriod / (soldPeriod + stock)      : 0;
-    const stPeriodRecon  = soldPeriod + stockRecon > 0 ? soldPeriod / (soldPeriod + stockRecon) : 0;
+    const receivedIn = parseFloat(q6.rows[0]?.received_in) || 0;
+    const sentOut    = parseFloat(q6.rows[0]?.sent_out)    || 0;
+
+    // Reconstituted stock uses tag-filtered stock as base
+    const stockRecon    = Math.max(0, stock    + sentOut - receivedIn);
+    const stockTagRecon = Math.max(0, stockTag + sentOut - receivedIn);
+
+    // Sell-through: denominator = tag-filtered stock
+    const st            = soldTag    + stockTag      > 0 ? soldTag    / (soldTag    + stockTag)      : 0;
+    const stRecon       = soldTag    + stockTagRecon > 0 ? soldTag    / (soldTag    + stockTagRecon) : 0;
+    const stPeriod      = soldPeriod + stockTag      > 0 ? soldPeriod / (soldPeriod + stockTag)      : 0;
+    const stPeriodRecon = soldPeriod + stockTagRecon > 0 ? soldPeriod / (soldPeriod + stockTagRecon) : 0;
 
     // Recommendation based on mode 1 (tag)
     const recommendation =
@@ -1701,7 +1740,8 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         sell_through_recon_pct:      Math.round(stRecon      * 1000) / 10,
         sell_through_period_pct:     Math.round(stPeriod     * 1000) / 10,
         sell_through_period_recon_pct: Math.round(stPeriodRecon * 1000) / 10,
-        stock_reconstituted:         Math.round(stockRecon),
+        stock_reconstituted:         Math.round(stockTagRecon),
+        current_stock_tag:           Math.round(stockTag),
         transfers_received_in:       Math.round(receivedIn),
         transfers_sent_out:          Math.round(sentOut),
         recommendation,
