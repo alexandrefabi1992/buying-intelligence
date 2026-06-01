@@ -1467,11 +1467,11 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     const seasonTag = allTime ? null : `%${seasonCode}%`;
     let q1Promise;
     if (allTime) {
-      // revenue_12w: last 12 weeks, no tag filter
       q1Promise = pool.query(`
         SELECT
           COUNT(DISTINCT sl.item_id)::int               AS active_items,
           ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
+          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
           ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-MIN(sl.completed_time)))/604800.0), 1)::float8
                                                         AS weekly_velocity,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks'
@@ -1491,6 +1491,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         SELECT
           COUNT(DISTINCT sl.item_id)::int               AS active_items,
           ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
+          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
           ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-$3::date))/604800.0), 1)::float8
                                                         AS weekly_velocity,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks'
@@ -1513,6 +1514,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         SELECT
           COUNT(DISTINCT sl.item_id)::int               AS active_items,
           ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
+          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
           ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-$2::date))/604800.0), 1)::float8
                                                         AS weekly_velocity,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks'

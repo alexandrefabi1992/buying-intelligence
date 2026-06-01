@@ -73,7 +73,7 @@
   <main id="content" class="hidden px-6 py-5 space-y-5 max-w-7xl mx-auto">
 
     <!-- KPI row -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
       <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
            data-tip="Unités vendues ÷ (vendues + stock actuel) × 100&#10;Calculé depuis le début de la saison sélectionnée">
         <p class="text-xs text-gray-400 mb-1">Sell-through <span id="kpiSTSeason" class="font-semibold text-gray-600"></span></p>
@@ -98,6 +98,12 @@
         <p class="text-xs text-gray-400 mb-1">Stock en main</p>
         <p id="kpiStock" class="text-2xl font-bold text-gray-900">—</p>
         <p class="text-xs text-gray-400 mt-0.5">qté dispo + en commande</p>
+      </div>
+      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
+           data-tip="Total des ventes depuis le début de la saison sélectionnée&#10;Tous les articles de la marque, sans filtre de tag">
+        <p class="text-xs text-gray-400 mb-1">Ventes <span id="kpiGlobalSeasonLabel" class="font-semibold text-gray-600"></span></p>
+        <p id="kpiGlobalRevenue" class="text-2xl font-bold text-gray-900">—</p>
+        <p id="kpiGlobalUnits" class="text-xs text-gray-400 mt-0.5">— unités</p>
       </div>
       <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
            data-tip="Somme de (qté vendue × prix unitaire)&#10;12 dernières semaines, articles taggés par saison">
@@ -227,8 +233,13 @@
     document.getElementById('kpiVelo').textContent    = fmt(p.weekly_velocity) + ' u.';
     document.getElementById('kpiMargin').textContent  = fmtP(p.avg_margin_pct);
     document.getElementById('kpiStock').textContent   = fmt(p.current_stock)  + ' u.';
+    const seasonLabel = d.season_code ? d.season_code.toUpperCase() : '';
+    document.getElementById('kpiGlobalSeasonLabel').textContent = seasonLabel;
+    document.getElementById('kpiGlobalRevenue').textContent = fmtC(p.revenue_season);
+    document.getElementById('kpiGlobalUnits').textContent   = fmt(p.units_sold_season) + ' unités';
+
     document.getElementById('kpiRevLabel').textContent =
-      d.season_code ? `12 sem. ${d.season_code.toUpperCase()}` : '12 sem.';
+      d.season_code ? `12 sem. ${seasonLabel}` : '12 sem.';
     document.getElementById('kpiRevenue').textContent = fmtC(p.revenue_12w);
     document.getElementById('kpiItems').textContent   =
       `${fmt(p.total_items)} articles · ${fmt(p.active_items)} actifs`;
