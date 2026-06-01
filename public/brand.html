@@ -75,7 +75,7 @@
     <!-- KPI row -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
       <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
-           data-tip="Unités vendues ÷ (vendues + stock actuel) × 100&#10;Calculé depuis le début de la saison sélectionnée">
+           data-tip="Unités vendues ÷ (vendues + stock actuel) × 100&#10;Par tag : toutes ventes des articles taggés saison&#10;+Période : restreint à la fenêtre de dates de la saison">
         <p class="text-xs text-gray-400 mb-1">Sell-through <span id="kpiSTSeason" class="font-semibold text-gray-600"></span></p>
         <p id="kpiST" class="text-2xl font-bold text-gray-900">—</p>
         <p id="kpiSTRecon" class="text-xs text-amber-600 mt-0.5 hidden font-medium"></p>
@@ -238,7 +238,13 @@
         + ` (reçu ${fmt(p.transfers_received_in)}, envoyé ${fmt(p.transfers_sent_out)})`;
     } else {
       kpiSTRecon.classList.add('hidden');
-      kpiSTSub.textContent = d.season_from ? `Ventes depuis le ${d.season_from}` : 'Tout l\'historique';
+      if (!d.season_code) {
+        kpiSTSub.textContent = 'Tout l\'historique';
+      } else if (isTag) {
+        kpiSTSub.textContent = `Articles taggés ${d.season_code.toUpperCase()}, toutes dates`;
+      } else {
+        kpiSTSub.textContent = `Articles taggés ${d.season_code.toUpperCase()} · depuis le ${d.season_from}`;
+      }
     }
   }
 
