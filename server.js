@@ -724,7 +724,7 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
     const hit = cacheGet(cacheKey);
     if (hit) return res.json({ ...hit, cached: true });
 
-    const params = [season.from, season.to]; // $1 = from, $2 = to
+    const params = [season.from, season.to, `%${seasonCode}%`]; // $1=from, $2=to, $3=season tag
     let shopCondSL = '', shopCondInv = '', collCond = '', sizeCond = '';
     if (shops?.length) {
       params.push(shops);
@@ -763,16 +763,17 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
         COALESCE(p.manufacturer, 'Sans marque')    AS manufacturer,
         COALESCE(p.category,     'Sans catégorie') AS category,
         COUNT(DISTINCT p.item_id)::int             AS items_count,
-        ROUND(SUM(COALESCE(st.current_stock, 0)), 0)::float8   AS remaining_stock_units,
-        ROUND(SUM(ss.units_sold_season), 0)::float8            AS reference_units_sold,
+        ROUND(SUM(COALESCE(st.current_stock, 0)), 0)::float8              AS remaining_stock_units,
+        ROUND(SUM(COALESCE(ss.units_sold_season, 0)), 0)::float8          AS reference_units_sold,
         ROUND(SUM(
-          GREATEST(0, ss.units_sold_season - COALESCE(st.current_stock, 0))
+          GREATEST(0, COALESCE(ss.units_sold_season, 0) - COALESCE(st.current_stock, 0))
           * COALESCE(p.default_cost, 0)
-        ), 2)::float8                              AS proposed_budget
+        ), 2)::float8                                                      AS proposed_budget
       FROM products p
-      JOIN season_sales ss ON ss.item_id = p.item_id
-      LEFT JOIN stock    st ON st.item_id = p.item_id
-      WHERE (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')
+      LEFT JOIN season_sales ss ON ss.item_id = p.item_id
+      LEFT JOIN stock        st ON st.item_id = p.item_id
+      WHERE p.tags ILIKE $3
+        AND p.tags NOT ILIKE '%nos%'
         AND p.archived = false
         AND p.default_cost > 0
         AND p.category    NOT ILIKE 'Alt%ration%'
@@ -1343,12 +1344,13 @@ app.get('/api/admin/explain', async (req, res, next) => {
       ORDER BY manufacturer, proposed_budget DESC
     `;
 
+    // explain uses p25 as representative season for query plan analysis
     const saisQuery = `
-      WITH last_year AS (
-        SELECT sl.item_id, SUM(sl.qty) AS units_sold_ly
+      WITH season_sales AS (
+        SELECT sl.item_id, SUM(sl.qty) AS units_sold_season
         FROM sale_lines sl
-        WHERE sl.completed_time >= now() - INTERVAL '52 weeks'
-          AND sl.completed_time <  now() - INTERVAL '52 weeks' + ('8 weeks')::interval
+        WHERE sl.completed_time >= '2025-02-01'::date
+          AND sl.completed_time <= '2025-09-30'::date
           AND sl.qty > 0
           AND sl.completed_time IS NOT NULL
         GROUP BY sl.item_id
@@ -1358,16 +1360,17 @@ app.get('/api/admin/explain', async (req, res, next) => {
         COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
         COALESCE(p.category, 'Sans catégorie')  AS category,
         COUNT(DISTINCT p.item_id)::int           AS items_count,
-        ROUND(SUM(COALESCE(st.current_stock, 0)), 0)::float8 AS remaining_stock_units,
-        ROUND(SUM(ly.units_sold_ly), 0)::float8              AS reference_units_sold,
+        ROUND(SUM(COALESCE(st.current_stock, 0)), 0)::float8             AS remaining_stock_units,
+        ROUND(SUM(COALESCE(ss.units_sold_season, 0)), 0)::float8         AS reference_units_sold,
         ROUND(SUM(
-          GREATEST(0, ly.units_sold_ly - COALESCE(st.current_stock, 0))
+          GREATEST(0, COALESCE(ss.units_sold_season, 0) - COALESCE(st.current_stock, 0))
           * COALESCE(p.default_cost, 0)
         ), 2)::float8 AS proposed_budget
       FROM products p
-      JOIN last_year ly ON ly.item_id = p.item_id
-      LEFT JOIN stock st ON st.item_id = p.item_id
-      WHERE (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')
+      LEFT JOIN season_sales ss ON ss.item_id = p.item_id
+      LEFT JOIN stock        st ON st.item_id = p.item_id
+      WHERE p.tags ILIKE '%p25%'
+        AND p.tags NOT ILIKE '%nos%'
         AND p.archived = false
         AND p.default_cost > 0
         AND p.category    NOT ILIKE 'Alt%ration%'
