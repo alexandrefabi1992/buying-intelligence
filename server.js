@@ -1458,43 +1458,65 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         `, p)
       : Promise.resolve({ rows: [{ received_in: 0, sent_out: 0 }] });
 
-    const [q1, q2, q3a, q3b, q4, q5, q6] = await Promise.all([
+    // Q1 — param positions depend on hasShop + allTime combos
+    // hasShop=true:  $1=mfr $2=shopId [$3=stFrom $4=stTo]
+    // hasShop=false: $1=mfr            [$2=stFrom $3=stTo]
+    let q1Promise;
+    if (allTime) {
+      q1Promise = pool.query(`
+        SELECT
+          COUNT(DISTINCT sl.item_id)::int               AS active_items,
+          ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
+          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
+          ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-MIN(sl.completed_time)))/604800.0), 1)::float8
+                                                        AS weekly_velocity
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND sl.completed_time IS NOT NULL
+          AND sl.qty > 0
+          AND p.archived = false
+          ${slS}
+      `, p);
+    } else if (hasShop) {
+      q1Promise = pool.query(`
+        SELECT
+          COUNT(DISTINCT sl.item_id)::int               AS active_items,
+          ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
+          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
+          ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-$3::date))/604800.0), 1)::float8
+                                                        AS weekly_velocity
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND sl.shop_id = $2
+          AND sl.completed_time >= $3::date
+          AND sl.completed_time <= $4::date
+          AND sl.completed_time IS NOT NULL
+          AND sl.qty > 0
+          AND p.archived = false
+      `, [mfr, shopId, stFrom, stTo]);
+    } else {
+      q1Promise = pool.query(`
+        SELECT
+          COUNT(DISTINCT sl.item_id)::int               AS active_items,
+          ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
+          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
+          ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-$2::date))/604800.0), 1)::float8
+                                                        AS weekly_velocity
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND sl.completed_time >= $2::date
+          AND sl.completed_time <= $3::date
+          AND sl.completed_time IS NOT NULL
+          AND sl.qty > 0
+          AND p.archived = false
+      `, [mfr, stFrom, stTo]);
+    }
 
-      // Q1 — Sell-through sales: season range or all-time when no season selected
-      pool.query(
-        allTime ? `
-          SELECT
-            COUNT(DISTINCT sl.item_id)::int               AS active_items,
-            ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
-            ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
-            ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-MIN(sl.completed_time)))/604800.0), 1)::float8
-                                                          AS weekly_velocity
-          FROM sale_lines sl
-          JOIN products p ON p.item_id = sl.item_id
-          WHERE p.manufacturer ILIKE $1
-            AND sl.completed_time IS NOT NULL
-            AND sl.qty > 0
-            AND p.archived = false
-            ${slS}
-        ` : `
-          SELECT
-            COUNT(DISTINCT sl.item_id)::int               AS active_items,
-            ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
-            ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
-            ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-$3::date))/604800.0), 1)::float8
-                                                          AS weekly_velocity
-          FROM sale_lines sl
-          JOIN products p ON p.item_id = sl.item_id
-          WHERE p.manufacturer ILIKE $1
-            AND sl.completed_time >= $3::date
-            AND sl.completed_time <= $4::date
-            AND sl.completed_time IS NOT NULL
-            AND sl.qty > 0
-            AND p.archived = false
-            ${slS}
-        `,
-        allTime ? p : [...p, stFrom, stTo]
-      ),
+    const [q1, q2, q3a, q3b, q4, q5, q6] = await Promise.all([
+      q1Promise,
 
       // Q2 — Stock + margin (all active products of this manufacturer)
       pool.query(`
