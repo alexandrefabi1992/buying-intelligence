@@ -1392,6 +1392,201 @@ app.get('/api/admin/explain', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/shops — shop list for dropdowns
+// ---------------------------------------------------------------------------
+app.get('/api/shops', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query('SELECT shop_id, name FROM shops ORDER BY name');
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/brand/:manufacturer — brand detail page data
+// ?shop_id= optional shop filter (applies to sales + stock)
+// ---------------------------------------------------------------------------
+app.get('/api/brand/:manufacturer', async (req, res, next) => {
+  try {
+    const mfr    = decodeURIComponent(req.params.manufacturer);
+    const shopId = req.query.shop_id || null;
+    const hasShop = !!shopId;
+    const p      = hasShop ? [mfr, shopId] : [mfr];
+    const slS    = hasShop ? 'AND sl.shop_id = $2'     : '';  // sale_lines shop filter
+    const invJ   = hasShop ? 'AND i.shop_id  = $2'     : '';  // inventory JOIN condition
+    // Reusable stock CTE for top-items + category queries (avoids double-counting)
+    const stCTE  = `
+      st AS (
+        SELECT item_id,
+               SUM(COALESCE(qty_on_hand,0) + COALESCE(qty_on_order,0)) AS stock
+        FROM   inventory
+        WHERE  1=1 ${hasShop ? 'AND shop_id = $2' : ''}
+        GROUP  BY item_id
+      )`;
+
+    const [q1, q2, q3a, q3b, q4, q5] = await Promise.all([
+
+      // Q1 — Aggregate sales (12 weeks)
+      pool.query(`
+        SELECT
+          COUNT(DISTINCT sl.item_id)::int            AS active_items,
+          ROUND(SUM(sl.qty), 0)::float8              AS units_sold_12w,
+          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_12w,
+          ROUND(SUM(sl.qty) / 12.0, 1)::float8      AS weekly_velocity
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND sl.completed_time >= now() - INTERVAL '12 weeks'
+          AND sl.completed_time IS NOT NULL
+          AND sl.qty > 0
+          AND p.archived = false
+          ${slS}
+      `, p),
+
+      // Q2 — Stock + margin (all active products of this manufacturer)
+      pool.query(`
+        SELECT
+          COUNT(DISTINCT p.item_id)::int             AS total_items,
+          ROUND(SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)), 0)::float8
+                                                     AS current_stock,
+          ROUND(AVG(
+            CASE WHEN p.default_price > 0
+                 THEN (p.default_price - p.default_cost) / p.default_price * 100
+                 ELSE NULL END
+          ), 1)::float8                              AS avg_margin_pct
+        FROM products p
+        LEFT JOIN inventory i ON i.item_id = p.item_id ${invJ}
+        WHERE p.manufacturer ILIKE $1
+          AND p.archived = false
+      `, p),
+
+      // Q3a — Weekly sales: current 12 weeks
+      pool.query(`
+        SELECT
+          date_trunc('week', sl.completed_time)          AS week,
+          ROUND(SUM(sl.qty), 0)::float8                  AS units,
+          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8  AS revenue
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND sl.completed_time >= now() - INTERVAL '12 weeks'
+          AND sl.completed_time IS NOT NULL
+          AND sl.qty > 0
+          ${slS}
+        GROUP BY 1 ORDER BY 1
+      `, p),
+
+      // Q3b — Weekly sales: same 12 weeks last year (shifted +364 days to align on chart)
+      pool.query(`
+        SELECT
+          (date_trunc('week', sl.completed_time) + INTERVAL '364 days') AS week,
+          ROUND(SUM(sl.qty), 0)::float8                                  AS units_ly
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND sl.completed_time >= now() - INTERVAL '64 weeks'
+          AND sl.completed_time <  now() - INTERVAL '52 weeks'
+          AND sl.completed_time IS NOT NULL
+          AND sl.qty > 0
+          ${slS}
+        GROUP BY date_trunc('week', sl.completed_time)
+        ORDER BY 1
+      `, p),
+
+      // Q4 — Top 10 articles by units sold (12 weeks)
+      pool.query(`
+        WITH s AS (
+          SELECT sl.item_id,
+                 SUM(sl.qty)                 AS units,
+                 SUM(sl.qty * sl.unit_price) AS rev
+          FROM sale_lines sl
+          WHERE sl.completed_time >= now() - INTERVAL '12 weeks'
+            AND sl.completed_time IS NOT NULL
+            AND sl.qty > 0
+            ${slS}
+          GROUP BY sl.item_id
+        ),
+        ${stCTE}
+        SELECT
+          p.item_id,
+          p.description,
+          p.category,
+          p.image_url,
+          p.default_cost,
+          p.default_price,
+          ROUND(s.units, 0)::float8              AS units_sold_12w,
+          ROUND(s.rev, 2)::float8                AS revenue_12w,
+          COALESCE(st.stock, 0)::float8          AS current_stock
+        FROM products p
+        JOIN s  ON s.item_id  = p.item_id
+        LEFT JOIN st ON st.item_id = p.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.archived = false
+        ORDER BY s.units DESC
+        LIMIT 10
+      `, p),
+
+      // Q5 — Sales + stock by category
+      pool.query(`
+        WITH s AS (
+          SELECT sl.item_id,
+                 SUM(sl.qty)                 AS units,
+                 SUM(sl.qty * sl.unit_price) AS rev
+          FROM sale_lines sl
+          WHERE sl.completed_time >= now() - INTERVAL '12 weeks'
+            AND sl.completed_time IS NOT NULL
+            AND sl.qty > 0
+            ${slS}
+          GROUP BY sl.item_id
+        ),
+        ${stCTE}
+        SELECT
+          COALESCE(p.category, 'Sans catégorie')       AS category,
+          COUNT(DISTINCT p.item_id)::int               AS items_count,
+          ROUND(SUM(COALESCE(s.units, 0)), 0)::float8  AS units_sold_12w,
+          ROUND(SUM(COALESCE(s.rev,   0)), 2)::float8  AS revenue_12w,
+          ROUND(SUM(COALESCE(st.stock,0)), 0)::float8  AS stock_units
+        FROM products p
+        LEFT JOIN s  ON s.item_id  = p.item_id
+        LEFT JOIN st ON st.item_id = p.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.archived = false
+        GROUP BY p.category
+        ORDER BY units_sold_12w DESC NULLS LAST
+      `, p),
+    ]);
+
+    const sold  = parseFloat(q1.rows[0]?.units_sold_12w) || 0;
+    const stock = parseFloat(q2.rows[0]?.current_stock)  || 0;
+    const st    = sold + stock > 0 ? sold / (sold + stock) : 0;
+    const recommendation =
+      st >= 0.70 ? 'ACHETER+' :
+      st >= 0.40 ? 'MAINTENIR' :
+      st >= 0.20 ? 'RÉDUIRE'  : 'ARRÊTER';
+
+    res.json({
+      manufacturer: mfr,
+      shop_id:      shopId,
+      performance: {
+        ...q1.rows[0],
+        ...q2.rows[0],
+        sell_through_pct: Math.round(st * 1000) / 10,
+        recommendation,
+      },
+      weekly_current: q3a.rows,
+      weekly_ly:      q3b.rows,
+      top_items:      q4.rows,
+      by_category:    q5.rows,
+    });
+  } catch (err) { next(err); }
+});
+
+// Serve brand.html for /brand/:manufacturer (express.static won't match this path)
+app.get('/brand/:manufacturer', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'brand.html'));
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/admin/refresh-view — force refresh mv_sales_velocity
 // ---------------------------------------------------------------------------
 app.post('/api/admin/refresh-view', async (req, res, next) => {
