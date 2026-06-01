@@ -986,6 +986,71 @@ app.get('/api/admin/tag-diag', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/revenue-diag?manufacturer=Brax&tag=p26&shop_id=5
+// Compare all raw Lightspeed price fields to find the correct pre-tax,
+// after-discount revenue formula for a Tag+Période window.
+// ---------------------------------------------------------------------------
+app.get('/api/admin/revenue-diag', async (req, res, next) => {
+  try {
+    const mfr    = req.query.manufacturer || 'Brax';
+    const tag    = req.query.tag          || 'p26';
+    const shopId = req.query.shop_id      || null;
+    const tagPat = `%${tag}%`;
+
+    const season = SEASON_RANGES[tag.toLowerCase()];
+    if (!season) return res.status(400).json({ error: `Tag "${tag}" not a known season code` });
+
+    const seasonFrom = season.from;
+    const seasonTo   = new Date().toISOString().slice(0,10) < season.to
+      ? new Date().toISOString().slice(0,10) : season.to;
+
+    const shopCond = shopId ? 'AND sl.shop_id = $4' : '';
+    const params   = shopId
+      ? [mfr, tagPat, seasonFrom, shopId, seasonTo]
+      : [mfr, tagPat, seasonFrom, seasonTo];
+    const toParam  = shopId ? '$5' : '$4';
+
+    const { rows } = await pool.query(`
+      SELECT
+        COUNT(*)::int                                                          AS sale_lines,
+        ROUND(SUM(sl.qty), 0)::float8                                         AS units,
+
+        -- What we were storing before
+        ROUND(SUM(sl.qty * sl.unit_price), 2)::float8                         AS sum_qty_x_unit_price,
+
+        -- Raw LS fields from JSON
+        ROUND(SUM((sl.raw->>'calcSubtotal')::numeric),       2)::float8       AS sum_calc_subtotal,
+        ROUND(SUM((sl.raw->>'calcLineDiscount')::numeric),   2)::float8       AS sum_calc_line_discount,
+        ROUND(SUM((sl.raw->>'calcTotal')::numeric),          2)::float8       AS sum_calc_total,
+        ROUND(SUM((sl.raw->>'calcTax1')::numeric),           2)::float8       AS sum_calc_tax1,
+        ROUND(SUM((sl.raw->>'calcTax2')::numeric),           2)::float8       AS sum_calc_tax2,
+
+        -- Derived: calcTotal minus taxes (pre-tax, after-discount)
+        ROUND(SUM(
+          COALESCE((sl.raw->>'calcTotal')::numeric, 0)
+          - COALESCE((sl.raw->>'calcTax1')::numeric, 0)
+          - COALESCE((sl.raw->>'calcTax2')::numeric, 0)
+        ), 2)::float8                                                          AS calc_total_pretax,
+
+        -- How many rows have calcTotal present in raw
+        COUNT(*) FILTER (WHERE sl.raw->>'calcTotal' IS NOT NULL)::int         AS rows_with_calc_total,
+        COUNT(*) FILTER (WHERE sl.raw->>'calcLineDiscount' IS NOT NULL)::int  AS rows_with_discount_field
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE p.manufacturer ILIKE $1
+        AND p.tags ILIKE $2
+        AND sl.completed_time >= $3::date
+        AND sl.completed_time <= ${toParam}::date
+        AND sl.qty > 0
+        AND sl.completed_time IS NOT NULL
+        ${shopCond}
+    `, params);
+
+    res.json({ params: { manufacturer: mfr, tag, shop_id: shopId, season_from: seasonFrom, season_to: seasonTo }, ...rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/admin/season-gap-diag
 // Diagnose the gap between Tag mode and Tag+Période mode for a given
 // manufacturer / tag / shop.
