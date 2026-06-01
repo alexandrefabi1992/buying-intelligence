@@ -9,8 +9,30 @@
   <style>
     .spinner { width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite }
     @keyframes spin { to { transform:rotate(360deg) } }
-    .kpi-card { transition: box-shadow .15s }
+    .kpi-card { transition: box-shadow .15s; position: relative; }
     .kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.07) }
+    .kpi-card[data-tip]::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1f2937;
+      color: #fff;
+      font-size: 11px;
+      line-height: 1.5;
+      padding: 6px 10px;
+      border-radius: 6px;
+      width: max-content;
+      max-width: 240px;
+      white-space: pre-line;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .15s;
+      z-index: 50;
+      text-align: center;
+    }
+    .kpi-card[data-tip]:hover::after { opacity: 1; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -52,28 +74,33 @@
 
     <!-- KPI row -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
+      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
+           data-tip="Unités vendues ÷ (vendues + stock actuel) × 100&#10;Calculé depuis le début de la saison sélectionnée">
         <p class="text-xs text-gray-400 mb-1">Sell-through <span id="kpiSTSeason" class="font-semibold text-gray-600"></span></p>
         <p id="kpiST" class="text-2xl font-bold text-gray-900">—</p>
         <p id="kpiSTRecon" class="text-xs text-amber-600 mt-0.5 hidden font-medium"></p>
         <p id="kpiSTSub" class="text-xs text-gray-400 mt-0.5">vendus depuis début de saison</p>
       </div>
-      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
+      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
+           data-tip="Moyenne d'unités vendues par semaine&#10;Calculée sur les 12 dernières semaines">
         <p class="text-xs text-gray-400 mb-1">Vélocité / sem</p>
         <p id="kpiVelo" class="text-2xl font-bold text-gray-900">—</p>
         <p class="text-xs text-gray-400 mt-0.5">moyenne 12 semaines</p>
       </div>
-      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
+      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
+           data-tip="Moyenne de (prix vente − coût) ÷ prix vente&#10;Sur tous les articles actifs de la marque">
         <p class="text-xs text-gray-400 mb-1">Marge réelle</p>
         <p id="kpiMargin" class="text-2xl font-bold text-gray-900">—</p>
         <p class="text-xs text-gray-400 mt-0.5">moy. sur articles actifs</p>
       </div>
-      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
+      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
+           data-tip="qty_on_hand + qty_on_order&#10;Toutes boutiques (ou boutique sélectionnée)">
         <p class="text-xs text-gray-400 mb-1">Stock en main</p>
         <p id="kpiStock" class="text-2xl font-bold text-gray-900">—</p>
         <p class="text-xs text-gray-400 mt-0.5">qté dispo + en commande</p>
       </div>
-      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
+      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
+           data-tip="Somme de (qté vendue × prix unitaire)&#10;12 dernières semaines, articles taggés par saison">
         <p class="text-xs text-gray-400 mb-1">Revenu <span id="kpiRevLabel" class="font-semibold text-gray-600"></span></p>
         <p id="kpiRevenue" class="text-2xl font-bold text-gray-900">—</p>
         <p id="kpiItems" class="text-xs text-gray-400 mt-0.5">—</p>
