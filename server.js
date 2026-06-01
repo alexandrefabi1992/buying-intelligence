@@ -986,6 +986,131 @@ app.get('/api/admin/tag-diag', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/season-gap-diag
+// Diagnose the gap between Tag mode and Tag+Période mode for a given
+// manufacturer / tag / shop.
+// Example: /api/admin/season-gap-diag?manufacturer=Brax&tag=p26&shop_id=5
+//
+// Returns:
+//  - summary: units inside season window vs outside
+//  - outside_by_month: monthly breakdown of the "extra" units (before season start)
+//  - outside_items: which articles are involved and when they sold
+//  - tag_freshness: last sync date for those products (detects stale tags)
+// ---------------------------------------------------------------------------
+app.get('/api/admin/season-gap-diag', async (req, res, next) => {
+  try {
+    const mfr     = req.query.manufacturer || 'Brax';
+    const tag     = req.query.tag          || 'p26';
+    const shopId  = req.query.shop_id      || null;
+    const tagPat  = `%${tag}%`;
+
+    const season  = SEASON_RANGES[tag.toLowerCase()];
+    if (!season) {
+      return res.status(400).json({ error: `Tag "${tag}" n'est pas un code de saison connu.` });
+    }
+    const seasonFrom = season.from;
+    const seasonTo   = new Date().toISOString().slice(0, 10) < season.to
+      ? new Date().toISOString().slice(0, 10) : season.to;
+
+    const shopCond = shopId ? `AND sl.shop_id = $3` : '';
+    const params   = shopId ? [mfr, tagPat, shopId] : [mfr, tagPat];
+
+    const [q1, q2, q3, q4] = await Promise.all([
+
+      // 1. Summary: inside vs outside season window
+      pool.query(`
+        SELECT
+          CASE WHEN sl.completed_time >= ${ shopId ? '$4' : '$3' }::date
+                AND sl.completed_time <= ${ shopId ? '$5' : '$4' }::date
+               THEN 'pendant_saison'
+               ELSE 'hors_saison'
+          END                                        AS period,
+          COUNT(*)::int                              AS sale_lines,
+          ROUND(SUM(sl.qty), 0)::float8              AS units,
+          ROUND(SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)), 2)::float8 AS revenue,
+          MIN(sl.completed_time)::date               AS earliest,
+          MAX(sl.completed_time)::date               AS latest
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.tags ILIKE $2
+          AND sl.qty > 0
+          AND sl.completed_time IS NOT NULL
+          ${shopCond}
+        GROUP BY 1
+        ORDER BY 1
+      `, [...params, seasonFrom, seasonTo]),
+
+      // 2. Monthly breakdown of sales OUTSIDE the season window
+      pool.query(`
+        SELECT
+          date_trunc('month', sl.completed_time)::date AS month,
+          ROUND(SUM(sl.qty), 0)::float8                AS units,
+          ROUND(SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)), 2)::float8 AS revenue,
+          COUNT(DISTINCT sl.item_id)::int              AS distinct_items
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.tags ILIKE $2
+          AND sl.qty > 0
+          AND sl.completed_time IS NOT NULL
+          AND (sl.completed_time < ${ shopId ? '$4' : '$3' }::date
+               OR sl.completed_time > ${ shopId ? '$5' : '$4' }::date)
+          ${shopCond}
+        GROUP BY 1
+        ORDER BY 1 DESC
+      `, [...params, seasonFrom, seasonTo]),
+
+      // 3. Item-level detail for sales OUTSIDE season window
+      pool.query(`
+        SELECT
+          p.item_id,
+          p.description,
+          p.tags,
+          MIN(sl.completed_time)::date              AS first_sale,
+          MAX(sl.completed_time)::date              AS last_sale,
+          ROUND(SUM(sl.qty), 0)::float8             AS units_outside,
+          ROUND(SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)), 2)::float8 AS revenue_outside
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.tags ILIKE $2
+          AND sl.qty > 0
+          AND sl.completed_time IS NOT NULL
+          AND (sl.completed_time < ${ shopId ? '$4' : '$3' }::date
+               OR sl.completed_time > ${ shopId ? '$5' : '$4' }::date)
+          ${shopCond}
+        GROUP BY p.item_id, p.description, p.tags
+        ORDER BY units_outside DESC
+        LIMIT 50
+      `, [...params, seasonFrom, seasonTo]),
+
+      // 4. Tag freshness — last synced_at for products with this tag
+      //    If synced_at is old, the tag might be stale (removed in LS but still in our DB)
+      pool.query(`
+        SELECT
+          MIN(p.synced_at)::date AS oldest_sync,
+          MAX(p.synced_at)::date AS newest_sync,
+          COUNT(*)::int          AS product_count,
+          COUNT(*) FILTER (WHERE p.synced_at < now() - INTERVAL '30 days')::int AS synced_over_30d_ago
+        FROM products p
+        WHERE p.manufacturer ILIKE $1
+          AND p.tags ILIKE $2
+      `, [mfr, tagPat]),
+
+    ]);
+
+    res.json({
+      params:       { manufacturer: mfr, tag, shop_id: shopId, season_from: seasonFrom, season_to: seasonTo },
+      summary:      q1.rows,
+      outside_by_month: q2.rows,
+      outside_items:    q3.rows,
+      tag_freshness:    q4.rows[0],
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/admin/ls-inspect — fetch first page of a Lightspeed reference endpoint
 // Usage: /api/admin/ls-inspect?resource=Category|Department|Manufacturer|ItemTag
 // ---------------------------------------------------------------------------
