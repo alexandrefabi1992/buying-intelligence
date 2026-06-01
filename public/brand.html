@@ -212,7 +212,7 @@
     // Transfers context — only show when a shop is selected AND transfers exist
     const txTotal = (p.transfers_sent_out || 0) + (p.transfers_received_in || 0);
     if (d.shop_id && txTotal > 0) {
-      const diff  = Math.round((p.sell_through_pct || 0) - (p.sell_through_recon_pct || 0));
+      const diff  = Math.round((p.sell_through_recon_pct || 0) - (p.sell_through_pct || 0));
       const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '=';
       kpiSTRecon.textContent = `Avant transferts : ${fmtP(p.sell_through_recon_pct)} ${arrow}${Math.abs(diff)} pts`;
       kpiSTRecon.classList.remove('hidden');
