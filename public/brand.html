@@ -100,8 +100,16 @@
         <p class="text-xs text-gray-400 mt-0.5">qté dispo + en commande</p>
       </div>
       <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
-           data-tip="Total des ventes depuis le début de la saison sélectionnée&#10;Tous les articles de la marque, sans filtre de tag">
-        <p class="text-xs text-gray-400 mb-1">Ventes <span id="kpiGlobalSeasonLabel" class="font-semibold text-gray-600"></span></p>
+           data-tip="Tag : articles taggés saison (toutes dates)&#10;Tag+Période : articles taggés ET vendus pendant la saison">
+        <div class="flex items-start justify-between gap-1 mb-1">
+          <p class="text-xs text-gray-400 leading-tight">Ventes <span id="kpiGlobalSeasonLabel" class="font-semibold text-gray-600"></span></p>
+          <div id="salesModeToggle" class="hidden flex-shrink-0 flex text-[10px] border border-gray-200 rounded overflow-hidden">
+            <button id="btnModeTag" onclick="setMode('tag')"
+                    class="px-1.5 py-0.5 bg-blue-600 text-white font-medium">Tag</button>
+            <button id="btnModePeriod" onclick="setMode('period')"
+                    class="px-1.5 py-0.5 text-gray-500 hover:bg-gray-50">+Période</button>
+          </div>
+        </div>
         <p id="kpiGlobalRevenue" class="text-2xl font-bold text-gray-900">—</p>
         <p id="kpiGlobalUnits" class="text-xs text-gray-400 mt-0.5">— unités</p>
       </div>
@@ -183,6 +191,57 @@
   // ── Chart instance ────────────────────────────────────────────────────────
   let chart = null;
 
+  // ── Sales mode toggle (tag | period) ─────────────────────────────────────
+  let currentMode = 'tag';
+  let lastData = null;
+
+  function setMode(mode) {
+    currentMode = mode;
+    const isTag = mode === 'tag';
+    document.getElementById('btnModeTag').className =
+      isTag ? 'px-1.5 py-0.5 bg-blue-600 text-white font-medium'
+            : 'px-1.5 py-0.5 text-gray-500 hover:bg-gray-50';
+    document.getElementById('btnModePeriod').className =
+      isTag ? 'px-1.5 py-0.5 text-gray-500 hover:bg-gray-50'
+            : 'px-1.5 py-0.5 bg-blue-600 text-white font-medium';
+    if (lastData) applyMode(lastData);
+  }
+
+  function applyMode(d) {
+    const p    = d.performance;
+    const isTag = currentMode === 'tag';
+    const r    = RECO[p.recommendation] ?? RECO['MAINTENIR'];
+
+    // Ventes saison card
+    document.getElementById('kpiGlobalRevenue').textContent =
+      fmtC(isTag ? p.revenue_tag : p.revenue_tag_period);
+    document.getElementById('kpiGlobalUnits').textContent =
+      fmt(isTag ? p.units_sold_tag : p.units_sold_tag_period) + ' unités';
+
+    // Sell-through KPI
+    const stPct   = isTag ? p.sell_through_pct        : p.sell_through_period_pct;
+    const stRecon = isTag ? p.sell_through_recon_pct  : p.sell_through_period_recon_pct;
+    const kpiST      = document.getElementById('kpiST');
+    const kpiSTRecon = document.getElementById('kpiSTRecon');
+    const kpiSTSub   = document.getElementById('kpiSTSub');
+    kpiST.textContent = fmtP(stPct);
+    kpiST.className   = `text-2xl font-bold ${r.kpiColor}`;
+
+    const txTotal = (p.transfers_sent_out || 0) + (p.transfers_received_in || 0);
+    if (d.shop_id && txTotal > 0) {
+      const diff  = Math.round((stRecon || 0) - (stPct || 0));
+      const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '=';
+      kpiSTRecon.textContent = `Avant transferts : ${fmtP(stRecon)} ${arrow}${Math.abs(diff)} pts`;
+      kpiSTRecon.classList.remove('hidden');
+      kpiSTSub.textContent =
+        `Stock actuel ${fmt(p.current_stock)} u. · reconstitué ${fmt(p.stock_reconstituted)} u.`
+        + ` (reçu ${fmt(p.transfers_received_in)}, envoyé ${fmt(p.transfers_sent_out)})`;
+    } else {
+      kpiSTRecon.classList.add('hidden');
+      kpiSTSub.textContent = d.season_from ? `Ventes depuis le ${d.season_from}` : 'Tout l\'historique';
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
   function render(d) {
     const p = d.performance;
@@ -192,57 +251,43 @@
       loader.classList.remove('hidden');
       return;
     }
+    lastData = d;
 
     // Header
     document.getElementById('brandName').textContent = d.manufacturer;
     const r      = RECO[p.recommendation] ?? RECO['MAINTENIR'];
     const badge  = document.getElementById('recoBadge');
     const rLabel = document.getElementById('recoLabel');
-    badge.textContent    = p.recommendation;
+    badge.textContent      = p.recommendation;
     badge.style.background = r.bg;
-    badge.title          = r.tip;
+    badge.title            = r.tip;
     badge.classList.remove('hidden');
-    rLabel.textContent   = r.tip;
+    rLabel.textContent = r.tip;
     rLabel.classList.remove('hidden');
 
-    // KPIs
-    const kpiST      = document.getElementById('kpiST');
-    const kpiSTRecon = document.getElementById('kpiSTRecon');
-    const kpiSTSub   = document.getElementById('kpiSTSub');
-    kpiST.textContent = fmtP(p.sell_through_pct);
-    kpiST.className   = `text-2xl font-bold ${r.kpiColor}`;
-
-    // Season label in sell-through title
-    document.getElementById('kpiSTSeason').textContent = d.season_code ? d.season_code.toUpperCase() : '';
-
-    // Transfers context — only show when a shop is selected AND transfers exist
-    const txTotal = (p.transfers_sent_out || 0) + (p.transfers_received_in || 0);
-    if (d.shop_id && txTotal > 0) {
-      const diff  = Math.round((p.sell_through_recon_pct || 0) - (p.sell_through_pct || 0));
-      const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '=';
-      kpiSTRecon.textContent = `Avant transferts : ${fmtP(p.sell_through_recon_pct)} ${arrow}${Math.abs(diff)} pts`;
-      kpiSTRecon.classList.remove('hidden');
-      kpiSTSub.textContent =
-        `Stock actuel ${fmt(p.current_stock)} u. · reconstitué ${fmt(p.stock_reconstituted)} u.`
-        + ` (reçu ${fmt(p.transfers_received_in)}, envoyé ${fmt(p.transfers_sent_out)})`;
-    } else {
-      kpiSTRecon.classList.add('hidden');
-      kpiSTSub.textContent = d.season_from ? `Ventes depuis le ${d.season_from}` : 'Tout l\'historique';
-    }
-
-    document.getElementById('kpiVelo').textContent    = fmt(p.weekly_velocity) + ' u.';
-    document.getElementById('kpiMargin').textContent  = fmtP(p.avg_margin_pct);
-    document.getElementById('kpiStock').textContent   = fmt(p.current_stock)  + ' u.';
+    // Season label + toggle visibility
     const seasonLabel = d.season_code ? d.season_code.toUpperCase() : '';
+    document.getElementById('kpiSTSeason').textContent      = seasonLabel;
     document.getElementById('kpiGlobalSeasonLabel').textContent = seasonLabel;
-    document.getElementById('kpiGlobalRevenue').textContent = fmtC(p.revenue_season);
-    document.getElementById('kpiGlobalUnits').textContent   = fmt(p.units_sold_season) + ' unités';
+    const toggle = document.getElementById('salesModeToggle');
+    if (d.season_code) { toggle.classList.remove('hidden'); } else { toggle.classList.add('hidden'); }
+
+    // Static KPIs (mode-independent)
+    document.getElementById('kpiVelo').textContent   = fmt(p.weekly_velocity) + ' u.';
+    document.getElementById('kpiMargin').textContent = fmtP(p.avg_margin_pct);
+    document.getElementById('kpiStock').textContent  = fmt(p.current_stock)  + ' u.';
 
     document.getElementById('kpiRevLabel').textContent =
       d.season_code ? `12 sem. ${seasonLabel}` : '12 sem.';
     document.getElementById('kpiRevenue').textContent = fmtC(p.revenue_12w);
     document.getElementById('kpiItems').textContent   =
       `${fmt(p.total_items)} articles · ${fmt(p.active_items)} actifs`;
+
+    // Reset to tag mode and apply
+    currentMode = 'tag';
+    document.getElementById('btnModeTag').className    = 'px-1.5 py-0.5 bg-blue-600 text-white font-medium';
+    document.getElementById('btnModePeriod').className = 'px-1.5 py-0.5 text-gray-500 hover:bg-gray-50';
+    applyMode(d);
 
     // ── Weekly chart ──────────────────────────────────────────────────────
     const curr   = d.weekly_current;
