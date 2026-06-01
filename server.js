@@ -970,16 +970,22 @@ app.get('/api/admin/ls-inspect', async (req, res, next) => {
       });
       return res.json({ resource, url, all_keys: keySummary, tag_related_keys: tagKeys, sample });
     } else if (resource === 'Transfer') {
-      // Inspect Transfer with full relations to understand structure
-      const params = new URLSearchParams({
-        limit: '3',
-        load_relations: '["TransferItem","Shop"]',
-        orderby: 'transferID',
-        orderby_desc: '1',
-      });
-      url = `${BASE_URL}/Transfer.json?${params}`;
-      resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
-      res.json({ resource, url, data: resp.data });
+      // Step 1: bare fetch to discover top-level keys
+      const results = {};
+      const bareUrl = `${BASE_URL}/Transfer.json?limit=2&orderby=transferID&orderby_desc=1`;
+      const bareResp = await axios.get(bareUrl, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
+      results.bare = bareResp.data;
+
+      // Step 2: try load_relations=all to discover available relations
+      try {
+        const allUrl = `${BASE_URL}/Transfer.json?limit=2&load_relations=all`;
+        const allResp = await axios.get(allUrl, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
+        results.with_all_relations = allResp.data;
+      } catch (e) {
+        results.all_relations_error = e.response?.data ?? e.message;
+      }
+
+      res.json({ resource, bareUrl, results });
     } else {
       url = `${BASE_URL}/${resource}.json?limit=5`;
       resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
