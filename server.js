@@ -970,24 +970,9 @@ app.get('/api/admin/ls-inspect', async (req, res, next) => {
       });
       return res.json({ resource, url, all_keys: keySummary, tag_related_keys: tagKeys, sample });
     } else if (resource === 'Transfer') {
-      // Try several candidate resource names and param combos — Lightspeed docs are inconsistent
-      const candidates = [
-        `${BASE_URL}/Transfer.json?limit=2`,
-        `${BASE_URL}/Transfer.json?limit=2&load_relations=all`,
-        `${BASE_URL}/Transfer.json?limit=2&load_relations=%5B%22TransferItem%22%5D`,
-        `${BASE_URL}/SaleTransfer.json?limit=2`,
-      ];
-      const results = {};
-      for (const candidateUrl of candidates) {
-        const key = candidateUrl.replace(BASE_URL, '');
-        try {
-          const r = await axios.get(candidateUrl, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 15000 });
-          results[key] = r.data;
-        } catch (e) {
-          results[key] = { error: e.response?.status, body: e.response?.data };
-        }
-      }
-      res.json({ results });
+      url = `${BASE_URL}/Transfer.json?limit=3&load_relations=all`;
+      resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
+      res.json({ resource, url, data: resp.data });
     } else {
       url = `${BASE_URL}/${resource}.json?limit=5`;
       resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });

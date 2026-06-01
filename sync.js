@@ -347,6 +347,55 @@ async function upsertSaleLines(client, rows, completedTime) {
   }
 }
 
+async function upsertTransfers(client, transfers) {
+  for (const t of transfers) {
+    const fromShopId = t.TransferFrom?.shopID  ?? null;
+    const toShopId   = t.TransferTo?.shopID    ?? null;
+    // Prefer the actual sent timestamp; fall back to record creation time
+    const transferDate = t.TransferFrom?.sentOn ?? t.timeStamp ?? null;
+    const note         = t.note || null;
+    const tSent        = t.sent     === 'true';
+    const tReceived    = t.received === 'true';
+
+    // TransferItems is "" (empty string) when the transfer has no line items
+    const itemsWrapper = t.TransferItems;
+    if (!itemsWrapper || itemsWrapper === '' || itemsWrapper === false) continue;
+
+    const rawItems = itemsWrapper.TransferItem;
+    const items    = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+
+    for (const ti of items) {
+      try {
+        await pool.query(
+          `INSERT INTO transfers(
+             transfer_item_id, transfer_id, from_shop_id, to_shop_id,
+             item_id, qty_sent, qty_received,
+             transfer_sent, transfer_received, transfer_date, note, raw)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           ON CONFLICT(transfer_item_id) DO UPDATE
+             SET transfer_id=$2, from_shop_id=$3, to_shop_id=$4,
+                 item_id=$5, qty_sent=$6, qty_received=$7,
+                 transfer_sent=$8, transfer_received=$9,
+                 transfer_date=$10, note=$11, raw=$12, synced_at=now()`,
+          [
+            ti.transferItemID, t.transferID,
+            fromShopId, toShopId,
+            ti.itemID ?? null,
+            numOrNull(ti.sent)     ?? 0,
+            numOrNull(ti.received) ?? 0,
+            tSent, tReceived,
+            transferDate, note,
+            { header: t, item: ti },
+          ],
+        );
+      } catch (err) {
+        if (err.code === '23503') continue; // orphaned FK (item or shop not yet synced)
+        throw err;
+      }
+    }
+  }
+}
+
 async function upsertOrders(client, rows) {
   for (const o of rows) {
     await pool.query(
@@ -368,7 +417,7 @@ async function upsertOrders(client, rows) {
 // ---------------------------------------------------------------------------
 // Main sync
 // ---------------------------------------------------------------------------
-const SYNC_STEPS = ['shops', 'items', 'inventory', 'sales', 'orders'];
+const SYNC_STEPS = ['shops', 'items', 'inventory', 'sales', 'orders', 'transfers'];
 
 async function runSync() {
   console.log(`[sync] Starting — ${new Date().toISOString()}`);
@@ -398,7 +447,8 @@ async function runSync() {
     for (const step of SYNC_STEPS) cps[step] = await getCheckpoint(step);
 
     // If the last step completed in the previous run, this is a fresh run — clear all
-    if (cps.orders?.next_url === 'COMPLETED') {
+    const lastStep = SYNC_STEPS[SYNC_STEPS.length - 1];
+    if (cps[lastStep]?.next_url === 'COMPLETED') {
       console.log('[sync] Previous run fully completed. Clearing checkpoints for fresh run.');
       for (const step of SYNC_STEPS) {
         await clearCheckpoint(step);
@@ -503,6 +553,25 @@ async function runSync() {
         if (nextUrl) await saveCheckpoint('orders', nextUrl, ordersCount);
       }
       await markStepCompleted('orders', ordersCount);
+    }
+
+    // ── 7. Transfers (inter-shop stock movements) ─────────────────────────
+    if (cps.transfers?.next_url === 'COMPLETED') {
+      console.log('[sync] transfers: skipping (already completed)');
+    } else {
+      let txCount = cps.transfers?.processed_count ?? 0;
+      if (cps.transfers) console.log(`[sync] Resuming transfers from checkpoint at ${txCount}…`);
+      else               console.log('[sync] Fetching transfers…');
+      for await (const { items, nextUrl } of paginate(client, 'Transfer', {
+        load_relations: 'all',
+      }, cps.transfers?.next_url)) {
+        await upsertTransfers(client, items);
+        txCount += items.length;
+        if (txCount % 500 === 0) console.log(`[sync] Transfers processed: ${txCount}`);
+        if (nextUrl && txCount % 2_000 === 0) await saveCheckpoint('transfers', nextUrl, txCount);
+      }
+      await markStepCompleted('transfers', txCount);
+      console.log(`[sync] Transfers done: ${txCount} records`);
     }
 
     // ── Refresh materialized views ────────────────────────────────────────
