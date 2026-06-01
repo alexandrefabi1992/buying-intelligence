@@ -1458,18 +1458,25 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         `, p)
       : Promise.resolve({ rows: [{ received_in: 0, sent_out: 0 }] });
 
-    // Q1 — param positions depend on hasShop + allTime combos
-    // hasShop=true:  $1=mfr $2=shopId [$3=stFrom $4=stTo]
-    // hasShop=false: $1=mfr            [$2=stFrom $3=stTo]
+    // Q1 — sell-through (season date range) + revenue_12w (last 12w + season tag)
+    // Param layout:
+    //   allTime + no shop : $1=mfr
+    //   allTime + shop    : $1=mfr  $2=shopId
+    //   season + no shop  : $1=mfr  $2=stFrom  $3=stTo  $4='%tag%'
+    //   season + shop     : $1=mfr  $2=shopId  $3=stFrom $4=stTo  $5='%tag%'
+    const seasonTag = allTime ? null : `%${seasonCode}%`;
     let q1Promise;
     if (allTime) {
+      // revenue_12w: last 12 weeks, no tag filter
       q1Promise = pool.query(`
         SELECT
           COUNT(DISTINCT sl.item_id)::int               AS active_items,
           ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
-          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
           ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-MIN(sl.completed_time)))/604800.0), 1)::float8
-                                                        AS weekly_velocity
+                                                        AS weekly_velocity,
+          ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks'
+                         THEN sl.qty * sl.unit_price ELSE 0 END), 2)::float8
+                                                        AS revenue_12w
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
@@ -1479,13 +1486,17 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           ${slS}
       `, p);
     } else if (hasShop) {
+      // $1=mfr $2=shopId $3=stFrom $4=stTo $5='%tag%'
       q1Promise = pool.query(`
         SELECT
           COUNT(DISTINCT sl.item_id)::int               AS active_items,
           ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
-          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
           ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-$3::date))/604800.0), 1)::float8
-                                                        AS weekly_velocity
+                                                        AS weekly_velocity,
+          ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks'
+                          AND p.tags ILIKE $5
+                         THEN sl.qty * sl.unit_price ELSE 0 END), 2)::float8
+                                                        AS revenue_12w
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
@@ -1495,15 +1506,19 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           AND sl.completed_time IS NOT NULL
           AND sl.qty > 0
           AND p.archived = false
-      `, [mfr, shopId, stFrom, stTo]);
+      `, [mfr, shopId, stFrom, stTo, seasonTag]);
     } else {
+      // $1=mfr $2=stFrom $3=stTo $4='%tag%'
       q1Promise = pool.query(`
         SELECT
           COUNT(DISTINCT sl.item_id)::int               AS active_items,
           ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
-          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
           ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-$2::date))/604800.0), 1)::float8
-                                                        AS weekly_velocity
+                                                        AS weekly_velocity,
+          ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks'
+                          AND p.tags ILIKE $4
+                         THEN sl.qty * sl.unit_price ELSE 0 END), 2)::float8
+                                                        AS revenue_12w
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
@@ -1512,7 +1527,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           AND sl.completed_time IS NOT NULL
           AND sl.qty > 0
           AND p.archived = false
-      `, [mfr, stFrom, stTo]);
+      `, [mfr, stFrom, stTo, seasonTag]);
     }
 
     const [q1, q2, q3a, q3b, q4, q5, q6] = await Promise.all([
