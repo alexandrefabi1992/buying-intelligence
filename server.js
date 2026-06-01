@@ -1428,7 +1428,25 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         GROUP  BY item_id
       )`;
 
-    const [q1, q2, q3a, q3b, q4, q5] = await Promise.all([
+    // Q6 — Transfers balance for this shop (only meaningful when shop filter active)
+    // received_in : units arriving from other shops  → inflates apparent sell-through
+    // sent_out    : units dispatched to other shops  → deflates apparent sell-through
+    // stock_reconstituted = current_stock + sent_out − received_in
+    const q6Promise = hasShop
+      ? pool.query(`
+          SELECT
+            COALESCE(SUM(CASE WHEN t.to_shop_id   = $2 THEN t.qty_received ELSE 0 END), 0)::float8 AS received_in,
+            COALESCE(SUM(CASE WHEN t.from_shop_id = $2 THEN t.qty_received ELSE 0 END), 0)::float8 AS sent_out
+          FROM transfers t
+          JOIN products p ON p.item_id = t.item_id
+          WHERE p.manufacturer ILIKE $1
+            AND t.transfer_received = true
+            AND t.item_id IS NOT NULL
+            AND (t.from_shop_id = $2 OR t.to_shop_id = $2)
+        `, p)
+      : Promise.resolve({ rows: [{ received_in: 0, sent_out: 0 }] });
+
+    const [q1, q2, q3a, q3b, q4, q5, q6] = await Promise.all([
 
       // Q1 — Aggregate sales (12 weeks)
       pool.query(`
@@ -1558,11 +1576,22 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         GROUP BY p.category
         ORDER BY units_sold_12w DESC NULLS LAST
       `, p),
+
+      q6Promise,
     ]);
 
-    const sold  = parseFloat(q1.rows[0]?.units_sold_12w) || 0;
-    const stock = parseFloat(q2.rows[0]?.current_stock)  || 0;
-    const st    = sold + stock > 0 ? sold / (sold + stock) : 0;
+    const sold        = parseFloat(q1.rows[0]?.units_sold_12w) || 0;
+    const stock       = parseFloat(q2.rows[0]?.current_stock)  || 0;
+    const receivedIn  = parseFloat(q6.rows[0]?.received_in)    || 0;
+    const sentOut     = parseFloat(q6.rows[0]?.sent_out)       || 0;
+
+    // Reconstituted stock: what the shop stock would be without any transfers
+    // Add back what was sent away, subtract what was received from other shops
+    const stockRecon  = Math.max(0, stock + sentOut - receivedIn);
+
+    const st          = sold + stock      > 0 ? sold / (sold + stock)      : 0;
+    const stRecon     = sold + stockRecon > 0 ? sold / (sold + stockRecon) : 0;
+
     const recommendation =
       st >= 0.70 ? 'ACHETER+' :
       st >= 0.40 ? 'MAINTENIR' :
@@ -1574,7 +1603,11 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       performance: {
         ...q1.rows[0],
         ...q2.rows[0],
-        sell_through_pct: Math.round(st * 1000) / 10,
+        sell_through_pct:       Math.round(st      * 1000) / 10,
+        sell_through_recon_pct: Math.round(stRecon * 1000) / 10,
+        stock_reconstituted:    Math.round(stockRecon),
+        transfers_received_in:  Math.round(receivedIn),
+        transfers_sent_out:     Math.round(sentOut),
         recommendation,
       },
       weekly_current: q3a.rows,

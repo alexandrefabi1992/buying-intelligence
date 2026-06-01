@@ -45,7 +45,8 @@
       <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
         <p class="text-xs text-gray-400 mb-1">Sell-through</p>
         <p id="kpiST" class="text-2xl font-bold text-gray-900">—</p>
-        <p class="text-xs text-gray-400 mt-0.5">vendus / (vendus + stock)</p>
+        <p id="kpiSTRecon" class="text-xs text-amber-600 mt-0.5 hidden font-medium"></p>
+        <p id="kpiSTSub" class="text-xs text-gray-400 mt-0.5">vendus / (vendus + stock)</p>
       </div>
       <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
         <p class="text-xs text-gray-400 mb-1">Vélocité / sem</p>
@@ -156,9 +157,26 @@
     rLabel.classList.remove('hidden');
 
     // KPIs
-    const kpiST = document.getElementById('kpiST');
-    kpiST.textContent  = fmtP(p.sell_through_pct);
-    kpiST.className    = `text-2xl font-bold ${r.kpiColor}`;
+    const kpiST      = document.getElementById('kpiST');
+    const kpiSTRecon = document.getElementById('kpiSTRecon');
+    const kpiSTSub   = document.getElementById('kpiSTSub');
+    kpiST.textContent = fmtP(p.sell_through_pct);
+    kpiST.className   = `text-2xl font-bold ${r.kpiColor}`;
+
+    // Transfers context — only show when a shop is selected AND transfers exist
+    const txTotal = (p.transfers_sent_out || 0) + (p.transfers_received_in || 0);
+    if (d.shop_id && txTotal > 0) {
+      const diff = Math.round((p.sell_through_pct || 0) - (p.sell_through_recon_pct || 0));
+      const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '=';
+      kpiSTRecon.textContent = `Avant transferts : ${fmtP(p.sell_through_recon_pct)} ${arrow}${Math.abs(diff)} pts`;
+      kpiSTRecon.classList.remove('hidden');
+      kpiSTSub.textContent =
+        `Stock actuel ${fmt(p.current_stock)} u. · reconstitué ${fmt(p.stock_reconstituted)} u.`
+        + ` (reçu ${fmt(p.transfers_received_in)}, envoyé ${fmt(p.transfers_sent_out)})`;
+    } else {
+      kpiSTRecon.classList.add('hidden');
+      kpiSTSub.textContent = 'vendus / (vendus + stock)';
+    }
 
     document.getElementById('kpiVelo').textContent    = fmt(p.weekly_velocity) + ' u.';
     document.getElementById('kpiMargin').textContent  = fmtP(p.avg_margin_pct);
