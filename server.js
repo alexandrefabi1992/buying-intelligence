@@ -165,6 +165,34 @@ async function runMigrations() {
   // Additive migration: tags and image_url columns on products
   await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS tags      TEXT`);
   await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT`);
+
+  // One-time migration: recreate mv_sales_velocity with HT after-discount revenue formula
+  const { rows: mvVer } = await pool.query(
+    "SELECT 1 FROM sync_state WHERE step = 'mv_velocity_v2'"
+  );
+  if (!mvVer.length) {
+    console.log('[migration] Recreating mv_sales_velocity with correct revenue formula…');
+    await pool.query('DROP MATERIALIZED VIEW IF EXISTS mv_sales_velocity CASCADE');
+    await pool.query(`
+      CREATE MATERIALIZED VIEW mv_sales_velocity AS
+      SELECT
+        sl.item_id,
+        sl.shop_id,
+        date_trunc('week', sl.completed_time) AS week,
+        SUM(sl.qty)                           AS units_sold,
+        SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS revenue
+      FROM sale_lines sl
+      WHERE sl.completed_time IS NOT NULL
+      GROUP BY sl.item_id, sl.shop_id, date_trunc('week', sl.completed_time)
+    `);
+    await pool.query(`CREATE UNIQUE INDEX idx_mv_velocity ON mv_sales_velocity(item_id, shop_id, week)`);
+    await pool.query(`CREATE INDEX idx_mv_velocity_week ON mv_sales_velocity(week)`);
+    await pool.query(
+      "INSERT INTO sync_state(step, next_url) VALUES ('mv_velocity_v2', 'applied') ON CONFLICT(step) DO NOTHING"
+    );
+    console.log('[migration] mv_sales_velocity recreated.');
+  }
+
   console.log('[migration] Schema up to date');
 }
 
@@ -753,7 +781,6 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
         FROM sale_lines sl
         WHERE sl.completed_time >= $1::date
           AND sl.completed_time <= $2::date
-          AND sl.qty > 0
           AND sl.completed_time IS NOT NULL
           ${shopCondSL}
         GROUP BY sl.item_id
@@ -1757,7 +1784,6 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
           AND sl.completed_time IS NOT NULL
-          AND sl.qty > 0
           AND p.archived = false
           ${slS}
       `, p);
@@ -1787,7 +1813,6 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         WHERE p.manufacturer ILIKE $1
           AND sl.shop_id = $2
           AND sl.completed_time IS NOT NULL
-          AND sl.qty > 0
           AND p.archived = false
       `, [mfr, shopId, stFrom, stTo, seasonTag]);
     } else {
@@ -1815,7 +1840,6 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
           AND sl.completed_time IS NOT NULL
-          AND sl.qty > 0
           AND p.archived = false
       `, [mfr, stFrom, stTo, seasonTag]);
     }
@@ -1884,7 +1908,6 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         WHERE p.manufacturer ILIKE $1
           AND sl.completed_time >= now() - INTERVAL '12 weeks'
           AND sl.completed_time IS NOT NULL
-          AND sl.qty > 0
           ${slS}
         GROUP BY 1 ORDER BY 1
       `, p),
@@ -1900,7 +1923,6 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           AND sl.completed_time >= now() - INTERVAL '64 weeks'
           AND sl.completed_time <  now() - INTERVAL '52 weeks'
           AND sl.completed_time IS NOT NULL
-          AND sl.qty > 0
           ${slS}
         GROUP BY date_trunc('week', sl.completed_time)
         ORDER BY 1
@@ -1915,7 +1937,6 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           FROM sale_lines sl
           WHERE sl.completed_time >= now() - INTERVAL '12 weeks'
             AND sl.completed_time IS NOT NULL
-            AND sl.qty > 0
             ${slS}
           GROUP BY sl.item_id
         ),
@@ -1948,7 +1969,6 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           FROM sale_lines sl
           WHERE sl.completed_time >= now() - INTERVAL '12 weeks'
             AND sl.completed_time IS NOT NULL
-            AND sl.qty > 0
             ${slS}
           GROUP BY sl.item_id
         ),
