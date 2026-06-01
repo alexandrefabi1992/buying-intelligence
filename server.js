@@ -1427,18 +1427,21 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         GROUP  BY item_id
       )`;
 
-    // Resolve season for sell-through: ?season=p26 or auto-detect current season
+    // Resolve season for sell-through
     const today = new Date();
     const requestedCode = (req.query.season ?? '').toLowerCase();
-    const seasonCode = SEASON_RANGES[requestedCode]
-      ? requestedCode
-      : Object.entries(SEASON_RANGES).find(([, r]) =>
-          new Date(r.from) <= today && today <= new Date(r.to)
-        )?.[0] ?? 'p26';
-    const season = SEASON_RANGES[seasonCode];
-    // Season window for sell-through (from season start to today, capped at season end)
-    const stFrom = season.from;
-    const stTo   = today.toISOString().slice(0, 10) < season.to ? today.toISOString().slice(0, 10) : season.to;
+    const allTime = !requestedCode; // empty → no date filter, full history
+    let seasonCode, season, stFrom, stTo;
+    if (!allTime) {
+      seasonCode = SEASON_RANGES[requestedCode]
+        ? requestedCode
+        : Object.entries(SEASON_RANGES).find(([, r]) =>
+            new Date(r.from) <= today && today <= new Date(r.to)
+          )?.[0] ?? 'p26';
+      season = SEASON_RANGES[seasonCode];
+      stFrom = season.from;
+      stTo   = today.toISOString().slice(0, 10) < season.to ? today.toISOString().slice(0, 10) : season.to;
+    }
 
     // Q6 — Transfers balance for this shop (only meaningful when shop filter active)
     const q6Promise = hasShop
@@ -1457,24 +1460,41 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
 
     const [q1, q2, q3a, q3b, q4, q5, q6] = await Promise.all([
 
-      // Q1 — Sell-through sales: season start → today (not a rolling 12w window)
-      pool.query(`
-        SELECT
-          COUNT(DISTINCT sl.item_id)::int               AS active_items,
-          ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
-          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
-          ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-$3::date))/604800.0), 1)::float8
-                                                        AS weekly_velocity
-        FROM sale_lines sl
-        JOIN products p ON p.item_id = sl.item_id
-        WHERE p.manufacturer ILIKE $1
-          AND sl.completed_time >= $3::date
-          AND sl.completed_time <= $4::date
-          AND sl.completed_time IS NOT NULL
-          AND sl.qty > 0
-          AND p.archived = false
-          ${slS}
-      `, [...p, stFrom, stTo]),
+      // Q1 — Sell-through sales: season range or all-time when no season selected
+      pool.query(
+        allTime ? `
+          SELECT
+            COUNT(DISTINCT sl.item_id)::int               AS active_items,
+            ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
+            ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
+            ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-MIN(sl.completed_time)))/604800.0), 1)::float8
+                                                          AS weekly_velocity
+          FROM sale_lines sl
+          JOIN products p ON p.item_id = sl.item_id
+          WHERE p.manufacturer ILIKE $1
+            AND sl.completed_time IS NOT NULL
+            AND sl.qty > 0
+            AND p.archived = false
+            ${slS}
+        ` : `
+          SELECT
+            COUNT(DISTINCT sl.item_id)::int               AS active_items,
+            ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
+            ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
+            ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-$3::date))/604800.0), 1)::float8
+                                                          AS weekly_velocity
+          FROM sale_lines sl
+          JOIN products p ON p.item_id = sl.item_id
+          WHERE p.manufacturer ILIKE $1
+            AND sl.completed_time >= $3::date
+            AND sl.completed_time <= $4::date
+            AND sl.completed_time IS NOT NULL
+            AND sl.qty > 0
+            AND p.archived = false
+            ${slS}
+        `,
+        allTime ? p : [...p, stFrom, stTo]
+      ),
 
       // Q2 — Stock + margin (all active products of this manufacturer)
       pool.query(`
@@ -1608,10 +1628,10 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     res.json({
       manufacturer:  mfr,
       shop_id:       shopId,
-      season_code:   seasonCode,
-      season_label:  season.label,
-      season_from:   stFrom,
-      season_to:     stTo,
+      season_code:   allTime ? null : seasonCode,
+      season_label:  allTime ? 'Toutes les saisons' : season.label,
+      season_from:   allTime ? null : stFrom,
+      season_to:     allTime ? null : stTo,
       performance: {
         ...q1.rows[0],
         ...q2.rows[0],
