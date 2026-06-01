@@ -104,7 +104,7 @@ SELECT
   sl.shop_id,
   date_trunc('week', sl.completed_time) AS week,
   SUM(sl.qty)                           AS units_sold,
-  SUM(sl.qty * sl.unit_price)           AS revenue
+  SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS revenue
 FROM sale_lines sl
 WHERE sl.completed_time IS NOT NULL
 GROUP BY sl.item_id, sl.shop_id, date_trunc('week', sl.completed_time);
