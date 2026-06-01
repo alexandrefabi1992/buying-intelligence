@@ -27,7 +27,7 @@
     <div class="ml-auto flex items-center gap-3 flex-shrink-0">
       <label class="text-xs text-gray-500">Saison</label>
       <select id="seasonFilter" class="border border-gray-300 rounded px-2 py-1 text-sm text-gray-700">
-        <option value="">Auto</option>
+        <option value="">Toutes les saisons</option>
         <option value="p26">P26 — Printemps 2026</option>
         <option value="a25">A25 — Automne 2025</option>
         <option value="p25">P25 — Printemps 2025</option>
@@ -153,6 +153,12 @@
   // ── Render ────────────────────────────────────────────────────────────────
   function render(d) {
     const p = d.performance;
+    if (!p) {
+      const loader = document.getElementById('loader');
+      loader.innerHTML = `<p class="text-red-500 text-sm">${d.error ?? 'Données de performance indisponibles.'}</p>`;
+      loader.classList.remove('hidden');
+      return;
+    }
 
     // Header
     document.getElementById('brandName').textContent = d.manufacturer;
@@ -174,7 +180,7 @@
     kpiST.className   = `text-2xl font-bold ${r.kpiColor}`;
 
     // Season label in sell-through title
-    document.getElementById('kpiSTSeason').textContent = d.season_code?.toUpperCase() ?? '';
+    document.getElementById('kpiSTSeason').textContent = d.season_code ? d.season_code.toUpperCase() : '';
 
     // Transfers context — only show when a shop is selected AND transfers exist
     const txTotal = (p.transfers_sent_out || 0) + (p.transfers_received_in || 0);
@@ -188,7 +194,7 @@
         + ` (reçu ${fmt(p.transfers_received_in)}, envoyé ${fmt(p.transfers_sent_out)})`;
     } else {
       kpiSTRecon.classList.add('hidden');
-      kpiSTSub.textContent = `Ventes depuis le ${d.season_from ?? '…'}`;
+      kpiSTSub.textContent = d.season_from ? `Ventes depuis le ${d.season_from}` : 'Tout l\'historique';
     }
 
     document.getElementById('kpiVelo').textContent    = fmt(p.weekly_velocity) + ' u.';
