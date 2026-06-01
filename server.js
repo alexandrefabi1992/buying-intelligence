@@ -900,6 +900,92 @@ app.get('/api/admin/query', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/tag-diag?manufacturer=Brax&tag=p26 — tag filter diagnostics
+// ---------------------------------------------------------------------------
+app.get('/api/admin/tag-diag', async (req, res, next) => {
+  try {
+    const mfr = req.query.manufacturer || 'Brax';
+    const tag = req.query.tag          || 'p26';
+    const tagPattern = `%${tag}%`;
+
+    const [q1, q2, q3, q4, q5] = await Promise.all([
+      // 1. Raw totals (user's requested query)
+      pool.query(`
+        SELECT COUNT(*)::int           AS row_count,
+               COUNT(DISTINCT sl.sale_line_id)::int AS distinct_sale_lines,
+               ROUND(SUM(sl.qty),0)::float8         AS total_qty,
+               ROUND(SUM(sl.qty * sl.unit_price),2)::float8 AS total_revenue
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.tags ILIKE $2
+          AND sl.qty > 0
+      `, [mfr, tagPattern]),
+
+      // 2. Same but only articles that have EXACTLY the tag (no partial matches)
+      pool.query(`
+        SELECT COUNT(DISTINCT p.item_id)::int AS products_matching_tag,
+               array_agg(DISTINCT p.tags ORDER BY p.tags) AS sample_tags
+        FROM products p
+        WHERE p.manufacturer ILIKE $1
+          AND p.tags ILIKE $2
+        LIMIT 1
+      `, [mfr, tagPattern]),
+
+      // 3. Breakdown by tag value — shows if '%p26%' catches unexpected tags
+      pool.query(`
+        SELECT p.tags,
+               COUNT(DISTINCT p.item_id)::int AS items,
+               ROUND(SUM(sl.qty),0)::float8   AS qty_sold
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.tags ILIKE $2
+          AND sl.qty > 0
+        GROUP BY p.tags
+        ORDER BY qty_sold DESC
+        LIMIT 20
+      `, [mfr, tagPattern]),
+
+      // 4. Check if sale_line_id is duplicated (JOIN producing extra rows?)
+      pool.query(`
+        SELECT COUNT(*)::int AS total_rows,
+               COUNT(DISTINCT sl.sale_line_id)::int AS distinct_ids,
+               COUNT(*) - COUNT(DISTINCT sl.sale_line_id) AS duplicates
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.tags ILIKE $2
+          AND sl.qty > 0
+      `, [mfr, tagPattern]),
+
+      // 5. Totals per year — shows if all-time vs season-period explains the gap
+      pool.query(`
+        SELECT date_trunc('year', sl.completed_time)::date AS year,
+               ROUND(SUM(sl.qty),0)::float8                AS qty_sold,
+               ROUND(SUM(sl.qty * sl.unit_price),2)::float8 AS revenue
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.tags ILIKE $2
+          AND sl.qty > 0
+          AND sl.completed_time IS NOT NULL
+        GROUP BY 1 ORDER BY 1 DESC
+      `, [mfr, tagPattern]),
+    ]);
+
+    res.json({
+      params: { manufacturer: mfr, tag, tagPattern },
+      raw_totals:       q1.rows[0],
+      duplicate_check:  q4.rows[0],
+      products_count:   q2.rows[0],
+      by_tag_value:     q3.rows,
+      by_year:          q5.rows,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/admin/ls-inspect — fetch first page of a Lightspeed reference endpoint
 // Usage: /api/admin/ls-inspect?resource=Category|Department|Manufacturer|ItemTag
 // ---------------------------------------------------------------------------
