@@ -914,7 +914,7 @@ app.get('/api/admin/tag-diag', async (req, res, next) => {
         SELECT COUNT(*)::int           AS row_count,
                COUNT(DISTINCT sl.sale_line_id)::int AS distinct_sale_lines,
                ROUND(SUM(sl.qty),0)::float8         AS total_qty,
-               ROUND(SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)),2)::float8 AS total_revenue
+               ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)),2)::float8 AS total_revenue
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
@@ -963,7 +963,7 @@ app.get('/api/admin/tag-diag', async (req, res, next) => {
       pool.query(`
         SELECT date_trunc('year', sl.completed_time)::date AS year,
                ROUND(SUM(sl.qty),0)::float8                AS qty_sold,
-               ROUND(SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)),2)::float8 AS revenue
+               ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)),2)::float8 AS revenue
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
@@ -1092,7 +1092,7 @@ app.get('/api/admin/season-gap-diag', async (req, res, next) => {
           END                                        AS period,
           COUNT(*)::int                              AS sale_lines,
           ROUND(SUM(sl.qty), 0)::float8              AS units,
-          ROUND(SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)), 2)::float8 AS revenue,
+          ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)), 2)::float8 AS revenue,
           MIN(sl.completed_time)::date               AS earliest,
           MAX(sl.completed_time)::date               AS latest
         FROM sale_lines sl
@@ -1111,7 +1111,7 @@ app.get('/api/admin/season-gap-diag', async (req, res, next) => {
         SELECT
           date_trunc('month', sl.completed_time)::date AS month,
           ROUND(SUM(sl.qty), 0)::float8                AS units,
-          ROUND(SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)), 2)::float8 AS revenue,
+          ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)), 2)::float8 AS revenue,
           COUNT(DISTINCT sl.item_id)::int              AS distinct_items
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
@@ -1135,7 +1135,7 @@ app.get('/api/admin/season-gap-diag', async (req, res, next) => {
           MIN(sl.completed_time)::date              AS first_sale,
           MAX(sl.completed_time)::date              AS last_sale,
           ROUND(SUM(sl.qty), 0)::float8             AS units_outside,
-          ROUND(SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)), 2)::float8 AS revenue_outside
+          ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)), 2)::float8 AS revenue_outside
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
@@ -1747,11 +1747,11 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         SELECT
           COUNT(DISTINCT sl.item_id)::int               AS active_items,
           ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
-          ROUND(SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)), 2)::float8 AS revenue_season,
+          ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)), 2)::float8 AS revenue_season,
           ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-MIN(sl.completed_time)))/604800.0), 1)::float8
                                                         AS weekly_velocity,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks'
-                         THEN COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price) ELSE 0 END), 2)::float8
+                         THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8
                                                         AS revenue_12w
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
@@ -1773,15 +1773,15 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           ROUND(SUM(CASE WHEN p.tags ILIKE $5
                          THEN sl.qty ELSE 0 END), 0)::float8           AS units_sold_tag,
           ROUND(SUM(CASE WHEN p.tags ILIKE $5
-                         THEN COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price) ELSE 0 END), 2)::float8 AS revenue_tag,
+                         THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_tag,
           ROUND(SUM(CASE WHEN p.tags ILIKE $5
                           AND sl.completed_time >= $3::date AND sl.completed_time <= $4::date
                          THEN sl.qty ELSE 0 END), 0)::float8           AS units_sold_tag_period,
           ROUND(SUM(CASE WHEN p.tags ILIKE $5
                           AND sl.completed_time >= $3::date AND sl.completed_time <= $4::date
-                         THEN COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price) ELSE 0 END), 2)::float8 AS revenue_tag_period,
+                         THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_tag_period,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks' AND p.tags ILIKE $5
-                         THEN COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price) ELSE 0 END), 2)::float8 AS revenue_12w
+                         THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_12w
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
@@ -1802,15 +1802,15 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           ROUND(SUM(CASE WHEN p.tags ILIKE $4
                          THEN sl.qty ELSE 0 END), 0)::float8           AS units_sold_tag,
           ROUND(SUM(CASE WHEN p.tags ILIKE $4
-                         THEN COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price) ELSE 0 END), 2)::float8 AS revenue_tag,
+                         THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_tag,
           ROUND(SUM(CASE WHEN p.tags ILIKE $4
                           AND sl.completed_time >= $2::date AND sl.completed_time <= $3::date
                          THEN sl.qty ELSE 0 END), 0)::float8           AS units_sold_tag_period,
           ROUND(SUM(CASE WHEN p.tags ILIKE $4
                           AND sl.completed_time >= $2::date AND sl.completed_time <= $3::date
-                         THEN COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price) ELSE 0 END), 2)::float8 AS revenue_tag_period,
+                         THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_tag_period,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks' AND p.tags ILIKE $4
-                         THEN COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price) ELSE 0 END), 2)::float8 AS revenue_12w
+                         THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_12w
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
@@ -1878,7 +1878,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         SELECT
           date_trunc('week', sl.completed_time)          AS week,
           ROUND(SUM(sl.qty), 0)::float8                  AS units,
-          ROUND(SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)), 2)::float8  AS revenue
+          ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)), 2)::float8  AS revenue
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
@@ -1911,7 +1911,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         WITH s AS (
           SELECT sl.item_id,
                  SUM(sl.qty)                 AS units,
-                 SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)) AS rev
+                 SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS rev
           FROM sale_lines sl
           WHERE sl.completed_time >= now() - INTERVAL '12 weeks'
             AND sl.completed_time IS NOT NULL
@@ -1944,7 +1944,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         WITH s AS (
           SELECT sl.item_id,
                  SUM(sl.qty)                 AS units,
-                 SUM(COALESCE((sl.raw->>'calcTotal')::numeric, sl.qty * sl.unit_price)) AS rev
+                 SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS rev
           FROM sale_lines sl
           WHERE sl.completed_time >= now() - INTERVAL '12 weeks'
             AND sl.completed_time IS NOT NULL
