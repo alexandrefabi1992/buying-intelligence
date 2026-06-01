@@ -906,7 +906,7 @@ app.get('/api/admin/query', async (req, res, next) => {
 app.get('/api/admin/ls-inspect', async (req, res, next) => {
   try {
     const resource = req.query.resource;
-    const ALLOWED_RESOURCES = ['Category', 'Department', 'Manufacturer', 'ItemTag', 'Images'];
+    const ALLOWED_RESOURCES = ['Category', 'Department', 'Manufacturer', 'ItemTag', 'Images', 'Transfer'];
     if (!ALLOWED_RESOURCES.includes(resource)) {
       return res.status(400).json({ error: 'resource must be one of: ' + ALLOWED_RESOURCES.join(', ') });
     }
@@ -969,6 +969,17 @@ app.get('/api/admin/ls-inspect', async (req, res, next) => {
         return obj;
       });
       return res.json({ resource, url, all_keys: keySummary, tag_related_keys: tagKeys, sample });
+    } else if (resource === 'Transfer') {
+      // Inspect Transfer with full relations to understand structure
+      const params = new URLSearchParams({
+        limit: '3',
+        load_relations: '["TransferItem","Shop"]',
+        orderby: 'transferID',
+        orderby_desc: '1',
+      });
+      url = `${BASE_URL}/Transfer.json?${params}`;
+      resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
+      res.json({ resource, url, data: resp.data });
     } else {
       url = `${BASE_URL}/${resource}.json?limit=5`;
       resp = await axios.get(url, { headers: { Authorization: `Bearer ${accessToken}` }, timeout: 30000 });
