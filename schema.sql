@@ -136,6 +136,30 @@ CREATE INDEX IF NOT EXISTS idx_products_manufacturer ON products(manufacturer);
 -- Partial index: most queries filter archived = false; skip archived rows entirely
 CREATE INDEX IF NOT EXISTS idx_products_active       ON products(item_id) WHERE archived = false;
 
+-- Inter-shop stock transfers (one row per transfer × item)
+-- sent/received booleans on the header; qty_received = units actually moved
+CREATE TABLE IF NOT EXISTS transfers (
+  transfer_item_id  TEXT PRIMARY KEY,                              -- TransferItem.transferItemID
+  transfer_id       TEXT NOT NULL,                                 -- Transfer.transferID
+  from_shop_id      TEXT REFERENCES shops(shop_id) ON DELETE SET NULL,
+  to_shop_id        TEXT REFERENCES shops(shop_id) ON DELETE SET NULL,
+  item_id           TEXT REFERENCES products(item_id) ON DELETE SET NULL,
+  qty_sent          NUMERIC(12,4) DEFAULT 0,
+  qty_received      NUMERIC(12,4) DEFAULT 0,
+  transfer_sent     BOOLEAN DEFAULT false,                         -- header: was it sent?
+  transfer_received BOOLEAN DEFAULT false,                         -- header: was it received?
+  transfer_date     TIMESTAMPTZ,                                   -- sentOn or timeStamp
+  note              TEXT,
+  raw               JSONB,
+  synced_at         TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_transfers_transfer ON transfers(transfer_id);
+CREATE INDEX IF NOT EXISTS idx_transfers_item     ON transfers(item_id);
+CREATE INDEX IF NOT EXISTS idx_transfers_from     ON transfers(from_shop_id);
+CREATE INDEX IF NOT EXISTS idx_transfers_to       ON transfers(to_shop_id);
+CREATE INDEX IF NOT EXISTS idx_transfers_date     ON transfers(transfer_date);
+
 -- Sync checkpoint — persists cursor position across restarts
 CREATE TABLE IF NOT EXISTS sync_state (
   step            VARCHAR(50) PRIMARY KEY,
