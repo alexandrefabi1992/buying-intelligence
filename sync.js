@@ -335,7 +335,7 @@ async function upsertSaleLines(client, rows, completedTime) {
           sl.saleLineID, sl.saleID ?? null,
           sl.itemID ?? null, sl.shopID ?? null,
           numOrNull(sl.unitPrice), numOrNull(sl.unitCost),
-          numOrNull(sl.unitQuantity), numOrNull(sl.discountAmount), numOrNull(sl.tax),
+          numOrNull(sl.unitQuantity), numOrNull(sl.calcLineDiscount), numOrNull(sl.tax),
           completedTime ?? null,
           sl,
         ],
