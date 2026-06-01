@@ -1416,9 +1416,8 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     const shopId = req.query.shop_id || null;
     const hasShop = !!shopId;
     const p      = hasShop ? [mfr, shopId] : [mfr];
-    const slS    = hasShop ? 'AND sl.shop_id = $2'     : '';  // sale_lines shop filter
-    const invJ   = hasShop ? 'AND i.shop_id  = $2'     : '';  // inventory JOIN condition
-    // Reusable stock CTE for top-items + category queries (avoids double-counting)
+    const slS    = hasShop ? 'AND sl.shop_id = $2'     : '';
+    const invJ   = hasShop ? 'AND i.shop_id  = $2'     : '';
     const stCTE  = `
       st AS (
         SELECT item_id,
@@ -1428,10 +1427,20 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         GROUP  BY item_id
       )`;
 
+    // Resolve season for sell-through: ?season=p26 or auto-detect current season
+    const today = new Date();
+    const requestedCode = (req.query.season ?? '').toLowerCase();
+    const seasonCode = SEASON_RANGES[requestedCode]
+      ? requestedCode
+      : Object.entries(SEASON_RANGES).find(([, r]) =>
+          new Date(r.from) <= today && today <= new Date(r.to)
+        )?.[0] ?? 'p26';
+    const season = SEASON_RANGES[seasonCode];
+    // Season window for sell-through (from season start to today, capped at season end)
+    const stFrom = season.from;
+    const stTo   = today.toISOString().slice(0, 10) < season.to ? today.toISOString().slice(0, 10) : season.to;
+
     // Q6 — Transfers balance for this shop (only meaningful when shop filter active)
-    // received_in : units arriving from other shops  → inflates apparent sell-through
-    // sent_out    : units dispatched to other shops  → deflates apparent sell-through
-    // stock_reconstituted = current_stock + sent_out − received_in
     const q6Promise = hasShop
       ? pool.query(`
           SELECT
@@ -1448,22 +1457,24 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
 
     const [q1, q2, q3a, q3b, q4, q5, q6] = await Promise.all([
 
-      // Q1 — Aggregate sales (12 weeks)
+      // Q1 — Sell-through sales: season start → today (not a rolling 12w window)
       pool.query(`
         SELECT
-          COUNT(DISTINCT sl.item_id)::int            AS active_items,
-          ROUND(SUM(sl.qty), 0)::float8              AS units_sold_12w,
-          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_12w,
-          ROUND(SUM(sl.qty) / 12.0, 1)::float8      AS weekly_velocity
+          COUNT(DISTINCT sl.item_id)::int               AS active_items,
+          ROUND(SUM(sl.qty), 0)::float8                 AS units_sold_season,
+          ROUND(SUM(sl.qty * sl.unit_price), 2)::float8 AS revenue_season,
+          ROUND(SUM(sl.qty) / GREATEST(1, EXTRACT(EPOCH FROM (now()-$3::date))/604800.0), 1)::float8
+                                                        AS weekly_velocity
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
-          AND sl.completed_time >= now() - INTERVAL '12 weeks'
+          AND sl.completed_time >= $3::date
+          AND sl.completed_time <= $4::date
           AND sl.completed_time IS NOT NULL
           AND sl.qty > 0
           AND p.archived = false
           ${slS}
-      `, p),
+      `, [...p, stFrom, stTo]),
 
       // Q2 — Stock + margin (all active products of this manufacturer)
       pool.query(`
@@ -1580,17 +1591,14 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       q6Promise,
     ]);
 
-    const sold        = parseFloat(q1.rows[0]?.units_sold_12w) || 0;
-    const stock       = parseFloat(q2.rows[0]?.current_stock)  || 0;
-    const receivedIn  = parseFloat(q6.rows[0]?.received_in)    || 0;
-    const sentOut     = parseFloat(q6.rows[0]?.sent_out)       || 0;
-
-    // Reconstituted stock: what the shop stock would be without any transfers
-    // Add back what was sent away, subtract what was received from other shops
+    const sold        = parseFloat(q1.rows[0]?.units_sold_season) || 0;
+    const stock       = parseFloat(q2.rows[0]?.current_stock)     || 0;
+    const receivedIn  = parseFloat(q6.rows[0]?.received_in)       || 0;
+    const sentOut     = parseFloat(q6.rows[0]?.sent_out)          || 0;
     const stockRecon  = Math.max(0, stock + sentOut - receivedIn);
 
-    const st          = sold + stock      > 0 ? sold / (sold + stock)      : 0;
-    const stRecon     = sold + stockRecon > 0 ? sold / (sold + stockRecon) : 0;
+    const st      = sold + stock      > 0 ? sold / (sold + stock)      : 0;
+    const stRecon = sold + stockRecon > 0 ? sold / (sold + stockRecon) : 0;
 
     const recommendation =
       st >= 0.70 ? 'ACHETER+' :
@@ -1598,8 +1606,12 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       st >= 0.20 ? 'RÉDUIRE'  : 'ARRÊTER';
 
     res.json({
-      manufacturer: mfr,
-      shop_id:      shopId,
+      manufacturer:  mfr,
+      shop_id:       shopId,
+      season_code:   seasonCode,
+      season_label:  season.label,
+      season_from:   stFrom,
+      season_to:     stTo,
       performance: {
         ...q1.rows[0],
         ...q2.rows[0],
