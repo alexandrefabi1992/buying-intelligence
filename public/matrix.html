@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Variantes — Buying Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .spinner { width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite }
+    @keyframes spin { to { transform:rotate(360deg) } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+    <button id="backBtn" onclick="goBack()"
+            class="text-blue-600 text-sm hover:underline flex-shrink-0">← Retour</button>
+    <div class="w-px h-5 bg-gray-200 flex-shrink-0"></div>
+    <h1 id="pageTitle" class="text-base font-semibold text-gray-900 truncate">…</h1>
+  </header>
+
+  <!-- Loader -->
+  <div id="loader" class="flex justify-center items-center py-24">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Content -->
+  <div id="content" class="hidden max-w-2xl mx-auto px-4 py-6">
+
+    <!-- Matrix header card -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-5 flex items-center gap-4">
+      <div id="matrixImg" class="flex-shrink-0"></div>
+      <div class="flex-1 min-w-0">
+        <p id="matrixName" class="font-semibold text-gray-900 truncate text-base"></p>
+        <p id="matrixSub"  class="text-xs text-gray-400 mt-0.5"></p>
+      </div>
+    </div>
+
+    <!-- Summary row -->
+    <div class="grid grid-cols-3 gap-3 mb-5">
+      <div class="bg-white rounded-lg border border-gray-100 shadow-sm p-3 text-center">
+        <p class="text-xs text-gray-400 mb-1">Unités 12 sem.</p>
+        <p id="sumUnits" class="text-lg font-bold text-gray-900">—</p>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-100 shadow-sm p-3 text-center">
+        <p class="text-xs text-gray-400 mb-1">Revenu 12 sem.</p>
+        <p id="sumRevenue" class="text-lg font-bold text-gray-900">—</p>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-100 shadow-sm p-3 text-center">
+        <p class="text-xs text-gray-400 mb-1">Stock total</p>
+        <p id="sumStock" class="text-lg font-bold text-gray-900">—</p>
+      </div>
+    </div>
+
+    <!-- Variants table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100">
+        <h2 class="text-sm font-semibold text-gray-700">Variantes</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="text-left px-4 py-2 text-gray-400 font-medium">Variante</th>
+              <th class="text-right px-3 py-2 text-gray-400 font-medium">Stock</th>
+              <th class="text-right px-3 py-2 text-gray-400 font-medium">Unités 12s</th>
+              <th class="text-right px-4 py-2 text-gray-400 font-medium">Revenu 12s</th>
+            </tr>
+          </thead>
+          <tbody id="variantBody"></tbody>
+        </table>
+      </div>
+      <p id="emptyMsg" class="hidden text-center text-gray-400 py-8 text-sm">Aucune variante trouvée.</p>
+    </div>
+
+    <!-- Shop filter notice -->
+    <p id="shopNotice" class="text-xs text-gray-400 text-center mt-3 hidden"></p>
+  </div>
+
+  <script>
+  const params      = new URLSearchParams(location.search);
+  const matrixId    = decodeURIComponent(location.pathname.replace(/^\/matrix\//, ''));
+  const manufacturer = params.get('manufacturer') ?? '';
+  const shopId      = params.get('shop_id') ?? '';
+  const season      = params.get('season') ?? '';
+
+  const fmt  = n => n == null ? '—' : new Intl.NumberFormat('fr-CA', { maximumFractionDigits: 0 }).format(n);
+  const fmtC = n => n == null ? '—' : new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(n);
+
+  function initials(str) {
+    if (!str) return '?';
+    return str.trim().split(/\s+/).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+  }
+
+  function goBack() {
+    if (manufacturer) {
+      const p = new URLSearchParams();
+      if (shopId) p.set('shop_id', shopId);
+      if (season)  p.set('season', season);
+      const qs = p.toString() ? '?' + p.toString() : '';
+      location.href = `/brand/${encodeURIComponent(manufacturer)}${qs}`;
+    } else {
+      history.back();
+    }
+  }
+
+  async function load() {
+    try {
+      const qs = shopId ? `?shop_id=${encodeURIComponent(shopId)}` : '';
+      const d  = await fetch(`/api/matrix/${encodeURIComponent(matrixId)}${qs}`).then(r => r.json());
+
+      const par = d.parent;
+      const vars = d.variants;
+
+      // Page title
+      const title = par?.description ?? matrixId;
+      document.title = title + ' — Buying Intelligence';
+      document.getElementById('pageTitle').textContent = title;
+
+      // Matrix header card
+      const imgEl = document.getElementById('matrixImg');
+      if (par?.image_url) {
+        imgEl.innerHTML = `<img src="${par.image_url}" alt="" class="w-16 h-16 object-cover rounded-lg" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-sm font-bold\\'>${initials(title)}</div>'">`
+      } else {
+        imgEl.innerHTML = `<div class="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-sm font-bold">${initials(title)}</div>`;
+      }
+
+      document.getElementById('matrixName').textContent = title;
+      const margin = par?.default_price > 0
+        ? Math.round((par.default_price - par.default_cost) / par.default_price * 100)
+        : null;
+      document.getElementById('matrixSub').textContent =
+        [manufacturer, margin != null ? `${margin} % marge` : null].filter(Boolean).join(' · ');
+
+      // Summary
+      const totalUnits   = vars.reduce((s, v) => s + (v.units_sold_12w ?? 0), 0);
+      const totalRevenue = vars.reduce((s, v) => s + (v.revenue_12w   ?? 0), 0);
+      const totalStock   = vars.reduce((s, v) => s + (v.current_stock ?? 0), 0);
+      document.getElementById('sumUnits').textContent   = fmt(totalUnits);
+      document.getElementById('sumRevenue').textContent = fmtC(totalRevenue);
+      document.getElementById('sumStock').textContent   = fmt(totalStock);
+
+      // Shop notice
+      if (shopId) {
+        document.getElementById('shopNotice').textContent = `Données filtrées pour la boutique sélectionnée.`;
+        document.getElementById('shopNotice').classList.remove('hidden');
+      }
+
+      // Variants table
+      if (!vars.length) {
+        document.getElementById('emptyMsg').classList.remove('hidden');
+      } else {
+        document.getElementById('variantBody').innerHTML = vars.map(v => {
+          const hasActivity = v.units_sold_12w > 0;
+          return `
+            <tr class="border-b border-gray-50 last:border-0 ${hasActivity ? '' : 'opacity-50'}">
+              <td class="px-4 py-2.5 text-gray-800 font-medium">${v.description ?? v.item_id}</td>
+              <td class="px-3 py-2.5 text-right text-gray-600">${fmt(v.current_stock)}</td>
+              <td class="px-3 py-2.5 text-right ${v.units_sold_12w > 0 ? 'font-semibold text-gray-900' : 'text-gray-400'}">${fmt(v.units_sold_12w)}</td>
+              <td class="px-4 py-2.5 text-right text-gray-600">${fmtC(v.revenue_12w)}</td>
+            </tr>`;
+        }).join('');
+      }
+
+      document.getElementById('loader').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+    } catch (e) {
+      document.getElementById('loader').innerHTML = `<p class="text-red-500 text-sm">${e.message}</p>`;
+    }
+  }
+
+  load();
+  </script>
+</body>
+</html>
