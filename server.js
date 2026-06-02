@@ -2064,6 +2064,68 @@ app.get('/brand/:manufacturer', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/matrix/:matrixId — variant breakdown for a matrix product (12 weeks)
+// ---------------------------------------------------------------------------
+app.get('/api/matrix/:matrixId', async (req, res, next) => {
+  try {
+    const matrixId = req.params.matrixId;
+    const shopId   = req.query.shop_id || null;
+    const hasShop  = !!shopId;
+    const shopSl   = hasShop ? 'AND sl.shop_id = $2' : '';
+    const shopInv  = hasShop ? 'AND shop_id = $2'    : '';
+    const p        = hasShop ? [matrixId, shopId] : [matrixId];
+
+    const { rows } = await pool.query(`
+      WITH sales AS (
+        SELECT
+          sl.item_id,
+          SUM(sl.qty)                                                                        AS units,
+          SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS rev
+        FROM sale_lines sl
+        WHERE sl.completed_time >= now() - INTERVAL '12 weeks'
+          AND sl.completed_time IS NOT NULL
+          ${shopSl}
+        GROUP BY sl.item_id
+      ),
+      inv AS (
+        SELECT item_id, SUM(COALESCE(qty_on_hand,0) + COALESCE(qty_on_order,0)) AS stock
+        FROM inventory
+        WHERE 1=1 ${shopInv}
+        GROUP BY item_id
+      )
+      SELECT
+        v.item_id,
+        v.description,
+        v.default_cost,
+        v.default_price,
+        v.image_url,
+        ROUND(COALESCE(s.units, 0), 0)::float8  AS units_sold_12w,
+        ROUND(COALESCE(s.rev,   0), 2)::float8  AS revenue_12w,
+        COALESCE(inv.stock, 0)::float8           AS current_stock,
+        (v.item_id = $1)                         AS is_parent
+      FROM products v
+      LEFT JOIN sales s   ON s.item_id   = v.item_id
+      LEFT JOIN inv       ON inv.item_id = v.item_id
+      WHERE (v.item_id = $1 OR v.matrix_id = $1)
+        AND v.archived = false
+      ORDER BY COALESCE(s.units, 0) DESC NULLS LAST, v.description
+    `, p);
+
+    const parent   = rows.find(r => r.is_parent) || null;
+    const variants = rows.filter(r => !r.is_parent);
+
+    res.json({ matrix_id: matrixId, parent, variants });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /matrix/:matrixId — serve matrix detail page
+// ---------------------------------------------------------------------------
+app.get('/matrix/:matrixId', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'matrix.html'));
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/admin/refresh-view — force refresh mv_sales_velocity
 // ---------------------------------------------------------------------------
 app.post('/api/admin/refresh-view', async (req, res, next) => {
