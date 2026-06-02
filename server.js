@@ -1927,10 +1927,15 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       `, p),
 
       // Q4 — Top 10 matrices by units sold (12 weeks), variants consolidated under parent
+      // matrix_name: strip trailing size/colour suffix from a non-self-referencing variant's
+      // description ("940008 VICKI 34 Blanc-99" → "940008 VICKI").  Falls back to par.description
+      // for standalone items (matrix_id IS NULL).
       pool.query(`
         WITH s AS (
           SELECT
             COALESCE(p.matrix_id, p.item_id)                                                  AS matrix_item_id,
+            MIN(CASE WHEN p.matrix_id IS NOT NULL AND p.matrix_id != p.item_id
+                     THEN p.description END)                                                   AS variant_desc,
             SUM(sl.qty)                                                                        AS units,
             SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS rev
           FROM sale_lines sl
@@ -1953,7 +1958,13 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         )
         SELECT
           par.item_id,
-          par.description,
+          COALESCE(
+            NULLIF(regexp_replace(
+              s.variant_desc,
+              '\\s+(\\d{2,3}|XXS|XS|XL|XXL|XXXL|S|M|L|TU|OS|UNI)(\\s.*)?$',
+              '', 'i'), ''),
+            par.description
+          )                             AS description,
           par.category,
           par.image_url,
           par.default_cost,
@@ -2092,6 +2103,15 @@ app.get('/api/matrix/:matrixId', async (req, res, next) => {
         FROM inventory
         WHERE 1=1 ${shopInv}
         GROUP BY item_id
+      ),
+      mname AS (
+        SELECT NULLIF(regexp_replace(
+          MIN(CASE WHEN matrix_id IS NOT NULL AND matrix_id != item_id
+                   THEN description END),
+          '\\s+(\\d{2,3}|XXS|XS|XL|XXL|XXXL|S|M|L|TU|OS|UNI)(\\s.*)?$',
+          '', 'i'), '') AS name
+        FROM products
+        WHERE (item_id = $1 OR matrix_id = $1) AND archived = false
       )
       SELECT
         v.item_id,
@@ -2102,7 +2122,8 @@ app.get('/api/matrix/:matrixId', async (req, res, next) => {
         ROUND(COALESCE(s.units, 0), 0)::float8  AS units_sold_12w,
         ROUND(COALESCE(s.rev,   0), 2)::float8  AS revenue_12w,
         COALESCE(inv.stock, 0)::float8           AS current_stock,
-        (v.item_id = $1)                         AS is_parent
+        (v.item_id = $1)                         AS is_parent,
+        (SELECT name FROM mname)                 AS matrix_name
       FROM products v
       LEFT JOIN sales s   ON s.item_id   = v.item_id
       LEFT JOIN inv       ON inv.item_id = v.item_id
@@ -2113,8 +2134,9 @@ app.get('/api/matrix/:matrixId', async (req, res, next) => {
 
     const parent   = rows.find(r => r.is_parent) || null;
     const variants = rows.filter(r => !r.is_parent);
+    const matrixName = rows[0]?.matrix_name || parent?.description || matrixId;
 
-    res.json({ matrix_id: matrixId, parent, variants });
+    res.json({ matrix_id: matrixId, matrix_name: matrixName, parent, variants });
   } catch (err) { next(err); }
 });
 
