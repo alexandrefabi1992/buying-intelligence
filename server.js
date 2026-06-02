@@ -1792,8 +1792,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       // No date filter in WHERE — CASEs handle mode 1 (tag) and mode 2 (tag+period)
       q1Promise = pool.query(`
         SELECT
-          COUNT(DISTINCT CASE WHEN sl.completed_time >= $3::date AND sl.completed_time <= $4::date
-                              THEN sl.item_id END)::int                AS active_items,
+          COUNT(DISTINCT CASE WHEN p.tags ILIKE $5 THEN sl.item_id END)::int AS active_items,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks'
                          THEN sl.qty ELSE 0 END) / 12.0, 1)::float8   AS weekly_velocity,
           ROUND(SUM(CASE WHEN p.tags ILIKE $5
@@ -1820,8 +1819,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       // No date filter in WHERE — CASEs handle mode 1 (tag) and mode 2 (tag+period)
       q1Promise = pool.query(`
         SELECT
-          COUNT(DISTINCT CASE WHEN sl.completed_time >= $2::date AND sl.completed_time <= $3::date
-                              THEN sl.item_id END)::int                AS active_items,
+          COUNT(DISTINCT CASE WHEN p.tags ILIKE $4 THEN sl.item_id END)::int AS active_items,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks'
                          THEN sl.qty ELSE 0 END) / 12.0, 1)::float8   AS weekly_velocity,
           ROUND(SUM(CASE WHEN p.tags ILIKE $4
