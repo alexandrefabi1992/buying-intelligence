@@ -110,15 +110,15 @@
       const qs = shopId ? `?shop_id=${encodeURIComponent(shopId)}` : '';
       const d  = await fetch(`/api/matrix/${encodeURIComponent(matrixId)}${qs}`).then(r => r.json());
 
-      const par = d.parent;
+      const par  = d.parent;
       const vars = d.variants;
 
-      // Page title
-      const title = par?.description ?? matrixId;
+      // Page title — prefer computed matrix_name (size/colour stripped) over raw parent description
+      const title = d.matrix_name ?? par?.description ?? matrixId;
       document.title = title + ' — Buying Intelligence';
       document.getElementById('pageTitle').textContent = title;
 
-      // Matrix header card
+      // Matrix header card — image comes from the parent record
       const imgEl = document.getElementById('matrixImg');
       if (par?.image_url) {
         imgEl.innerHTML = `<img src="${par.image_url}" alt="" class="w-16 h-16 object-cover rounded-lg" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-sm font-bold\\'>${initials(title)}</div>'">`
