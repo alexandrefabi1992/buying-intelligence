@@ -1926,34 +1926,44 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         ORDER BY 1
       `, p),
 
-      // Q4 — Top 10 articles by units sold (12 weeks)
+      // Q4 — Top 10 matrices by units sold (12 weeks), variants consolidated under parent
       pool.query(`
         WITH s AS (
-          SELECT sl.item_id,
-                 SUM(sl.qty)                 AS units,
-                 SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS rev
+          SELECT
+            COALESCE(p.matrix_id, p.item_id)                                                  AS matrix_item_id,
+            SUM(sl.qty)                                                                        AS units,
+            SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS rev
           FROM sale_lines sl
+          JOIN products p ON p.item_id = sl.item_id
           WHERE sl.completed_time >= now() - INTERVAL '12 weeks'
             AND sl.completed_time IS NOT NULL
+            AND p.manufacturer ILIKE $1
+            AND p.archived = false
             ${slS}
-          GROUP BY sl.item_id
+          GROUP BY COALESCE(p.matrix_id, p.item_id)
         ),
-        ${stCTE}
+        ${stCTE},
+        st_matrix AS (
+          SELECT
+            COALESCE(p2.matrix_id, p2.item_id) AS matrix_item_id,
+            SUM(st.stock)                       AS stock
+          FROM st
+          JOIN products p2 ON p2.item_id = st.item_id
+          GROUP BY COALESCE(p2.matrix_id, p2.item_id)
+        )
         SELECT
-          p.item_id,
-          p.description,
-          p.category,
-          p.image_url,
-          p.default_cost,
-          p.default_price,
-          ROUND(s.units, 0)::float8              AS units_sold_12w,
-          ROUND(s.rev, 2)::float8                AS revenue_12w,
-          COALESCE(st.stock, 0)::float8          AS current_stock
-        FROM products p
-        JOIN s  ON s.item_id  = p.item_id
-        LEFT JOIN st ON st.item_id = p.item_id
-        WHERE p.manufacturer ILIKE $1
-          AND p.archived = false
+          par.item_id,
+          par.description,
+          par.category,
+          par.image_url,
+          par.default_cost,
+          par.default_price,
+          ROUND(s.units, 0)::float8     AS units_sold_12w,
+          ROUND(s.rev, 2)::float8       AS revenue_12w,
+          COALESCE(sm.stock, 0)::float8 AS current_stock
+        FROM s
+        JOIN products par ON par.item_id = s.matrix_item_id AND par.archived = false
+        LEFT JOIN st_matrix sm ON sm.matrix_item_id = s.matrix_item_id
         ORDER BY s.units DESC
         LIMIT 10
       `, p),
