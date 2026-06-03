@@ -599,8 +599,8 @@ if (process.argv.includes('--once')) {
     process.exit(1);
   });
 } else {
-  console.log('[sync] Scheduler started — runs every Monday at 07:00');
-  cron.schedule('0 7 * * 1', () => {
+  console.log('[sync] Scheduler started — runs every hour at :00');
+  cron.schedule('0 * * * *', () => {
     runSync().catch(err => console.error('[sync] Error:', err));
   });
 }
