@@ -245,9 +245,6 @@ async function drillManufacturer(mfrEnc) {
       const img = m.image_url
         ? `<img src="${m.image_url}" alt="" class="w-8 h-8 object-cover rounded flex-shrink-0" loading="lazy" onerror="this.style.display='none'">`
         : `<div class="w-8 h-8 rounded bg-gray-100 flex-shrink-0"></div>`;
-      const wk = m.sellout_date
-        ? Math.ceil((new Date(m.sellout_date) - new Date(d.season_code === 'p26' ? '2026-02-01' : d.season_code === 'p25' ? '2025-02-01' : d.season_code === 'a25' ? '2025-09-01' : d.season_code === 'a24' ? '2024-09-01' : '2024-02-01')) / (7*86400000)) + 1
-        : null;
       return `
         <tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="drillMatrix('${m.matrix_key}', '${encodeURIComponent(m.matrix_name ?? m.matrix_key)}')">
           <td class="px-4 py-2.5">
@@ -264,7 +261,7 @@ async function drillManufacturer(mfrEnc) {
           ${stCell(m.st_final, 0.80)}
           ${stCell(m.fp_pct, 0.70)}
           ${ratingCell(m.rating)}
-          ${selloutCell(m.sellout_date, wk)}
+          ${selloutCell(m.sellout_date, m.sellout_week)}
           ${actionCell(m.action)}
         </tr>`;
     }).join('');

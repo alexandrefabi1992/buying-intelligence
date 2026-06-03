@@ -2243,12 +2243,12 @@ function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam) {
 }
 
 function enrichVelocityRow(row, weeksElapsed, seasonActive) {
-  const st    = r => r !== null && parseFloat(r) || null;
-  const stF   = st(row.st_final);
-  const stS4  = st(row.st_s4);
-  const stS7  = st(row.st_s7);
-  const stS10 = st(row.st_s10);
-  const fpPct = st(row.fp_pct);
+  const toFloat = r => (r !== null && r !== undefined) ? parseFloat(r) : null;
+  const stF   = toFloat(row.st_final);
+  const stS4  = toFloat(row.st_s4);
+  const stS7  = toFloat(row.st_s7);
+  const stS10 = toFloat(row.st_s10);
+  const fpPct = toFloat(row.fp_pct);
   const init  = parseFloat(row.initial_stock) || 0;
   const cur   = parseFloat(row.current_stock) || 0;
   const residual = init > 0 ? cur / init : 0;
@@ -2264,7 +2264,7 @@ app.get('/api/velocity/brands', async (req, res, next) => {
   try {
     const seasonCode = (req.query.season ?? 'p25').toLowerCase();
     const season     = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p25;
-    const shopId     = req.query.shop_id || null;
+    const shopId     = /^\d+$/.test(req.query.shop_id ?? '') ? req.query.shop_id : null;
     const hasShop    = !!shopId;
     const shopCondSL  = hasShop ? `AND sl.shop_id = '${shopId}'` : '';
     const shopCondInv = hasShop ? `AND shop_id = '${shopId}'`    : '';
@@ -2310,7 +2310,7 @@ app.get('/api/velocity/matrices', async (req, res, next) => {
     const seasonCode   = (req.query.season ?? 'p25').toLowerCase();
     const season       = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p25;
     const manufacturer = req.query.manufacturer || '';
-    const shopId       = req.query.shop_id || null;
+    const shopId       = /^\d+$/.test(req.query.shop_id ?? '') ? req.query.shop_id : null;
     const hasShop      = !!shopId;
     const shopCondSL   = hasShop ? `AND sl.shop_id = '${shopId}'` : '';
     const shopCondInv  = hasShop ? `AND shop_id = '${shopId}'`    : '';
@@ -2346,7 +2346,10 @@ app.get('/api/velocity/matrices', async (req, res, next) => {
         ROUND(SUM(f.u_total)/ NULLIF(SUM(f.initial_stock), 0), 3)::float8      AS st_final,
         ROUND(SUM(f.u_fp)   / NULLIF(SUM(f.u_gross), 0), 3)::float8            AS fp_pct,
         -- Sell-out date: last positive sale if all stock is gone
-        CASE WHEN SUM(f.current_stock) = 0 THEN MAX(f.last_sale_dt) END        AS sellout_date
+        CASE WHEN SUM(f.current_stock) = 0 THEN MAX(f.last_sale_dt) END        AS sellout_date,
+        CASE WHEN SUM(f.current_stock) = 0 AND MAX(f.last_sale_dt) IS NOT NULL
+             THEN GREATEST(1, CEIL((MAX(f.last_sale_dt)::date - '${season.from}'::date + 1) / 7.0))::int
+        END                                                                     AS sellout_week
       FROM item_full f
       JOIN products p2 ON p2.item_id = f.item_id
       WHERE f.manufacturer ILIKE $1
@@ -2369,7 +2372,7 @@ app.get('/api/velocity/articles', async (req, res, next) => {
     const seasonCode = (req.query.season ?? 'p25').toLowerCase();
     const season     = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p25;
     const matrixId   = req.query.matrix_id || '';
-    const shopId     = req.query.shop_id || null;
+    const shopId     = /^\d+$/.test(req.query.shop_id ?? '') ? req.query.shop_id : null;
     const hasShop    = !!shopId;
     const shopCondSL  = hasShop ? `AND sl.shop_id = '${shopId}'` : '';
     const shopCondInv = hasShop ? `AND shop_id = '${shopId}'`    : '';
@@ -2442,8 +2445,7 @@ app.get('/api/velocity/articles', async (req, res, next) => {
         COALESCE(ia.u_gross,0)::float8                                         AS u_gross,
         COALESCE(cs.stock, 0)::float8                                          AS current_stock,
         (COALESCE(ia.u_total,0) + COALESCE(cs.stock,0))::float8               AS initial_stock,
-        ROUND((COALESCE(ia.u_total,0)+COALESCE(cs.stock,0)) / NULLIF(COALESCE(ia.u_total,0)+COALESCE(cs.stock,0),0),3)::float8 AS st_final,
-        ROUND(COALESCE(ia.u_total,0) / NULLIF(COALESCE(ia.u_total,0)+COALESCE(cs.stock,0),0),3)::float8 AS st_final2,
+        ROUND(COALESCE(ia.u_total,0) / NULLIF(COALESCE(ia.u_total,0)+COALESCE(cs.stock,0),0),3)::float8 AS st_final,
         ROUND(COALESCE(ia.u_fp,0) / NULLIF(COALESCE(ia.u_gross,0),0),3)::float8 AS fp_pct,
         CASE WHEN COALESCE(cs.stock,0) = 0 THEN ia.last_sale_dt END           AS sellout_date,
         CASE WHEN COALESCE(cs.stock,0) = 0 AND ia.last_sale_dt IS NOT NULL
@@ -2456,12 +2458,11 @@ app.get('/api/velocity/articles', async (req, res, next) => {
       ORDER BY COALESCE(ia.u_total,0) DESC NULLS LAST, p.description
     `, [itemIds]);
 
-    // Fix st_final (use the computed sell-through)
     const articles = rows.map(r => {
       const init = parseFloat(r.initial_stock) || 0;
       const sold = parseFloat(r.units_sold) || 0;
       const st   = init > 0 ? sold / init : null;
-      const fp   = parseFloat(r.fp_pct) || null;
+      const fp   = (r.fp_pct !== null && r.fp_pct !== undefined) ? parseFloat(r.fp_pct) : null;
       return {
         ...r,
         st_s4:  init > 0 ? parseFloat(r.u_s4)  / init : null,
