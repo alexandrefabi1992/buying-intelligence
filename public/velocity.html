@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vélocité — Buying Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .spinner { width:28px;height:28px;border:3px solid #e5e7eb;border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite }
+    @keyframes spin { to { transform:rotate(360deg) } }
+    .phase-bar { height:6px;border-radius:3px;background:#e5e7eb;position:relative;min-width:60px }
+    .phase-fill { height:100%;border-radius:3px;position:absolute;left:0;top:0;transition:width .3s }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- Header -->
+<header class="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+  <a href="/" class="text-blue-600 text-sm hover:underline flex-shrink-0">← Dashboard</a>
+  <div class="w-px h-5 bg-gray-200 flex-shrink-0"></div>
+  <h1 class="text-base font-semibold text-gray-900">Vélocité d'écoulement</h1>
+  <div id="breadcrumb" class="flex items-center gap-2 text-sm text-gray-500 ml-2"></div>
+  <div class="ml-auto flex items-center gap-3 flex-shrink-0">
+    <select id="shopFilter" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+      <option value="">Toutes les boutiques</option>
+    </select>
+    <select id="seasonFilter" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+      <option value="p26">P26 — Printemps 2026</option>
+      <option value="a25">A25 — Automne 2025</option>
+      <option value="p25" selected>P25 — Printemps 2025</option>
+      <option value="a24">A24 — Automne 2024</option>
+      <option value="p24">P24 — Printemps 2024</option>
+    </select>
+  </div>
+</header>
+
+<!-- Phase legend -->
+<div class="bg-white border-b border-gray-100 px-6 py-2 flex items-center gap-6 text-xs text-gray-500 flex-wrap">
+  <span class="font-medium text-gray-700">Seuils cibles :</span>
+  <span><span class="font-semibold text-gray-800">S4</span> ≥ 20%</span>
+  <span><span class="font-semibold text-gray-800">S7</span> ≥ 35%</span>
+  <span><span class="font-semibold text-gray-800">S10</span> ≥ 55%</span>
+  <span><span class="font-semibold text-gray-800">S14</span> ≥ 80%</span>
+  <span class="ml-4 border-l pl-4">Full price ≥ 90% du prix régulier</span>
+  <div id="weekBadge" class="ml-auto"></div>
+</div>
+
+<!-- Loader -->
+<div id="loader" class="flex justify-center items-center py-20">
+  <div class="spinner"></div>
+</div>
+
+<!-- Content -->
+<div id="content" class="hidden max-w-7xl mx-auto px-4 py-5">
+
+  <!-- Level: brands -->
+  <div id="level-brands">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-700">Par marque</h2>
+        <p id="brandSubtitle" class="text-xs text-gray-400"></p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-gray-100 bg-gray-50">
+              <th class="text-left px-4 py-2.5 text-gray-400 font-medium">Marque</th>
+              <th class="text-right px-3 py-2.5 text-gray-400 font-medium">Stk init.</th>
+              <th class="text-right px-3 py-2.5 text-gray-400 font-medium">Vendus</th>
+              <th class="text-right px-3 py-2.5 text-gray-400 font-medium">Restant</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">S4</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">S10</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">Final</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">Full price</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">Cote</th>
+              <th class="text-left px-4 py-2.5 text-gray-400 font-medium">Action</th>
+            </tr>
+          </thead>
+          <tbody id="brandBody" class="divide-y divide-gray-50"></tbody>
+        </table>
+      </div>
+      <p id="brandEmpty" class="hidden text-center text-gray-400 py-10 text-sm">Aucune donnée pour cette saison.</p>
+    </div>
+  </div>
+
+  <!-- Level: matrices (hidden until drill-down) -->
+  <div id="level-matrices" class="hidden">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-3">
+        <button onclick="goToLevel('brands')" class="text-blue-600 hover:underline text-xs">← Marques</button>
+        <h2 id="matrixTitle" class="text-sm font-semibold text-gray-700"></h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-gray-100 bg-gray-50">
+              <th class="text-left px-4 py-2.5 text-gray-400 font-medium">Matrice</th>
+              <th class="text-right px-3 py-2.5 text-gray-400 font-medium">Stk init.</th>
+              <th class="text-right px-3 py-2.5 text-gray-400 font-medium">Vendus</th>
+              <th class="text-right px-3 py-2.5 text-gray-400 font-medium">Restant</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">S4</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">S10</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">Final</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">Full price</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">Cote</th>
+              <th class="text-left px-3 py-2.5 text-gray-400 font-medium">Sell-out</th>
+              <th class="text-left px-4 py-2.5 text-gray-400 font-medium">Action</th>
+            </tr>
+          </thead>
+          <tbody id="matrixBody" class="divide-y divide-gray-50"></tbody>
+        </table>
+      </div>
+      <p id="matrixEmpty" class="hidden text-center text-gray-400 py-10 text-sm">Aucune donnée.</p>
+    </div>
+  </div>
+
+  <!-- Level: articles (hidden until drill-down) -->
+  <div id="level-articles" class="hidden">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-3">
+        <button onclick="goToLevel('brands')" class="text-blue-600 hover:underline text-xs">← Marques</button>
+        <span class="text-gray-300 text-xs">›</span>
+        <button id="backToMatrices" onclick="goToLevel('matrices')" class="text-blue-600 hover:underline text-xs"></button>
+        <h2 id="articleTitle" class="text-sm font-semibold text-gray-700 ml-1"></h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-gray-100 bg-gray-50">
+              <th class="text-left px-4 py-2.5 text-gray-400 font-medium">Variante</th>
+              <th class="text-right px-3 py-2.5 text-gray-400 font-medium">Stk init.</th>
+              <th class="text-right px-3 py-2.5 text-gray-400 font-medium">Vendus</th>
+              <th class="text-right px-3 py-2.5 text-gray-400 font-medium">Stock</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">S4</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">S10</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">Final</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">Full price</th>
+              <th class="text-center px-3 py-2.5 text-gray-400 font-medium">Cote</th>
+              <th class="text-left px-3 py-2.5 text-gray-400 font-medium">Sell-out</th>
+            </tr>
+          </thead>
+          <tbody id="articleBody" class="divide-y divide-gray-50"></tbody>
+        </table>
+      </div>
+      <p id="articleEmpty" class="hidden text-center text-gray-400 py-10 text-sm">Aucune donnée.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const fmt  = n => n == null ? '—' : new Intl.NumberFormat('fr-CA', { maximumFractionDigits: 0 }).format(n);
+const fmtP = n => n == null ? '—' : (n * 100).toFixed(0) + '%';
+const fmtD = s => s ? new Date(s).toLocaleDateString('fr-CA', { month: 'short', day: 'numeric' }) : '—';
+
+let state = { season: 'p25', shopId: '', manufacturer: '', matrixId: '', matrixName: '', weeksElapsed: 0, seasonActive: false };
+
+// Phase threshold check → color
+function phaseColor(val, threshold) {
+  if (val === null) return '#d1d5db';
+  return val >= threshold ? '#16a34a' : val >= threshold * 0.75 ? '#f59e0b' : '#dc2626';
+}
+
+function stCell(val, threshold) {
+  if (val === null) return '<td class="px-3 py-2.5 text-center text-gray-300">—</td>';
+  const pct   = Math.round(val * 100);
+  const color = phaseColor(val, threshold);
+  const bg    = val >= threshold ? 'bg-green-50 text-green-700' : val >= threshold * 0.75 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
+  return `<td class="px-3 py-2.5 text-center"><span class="px-1.5 py-0.5 rounded text-xs font-semibold ${bg}">${pct}%</span></td>`;
+}
+
+function ratingCell(rating) {
+  if (!rating) return '<td class="px-3 py-2.5 text-center text-gray-300">—</td>';
+  return `<td class="px-3 py-2.5 text-center" title="${rating.label}"><span class="font-semibold">${rating.cote}</span></td>`;
+}
+
+function actionCell(action) {
+  if (!action) return '<td class="px-4 py-2.5 text-gray-300">—</td>';
+  const colors = { critical: 'bg-red-100 text-red-700', high: 'bg-orange-100 text-orange-700', medium: 'bg-amber-100 text-amber-700' };
+  return `<td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-full text-xs font-medium ${colors[action.severity] ?? 'bg-gray-100 text-gray-600'}">${action.action}</span></td>`;
+}
+
+function selloutCell(date, week) {
+  if (!date) return '<td class="px-3 py-2.5 text-gray-300">—</td>';
+  return `<td class="px-3 py-2.5 text-xs text-gray-600">${fmtD(date)}<span class="text-gray-400 ml-1">S${week ?? '?'}</span></td>`;
+}
+
+// ── Brand level ───────────────────────────────────────────────────────────────
+async function loadBrands() {
+  showLoader();
+  const qs = new URLSearchParams({ season: state.season });
+  if (state.shopId) qs.set('shop_id', state.shopId);
+  const d = await fetch(`/api/velocity/brands?${qs}`).then(r => r.json());
+  state.weeksElapsed  = d.weeks_elapsed;
+  state.seasonActive  = d.season_active;
+
+  document.getElementById('weekBadge').innerHTML = d.season_active
+    ? `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Saison en cours — Semaine ${d.weeks_elapsed}</span>`
+    : `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Saison terminée — ${d.season_label}</span>`;
+
+  document.getElementById('brandSubtitle').textContent = `${d.brands.length} marques · ${d.season_label}`;
+
+  const tbody = document.getElementById('brandBody');
+  if (!d.brands.length) {
+    document.getElementById('brandEmpty').classList.remove('hidden');
+    tbody.innerHTML = '';
+  } else {
+    document.getElementById('brandEmpty').classList.add('hidden');
+    tbody.innerHTML = d.brands.map(b => `
+      <tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="drillManufacturer('${encodeURIComponent(b.manufacturer)}')">
+        <td class="px-4 py-2.5 font-medium text-gray-900">${b.manufacturer}<span class="ml-1 text-gray-400 font-normal text-[10px]">${b.items_count} art.</span></td>
+        <td class="px-3 py-2.5 text-right text-gray-600">${fmt(b.initial_stock)}</td>
+        <td class="px-3 py-2.5 text-right text-gray-800 font-medium">${fmt(b.units_sold)}</td>
+        <td class="px-3 py-2.5 text-right text-gray-500">${fmt(b.current_stock)}</td>
+        ${stCell(b.st_s4,  0.20)}
+        ${stCell(b.st_s10, 0.55)}
+        ${stCell(b.st_final, 0.80)}
+        ${stCell(b.fp_pct, 0.70)}
+        ${ratingCell(b.rating)}
+        ${actionCell(b.action)}
+      </tr>`).join('');
+  }
+  goToLevel('brands');
+  hideLoader();
+}
+
+// ── Matrix level ──────────────────────────────────────────────────────────────
+async function drillManufacturer(mfrEnc) {
+  const mfr = decodeURIComponent(mfrEnc);
+  state.manufacturer = mfr;
+  showLoader();
+  const qs = new URLSearchParams({ season: state.season, manufacturer: mfr });
+  if (state.shopId) qs.set('shop_id', state.shopId);
+  const d = await fetch(`/api/velocity/matrices?${qs}`).then(r => r.json());
+
+  document.getElementById('matrixTitle').textContent = mfr;
+
+  const tbody = document.getElementById('matrixBody');
+  if (!d.matrices.length) {
+    document.getElementById('matrixEmpty').classList.remove('hidden');
+    tbody.innerHTML = '';
+  } else {
+    document.getElementById('matrixEmpty').classList.add('hidden');
+    tbody.innerHTML = d.matrices.map(m => {
+      const img = m.image_url
+        ? `<img src="${m.image_url}" alt="" class="w-8 h-8 object-cover rounded flex-shrink-0" loading="lazy" onerror="this.style.display='none'">`
+        : `<div class="w-8 h-8 rounded bg-gray-100 flex-shrink-0"></div>`;
+      const wk = m.sellout_date
+        ? Math.ceil((new Date(m.sellout_date) - new Date(d.season_code === 'p26' ? '2026-02-01' : d.season_code === 'p25' ? '2025-02-01' : d.season_code === 'a25' ? '2025-09-01' : d.season_code === 'a24' ? '2024-09-01' : '2024-02-01')) / (7*86400000)) + 1
+        : null;
+      return `
+        <tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="drillMatrix('${m.matrix_key}', '${encodeURIComponent(m.matrix_name ?? m.matrix_key)}')">
+          <td class="px-4 py-2.5">
+            <div class="flex items-center gap-2">
+              ${img}
+              <span class="font-medium text-gray-900 truncate max-w-[180px]" title="${m.matrix_name ?? ''}">${m.matrix_name ?? m.matrix_key}</span>
+            </div>
+          </td>
+          <td class="px-3 py-2.5 text-right text-gray-600">${fmt(m.initial_stock)}</td>
+          <td class="px-3 py-2.5 text-right text-gray-800 font-medium">${fmt(m.units_sold)}</td>
+          <td class="px-3 py-2.5 text-right text-gray-500">${fmt(m.current_stock)}</td>
+          ${stCell(m.st_s4,  0.20)}
+          ${stCell(m.st_s10, 0.55)}
+          ${stCell(m.st_final, 0.80)}
+          ${stCell(m.fp_pct, 0.70)}
+          ${ratingCell(m.rating)}
+          ${selloutCell(m.sellout_date, wk)}
+          ${actionCell(m.action)}
+        </tr>`;
+    }).join('');
+  }
+  goToLevel('matrices');
+  hideLoader();
+}
+
+// ── Article level ─────────────────────────────────────────────────────────────
+async function drillMatrix(matrixId, nameEnc) {
+  const name = decodeURIComponent(nameEnc);
+  state.matrixId   = matrixId;
+  state.matrixName = name;
+  showLoader();
+  const qs = new URLSearchParams({ season: state.season, matrix_id: matrixId });
+  if (state.shopId) qs.set('shop_id', state.shopId);
+  const d = await fetch(`/api/velocity/articles?${qs}`).then(r => r.json());
+
+  document.getElementById('articleTitle').textContent = name;
+  document.getElementById('backToMatrices').textContent = `← ${state.manufacturer}`;
+
+  const tbody = document.getElementById('articleBody');
+  if (!d.articles.length) {
+    document.getElementById('articleEmpty').classList.remove('hidden');
+    tbody.innerHTML = '';
+  } else {
+    document.getElementById('articleEmpty').classList.add('hidden');
+    tbody.innerHTML = d.articles.map(a => `
+      <tr class="${a.initial_stock === 0 ? 'opacity-40' : 'hover:bg-gray-50'} transition-colors">
+        <td class="px-4 py-2.5 font-medium text-gray-900">${a.description ?? a.item_id}</td>
+        <td class="px-3 py-2.5 text-right text-gray-600">${fmt(a.initial_stock)}</td>
+        <td class="px-3 py-2.5 text-right text-gray-800 font-medium">${fmt(a.units_sold)}</td>
+        <td class="px-3 py-2.5 text-right text-gray-500">${fmt(a.current_stock)}</td>
+        ${stCell(a.st_s4,  0.20)}
+        ${stCell(a.st_s10, 0.55)}
+        ${stCell(a.st_final, 0.80)}
+        ${stCell(a.fp_pct, 0.70)}
+        ${ratingCell(a.rating)}
+        ${selloutCell(a.sellout_date, a.sellout_week)}
+      </tr>`).join('');
+  }
+  goToLevel('articles');
+  hideLoader();
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function goToLevel(level) {
+  ['brands','matrices','articles'].forEach(l => {
+    document.getElementById(`level-${l}`).classList.toggle('hidden', l !== level);
+  });
+  // Breadcrumb
+  const bc = document.getElementById('breadcrumb');
+  if (level === 'brands') bc.innerHTML = '';
+  else if (level === 'matrices') bc.innerHTML = `<span class="text-gray-400">›</span><span>${state.manufacturer}</span>`;
+  else bc.innerHTML = `<span class="text-gray-400">›</span><button onclick="goToLevel('matrices')" class="hover:underline text-blue-500">${state.manufacturer}</button><span class="text-gray-400">›</span><span>${state.matrixName}</span>`;
+}
+
+function showLoader() { document.getElementById('loader').classList.remove('hidden'); document.getElementById('content').classList.add('hidden'); }
+function hideLoader() { document.getElementById('loader').classList.add('hidden'); document.getElementById('content').classList.remove('hidden'); }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    const shops = await fetch('/api/shops').then(r => r.json());
+    const sel = document.getElementById('shopFilter');
+    for (const s of shops) {
+      const o = document.createElement('option');
+      o.value = s.shop_id; o.textContent = s.name;
+      sel.appendChild(o);
+    }
+  } catch (_) {}
+
+  document.getElementById('shopFilter').addEventListener('change', e => { state.shopId = e.target.value; loadBrands(); });
+  document.getElementById('seasonFilter').addEventListener('change', e => { state.season = e.target.value; loadBrands(); });
+
+  state.season = document.getElementById('seasonFilter').value;
+  await loadBrands();
+})();
+</script>
+</body>
+</html>
