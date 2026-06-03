@@ -594,8 +594,22 @@ app.get('/api/budget', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// Multiplier table: sell-through + full-price rate → buying budget adjustment
+// Both conditions must be met for a tier; falls to the next if either fails.
+// ---------------------------------------------------------------------------
+function computeMultiplier(st, fp) {
+  if (st === null || st === undefined || fp === null || fp === undefined || isNaN(st) || isNaN(fp)) {
+    return { multiplier: 1.00, label: 'Reconduire' };
+  }
+  if (st >= 0.80 && fp >= 0.70) return { multiplier: 1.25, label: 'Augmenter'     };
+  if (st >= 0.65 && fp >= 0.50) return { multiplier: 1.10, label: 'Légère hausse' };
+  if (st >= 0.50 && fp >= 0.40) return { multiplier: 1.00, label: 'Reconduire'    };
+  if (st >= 0.35 && fp >= 0.30) return { multiplier: 0.80, label: 'Réduire'       };
+  return                               { multiplier: 0.50, label: 'Couper'         };
+}
+
+// ---------------------------------------------------------------------------
 // Shared helper: aggregate manufacturer×category rows into a nested tree.
-// Each manufacturer entry gets a `hypothesis` scaffold for future multipliers.
 // refField is the column name carrying the reference-demand figure
 // (differs between NOS and seasonal).
 // ---------------------------------------------------------------------------
@@ -611,7 +625,9 @@ function buildManufacturerTree(rows, refField) {
         remaining_stock_units: 0,
         [refField]:            0,
         proposed_budget:       0,
-        hypothesis:            { multiplier: 1.0, adjusted_budget: 0 },
+        fp_units_sold:         0,
+        gross_units_sold:      0,
+        hypothesis:            { multiplier: 1.0, label: 'Reconduire', adjusted_budget: 0 },
         by_category:           [],
       });
     }
@@ -620,6 +636,8 @@ function buildManufacturerTree(rows, refField) {
     m.remaining_stock_units += parseFloat(row.remaining_stock_units ?? 0);
     m[refField]             += parseFloat(row[refField] ?? 0);
     m.proposed_budget       += budget;
+    m.fp_units_sold         += parseFloat(row.fp_units_sold    ?? 0);
+    m.gross_units_sold      += parseFloat(row.gross_units_sold ?? 0);
     m.by_category.push({
       category:              row.category,
       items_count:           parseInt(row.items_count ?? 0),
@@ -777,8 +795,15 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
       WITH season_sales AS (
         SELECT
           sl.item_id,
-          SUM(sl.qty) AS units_sold_season
+          SUM(sl.qty)                                                               AS units_sold_season,
+          SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END)                         AS gross_units,
+          SUM(CASE WHEN sl.qty > 0
+                    AND p2.default_price > 0
+                    AND (sl.unit_price * sl.qty - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0))
+                        >= p2.default_price * sl.qty * 0.90
+               THEN sl.qty ELSE 0 END)                                             AS fp_units
         FROM sale_lines sl
+        JOIN products p2 ON p2.item_id = sl.item_id
         WHERE sl.completed_time >= $1::date
           AND sl.completed_time <= $2::date
           AND sl.completed_time IS NOT NULL
@@ -792,6 +817,8 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
         COUNT(DISTINCT p.item_id)::int             AS items_count,
         ROUND(SUM(COALESCE(st.current_stock, 0)), 0)::float8              AS remaining_stock_units,
         ROUND(SUM(COALESCE(ss.units_sold_season, 0)), 0)::float8          AS reference_units_sold,
+        ROUND(SUM(COALESCE(ss.fp_units,    0)), 0)::float8                AS fp_units_sold,
+        ROUND(SUM(COALESCE(ss.gross_units, 0)), 0)::float8                AS gross_units_sold,
         ROUND(SUM(
           GREATEST(0, COALESCE(ss.units_sold_season, 0) - COALESCE(st.current_stock, 0))
           * COALESCE(p.default_cost, 0)
@@ -812,7 +839,17 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
       ORDER BY p.manufacturer, proposed_budget DESC
     `, params);
 
-    const byManufacturer = buildManufacturerTree(rows, 'reference_units_sold');
+    const byManufacturer = buildManufacturerTree(rows, 'reference_units_sold').map(m => {
+      const ref   = m.reference_units_sold;
+      const stock = m.remaining_stock_units;
+      const st    = (ref + stock) > 0 ? ref / (ref + stock) : null;
+      const fp    = m.gross_units_sold > 0 ? m.fp_units_sold / m.gross_units_sold : null;
+      const hyp   = computeMultiplier(st, fp);
+      m.st_rate   = st !== null ? Math.round(st * 1000) / 1000 : null;
+      m.fp_rate   = fp !== null ? Math.round(fp * 1000) / 1000 : null;
+      m.hypothesis = { ...hyp, adjusted_budget: Math.round(m.proposed_budget * hyp.multiplier * 100) / 100 };
+      return m;
+    });
     const total = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
 
     const result = {

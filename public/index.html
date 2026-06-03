@@ -186,8 +186,10 @@
                 <th class="px-3 py-2 text-right">Articles</th>
                 <th class="px-3 py-2 text-right">Stock en main</th>
                 <th class="px-3 py-2 text-right">Unités vendues (réf.)</th>
+                <th class="px-3 py-2 text-right">Sell-through</th>
+                <th class="px-3 py-2 text-right">Full price %</th>
                 <th class="px-3 py-2 text-right">Budget suggéré $</th>
-                <th class="px-3 py-2 text-right">Ajustement %</th>
+                <th class="px-3 py-2 text-right">Hypothèse</th>
               </tr>
             </thead>
             <tbody id="budgetSeasBody" class="divide-y divide-gray-100"></tbody>
@@ -553,13 +555,30 @@ function updateFilterBadge() {
 
 // ── BUDGET — config ────────────────────────────────────────────────────────
 const BUDGET_CFG = {
-  budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetMfrSearch', totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS' },
-  budgetSeas: { refField:'reference_units_sold', color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'budgetMfrSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier' },
+  budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetMfrSearch', totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS',        cols:7, hasHyp:false },
+  budgetSeas: { refField:'reference_units_sold', color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'budgetMfrSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:9, hasHyp:true  },
 };
+
+const HYP_STYLE = {
+  'Augmenter':     { bg:'bg-green-100',  text:'text-green-700'  },
+  'Légère hausse': { bg:'bg-blue-100',   text:'text-blue-700'   },
+  'Reconduire':    { bg:'bg-gray-100',   text:'text-gray-600'   },
+  'Réduire':       { bg:'bg-amber-100',  text:'text-amber-700'  },
+  'Couper':        { bg:'bg-red-100',    text:'text-red-700'    },
+};
+
+function stPctCell(val, threshold) {
+  if (val === null || val === undefined) return '<td class="px-3 py-2.5 text-right text-gray-300">—</td>';
+  const pct = Math.round(val * 100);
+  const ok  = val >= threshold;
+  const mid = val >= threshold * 0.75;
+  const bg  = ok ? 'bg-green-50 text-green-700' : mid ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
+  return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${bg}">${pct}%</span></td>`;
+}
 
 // ── Budget: render one table ───────────────────────────────────────────────
 function renderBudgetTable(key) {
-  const { refField, color, catBg, bodyId, searchId } = BUDGET_CFG[key];
+  const { refField, color, catBg, bodyId, searchId, cols, hasHyp } = BUDGET_CFG[key];
   const search = document.getElementById(searchId).value.toLowerCase().trim();
   const { data, expanded, multipliers } = state[key];
   const visible = search ? data.filter(m => m.manufacturer.toLowerCase().includes(search)) : data;
@@ -569,11 +588,31 @@ function renderBudgetTable(key) {
     const isOpen  = expanded.has(m.manufacturer);
     const hasCats = m.by_category?.length > 0;
     const chevron = hasCats ? `<span style="font-size:10px;color:#9ca3af">${isOpen ? '▼' : '▶'}</span>` : '';
-    const pct     = Math.round(((multipliers[m.manufacturer] ?? 1) - 1) * 100);
-    const adjusted = m.proposed_budget * (1 + pct / 100);
-    const hasAdj  = Math.abs(pct) > 0;
-    const adjColor = pct > 0 ? 'color:#059669' : 'color:#dc2626';
+    const mult    = multipliers[m.manufacturer] ?? (hasHyp ? (m.hypothesis?.multiplier ?? 1) : 1);
+    const pct     = Math.round((mult - 1) * 100);
+    const adjusted = m.proposed_budget * mult;
+    const hasAdj  = Math.abs(mult - 1) > 0.001;
+    const adjColor = mult >= 1 ? 'color:#059669' : 'color:#dc2626';
     const adjHtml = hasAdj ? `<span style="font-size:11px;${adjColor};font-weight:600"> → ${fmtC(adjusted)}</span>` : '';
+
+    // Hypothesis badge (saisonnier only)
+    const hyp = m.hypothesis;
+    const hypStyle = HYP_STYLE[hyp?.label] ?? HYP_STYLE['Reconduire'];
+    const hypCells = hasHyp ? `
+        ${stPctCell(m.st_rate, 0.65)}
+        ${stPctCell(m.fp_rate, 0.50)}
+        <td class="px-3 py-2.5 text-right font-semibold ${color}">${fmtC(m.proposed_budget)}</td>
+        <td class="px-3 py-2.5 text-right" style="white-space:nowrap">
+          <span class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${hypStyle.bg} ${hypStyle.text} mr-1">${hyp?.multiplier?.toFixed(2)}× ${hyp?.label ?? ''}</span>
+          <span class="text-gray-400 text-[10px]">${fmtC(hyp?.adjusted_budget)}</span>
+        </td>` : `
+        <td class="px-3 py-2.5 text-right font-semibold ${color}">${fmtC(m.proposed_budget)}</td>
+        <td class="px-3 py-2.5 text-right" style="white-space:nowrap">
+          <input class="pct-input" type="number" min="-99" max="500" step="1"
+            value="${pct || ''}" placeholder="0"
+            data-mfr="${escHtml(m.manufacturer)}" data-key="${key}" data-base="${m.proposed_budget}"
+          ><span class="text-gray-400 text-[10px] ml-0.5">%</span>${adjHtml}
+        </td>`;
 
     rows.push(`
       <tr class="mfr-row" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
@@ -585,16 +624,11 @@ function renderBudgetTable(key) {
         <td class="px-3 py-2.5 text-right text-gray-500">${m.items_count}</td>
         <td class="px-3 py-2.5 text-right text-gray-500">${fmt(m.remaining_stock_units)}</td>
         <td class="px-3 py-2.5 text-right">${fmt(m[refField])}</td>
-        <td class="px-3 py-2.5 text-right font-semibold ${color}">${fmtC(m.proposed_budget)}</td>
-        <td class="px-3 py-2.5 text-right" style="white-space:nowrap">
-          <input class="pct-input" type="number" min="-99" max="500" step="1"
-            value="${pct || ''}" placeholder="0"
-            data-mfr="${escHtml(m.manufacturer)}" data-key="${key}" data-base="${m.proposed_budget}"
-          ><span class="text-gray-400 text-[10px] ml-0.5">%</span>${adjHtml}
-        </td>
+        ${hypCells}
       </tr>`);
 
     if (isOpen && hasCats) {
+      const catEmpty = hasHyp ? `<td class="px-3 py-1.5"></td><td class="px-3 py-1.5"></td>` : '';
       for (const cat of m.by_category) {
         rows.push(`
           <tr class="cat-row" style="background:${catBg}">
@@ -603,6 +637,7 @@ function renderBudgetTable(key) {
             <td class="px-3 py-1.5 text-right text-gray-400">${cat.items_count}</td>
             <td class="px-3 py-1.5 text-right text-gray-400">${fmt(cat.remaining_stock_units)}</td>
             <td class="px-3 py-1.5 text-right text-gray-400">${fmt(cat[refField])}</td>
+            ${catEmpty}
             <td class="px-3 py-1.5 text-right text-gray-500">${fmtC(cat.proposed_budget)}</td>
             <td class="px-3 py-1.5"></td>
           </tr>`);
@@ -611,7 +646,7 @@ function renderBudgetTable(key) {
   }
 
   const tbody = document.getElementById(bodyId);
-  tbody.innerHTML = rows.join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">Aucun résultat</td></tr>`;
+  tbody.innerHTML = rows.join('') || `<tr><td colspan="${cols}" class="text-center py-8 text-gray-400">Aucun résultat</td></tr>`;
 }
 
 // ── Budget: attach table event listeners once at startup ───────────────────
@@ -661,9 +696,13 @@ function updateAllBudgetTotals() {
   let grandBase = 0, grandAdj = 0;
   for (const key of ['budgetNos', 'budgetSeas']) {
     const { data, multipliers } = state[key];
+    const hasHyp = BUDGET_CFG[key].hasHyp;
     if (!data.length) continue;
     const base = data.reduce((s, m) => s + m.proposed_budget, 0);
-    const adj  = data.reduce((s, m) => s + m.proposed_budget * (multipliers[m.manufacturer] ?? 1), 0);
+    const adj  = data.reduce((s, m) => {
+      const mult = multipliers[m.manufacturer] ?? (hasHyp ? (m.hypothesis?.multiplier ?? 1) : 1);
+      return s + m.proposed_budget * mult;
+    }, 0);
     grandBase += base; grandAdj += adj;
     const diff = adj - base, hasAdj = Math.abs(diff) > 0.01;
     let html = `${BUDGET_CFG[key].label} : ${fmtC(base)} · ${data.length} marques`;
@@ -691,6 +730,13 @@ async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
     const d  = await fetch(`${BASE}${endpoint}${qs}`).then(r => r.json());
     state[key].data     = d.by_manufacturer ?? [];
     state[key].expanded = new Set();
+    // Seed multipliers from server-computed hypothesis (saisonnier only)
+    if (BUDGET_CFG[key].hasHyp) {
+      for (const m of state[key].data) {
+        state[key].multipliers[m.manufacturer] = m.hypothesis?.multiplier ?? 1.0;
+      }
+      saveMultipliers();
+    }
     renderBudgetTable(key);
     if (key === 'budgetSeas') {
       document.getElementById('budgetSeasPeriod').textContent =
@@ -698,7 +744,7 @@ async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
     }
   } catch (e) {
     document.getElementById(BUDGET_CFG[key].bodyId).innerHTML =
-      `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
+      `<tr><td colspan="${BUDGET_CFG[key].cols}" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
   }
   showLoader(key, false);
 }
