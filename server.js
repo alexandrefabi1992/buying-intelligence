@@ -2148,6 +2148,350 @@ app.get('/matrix/:matrixId', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// VELOCITY ANALYSIS — sell-through phases, full-price %, rating, actions
+// ---------------------------------------------------------------------------
+
+function velocityRating(st, fp) {
+  if (st === null) return null;
+  if (st >= 0.80 && fp >= 0.70) return { cote: '⭐⭐⭐', label: 'Winner',        color: '#16a34a' };
+  if (st >= 0.60 && fp >= 0.50) return { cote: '⭐⭐',  label: 'Solide',        color: '#2563eb' };
+  if (st >= 0.40 && fp >= 0.35) return { cote: '⭐',   label: 'Acceptable',    color: '#ca8a04' };
+  if (st >= 0.25)                return { cote: '⚠️',  label: 'Problématique', color: '#ea580c' };
+  return                                { cote: '🚫',  label: 'Abandon',       color: '#dc2626' };
+}
+
+function velocityAction(weeksElapsed, st_s4, st_s7, st_s10, residual_pct, seasonActive) {
+  if (!seasonActive) return null;
+  if (weeksElapsed >= 14 && residual_pct > 0.25) return { action: 'Liquidation ou retour fournisseur', severity: 'critical' };
+  if (weeksElapsed >= 10 && st_s10 !== null && st_s10 < 0.50) return { action: 'Entrée en solde anticipée', severity: 'high' };
+  if (weeksElapsed >= 7  && st_s7  !== null && st_s7  < 0.30) return { action: 'Promotion ciblée', severity: 'medium' };
+  if (weeksElapsed >= 4  && st_s4  !== null && st_s4  < 0.15) return { action: 'Transfert inter-portes immédiat', severity: 'high' };
+  return null;
+}
+
+// Shared CTE builder — items tagged with season + their sales within the window
+function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam) {
+  return `
+    season_items AS (
+      SELECT item_id, manufacturer, category, default_price, default_cost,
+             COALESCE(matrix_id, item_id) AS matrix_key
+      FROM products
+      WHERE tags ILIKE ${tagParam}
+        AND archived = false
+        AND default_cost > 0
+        AND category NOT ILIKE 'Alt%ration%'
+        AND description NOT ILIKE '%shopify%'
+    ),
+    season_lines AS (
+      SELECT
+        sl.item_id,
+        sl.completed_time,
+        GREATEST(1, CEIL((sl.completed_time::date - '${seasonFrom}'::date + 1) / 7.0))::int AS wk,
+        sl.qty,
+        CASE WHEN sl.qty > 0
+              AND si.default_price > 0
+              AND (sl.unit_price * sl.qty - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0))
+                  >= si.default_price * sl.qty * 0.90
+             THEN sl.qty ELSE 0 END AS qty_fp,
+        CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END AS qty_gross
+      FROM sale_lines sl
+      JOIN season_items si ON si.item_id = sl.item_id
+      WHERE sl.completed_time >= '${seasonFrom}'::date
+        AND sl.completed_time <= LEAST('${seasonTo}'::date, CURRENT_DATE)
+        AND sl.completed_time IS NOT NULL
+        ${shopCondSL}
+    ),
+    item_agg AS (
+      SELECT
+        item_id,
+        SUM(CASE WHEN wk <= 4  THEN qty ELSE 0 END)::float8 AS u_s4,
+        SUM(CASE WHEN wk <= 7  THEN qty ELSE 0 END)::float8 AS u_s7,
+        SUM(CASE WHEN wk <= 10 THEN qty ELSE 0 END)::float8 AS u_s10,
+        SUM(CASE WHEN wk <= 14 THEN qty ELSE 0 END)::float8 AS u_s14,
+        SUM(qty)::float8                                     AS u_total,
+        SUM(qty_fp)::float8                                  AS u_fp,
+        SUM(qty_gross)::float8                               AS u_gross,
+        MAX(CASE WHEN qty > 0 THEN completed_time END)       AS last_sale_dt
+      FROM season_lines
+      GROUP BY item_id
+    ),
+    current_stk AS (
+      SELECT item_id,
+             SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS stock
+      FROM inventory
+      WHERE 1=1 ${shopCondInv}
+      GROUP BY item_id
+    ),
+    item_full AS (
+      SELECT
+        si.manufacturer, si.category, si.matrix_key, si.item_id,
+        si.default_price, si.default_cost,
+        COALESCE(ia.u_s4,   0) AS u_s4,
+        COALESCE(ia.u_s7,   0) AS u_s7,
+        COALESCE(ia.u_s10,  0) AS u_s10,
+        COALESCE(ia.u_s14,  0) AS u_s14,
+        COALESCE(ia.u_total,0) AS u_total,
+        COALESCE(ia.u_fp,   0) AS u_fp,
+        COALESCE(ia.u_gross,0) AS u_gross,
+        COALESCE(cs.stock,  0) AS current_stock,
+        COALESCE(ia.u_total,0) + COALESCE(cs.stock, 0) AS initial_stock,
+        ia.last_sale_dt
+      FROM season_items si
+      LEFT JOIN item_agg ia    ON ia.item_id = si.item_id
+      LEFT JOIN current_stk cs ON cs.item_id = si.item_id
+    )`;
+}
+
+function enrichVelocityRow(row, weeksElapsed, seasonActive) {
+  const st    = r => r !== null && parseFloat(r) || null;
+  const stF   = st(row.st_final);
+  const stS4  = st(row.st_s4);
+  const stS7  = st(row.st_s7);
+  const stS10 = st(row.st_s10);
+  const fpPct = st(row.fp_pct);
+  const init  = parseFloat(row.initial_stock) || 0;
+  const cur   = parseFloat(row.current_stock) || 0;
+  const residual = init > 0 ? cur / init : 0;
+  return {
+    ...row,
+    rating: velocityRating(stF, fpPct),
+    action: velocityAction(weeksElapsed, stS4, stS7, stS10, residual, seasonActive),
+  };
+}
+
+// GET /api/velocity/brands
+app.get('/api/velocity/brands', async (req, res, next) => {
+  try {
+    const seasonCode = (req.query.season ?? 'p25').toLowerCase();
+    const season     = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p25;
+    const shopId     = req.query.shop_id || null;
+    const hasShop    = !!shopId;
+    const shopCondSL  = hasShop ? `AND sl.shop_id = '${shopId}'` : '';
+    const shopCondInv = hasShop ? `AND shop_id = '${shopId}'`    : '';
+
+    const today       = new Date();
+    const seasonFrom  = new Date(season.from);
+    const seasonTo    = new Date(season.to);
+    const seasonActive = today >= seasonFrom && today <= seasonTo;
+    const weeksElapsed = today < seasonFrom ? 0
+      : Math.floor((Math.min(today, seasonTo) - seasonFrom) / (7 * 86400000)) + 1;
+
+    const { rows } = await pool.query(`
+      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'")}
+      SELECT
+        manufacturer,
+        COUNT(DISTINCT item_id)::int                                            AS items_count,
+        ROUND(SUM(initial_stock), 0)::float8                                   AS initial_stock,
+        ROUND(SUM(u_total), 0)::float8                                         AS units_sold,
+        ROUND(SUM(current_stock), 0)::float8                                   AS current_stock,
+        ROUND(SUM(u_s4)   / NULLIF(SUM(initial_stock), 0), 3)::float8         AS st_s4,
+        ROUND(SUM(u_s7)   / NULLIF(SUM(initial_stock), 0), 3)::float8         AS st_s7,
+        ROUND(SUM(u_s10)  / NULLIF(SUM(initial_stock), 0), 3)::float8         AS st_s10,
+        ROUND(SUM(u_s14)  / NULLIF(SUM(initial_stock), 0), 3)::float8         AS st_s14,
+        ROUND(SUM(u_total)/ NULLIF(SUM(initial_stock), 0), 3)::float8         AS st_final,
+        ROUND(SUM(u_fp)   / NULLIF(SUM(u_gross), 0), 3)::float8               AS fp_pct
+      FROM item_full
+      WHERE initial_stock > 0
+      GROUP BY manufacturer
+      ORDER BY manufacturer
+    `);
+
+    res.json({
+      season_code: seasonCode, season_label: season.label,
+      weeks_elapsed: weeksElapsed, season_active: seasonActive,
+      brands: rows.map(r => enrichVelocityRow(r, weeksElapsed, seasonActive)),
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/velocity/matrices
+app.get('/api/velocity/matrices', async (req, res, next) => {
+  try {
+    const seasonCode   = (req.query.season ?? 'p25').toLowerCase();
+    const season       = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p25;
+    const manufacturer = req.query.manufacturer || '';
+    const shopId       = req.query.shop_id || null;
+    const hasShop      = !!shopId;
+    const shopCondSL   = hasShop ? `AND sl.shop_id = '${shopId}'` : '';
+    const shopCondInv  = hasShop ? `AND shop_id = '${shopId}'`    : '';
+
+    const today        = new Date();
+    const seasonFrom   = new Date(season.from);
+    const seasonTo     = new Date(season.to);
+    const seasonActive = today >= seasonFrom && today <= seasonTo;
+    const weeksElapsed = today < seasonFrom ? 0
+      : Math.floor((Math.min(today, seasonTo) - seasonFrom) / (7 * 86400000)) + 1;
+
+    const { rows } = await pool.query(`
+      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'")}
+      SELECT
+        matrix_key,
+        -- Matrix name: strip size/colour from a non-self-referencing variant
+        COALESCE(
+          NULLIF(regexp_replace(
+            MIN(CASE WHEN p2.matrix_id IS NOT NULL AND p2.matrix_id != p2.item_id
+                     THEN p2.description END),
+            '\\s+(\\d{2,3}|XXS|XS|XL|XXL|XXXL|S|M|L|TU|OS|UNI)(\\s.*)?$', '', 'i'), ''),
+          MIN(p2.description)
+        )                                                                        AS matrix_name,
+        MAX(p2.image_url)                                                        AS image_url,
+        COUNT(DISTINCT f.item_id)::int                                           AS items_count,
+        ROUND(SUM(f.initial_stock), 0)::float8                                  AS initial_stock,
+        ROUND(SUM(f.u_total), 0)::float8                                        AS units_sold,
+        ROUND(SUM(f.current_stock), 0)::float8                                  AS current_stock,
+        ROUND(SUM(f.u_s4)   / NULLIF(SUM(f.initial_stock), 0), 3)::float8      AS st_s4,
+        ROUND(SUM(f.u_s7)   / NULLIF(SUM(f.initial_stock), 0), 3)::float8      AS st_s7,
+        ROUND(SUM(f.u_s10)  / NULLIF(SUM(f.initial_stock), 0), 3)::float8      AS st_s10,
+        ROUND(SUM(f.u_s14)  / NULLIF(SUM(f.initial_stock), 0), 3)::float8      AS st_s14,
+        ROUND(SUM(f.u_total)/ NULLIF(SUM(f.initial_stock), 0), 3)::float8      AS st_final,
+        ROUND(SUM(f.u_fp)   / NULLIF(SUM(f.u_gross), 0), 3)::float8            AS fp_pct,
+        -- Sell-out date: last positive sale if all stock is gone
+        CASE WHEN SUM(f.current_stock) = 0 THEN MAX(f.last_sale_dt) END        AS sellout_date
+      FROM item_full f
+      JOIN products p2 ON p2.item_id = f.item_id
+      WHERE f.manufacturer ILIKE $1
+        AND f.initial_stock > 0
+      GROUP BY f.matrix_key
+      ORDER BY SUM(f.u_total) DESC NULLS LAST
+    `, [manufacturer]);
+
+    res.json({
+      season_code: seasonCode, season_label: season.label, manufacturer,
+      weeks_elapsed: weeksElapsed, season_active: seasonActive,
+      matrices: rows.map(r => enrichVelocityRow(r, weeksElapsed, seasonActive)),
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/velocity/articles
+app.get('/api/velocity/articles', async (req, res, next) => {
+  try {
+    const seasonCode = (req.query.season ?? 'p25').toLowerCase();
+    const season     = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p25;
+    const matrixId   = req.query.matrix_id || '';
+    const shopId     = req.query.shop_id || null;
+    const hasShop    = !!shopId;
+    const shopCondSL  = hasShop ? `AND sl.shop_id = '${shopId}'` : '';
+    const shopCondInv = hasShop ? `AND shop_id = '${shopId}'`    : '';
+
+    const today        = new Date();
+    const seasonFrom   = new Date(season.from);
+    const seasonTo     = new Date(season.to);
+    const seasonActive = today >= seasonFrom && today <= seasonTo;
+    const weeksElapsed = today < seasonFrom ? 0
+      : Math.floor((Math.min(today, seasonTo) - seasonFrom) / (7 * 86400000)) + 1;
+
+    // Get all item_ids belonging to this matrix
+    const { rows: matrixItems } = await pool.query(
+      `SELECT item_id FROM products WHERE (item_id = $1 OR matrix_id = $1) AND archived = false`,
+      [matrixId]
+    );
+    const itemIds = matrixItems.map(r => r.item_id);
+    if (!itemIds.length) return res.json({ articles: [], season_code: seasonCode, weeks_elapsed: weeksElapsed });
+
+    // Build IN list safely using ANY
+    const { rows } = await pool.query(`
+      WITH season_lines AS (
+        SELECT
+          sl.item_id,
+          sl.completed_time,
+          GREATEST(1, CEIL((sl.completed_time::date - '${season.from}'::date + 1) / 7.0))::int AS wk,
+          sl.qty,
+          CASE WHEN sl.qty > 0
+                AND p.default_price > 0
+                AND (sl.unit_price * sl.qty - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0))
+                    >= p.default_price * sl.qty * 0.90
+               THEN sl.qty ELSE 0 END AS qty_fp,
+          CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END AS qty_gross
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE sl.item_id = ANY($1)
+          AND sl.completed_time >= '${season.from}'::date
+          AND sl.completed_time <= LEAST('${season.to}'::date, CURRENT_DATE)
+          AND sl.completed_time IS NOT NULL
+          ${shopCondSL}
+      ),
+      item_agg AS (
+        SELECT
+          item_id,
+          SUM(CASE WHEN wk <= 4  THEN qty ELSE 0 END)::float8  AS u_s4,
+          SUM(CASE WHEN wk <= 7  THEN qty ELSE 0 END)::float8  AS u_s7,
+          SUM(CASE WHEN wk <= 10 THEN qty ELSE 0 END)::float8  AS u_s10,
+          SUM(CASE WHEN wk <= 14 THEN qty ELSE 0 END)::float8  AS u_s14,
+          SUM(qty)::float8                                      AS u_total,
+          SUM(qty_fp)::float8                                   AS u_fp,
+          SUM(qty_gross)::float8                                AS u_gross,
+          MAX(CASE WHEN qty > 0 THEN completed_time END)        AS last_sale_dt
+        FROM season_lines
+        GROUP BY item_id
+      ),
+      current_stk AS (
+        SELECT item_id, SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS stock
+        FROM inventory
+        WHERE item_id = ANY($1) ${shopCondInv}
+        GROUP BY item_id
+      )
+      SELECT
+        p.item_id, p.description,
+        COALESCE(ia.u_s4,   0)::float8                                         AS u_s4,
+        COALESCE(ia.u_s7,   0)::float8                                         AS u_s7,
+        COALESCE(ia.u_s10,  0)::float8                                         AS u_s10,
+        COALESCE(ia.u_s14,  0)::float8                                         AS u_s14,
+        COALESCE(ia.u_total,0)::float8                                         AS units_sold,
+        COALESCE(ia.u_fp,  0)::float8                                          AS u_fp,
+        COALESCE(ia.u_gross,0)::float8                                         AS u_gross,
+        COALESCE(cs.stock, 0)::float8                                          AS current_stock,
+        (COALESCE(ia.u_total,0) + COALESCE(cs.stock,0))::float8               AS initial_stock,
+        ROUND((COALESCE(ia.u_total,0)+COALESCE(cs.stock,0)) / NULLIF(COALESCE(ia.u_total,0)+COALESCE(cs.stock,0),0),3)::float8 AS st_final,
+        ROUND(COALESCE(ia.u_total,0) / NULLIF(COALESCE(ia.u_total,0)+COALESCE(cs.stock,0),0),3)::float8 AS st_final2,
+        ROUND(COALESCE(ia.u_fp,0) / NULLIF(COALESCE(ia.u_gross,0),0),3)::float8 AS fp_pct,
+        CASE WHEN COALESCE(cs.stock,0) = 0 THEN ia.last_sale_dt END           AS sellout_date,
+        CASE WHEN COALESCE(cs.stock,0) = 0 AND ia.last_sale_dt IS NOT NULL
+             THEN GREATEST(1, CEIL((ia.last_sale_dt::date - '${season.from}'::date + 1) / 7.0))::int
+        END                                                                     AS sellout_week
+      FROM products p
+      LEFT JOIN item_agg ia    ON ia.item_id = p.item_id
+      LEFT JOIN current_stk cs ON cs.item_id = p.item_id
+      WHERE p.item_id = ANY($1)
+      ORDER BY COALESCE(ia.u_total,0) DESC NULLS LAST, p.description
+    `, [itemIds]);
+
+    // Fix st_final (use the computed sell-through)
+    const articles = rows.map(r => {
+      const init = parseFloat(r.initial_stock) || 0;
+      const sold = parseFloat(r.units_sold) || 0;
+      const st   = init > 0 ? sold / init : null;
+      const fp   = parseFloat(r.fp_pct) || null;
+      return {
+        ...r,
+        st_s4:  init > 0 ? parseFloat(r.u_s4)  / init : null,
+        st_s7:  init > 0 ? parseFloat(r.u_s7)  / init : null,
+        st_s10: init > 0 ? parseFloat(r.u_s10) / init : null,
+        st_s14: init > 0 ? parseFloat(r.u_s14) / init : null,
+        st_final: st,
+        fp_pct: fp,
+        rating: velocityRating(st, fp),
+        action: velocityAction(
+          weeksElapsed,
+          init > 0 ? parseFloat(r.u_s4) / init : null,
+          init > 0 ? parseFloat(r.u_s7) / init : null,
+          init > 0 ? parseFloat(r.u_s10) / init : null,
+          init > 0 ? parseFloat(r.current_stock) / init : 0,
+          seasonActive
+        ),
+      };
+    });
+
+    res.json({ season_code: seasonCode, season_label: season.label, matrix_id: matrixId, weeks_elapsed: weeksElapsed, season_active: seasonActive, articles });
+  } catch (err) { next(err); }
+});
+
+// GET /velocity — serve velocity analysis page
+app.get('/velocity', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'velocity.html'));
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/admin/refresh-view — force refresh mv_sales_velocity
 // ---------------------------------------------------------------------------
 app.post('/api/admin/refresh-view', async (req, res, next) => {
