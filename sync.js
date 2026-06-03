@@ -88,15 +88,23 @@ async function apiClient() {
   });
 }
 
-async function fetchWithRetry(url, headers, retries = 3) {
+async function fetchWithRetry(url, headers, retries = 6) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      return await axios.get(url, { headers, timeout: API_TIMEOUT });
+      const res = await axios.get(url, { headers, timeout: API_TIMEOUT });
+      return res;
     } catch (err) {
-      const retriable = err.code === 'ECONNABORTED' || (err.response?.status ?? 0) >= 500;
-      if (retriable && attempt < retries) {
-        console.log(`[sync] Retry ${attempt}/${retries - 1} for ${url}`);
-        await new Promise(r => setTimeout(r, 2000 * attempt));
+      const status = err.response?.status ?? 0;
+      const isRateLimit = status === 429;
+      const isRetriable = isRateLimit || err.code === 'ECONNABORTED' || status >= 500;
+      if (isRetriable && attempt < retries) {
+        // Honour Retry-After header if present, else exponential backoff (max 60s)
+        const retryAfter = parseInt(err.response?.headers?.['retry-after'] ?? '0', 10);
+        const delay = isRateLimit
+          ? Math.max(retryAfter * 1000, 5000)
+          : Math.min(2000 * Math.pow(2, attempt - 1), 60000);
+        console.log(`[sync] ${isRateLimit ? 'Rate limited' : 'Error'} — waiting ${delay / 1000}s before retry ${attempt}/${retries - 1}`);
+        await new Promise(r => setTimeout(r, delay));
       } else {
         throw err;
       }
