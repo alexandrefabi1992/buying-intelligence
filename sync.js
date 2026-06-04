@@ -11,6 +11,11 @@ const BASE_URL = `https://api.lightspeedapp.com/API/V3/Account/${process.env.LIG
 const TOKEN_URL = 'https://cloud.lightspeedapp.com/oauth/access_token.php';
 const LIMIT = 200;
 
+// Steps whose data doesn't change daily — only re-sync if stale (> STATIC_SYNC_DAYS old).
+// Time-filtered steps (sales, orders, transfers) always re-run to pick up the daily delta.
+const STATIC_STEPS    = new Set(['shops', 'items', 'inventory']);
+const STATIC_SYNC_DAYS = parseInt(process.env.STATIC_SYNC_DAYS ?? '7', 10);
+
 // ---------------------------------------------------------------------------
 // OAuth2 — access token cache + rotation-safe refresh token persistence.
 // Lightspeed rotates the refresh_token on every exchange; we persist the
@@ -117,7 +122,7 @@ async function fetchWithRetry(url, headers, retries = 6) {
 // ---------------------------------------------------------------------------
 async function getCheckpoint(step) {
   const { rows } = await pool.query(
-    'SELECT next_url, processed_count FROM sync_state WHERE step = $1',
+    'SELECT next_url, processed_count, updated_at FROM sync_state WHERE step = $1',
     [step],
   );
   return rows[0] ?? null;
@@ -454,13 +459,27 @@ async function runSync() {
     const cps = {};
     for (const step of SYNC_STEPS) cps[step] = await getCheckpoint(step);
 
-    // If the last step completed in the previous run, this is a fresh run — clear all
+    // If the last step completed in the previous run, start a fresh run.
+    // Static steps (shops, items, inventory) are only cleared if stale (> STATIC_SYNC_DAYS).
+    // Time-filtered steps (sales, orders, transfers) are always cleared so they re-fetch the delta.
     const lastStep = SYNC_STEPS[SYNC_STEPS.length - 1];
     if (cps[lastStep]?.next_url === 'COMPLETED') {
-      console.log('[sync] Previous run fully completed. Clearing checkpoints for fresh run.');
+      console.log('[sync] Previous run fully completed. Resetting steps selectively.');
       for (const step of SYNC_STEPS) {
-        await clearCheckpoint(step);
-        cps[step] = null;
+        if (STATIC_STEPS.has(step)) {
+          const updatedAt = cps[step]?.updated_at ? new Date(cps[step].updated_at) : null;
+          const ageDays   = updatedAt ? (Date.now() - updatedAt.getTime()) / 86_400_000 : Infinity;
+          if (ageDays > STATIC_SYNC_DAYS) {
+            console.log(`[sync] ${step}: stale (${Math.round(ageDays)}d old) — will re-sync`);
+            await clearCheckpoint(step);
+            cps[step] = null;
+          } else {
+            console.log(`[sync] ${step}: fresh (${Math.round(ageDays)}d old) — skipping`);
+          }
+        } else {
+          await clearCheckpoint(step);
+          cps[step] = null;
+        }
       }
     }
 
