@@ -2550,9 +2550,35 @@ app.use((err, req, res, _next) => {
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 console.log('[startup] PORT=%d DATABASE_URL=%s', PORT, process.env.DATABASE_URL ? 'set' : 'NOT SET');
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log('[startup] Listening on 0.0.0.0:%d', PORT);
-  runMigrations().catch(err => console.error('[migration] Fatal:', err.message));
+  await runMigrations().catch(err => console.error('[migration] Fatal:', err.message));
+
+  // Auto-resume a sync that was killed mid-way (e.g. by a redeploy)
+  try {
+    const { rows } = await pool.query(
+      `SELECT step FROM sync_state WHERE next_url != 'COMPLETED' LIMIT 1`
+    );
+    if (rows.length > 0 && !syncRunning && process.env.LIGHTSPEED_REFRESH_TOKEN) {
+      console.log('[startup] In-progress sync detected — auto-resuming…');
+      syncRunning = true;
+      const { spawn } = require('child_process');
+      const child = spawn('node', ['sync.js', '--once'], { cwd: __dirname });
+      const capture = chunk => {
+        const text = chunk.toString();
+        process.stdout.write(text);
+        text.split('\n').filter(Boolean).forEach(appendLog);
+      };
+      child.stdout.on('data', capture);
+      child.stderr.on('data', capture);
+      child.on('close', code => {
+        syncRunning = false;
+        appendLog(`[sync/run] exited with code ${code}`);
+      });
+    }
+  } catch (err) {
+    console.error('[startup] Auto-resume check failed:', err.message);
+  }
 });
 
 } catch (err) {
