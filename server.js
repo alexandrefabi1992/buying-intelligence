@@ -2050,9 +2050,12 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const refSeason = SEASON_RANGES[refCode];
       if (!refSeason) continue;
 
-      const tagPattern  = `%${refCode}%`;
-      const rxParams    = [...baseParams, tagPattern];
-      const rxTagIdx    = rxParams.length;
+      // Use transfer_date within the season window — not product tags.
+      // Many boutique products are never tagged with a season code in Lightspeed,
+      // so tag-based filtering massively undercounts receivings for those brands.
+      const rxParams  = [...baseParams, refSeason.from, refSeason.to];
+      const rxFromIdx = rxParams.length - 1;
+      const rxToIdx   = rxParams.length;
 
       const { rows: rxRows } = await pool.query(`
         SELECT
@@ -2063,7 +2066,8 @@ app.get('/api/budget/marque', async (req, res, next) => {
         JOIN products p ON p.item_id = t.item_id
         WHERE t.transfer_received = true
           AND t.qty_received > 0
-          AND p.tags ILIKE $${rxTagIdx}
+          AND t.transfer_date >= $${rxFromIdx}::date
+          AND t.transfer_date <= $${rxToIdx}::date
           AND p.tags NOT ILIKE '%nos%'
           AND p.archived = false
           AND p.default_cost > 0
@@ -2073,10 +2077,9 @@ app.get('/api/budget/marque', async (req, res, next) => {
         GROUP BY p.manufacturer
       `, rxParams);
 
-      const slParams   = [...baseParams, tagPattern, refSeason.from, refSeason.to];
-      const slTagIdx   = slParams.length - 2;
-      const slFromIdx  = slParams.length - 1;
-      const slToIdx    = slParams.length;
+      const slParams  = [...baseParams, refSeason.from, refSeason.to];
+      const slFromIdx = slParams.length - 1;
+      const slToIdx   = slParams.length;
 
       const { rows: slRows } = await pool.query(`
         SELECT
@@ -2088,7 +2091,6 @@ app.get('/api/budget/marque', async (req, res, next) => {
           AND sl.completed_time <= $${slToIdx}::date
           AND sl.completed_time IS NOT NULL
           AND sl.qty > 0
-          AND p.tags ILIKE $${slTagIdx}
           AND p.tags NOT ILIKE '%nos%'
           AND p.archived = false
           AND p.default_cost > 0
