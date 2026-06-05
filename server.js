@@ -1102,6 +1102,53 @@ app.get('/api/admin/query', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/receiving-sources — audit all ways stock enters the system
+// Shows orders table, transfers with null from_shop_id (vendor receivings),
+// and transfers between shops, to understand what data is available
+// ---------------------------------------------------------------------------
+app.get('/api/admin/receiving-sources', async (req, res, next) => {
+  try {
+    const [ordersStats, transferTypes, ordersSample, ordersRawKeys] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*)::int AS total_orders,
+          COUNT(CASE WHEN status ILIKE '%receiv%' OR status ILIKE '%complet%' THEN 1 END)::int AS received_orders,
+          MIN(order_date) AS earliest,
+          MAX(order_date) AS latest
+        FROM orders
+      `),
+      pool.query(`
+        SELECT
+          CASE
+            WHEN from_shop_id IS NULL THEN 'vendor_receiving'
+            ELSE 'shop_to_shop'
+          END AS type,
+          COUNT(*)::int AS rows,
+          COUNT(CASE WHEN transfer_received = true AND qty_received > 0 THEN 1 END)::int AS usable,
+          MIN(transfer_date) AS earliest,
+          MAX(transfer_date) AS latest
+        FROM transfers
+        GROUP BY 1
+      `),
+      pool.query(`
+        SELECT o.order_id, o.status, o.order_date, o.total,
+               jsonb_object_keys(o.raw) AS raw_key
+        FROM orders o
+        LIMIT 1
+      `),
+      pool.query(`SELECT DISTINCT jsonb_object_keys(raw) AS k FROM orders LIMIT 50`),
+    ]);
+
+    res.json({
+      orders:          ordersStats.rows[0],
+      transfer_types:  transferTypes.rows,
+      orders_raw_keys: ordersRawKeys.rows.map(r => r.k).sort(),
+      orders_sample:   ordersSample.rows,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/admin/transfers-by-mfr?manufacturer=Corneliani — all transfers for a brand
 // Shows transfer_date distribution, useful to debug why a brand is undercounted
 // ---------------------------------------------------------------------------
