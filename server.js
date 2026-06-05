@@ -1101,6 +1101,42 @@ app.get('/api/admin/query', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/transfers-by-mfr?manufacturer=Corneliani — all transfers for a brand
+// Shows transfer_date distribution, useful to debug why a brand is undercounted
+// ---------------------------------------------------------------------------
+app.get('/api/admin/transfers-by-mfr', async (req, res, next) => {
+  try {
+    const mfr = req.query.manufacturer || 'Corneliani';
+    const { rows } = await pool.query(`
+      SELECT
+        t.transfer_item_id,
+        t.transfer_date,
+        t.qty_received,
+        t.transfer_received,
+        p.description,
+        p.default_cost,
+        p.tags,
+        t.qty_received * COALESCE(p.default_cost, 0) AS line_cost
+      FROM transfers t
+      JOIN products p ON p.item_id = t.item_id
+      WHERE p.manufacturer ILIKE $1
+      ORDER BY t.transfer_date DESC
+    `, [`%${mfr}%`]);
+
+    const byYear = {};
+    for (const r of rows) {
+      const y = r.transfer_date ? new Date(r.transfer_date).getFullYear() : 'null';
+      if (!byYear[y]) byYear[y] = { rows: 0, units: 0, cost: 0 };
+      byYear[y].rows++;
+      byYear[y].units += parseFloat(r.qty_received ?? 0);
+      byYear[y].cost  += parseFloat(r.line_cost ?? 0);
+    }
+
+    res.json({ manufacturer: mfr, total_rows: rows.length, by_year: byYear, rows });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/admin/tag-diag?manufacturer=Brax&tag=p26 — tag filter diagnostics
 // ---------------------------------------------------------------------------
 app.get('/api/admin/tag-diag', async (req, res, next) => {
