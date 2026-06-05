@@ -1884,6 +1884,106 @@ app.get('/api/shops', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/transfers-diag — diagnose transfer/receiving data in DB
+// Checks: total rows, received rows, rows with season tags, sample
+// ---------------------------------------------------------------------------
+app.get('/api/admin/transfers-diag', async (req, res, next) => {
+  try {
+    const [totals, byFlag, bySeason, sample, topMfr] = await Promise.all([
+
+      // 1. Overall counts
+      pool.query(`
+        SELECT
+          COUNT(*)::int                                                  AS total_rows,
+          COUNT(*) FILTER (WHERE transfer_received = true)::int         AS received_true,
+          COUNT(*) FILTER (WHERE transfer_received = false)::int        AS received_false,
+          COUNT(*) FILTER (WHERE qty_received > 0)::int                 AS qty_received_gt0,
+          COUNT(*) FILTER (WHERE transfer_received = true AND qty_received > 0)::int AS usable,
+          MIN(transfer_date)::date                                       AS earliest,
+          MAX(transfer_date)::date                                       AS latest
+        FROM transfers
+      `),
+
+      // 2. Rows joined to products with a season tag
+      pool.query(`
+        SELECT
+          COUNT(*)::int                                                  AS rows_with_product,
+          COUNT(*) FILTER (WHERE p.tags IS NOT NULL)::int                AS rows_with_tags,
+          COUNT(*) FILTER (WHERE p.tags ~* 'p2[0-9]|a2[0-9]')::int      AS rows_with_season_tag,
+          COUNT(*) FILTER (WHERE t.transfer_received = true
+                             AND t.qty_received > 0
+                             AND p.tags ~* 'p2[0-9]|a2[0-9]')::int     AS usable_with_season
+        FROM transfers t
+        JOIN products p ON p.item_id = t.item_id
+      `),
+
+      // 3. Received cost per season tag
+      pool.query(`
+        SELECT
+          regexp_matches(lower(p.tags), '(p2[0-9]|a2[0-9])', 'g') AS season,
+          COUNT(DISTINCT t.transfer_item_id)::int                   AS transfer_rows,
+          COUNT(DISTINCT p.manufacturer)::int                       AS manufacturers,
+          ROUND(SUM(t.qty_received))::int                           AS units_received,
+          ROUND(SUM(t.qty_received * COALESCE(p.default_cost,0)),0)::float8 AS received_cost
+        FROM transfers t
+        JOIN products p ON p.item_id = t.item_id
+        WHERE t.transfer_received = true
+          AND t.qty_received > 0
+          AND p.tags IS NOT NULL
+          AND p.default_cost > 0
+        GROUP BY regexp_matches(lower(p.tags), '(p2[0-9]|a2[0-9])', 'g')
+        ORDER BY season
+      `),
+
+      // 4. Sample of 5 usable rows
+      pool.query(`
+        SELECT
+          t.transfer_item_id,
+          t.transfer_date::date,
+          t.qty_received,
+          p.manufacturer,
+          p.tags,
+          p.default_cost,
+          ROUND(t.qty_received * COALESCE(p.default_cost,0), 2) AS line_cost
+        FROM transfers t
+        JOIN products p ON p.item_id = t.item_id
+        WHERE t.transfer_received = true
+          AND t.qty_received > 0
+          AND p.tags ~* 'p2[0-9]|a2[0-9]'
+          AND p.default_cost > 0
+        ORDER BY t.transfer_date DESC NULLS LAST
+        LIMIT 5
+      `),
+
+      // 5. Top 10 manufacturers by received cost (all seasons)
+      pool.query(`
+        SELECT
+          COALESCE(p.manufacturer, 'Sans marque')                   AS manufacturer,
+          ROUND(SUM(t.qty_received))::int                           AS units_received,
+          ROUND(SUM(t.qty_received * COALESCE(p.default_cost,0)),0)::float8 AS received_cost
+        FROM transfers t
+        JOIN products p ON p.item_id = t.item_id
+        WHERE t.transfer_received = true
+          AND t.qty_received > 0
+          AND p.tags ~* 'p2[0-9]|a2[0-9]'
+          AND p.default_cost > 0
+        GROUP BY p.manufacturer
+        ORDER BY received_cost DESC
+        LIMIT 10
+      `),
+    ]);
+
+    res.json({
+      totals:           totals.rows[0],
+      product_join:     byFlag.rows[0],
+      by_season:        bySeason.rows.map(r => ({ season: r.season?.[0], ...r, season: undefined })),
+      sample_rows:      sample.rows,
+      top_manufacturers: topMfr.rows,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/settings/multipliers — read multiplier tier config
 // PUT /api/settings/multipliers — update multiplier tier config
 // Tiers format: [{ st_min: 0.80, multiplier: 1.25, label: 'Augmenter' }, …]
