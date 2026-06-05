@@ -1158,9 +1158,15 @@ app.get('/api/admin/transfers-by-mfr', async (req, res, next) => {
     const { rows } = await pool.query(`
       SELECT
         t.transfer_item_id,
+        t.transfer_id,
+        t.from_shop_id,
+        t.to_shop_id,
         t.transfer_date,
         t.qty_received,
+        t.qty_sent,
         t.transfer_received,
+        t.transfer_sent,
+        p.item_id,
         p.description,
         p.default_cost,
         p.tags,
