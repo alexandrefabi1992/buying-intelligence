@@ -2166,18 +2166,19 @@ app.put('/api/settings/multipliers', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/budget/marque — Buying budget per brand based on historical receivings
+// GET /api/budget/marque — Buying budget per brand based on implied historical receivings
 //
-// SOURCE: transfers table (qty_received × default_cost), not shortage calculations.
-// Filters by product season tag (P23, P24, P25 for a P26 target season).
+// SOURCE: inventory-based (qty_on_hand + qty_sold_all_time) for season-tagged products.
+// This captures ALL stock entries regardless of how they were added in Lightspeed
+// (transfer, inventory adjustment, direct entry, etc.). Product season tags are the
+// authoritative indicator of which season an item belongs to.
 //
 // CALC:
-//   received_cost[season] = SUM(qty_received × default_cost) for that brand+season
-//   st_rate[season]       = units_sold_in_season / units_received
-//   proposed_budget       = avg(received_cost over ref seasons) × multiplier
-//   multiplier            = from app_settings tiers, based on avg sell-through
-//
-// Returns "Données insuffisantes" brands are excluded (no transfer data found).
+//   implied_received[season] = SUM(qty_on_hand + qty_sold_ever) for season-tagged products
+//   received_cost[season]    = implied_received × default_cost
+//   st_rate[season]          = units_sold_in_season_dates / implied_received
+//   proposed_budget          = avg(received_cost over ref seasons) × multiplier
+//   multiplier               = from app_settings tiers, based on avg sell-through
 // ---------------------------------------------------------------------------
 app.get('/api/budget/marque', async (req, res, next) => {
   try {
@@ -2192,9 +2193,9 @@ app.get('/api/budget/marque', async (req, res, next) => {
 
     const tiers = await getMultiplierTiers();
 
-    const baseParams   = shops?.length ? [shops] : [];
-    const shopCondTx   = shops?.length ? `AND t.to_shop_id = ANY($1)` : '';
-    const shopCondSL   = shops?.length ? `AND sl.shop_id = ANY($1)`   : '';
+    const baseParams  = shops?.length ? [shops] : [];
+    const shopCondInv = shops?.length ? `AND inv.shop_id = ANY($1)` : '';
+    const shopCondSL  = shops?.length ? `AND sl.shop_id = ANY($1)`  : '';
 
     const seasonResults = {};
 
@@ -2202,34 +2203,44 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const refSeason = SEASON_RANGES[refCode];
       if (!refSeason) continue;
 
-      // Receiving window starts 4 months before the season (recv_from) to capture
-      // pre-deliveries (e.g. a Dec buy for a Feb season), and ends at season end.
-      // NOS items are intentionally included — they are real purchases for the season.
-      const recvFrom  = refSeason.recv_from ?? refSeason.from;
-      const rxParams  = [...baseParams, recvFrom, refSeason.to];
-      const rxFromIdx = rxParams.length - 1;
-      const rxToIdx   = rxParams.length;
+      // Use inventory-based implied received: qty_on_hand + qty_sold_all_time.
+      // This captures all stock regardless of how it entered (transfer, adjustment,
+      // direct entry), and uses the product's season tag as the authoritative
+      // indicator of which season the item belongs to.
+      const tagPattern = `%${refCode}%`;
+      const rxParams   = [...baseParams, tagPattern];
+      const rxTagIdx   = rxParams.length;
 
       const { rows: rxRows } = await pool.query(`
         SELECT
-          COALESCE(p.manufacturer, 'Sans marque')                           AS manufacturer,
-          SUM(t.qty_received)::float8                                        AS units_received,
-          SUM(t.qty_received * COALESCE(p.default_cost, 0))::float8         AS received_cost
-        FROM transfers t
-        JOIN products p ON p.item_id = t.item_id
-        WHERE t.transfer_received = true
-          AND t.qty_received > 0
-          AND t.transfer_date >= $${rxFromIdx}::date
-          AND t.transfer_date <= $${rxToIdx}::date
+          COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+          SUM(COALESCE(inv_agg.qty_on_hand, 0) + COALESCE(sl_agg.units_sold, 0))::float8 AS units_received,
+          SUM((COALESCE(inv_agg.qty_on_hand, 0) + COALESCE(sl_agg.units_sold, 0))
+              * COALESCE(p.default_cost, 0))::float8 AS received_cost
+        FROM products p
+        LEFT JOIN (
+          SELECT item_id, SUM(COALESCE(qty_on_hand, 0)) AS qty_on_hand
+          FROM inventory
+          WHERE 1=1 ${shopCondInv}
+          GROUP BY item_id
+        ) inv_agg ON inv_agg.item_id = p.item_id
+        LEFT JOIN (
+          SELECT item_id, SUM(qty) AS units_sold
+          FROM sale_lines
+          WHERE qty > 0
+          GROUP BY item_id
+        ) sl_agg ON sl_agg.item_id = p.item_id
+        WHERE p.tags ILIKE $${rxTagIdx}
           AND p.archived = false
           AND p.default_cost > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
-          ${shopCondTx}
         GROUP BY p.manufacturer
       `, rxParams);
 
-      const slParams  = [...baseParams, refSeason.from, refSeason.to];
+      // ST uses sales within the season's calendar window
+      const slParams  = [...baseParams, tagPattern, refSeason.from, refSeason.to];
+      const slTagIdx  = slParams.length - 2;
       const slFromIdx = slParams.length - 1;
       const slToIdx   = slParams.length;
 
@@ -2243,7 +2254,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
           AND sl.completed_time <= $${slToIdx}::date
           AND sl.completed_time IS NOT NULL
           AND sl.qty > 0
-          AND p.tags NOT ILIKE '%nos%'
+          AND p.tags ILIKE $${slTagIdx}
           AND p.archived = false
           AND p.default_cost > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
