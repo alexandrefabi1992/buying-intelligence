@@ -815,14 +815,15 @@ app.get('/api/budget/nos', async (req, res, next) => {
 // prorated by current vs historical item count (handles portfolio size changes).
 // ---------------------------------------------------------------------------
 const SEASON_RANGES = {
-  p23: { from: '2023-02-01', to: '2023-09-30', label: 'P23 — Printemps 2023' },
-  a23: { from: '2023-09-01', to: '2024-02-28', label: 'A23 — Automne 2023'   },
-  p24: { from: '2024-02-01', to: '2024-09-30', label: 'P24 — Printemps 2024' },
-  a24: { from: '2024-09-01', to: '2025-02-28', label: 'A24 — Automne 2024'   },
-  p25: { from: '2025-02-01', to: '2025-09-30', label: 'P25 — Printemps 2025' },
-  a25: { from: '2025-09-01', to: '2026-02-28', label: 'A25 — Automne 2025'   },
-  p26: { from: '2026-02-01', to: '2026-09-30', label: 'P26 — Printemps 2026' },
-  a26: { from: '2026-09-01', to: '2027-02-28', label: 'A26 — Automne 2026'   },
+  // recv_from = 4 months before season start, to catch pre-season deliveries
+  p23: { from: '2023-02-01', to: '2023-09-30', recv_from: '2022-10-01', label: 'P23 — Printemps 2023' },
+  a23: { from: '2023-09-01', to: '2024-02-28', recv_from: '2023-05-01', label: 'A23 — Automne 2023'   },
+  p24: { from: '2024-02-01', to: '2024-09-30', recv_from: '2023-10-01', label: 'P24 — Printemps 2024' },
+  a24: { from: '2024-09-01', to: '2025-02-28', recv_from: '2024-05-01', label: 'A24 — Automne 2024'   },
+  p25: { from: '2025-02-01', to: '2025-09-30', recv_from: '2024-10-01', label: 'P25 — Printemps 2025' },
+  a25: { from: '2025-09-01', to: '2026-02-28', recv_from: '2025-05-01', label: 'A25 — Automne 2025'   },
+  p26: { from: '2026-02-01', to: '2026-09-30', recv_from: '2025-10-01', label: 'P26 — Printemps 2026' },
+  a26: { from: '2026-09-01', to: '2027-02-28', recv_from: '2026-05-01', label: 'A26 — Automne 2026'   },
 };
 
 // Returns the up-to-3 previous equivalent seasons for a given code.
@@ -2086,10 +2087,11 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const refSeason = SEASON_RANGES[refCode];
       if (!refSeason) continue;
 
-      // Use transfer_date within the season window — not product tags.
-      // Many boutique products are never tagged with a season code in Lightspeed,
-      // so tag-based filtering massively undercounts receivings for those brands.
-      const rxParams  = [...baseParams, refSeason.from, refSeason.to];
+      // Receiving window starts 4 months before the season (recv_from) to capture
+      // pre-deliveries (e.g. a Dec buy for a Feb season), and ends at season end.
+      // NOS items are intentionally included — they are real purchases for the season.
+      const recvFrom  = refSeason.recv_from ?? refSeason.from;
+      const rxParams  = [...baseParams, recvFrom, refSeason.to];
       const rxFromIdx = rxParams.length - 1;
       const rxToIdx   = rxParams.length;
 
@@ -2104,7 +2106,6 @@ app.get('/api/budget/marque', async (req, res, next) => {
           AND t.qty_received > 0
           AND t.transfer_date >= $${rxFromIdx}::date
           AND t.transfer_date <= $${rxToIdx}::date
-          AND p.tags NOT ILIKE '%nos%'
           AND p.archived = false
           AND p.default_cost > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
