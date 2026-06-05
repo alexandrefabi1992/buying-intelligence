@@ -185,12 +185,17 @@ async function runMigrations() {
       WHERE sl.completed_time IS NOT NULL
       GROUP BY sl.item_id, sl.shop_id, date_trunc('week', sl.completed_time)
     `);
-    await pool.query(`CREATE UNIQUE INDEX idx_mv_velocity ON mv_sales_velocity(item_id, shop_id, week)`);
-    await pool.query(`CREATE INDEX idx_mv_velocity_week ON mv_sales_velocity(week)`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_velocity ON mv_sales_velocity(item_id, shop_id, week)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_mv_velocity_week ON mv_sales_velocity(week)`);
     await pool.query(
-      "INSERT INTO sync_state(step, next_url) VALUES ('mv_velocity_v2', 'applied') ON CONFLICT(step) DO NOTHING"
+      "INSERT INTO sync_state(step, next_url) VALUES ('mv_velocity_v2', 'COMPLETED') ON CONFLICT(step) DO NOTHING"
     );
     console.log('[migration] mv_sales_velocity recreated.');
+  } else {
+    // Ensure mv_velocity_v2 is always marked COMPLETED (not stuck in in_progress)
+    await pool.query(
+      "UPDATE sync_state SET next_url = 'COMPLETED' WHERE step = 'mv_velocity_v2' AND next_url != 'COMPLETED'"
+    );
   }
 
   console.log('[migration] Schema up to date');
@@ -746,9 +751,13 @@ app.get('/api/budget/nos', async (req, res, next) => {
 // Filter: products where tags IS NULL OR tags NOT ILIKE '%nos%'
 // Reference demand: units sold during the selected reference season
 // Shortage: MAX(0, season_units − current_stock) × default_cost
-// ?season=p25 → season code (default p25); options: p26,a26,p25,a25,p24,a24
+// ?season=p26 → season code (default p26); options: p26,a26,p25,a25,p24,a24,p23,a23
+// Reference demand comes from the equivalent seasons of the N previous years,
+// prorated by current vs historical item count (handles portfolio size changes).
 // ---------------------------------------------------------------------------
 const SEASON_RANGES = {
+  p23: { from: '2023-02-01', to: '2023-09-30', label: 'P23 — Printemps 2023' },
+  a23: { from: '2023-09-01', to: '2024-02-28', label: 'A23 — Automne 2023'   },
   p24: { from: '2024-02-01', to: '2024-09-30', label: 'P24 — Printemps 2024' },
   a24: { from: '2024-09-01', to: '2025-02-28', label: 'A24 — Automne 2024'   },
   p25: { from: '2025-02-01', to: '2025-09-30', label: 'P25 — Printemps 2025' },
@@ -757,20 +766,32 @@ const SEASON_RANGES = {
   a26: { from: '2026-09-01', to: '2027-02-28', label: 'A26 — Automne 2026'   },
 };
 
+// Returns the up-to-3 previous equivalent seasons for a given code.
+// e.g. p26 → ['p25', 'p24', 'p23']
+function getPreviousSeasons(code) {
+  const type = code[0];
+  const year = parseInt(code.slice(1), 10);
+  return [year - 1, year - 2, year - 3]
+    .map(y => `${type}${y}`)
+    .filter(c => SEASON_RANGES[c]);
+}
+
 app.get('/api/budget/saisonnier', async (req, res, next) => {
   try {
-    const seasonCode = (req.query.season ?? 'p25').toLowerCase();
-    const season     = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p25;
+    const seasonCode     = (req.query.season ?? 'p26').toLowerCase();
+    const season         = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p26;
+    const refSeasonCodes = getPreviousSeasons(seasonCode); // e.g. ['p25','p24','p23']
 
     const shops = req.query.shops       ? req.query.shops.split(',').filter(Boolean)                                       : null;
     const colls = req.query.collections ? req.query.collections.split(',').map(s => s.toLowerCase().trim()).filter(Boolean) : null;
     const sizes = req.query.sizes       ? req.query.sizes.split(',').filter(Boolean)                                       : null;
 
-    const cacheKey = JSON.stringify({ r: 'saisonnier', season: seasonCode, shops, colls, sizes });
+    const cacheKey = JSON.stringify({ r: 'saisonnier2', season: seasonCode, shops, colls, sizes });
     const hit = cacheGet(cacheKey);
     if (hit) return res.json({ ...hit, cached: true });
 
-    const params = [season.from, season.to, `%${seasonCode}%`]; // $1=from, $2=to, $3=season tag
+    // $1 = target season tag (portfolio to buy for)
+    const params = [`%${seasonCode}%`];
     let shopCondSL = '', shopCondInv = '', collCond = '', sizeCond = '';
     if (shops?.length) {
       params.push(shops);
@@ -778,8 +799,8 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
       shopCondSL  = `AND sl.shop_id = ANY($${n})`;
       shopCondInv = `AND shop_id    = ANY($${n})`;
     }
-    if (colls?.length) { params.push(colls);                                          collCond = `AND string_to_array(lower(coalesce(p.tags,'')), ',') && $${params.length}::text[]`; }
-    if (sizes?.length) { params.push('\\y(' + sizes.join('|') + ')\\y');             sizeCond = `AND p.description ~* $${params.length}`; }
+    if (colls?.length) { params.push(colls); collCond = `AND string_to_array(lower(coalesce(p.tags,'')), ',') && $${params.length}::text[]`; }
+    if (sizes?.length) { params.push('\\y(' + sizes.join('|') + ')\\y'); sizeCond = `AND p.description ~* $${params.length}`; }
 
     const stockCTE = shops?.length
       ? `stock AS (
@@ -791,52 +812,108 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
          )`
       : `stock AS (SELECT item_id, current_stock_all AS current_stock FROM mv_inventory_stock)`;
 
+    // One CTE per reference season — LEFT JOIN ensures items with no sales are still counted
+    // (items_count = full portfolio size, not just items that sold)
+    const refCTEParts    = [];
+    const refSelectParts = [];
+    for (const refCode of refSeasonCodes) {
+      const refSeason = SEASON_RANGES[refCode];
+      params.push(refSeason.from, refSeason.to, `%${refCode}%`);
+      const fromP = params.length - 2;
+      const toP   = params.length - 1;
+      const tagP  = params.length;
+
+      refCTEParts.push(`
+        ref_${refCode} AS (
+          SELECT
+            COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+            COALESCE(p.category,     'Sans catégorie') AS category,
+            COUNT(DISTINCT p.item_id)::float8 AS items_count,
+            COALESCE(SUM(sl.qty), 0)::float8 AS net_units,
+            COALESCE(SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END), 0)::float8 AS gross_units,
+            COALESCE(SUM(CASE WHEN sl.qty > 0
+                              AND p.default_price > 0
+                              AND (sl.unit_price * sl.qty - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0))
+                                  >= p.default_price * sl.qty * 0.90
+                         THEN sl.qty ELSE 0 END), 0)::float8 AS fp_units
+          FROM products p
+          LEFT JOIN sale_lines sl
+            ON  sl.item_id = p.item_id
+            AND sl.completed_time >= $${fromP}::date
+            AND sl.completed_time <= $${toP}::date
+            AND sl.completed_time IS NOT NULL
+            ${shopCondSL}
+          WHERE p.tags ILIKE $${tagP}
+            AND p.tags NOT ILIKE '%nos%'
+            AND p.archived = false
+            AND p.default_cost > 0
+            AND p.category    NOT ILIKE 'Alt%ration%'
+            AND p.description NOT ILIKE '%shopify%'
+            AND NOT (p.default_cost = 0 AND p.default_price = 0)
+          GROUP BY p.manufacturer, p.category
+        )`);
+
+      refSelectParts.push(`
+        SELECT manufacturer, category,
+          GREATEST(0, net_units   / NULLIF(items_count, 0)) AS net_per_item,
+          GREATEST(0, gross_units / NULLIF(items_count, 0)) AS gross_per_item,
+          GREATEST(0, fp_units    / NULLIF(items_count, 0)) AS fp_per_item
+        FROM ref_${refCode}`);
+    }
+
+    // Average the per-item rates across available reference seasons
+    const combinedRefCTE = refSelectParts.length > 0
+      ? `combined_ref AS (
+          SELECT manufacturer, category,
+            AVG(net_per_item)   AS avg_net_per_item,
+            AVG(gross_per_item) AS avg_gross_per_item,
+            AVG(fp_per_item)    AS avg_fp_per_item
+          FROM (
+            ${refSelectParts.join('\n            UNION ALL\n')}
+          ) all_refs
+          GROUP BY manufacturer, category
+        )`
+      : `combined_ref AS (SELECT NULL::text AS manufacturer, NULL::text AS category,
+            0::float8 AS avg_net_per_item, 0::float8 AS avg_gross_per_item, 0::float8 AS avg_fp_per_item WHERE false)`;
+
+    const allCTEs = [stockCTE, ...refCTEParts, combinedRefCTE].join(',\n');
+
     const { rows } = await pool.query(`
-      WITH season_sales AS (
+      WITH ${allCTEs},
+      current_season AS (
         SELECT
-          sl.item_id,
-          SUM(sl.qty)                                                               AS units_sold_season,
-          SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END)                         AS gross_units,
-          SUM(CASE WHEN sl.qty > 0
-                    AND p2.default_price > 0
-                    AND (sl.unit_price * sl.qty - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0))
-                        >= p2.default_price * sl.qty * 0.90
-               THEN sl.qty ELSE 0 END)                                             AS fp_units
-        FROM sale_lines sl
-        JOIN products p2 ON p2.item_id = sl.item_id
-        WHERE sl.completed_time >= $1::date
-          AND sl.completed_time <= $2::date
-          AND sl.completed_time IS NOT NULL
-          ${shopCondSL}
-        GROUP BY sl.item_id
-      ),
-      ${stockCTE}
+          COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+          COALESCE(p.category,     'Sans catégorie') AS category,
+          COUNT(DISTINCT p.item_id)::int AS items_count,
+          ROUND(SUM(COALESCE(st.current_stock, 0))::numeric, 0)::float8 AS current_stock,
+          SUM(COALESCE(p.default_cost, 0)) / NULLIF(COUNT(DISTINCT p.item_id), 0) AS avg_unit_cost
+        FROM products p
+        LEFT JOIN stock st ON st.item_id = p.item_id
+        WHERE p.tags ILIKE $1
+          AND p.tags NOT ILIKE '%nos%'
+          AND p.archived = false
+          AND p.default_cost > 0
+          AND p.category    NOT ILIKE 'Alt%ration%'
+          AND p.description NOT ILIKE '%shopify%'
+          AND NOT (p.default_cost = 0 AND p.default_price = 0)
+          ${collCond}
+          ${sizeCond}
+        GROUP BY p.manufacturer, p.category
+      )
       SELECT
-        COALESCE(p.manufacturer, 'Sans marque')    AS manufacturer,
-        COALESCE(p.category,     'Sans catégorie') AS category,
-        COUNT(DISTINCT p.item_id)::int             AS items_count,
-        ROUND(SUM(COALESCE(st.current_stock, 0)), 0)::float8              AS remaining_stock_units,
-        ROUND(SUM(COALESCE(ss.units_sold_season, 0)), 0)::float8          AS reference_units_sold,
-        ROUND(SUM(COALESCE(ss.fp_units,    0)), 0)::float8                AS fp_units_sold,
-        ROUND(SUM(COALESCE(ss.gross_units, 0)), 0)::float8                AS gross_units_sold,
-        ROUND(SUM(
-          GREATEST(0, COALESCE(ss.units_sold_season, 0) - COALESCE(st.current_stock, 0))
-          * COALESCE(p.default_cost, 0)
-        ), 2)::float8                                                      AS proposed_budget
-      FROM products p
-      LEFT JOIN season_sales ss ON ss.item_id = p.item_id
-      LEFT JOIN stock        st ON st.item_id = p.item_id
-      WHERE p.tags ILIKE $3
-        AND p.tags NOT ILIKE '%nos%'
-        AND p.archived = false
-        AND p.default_cost > 0
-        AND p.category    NOT ILIKE 'Alt%ration%'
-        AND p.description NOT ILIKE '%shopify%'
-        AND NOT (p.default_cost = 0 AND p.default_price = 0)
-        ${collCond}
-        ${sizeCond}
-      GROUP BY p.manufacturer, p.category
-      ORDER BY p.manufacturer, proposed_budget DESC
+        cs.manufacturer,
+        cs.category,
+        cs.items_count,
+        cs.current_stock                                                                                      AS remaining_stock_units,
+        ROUND(GREATEST(0, COALESCE(cr.avg_net_per_item   * cs.items_count, 0))::numeric)::float8             AS reference_units_sold,
+        ROUND(GREATEST(0, COALESCE(cr.avg_fp_per_item    * cs.items_count, 0))::numeric)::float8             AS fp_units_sold,
+        ROUND(GREATEST(0, COALESCE(cr.avg_gross_per_item * cs.items_count, 0))::numeric)::float8             AS gross_units_sold,
+        ROUND(GREATEST(0,
+          COALESCE(cr.avg_net_per_item * cs.items_count, 0) - cs.current_stock
+        )::numeric * COALESCE(cs.avg_unit_cost, 0), 2)::float8                                               AS proposed_budget
+      FROM current_season cs
+      LEFT JOIN combined_ref cr ON cr.manufacturer = cs.manufacturer AND cr.category = cs.category
+      ORDER BY cs.manufacturer, proposed_budget DESC
     `, params);
 
     const byManufacturer = buildManufacturerTree(rows, 'reference_units_sold').map(m => {
@@ -853,13 +930,14 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
     const total = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
 
     const result = {
-      season_code:           seasonCode,
-      season_label:          season.label,
-      reference_period:      { from: season.from, to: season.to },
-      generated_at:          new Date().toISOString(),
-      total_proposed_budget: Math.round(total * 100) / 100,
-      manufacturer_count:    byManufacturer.length,
-      by_manufacturer:       byManufacturer,
+      season_code:             seasonCode,
+      season_label:            season.label,
+      reference_seasons:       refSeasonCodes,
+      reference_seasons_label: refSeasonCodes.map(c => c.toUpperCase()).join(', '),
+      generated_at:            new Date().toISOString(),
+      total_proposed_budget:   Math.round(total * 100) / 100,
+      manufacturer_count:      byManufacturer.length,
+      by_manufacturer:         byManufacturer,
     };
     cacheSet(cacheKey, result);
     res.json(result);
@@ -2534,7 +2612,18 @@ app.get('/velocity', (req, res) => {
 // ---------------------------------------------------------------------------
 app.post('/api/admin/refresh-view', async (req, res, next) => {
   try {
-    await pool.query('REFRESH MATERIALIZED VIEW mv_sales_velocity');
+    try {
+      await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_sales_velocity');
+    } catch (err) {
+      const msg = String(err.message || err);
+      if (msg.includes('does not have a unique index') || msg.includes('cannot refresh materialized view concurrently') || msg.includes('CONCURRENTLY')) {
+        console.warn('[admin] Concurrent refresh failed; falling back to non-concurrent refresh. Reason:', msg);
+        await pool.query('REFRESH MATERIALIZED VIEW mv_sales_velocity');
+      } else {
+        throw err;
+      }
+    }
+
     const { rows } = await pool.query('SELECT COUNT(*) FROM mv_sales_velocity');
     res.json({ ok: true, mv_sales_velocity_count: rows[0].count });
   } catch (err) { next(err); }

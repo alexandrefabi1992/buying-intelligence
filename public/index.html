@@ -156,15 +156,15 @@
       <div class="flex flex-wrap items-end gap-4 mb-3">
         <div>
           <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 mb-2">
-            Saisonnier — Ventes de la saison de référence
+            Saisonnier — Budget basé sur l'historique
           </span>
           <div class="flex items-center gap-2">
-            <label class="text-xs text-gray-500">Saison de référence :</label>
+            <label class="text-xs text-gray-500">Saison d'achat :</label>
             <select id="budgetSeasSeason"
               class="border border-gray-300 rounded px-2 py-1 text-xs font-semibold text-amber-700 bg-white">
-              <option value="p26">P26 — Printemps 2026</option>
+              <option value="p26" selected>P26 — Printemps 2026</option>
               <option value="a26">A26 — Automne 2026</option>
-              <option value="p25" selected>P25 — Printemps 2025</option>
+              <option value="p25">P25 — Printemps 2025</option>
               <option value="a25">A25 — Automne 2025</option>
               <option value="p24">P24 — Printemps 2024</option>
               <option value="a24">A24 — Automne 2024</option>
@@ -185,7 +185,7 @@
                 <th class="px-3 py-2 text-left">Marque</th>
                 <th class="px-3 py-2 text-right">Articles</th>
                 <th class="px-3 py-2 text-right">Stock en main</th>
-                <th class="px-3 py-2 text-right">Unités vendues (réf.)</th>
+                <th class="px-3 py-2 text-right">Unités proj. (histor.)</th>
                 <th class="px-3 py-2 text-right">Sell-through</th>
                 <th class="px-3 py-2 text-right">Full price %</th>
                 <th class="px-3 py-2 text-right">Budget suggéré $</th>
@@ -740,7 +740,7 @@ async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
     renderBudgetTable(key);
     if (key === 'budgetSeas') {
       document.getElementById('budgetSeasPeriod').textContent =
-        d.season_label ? `Réf. : ${d.season_label}` : '';
+        d.reference_seasons_label ? `Réf. histor. : ${d.reference_seasons_label}` : '';
     }
   } catch (e) {
     document.getElementById(BUDGET_CFG[key].bodyId).innerHTML =
