@@ -427,6 +427,20 @@ async function upsertOrders(client, rows) {
   }
 }
 
+async function refreshMaterializedView(viewName) {
+  try {
+    await pool.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${viewName}`);
+  } catch (err) {
+    const msg = String(err.message || err);
+    if (msg.includes('does not have a unique index') || msg.includes('cannot refresh materialized view concurrently') || msg.includes('CONCURRENTLY')) {
+      console.warn(`[sync] Concurrent refresh failed for ${viewName}; falling back to non-concurrent refresh. Reason: ${msg}`);
+      await pool.query(`REFRESH MATERIALIZED VIEW ${viewName}`);
+      return;
+    }
+    throw err;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main sync
 // ---------------------------------------------------------------------------
@@ -603,8 +617,8 @@ async function runSync() {
 
     // ── Refresh materialized views ────────────────────────────────────────
     console.log('[sync] Refreshing materialized views…');
-    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_sales_velocity');
-    await pool.query('REFRESH MATERIALIZED VIEW CONCURRENTLY mv_inventory_stock');
+    await refreshMaterializedView('mv_sales_velocity');
+    await refreshMaterializedView('mv_inventory_stock');
 
     console.log(`[sync] Done — ${new Date().toISOString()}`);
 
