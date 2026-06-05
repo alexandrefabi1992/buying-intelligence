@@ -1108,21 +1108,16 @@ app.get('/api/admin/query', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/admin/receiving-sources', async (req, res, next) => {
   try {
-    const [ordersStats, transferTypes, ordersSample, ordersRawKeys] = await Promise.all([
+    const [ordersStats, transferTypes, ordersDetail] = await Promise.all([
       pool.query(`
-        SELECT
-          COUNT(*)::int AS total_orders,
-          COUNT(CASE WHEN status ILIKE '%receiv%' OR status ILIKE '%complet%' THEN 1 END)::int AS received_orders,
-          MIN(order_date) AS earliest,
-          MAX(order_date) AS latest
+        SELECT COUNT(*)::int AS total_orders,
+               MIN(raw->>'orderedDate') AS earliest,
+               MAX(raw->>'orderedDate') AS latest
         FROM orders
       `),
       pool.query(`
         SELECT
-          CASE
-            WHEN from_shop_id IS NULL THEN 'vendor_receiving'
-            ELSE 'shop_to_shop'
-          END AS type,
+          CASE WHEN from_shop_id IS NULL THEN 'vendor_receiving' ELSE 'shop_to_shop' END AS type,
           COUNT(*)::int AS rows,
           COUNT(CASE WHEN transfer_received = true AND qty_received > 0 THEN 1 END)::int AS usable,
           MIN(transfer_date) AS earliest,
@@ -1131,20 +1126,87 @@ app.get('/api/admin/receiving-sources', async (req, res, next) => {
         GROUP BY 1
       `),
       pool.query(`
-        SELECT o.order_id, o.status, o.order_date, o.total,
-               jsonb_object_keys(o.raw) AS raw_key
-        FROM orders o
-        LIMIT 1
+        SELECT order_id,
+               raw->>'orderedDate'   AS ordered_date,
+               raw->>'receivedDate'  AS received_date,
+               raw->>'totalQuantity' AS total_qty,
+               raw->>'totalCost'     AS total_cost,
+               raw->>'orderStatus'   AS order_status,
+               raw->>'vendorID'      AS vendor_id
+        FROM orders
+        ORDER BY (raw->>'orderedDate') DESC NULLS LAST
       `),
-      pool.query(`SELECT DISTINCT jsonb_object_keys(raw) AS k FROM orders LIMIT 50`),
     ]);
 
     res.json({
-      orders:          ordersStats.rows[0],
-      transfer_types:  transferTypes.rows,
-      orders_raw_keys: ordersRawKeys.rows.map(r => r.k).sort(),
-      orders_sample:   ordersSample.rows,
+      orders:         ordersStats.rows[0],
+      transfer_types: transferTypes.rows,
+      orders_detail:  ordersDetail.rows,
     });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/admin/inventory-by-mfr?manufacturer=Corneliani — current stock for a brand
+// Also derives "implied received" = qty_on_hand + qty_sold since a given date
+// ---------------------------------------------------------------------------
+app.get('/api/admin/inventory-by-mfr', async (req, res, next) => {
+  try {
+    const mfr   = req.query.manufacturer || 'Corneliani';
+    const since = req.query.since        || '2025-10-01'; // P26 recv window start
+
+    const [invRows, salesRows] = await Promise.all([
+      pool.query(`
+        SELECT p.item_id, p.description, p.tags, p.default_cost, p.archived,
+               SUM(COALESCE(i.qty_on_hand, 0))   AS qty_on_hand,
+               SUM(COALESCE(i.qty_on_order, 0))  AS qty_on_order
+        FROM products p
+        LEFT JOIN inventory i ON i.item_id = p.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.archived = false
+        GROUP BY p.item_id, p.description, p.tags, p.default_cost, p.archived
+        ORDER BY p.description
+      `, [`%${mfr}%`]),
+      pool.query(`
+        SELECT p.item_id, SUM(sl.qty) AS units_sold
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND sl.completed_time >= $2::date
+          AND sl.qty > 0
+        GROUP BY p.item_id
+      `, [`%${mfr}%`, since]),
+    ]);
+
+    const salesMap = {};
+    for (const r of salesRows.rows) salesMap[r.item_id] = parseFloat(r.units_sold ?? 0);
+
+    const items = invRows.rows.map(r => {
+      const sold    = salesMap[r.item_id] ?? 0;
+      const onHand  = parseFloat(r.qty_on_hand ?? 0);
+      const onOrder = parseFloat(r.qty_on_order ?? 0);
+      return {
+        item_id:         r.item_id,
+        description:     r.description,
+        tags:            r.tags,
+        default_cost:    parseFloat(r.default_cost ?? 0),
+        qty_on_hand:     onHand,
+        qty_on_order:    onOrder,
+        units_sold_since: sold,
+        implied_received: onHand + sold,
+        implied_cost:     (onHand + sold) * parseFloat(r.default_cost ?? 0),
+      };
+    });
+
+    const totals = items.reduce((acc, r) => ({
+      qty_on_hand:      acc.qty_on_hand      + r.qty_on_hand,
+      qty_on_order:     acc.qty_on_order     + r.qty_on_order,
+      units_sold_since: acc.units_sold_since + r.units_sold_since,
+      implied_received: acc.implied_received + r.implied_received,
+      implied_cost:     acc.implied_cost     + r.implied_cost,
+    }), { qty_on_hand: 0, qty_on_order: 0, units_sold_since: 0, implied_received: 0, implied_cost: 0 });
+
+    res.json({ manufacturer: mfr, since, totals, items });
   } catch (err) { next(err); }
 });
 
