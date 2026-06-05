@@ -37,6 +37,46 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // ---------------------------------------------------------------------------
+// Multiplier tiers — default values; overridden by app_settings DB table.
+// Each tier: { st_min: 0–1, multiplier: number, label: string }
+// Tiers are checked highest-to-lowest; first match wins.
+// ---------------------------------------------------------------------------
+const DEFAULT_MULTIPLIER_TIERS = [
+  { st_min: 0.80, multiplier: 1.25, label: 'Augmenter'     },
+  { st_min: 0.65, multiplier: 1.10, label: 'Légère hausse' },
+  { st_min: 0.50, multiplier: 1.00, label: 'Reconduire'    },
+  { st_min: 0.35, multiplier: 0.80, label: 'Réduire'       },
+  { st_min: 0.00, multiplier: 0.50, label: 'Couper'        },
+];
+
+async function getMultiplierTiers() {
+  try {
+    const { rows } = await pool.query(
+      "SELECT value FROM app_settings WHERE key = 'multiplier_tiers'"
+    );
+    if (rows.length && Array.isArray(rows[0].value)) return rows[0].value;
+  } catch {}
+  return DEFAULT_MULTIPLIER_TIERS;
+}
+
+function applyMultiplierTiers(st, tiers) {
+  if (st === null || st === undefined || isNaN(st)) {
+    return { multiplier: 1.00, label: 'Reconduire', tier_threshold: null };
+  }
+  const sorted = [...tiers].sort((a, b) => b.st_min - a.st_min);
+  for (const tier of sorted) {
+    if (st >= tier.st_min) {
+      const threshold = tier.st_min > 0
+        ? `ST ≥ ${Math.round(tier.st_min * 100)}%`
+        : `ST < ${Math.round((sorted[sorted.length - 2]?.st_min ?? 0.35) * 100)}%`;
+      return { multiplier: tier.multiplier, label: tier.label, tier_threshold: threshold };
+    }
+  }
+  const last = sorted[sorted.length - 1];
+  return { multiplier: last.multiplier, label: last.label, tier_threshold: 'repli' };
+}
+
+// ---------------------------------------------------------------------------
 // In-memory TTL cache — 5-minute TTL for slow budget queries
 // Key: JSON string of route + params. Auto-expires on get.
 // ---------------------------------------------------------------------------
@@ -165,6 +205,25 @@ async function runMigrations() {
   // Additive migration: tags and image_url columns on products
   await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS tags      TEXT`);
   await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT`);
+
+  // app_settings: key/value store for editable config (multiplier tiers, etc.)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key        TEXT PRIMARY KEY,
+      value      JSONB NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT now()
+    )
+  `);
+  const { rows: tiersRow } = await pool.query(
+    "SELECT 1 FROM app_settings WHERE key = 'multiplier_tiers'"
+  );
+  if (!tiersRow.length) {
+    await pool.query(
+      "INSERT INTO app_settings(key, value) VALUES ('multiplier_tiers', $1::jsonb)",
+      [JSON.stringify(DEFAULT_MULTIPLIER_TIERS)]
+    );
+    console.log('[migration] Default multiplier tiers seeded into app_settings');
+  }
 
   // One-time migration: recreate mv_sales_velocity with HT after-discount revenue formula
   const { rows: mvVer } = await pool.query(
@@ -1821,6 +1880,213 @@ app.get('/api/shops', async (req, res, next) => {
   try {
     const { rows } = await pool.query('SELECT shop_id, name FROM shops ORDER BY name');
     res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/settings/multipliers — read multiplier tier config
+// PUT /api/settings/multipliers — update multiplier tier config
+// Tiers format: [{ st_min: 0.80, multiplier: 1.25, label: 'Augmenter' }, …]
+// st_min is a decimal fraction (0–1), not a percentage.
+// ---------------------------------------------------------------------------
+app.get('/api/settings/multipliers', async (req, res, next) => {
+  try {
+    const tiers = await getMultiplierTiers();
+    res.json({ tiers });
+  } catch (err) { next(err); }
+});
+
+app.put('/api/settings/multipliers', async (req, res, next) => {
+  try {
+    const { tiers } = req.body;
+    if (!Array.isArray(tiers) || tiers.length === 0) {
+      return res.status(400).json({ error: 'tiers must be a non-empty array' });
+    }
+    await pool.query(
+      `INSERT INTO app_settings(key, value, updated_at)
+       VALUES ('multiplier_tiers', $1::jsonb, now())
+       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
+      [JSON.stringify(tiers)]
+    );
+    budgetCache.clear();
+    res.json({ ok: true, tiers });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/budget/marque — Buying budget per brand based on historical receivings
+//
+// SOURCE: transfers table (qty_received × default_cost), not shortage calculations.
+// Filters by product season tag (P23, P24, P25 for a P26 target season).
+//
+// CALC:
+//   received_cost[season] = SUM(qty_received × default_cost) for that brand+season
+//   st_rate[season]       = units_sold_in_season / units_received
+//   proposed_budget       = avg(received_cost over ref seasons) × multiplier
+//   multiplier            = from app_settings tiers, based on avg sell-through
+//
+// Returns "Données insuffisantes" brands are excluded (no transfer data found).
+// ---------------------------------------------------------------------------
+app.get('/api/budget/marque', async (req, res, next) => {
+  try {
+    const targetSeasonCode = (req.query.season ?? 'p26').toLowerCase();
+    const refSeasonCodes   = getPreviousSeasons(targetSeasonCode);
+
+    const shops = req.query.shops ? req.query.shops.split(',').filter(Boolean) : null;
+
+    const cacheKey = JSON.stringify({ r: 'marque', season: targetSeasonCode, shops });
+    const hit = cacheGet(cacheKey);
+    if (hit) return res.json({ ...hit, cached: true });
+
+    const tiers = await getMultiplierTiers();
+
+    const baseParams   = shops?.length ? [shops] : [];
+    const shopCondTx   = shops?.length ? `AND t.to_shop_id = ANY($1)` : '';
+    const shopCondSL   = shops?.length ? `AND sl.shop_id = ANY($1)`   : '';
+
+    const seasonResults = {};
+
+    for (const refCode of refSeasonCodes) {
+      const refSeason = SEASON_RANGES[refCode];
+      if (!refSeason) continue;
+
+      const tagPattern  = `%${refCode}%`;
+      const rxParams    = [...baseParams, tagPattern];
+      const rxTagIdx    = rxParams.length;
+
+      const { rows: rxRows } = await pool.query(`
+        SELECT
+          COALESCE(p.manufacturer, 'Sans marque')                           AS manufacturer,
+          SUM(t.qty_received)::float8                                        AS units_received,
+          SUM(t.qty_received * COALESCE(p.default_cost, 0))::float8         AS received_cost
+        FROM transfers t
+        JOIN products p ON p.item_id = t.item_id
+        WHERE t.transfer_received = true
+          AND t.qty_received > 0
+          AND p.tags ILIKE $${rxTagIdx}
+          AND p.tags NOT ILIKE '%nos%'
+          AND p.archived = false
+          AND p.default_cost > 0
+          AND p.category    NOT ILIKE 'Alt%ration%'
+          AND p.description NOT ILIKE '%shopify%'
+          ${shopCondTx}
+        GROUP BY p.manufacturer
+      `, rxParams);
+
+      const slParams   = [...baseParams, tagPattern, refSeason.from, refSeason.to];
+      const slTagIdx   = slParams.length - 2;
+      const slFromIdx  = slParams.length - 1;
+      const slToIdx    = slParams.length;
+
+      const { rows: slRows } = await pool.query(`
+        SELECT
+          COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+          SUM(sl.qty)::float8                      AS units_sold
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE sl.completed_time >= $${slFromIdx}::date
+          AND sl.completed_time <= $${slToIdx}::date
+          AND sl.completed_time IS NOT NULL
+          AND sl.qty > 0
+          AND p.tags ILIKE $${slTagIdx}
+          AND p.tags NOT ILIKE '%nos%'
+          AND p.archived = false
+          AND p.default_cost > 0
+          AND p.category    NOT ILIKE 'Alt%ration%'
+          AND p.description NOT ILIKE '%shopify%'
+          ${shopCondSL}
+        GROUP BY p.manufacturer
+      `, slParams);
+
+      const salesMap = {};
+      for (const r of slRows) salesMap[r.manufacturer] = parseFloat(r.units_sold ?? 0);
+
+      seasonResults[refCode] = {};
+      for (const r of rxRows) {
+        const recv = parseFloat(r.units_received ?? 0);
+        const sold = salesMap[r.manufacturer] ?? 0;
+        seasonResults[refCode][r.manufacturer] = {
+          units_received: Math.round(recv),
+          units_sold:     Math.round(sold),
+          received_cost:  Math.round(parseFloat(r.received_cost ?? 0) * 100) / 100,
+          st_rate:        recv > 0 ? Math.round(sold / recv * 1000) / 1000 : null,
+        };
+      }
+    }
+
+    const allMfr = new Set();
+    for (const code of refSeasonCodes) {
+      Object.keys(seasonResults[code] ?? {}).forEach(m => allMfr.add(m));
+    }
+
+    const byManufacturer = [];
+    for (const mfr of allMfr) {
+      const seasons = {};
+      const costs   = [];
+      const stRates = [];
+
+      for (const code of refSeasonCodes) {
+        const d = seasonResults[code]?.[mfr];
+        if (d) {
+          seasons[code] = d;
+          if (d.received_cost > 0) costs.push(d.received_cost);
+          if (d.st_rate !== null)  stRates.push(d.st_rate);
+        }
+      }
+
+      if (!costs.length) continue;
+
+      const avgCost = costs.reduce((a, b) => a + b, 0) / costs.length;
+      const minCost = Math.min(...costs);
+      const maxCost = Math.max(...costs);
+      const avgSt   = stRates.length
+        ? stRates.reduce((a, b) => a + b, 0) / stRates.length
+        : null;
+
+      // Trend: compare most-recent vs oldest season with data
+      let trend = 'stable';
+      const codesWithData = refSeasonCodes.filter(c => (seasonResults[c]?.[mfr]?.received_cost ?? 0) > 0);
+      if (codesWithData.length >= 2) {
+        const latest = seasonResults[codesWithData[0]][mfr].received_cost;
+        const oldest = seasonResults[codesWithData[codesWithData.length - 1]][mfr].received_cost;
+        if (latest > oldest * 1.10)      trend = 'hausse';
+        else if (latest < oldest * 0.90) trend = 'baisse';
+      }
+
+      const hyp            = applyMultiplierTiers(avgSt, tiers);
+      const proposedBudget = Math.round(avgCost * 100) / 100;
+
+      byManufacturer.push({
+        manufacturer:      mfr,
+        seasons_count:     costs.length,
+        seasons,
+        avg_received_cost: proposedBudget,
+        min_received_cost: Math.round(minCost * 100) / 100,
+        max_received_cost: Math.round(maxCost * 100) / 100,
+        avg_st_rate:       avgSt !== null ? Math.round(avgSt * 1000) / 1000 : null,
+        trend,
+        proposed_budget:   proposedBudget,
+        hypothesis: { ...hyp, adjusted_budget: Math.round(proposedBudget * hyp.multiplier * 100) / 100 },
+      });
+    }
+
+    byManufacturer.sort((a, b) => b.proposed_budget - a.proposed_budget);
+
+    const total = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
+
+    const result = {
+      target_season:           targetSeasonCode,
+      target_season_label:     SEASON_RANGES[targetSeasonCode]?.label ?? targetSeasonCode.toUpperCase(),
+      reference_seasons:       refSeasonCodes,
+      reference_seasons_label: refSeasonCodes.map(c => c.toUpperCase()).join(', '),
+      generated_at:            new Date().toISOString(),
+      total_proposed_budget:   Math.round(total * 100) / 100,
+      manufacturer_count:      byManufacturer.length,
+      by_manufacturer:         byManufacturer,
+    };
+
+    cacheSet(cacheKey, result);
+    res.json(result);
   } catch (err) { next(err); }
 });
 

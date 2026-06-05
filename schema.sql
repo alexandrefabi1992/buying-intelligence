@@ -168,3 +168,15 @@ CREATE TABLE IF NOT EXISTS sync_state (
   started_at      TIMESTAMPTZ DEFAULT now(),
   updated_at      TIMESTAMPTZ DEFAULT now()
 );
+
+-- App settings — key/value store for editable config (multiplier tiers, etc.)
+-- Multiplier tiers key: 'multiplier_tiers'
+-- Value format: [{ "st_min": 0.80, "multiplier": 1.25, "label": "Augmenter" }, …]
+-- st_min is a decimal fraction (0–1). Tiers checked highest-to-lowest; first match wins.
+-- Edit via PUT /api/settings/multipliers or directly in DB:
+--   UPDATE app_settings SET value = '[...]'::jsonb WHERE key = 'multiplier_tiers';
+CREATE TABLE IF NOT EXISTS app_settings (
+  key        TEXT PRIMARY KEY,
+  value      JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
