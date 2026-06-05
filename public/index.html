@@ -46,6 +46,7 @@
   <button class="tab py-3 tab-inactive" data-tab="seasonal">Saisonnier</button>
   <button class="tab py-3 tab-inactive" data-tab="sizes">Courbes tailles</button>
   <button class="tab py-3 tab-inactive" data-tab="transfers">Transferts / Actions</button>
+  <button class="tab py-3 tab-inactive" data-tab="params">Paramètres</button>
   <a href="/velocity" class="ml-auto py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">Vélocité →</a>
 </nav>
 
@@ -366,12 +367,64 @@
     </div>
   </section>
 
+  <!-- ── PARAMÈTRES ────────────────────────────────────────────────── -->
+  <section id="tab-params" class="hidden">
+    <div class="max-w-2xl">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+          Hypothèses d'achat — Multiplicateurs
+        </span>
+      </div>
+      <p class="text-xs text-gray-500 mb-5">
+        Les deux conditions (Sell-through <strong>ET</strong> Full price %) doivent être satisfaites pour atteindre un niveau.
+        Le niveau <strong>Couper</strong> est le repli par défaut si aucun seuil n'est atteint. Les modifications s'appliquent
+        uniquement au Saisonnier.
+      </p>
+
+      <div class="bg-white rounded-lg border border-gray-200 overflow-hidden mb-5">
+        <table class="w-full text-xs">
+          <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+            <tr>
+              <th class="px-4 py-2.5 text-left">Niveau</th>
+              <th class="px-4 py-2.5 text-center">Sell-through min</th>
+              <th class="px-4 py-2.5 text-center">Full price min</th>
+              <th class="px-4 py-2.5 text-center">Multiplicateur</th>
+            </tr>
+          </thead>
+          <tbody id="tiersTableBody" class="divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+
+      <div class="flex gap-3">
+        <button id="tiersApply"
+          class="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+          Appliquer &amp; Recalculer
+        </button>
+        <button id="tiersReset"
+          class="px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          Réinitialiser les défauts
+        </button>
+      </div>
+
+      <div id="tiersNote" class="mt-4 text-xs text-emerald-700 font-semibold hidden">Paramètres appliqués — budgets recalculés.</div>
+    </div>
+  </section>
+
 </main>
 
 <script>
 const BASE      = 'https://buying-intelligence-production.up.railway.app';
 const PAGE_SIZE = 50;
-const LS_KEY    = 'buying_hypothesis';
+const LS_KEY       = 'buying_hypothesis';
+const LS_TIERS_KEY = 'buying_tiers';
+
+const DEFAULT_TIERS = [
+  { label: 'Augmenter',     st: 80, fp: 70, multiplier: 1.25 },
+  { label: 'Légère hausse', st: 65, fp: 50, multiplier: 1.10 },
+  { label: 'Reconduire',    st: 50, fp: 40, multiplier: 1.00 },
+  { label: 'Réduire',       st: 35, fp: 30, multiplier: 0.80 },
+  { label: 'Couper',        st:  0, fp:  0, multiplier: 0.50 },
+];
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
@@ -380,8 +433,8 @@ const state = {
   sizes:      { data: [], filtered: [], page: 0 },
   budgetNos:  { data: [], expanded: new Set(), multipliers: {} },
   budgetSeas: { data: [], expanded: new Set(), multipliers: {} },
-  // Active filter state (applied on "Appliquer" click)
   filters:    { shops: new Set(), collections: new Set(), sizes: new Set() },
+  tiers:      DEFAULT_TIERS.map(t => ({ ...t })),
 };
 
 // ── Utilities ─────────────────────────────────────────────────────────────
@@ -415,6 +468,89 @@ function saveMultipliers() {
   }, 400);
 }
 
+// ── Tiers (multiplier table) ──────────────────────────────────────────────
+function loadTiers() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_TIERS_KEY) ?? 'null');
+    if (saved && saved.length === DEFAULT_TIERS.length) state.tiers = saved;
+  } catch {}
+}
+
+function saveTiers() {
+  try { localStorage.setItem(LS_TIERS_KEY, JSON.stringify(state.tiers)); } catch {}
+}
+
+function computeHypothesisFromTiers(st, fp) {
+  if (st == null || fp == null || isNaN(st) || isNaN(fp))
+    return { multiplier: 1.00, label: 'Reconduire' };
+  const tiers = state.tiers;
+  for (let i = 0; i < tiers.length - 1; i++) {
+    const t = tiers[i];
+    if (st * 100 >= t.st && fp * 100 >= t.fp)
+      return { multiplier: t.multiplier, label: t.label };
+  }
+  return { multiplier: tiers[tiers.length - 1].multiplier, label: tiers[tiers.length - 1].label };
+}
+
+function applyClientTiers(data) {
+  for (const m of data) {
+    const hyp = computeHypothesisFromTiers(m.st_rate, m.fp_rate);
+    m.hypothesis = { ...hyp, adjusted_budget: Math.round(m.proposed_budget * hyp.multiplier * 100) / 100 };
+  }
+}
+
+const TIERS_BADGE = {
+  'Augmenter':     'bg-green-100 text-green-700',
+  'Légère hausse': 'bg-blue-100 text-blue-700',
+  'Reconduire':    'bg-gray-100 text-gray-600',
+  'Réduire':       'bg-amber-100 text-amber-700',
+  'Couper':        'bg-red-100 text-red-700',
+};
+
+function renderTiersTable() {
+  const body = document.getElementById('tiersTableBody');
+  if (!body) return;
+  const tiers = state.tiers;
+  body.innerHTML = tiers.map((t, i) => {
+    const isFallback = i === tiers.length - 1;
+    const badge = TIERS_BADGE[t.label] ?? 'bg-gray-100 text-gray-600';
+    const thresholdCells = isFallback
+      ? `<td class="px-4 py-3 text-center text-gray-300 text-xs">—</td>
+         <td class="px-4 py-3 text-center text-gray-300 text-xs">—</td>`
+      : `<td class="px-4 py-3 text-center">
+           <div class="flex items-center justify-center gap-1">
+             <input type="number" min="0" max="100" step="1" value="${t.st}"
+               class="tiers-input w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-xs"
+               data-idx="${i}" data-field="st">
+             <span class="text-gray-400">%</span>
+           </div>
+         </td>
+         <td class="px-4 py-3 text-center">
+           <div class="flex items-center justify-center gap-1">
+             <input type="number" min="0" max="100" step="1" value="${t.fp}"
+               class="tiers-input w-14 text-center border border-gray-300 rounded px-1 py-0.5 text-xs"
+               data-idx="${i}" data-field="fp">
+             <span class="text-gray-400">%</span>
+           </div>
+         </td>`;
+    return `
+      <tr class="${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
+        <td class="px-4 py-3">
+          <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${badge}">${escHtml(t.label)}</span>
+        </td>
+        ${thresholdCells}
+        <td class="px-4 py-3 text-center">
+          <div class="flex items-center justify-center gap-1">
+            <input type="number" min="0" max="5" step="0.05" value="${t.multiplier}"
+              class="tiers-input w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-xs"
+              data-idx="${i}" data-field="multiplier">
+            <span class="text-gray-400">×</span>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
 // ── Tabs ──────────────────────────────────────────────────────────────────
 const tabLoaded = {};
 document.querySelectorAll('.tab').forEach(btn => {
@@ -433,6 +569,7 @@ function loadTab(id) {
   if (id === 'seasonal')  loadSeasonal();
   if (id === 'sizes')     loadSizes();
   if (id === 'transfers') loadTransfers();
+  if (id === 'params')    renderTiersTable();
 }
 
 // ── Sync status ───────────────────────────────────────────────────────────
@@ -730,8 +867,8 @@ async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
     const d  = await fetch(`${BASE}${endpoint}${qs}`).then(r => r.json());
     state[key].data     = d.by_manufacturer ?? [];
     state[key].expanded = new Set();
-    // Seed multipliers from server-computed hypothesis (saisonnier only)
     if (BUDGET_CFG[key].hasHyp) {
+      applyClientTiers(state[key].data);
       for (const m of state[key].data) {
         state[key].multipliers[m.manufacturer] = m.hypothesis?.multiplier ?? 1.0;
       }
@@ -974,7 +1111,46 @@ document.getElementById('sizesShop').addEventListener('change', filterAndRenderS
 document.getElementById('sizesSearch').addEventListener('input', () => { clearTimeout(sizD); sizD = setTimeout(filterAndRenderSizes, 250); });
 bindPager('sizes', renderSizesPage);
 
+// ── Paramètres — events ───────────────────────────────────────────────────
+document.getElementById('tiersApply').addEventListener('click', () => {
+  // Read all inputs and update state.tiers
+  document.querySelectorAll('.tiers-input').forEach(inp => {
+    const idx   = parseInt(inp.dataset.idx, 10);
+    const field = inp.dataset.field;
+    const val   = parseFloat(inp.value);
+    if (!isNaN(val)) state.tiers[idx][field] = val;
+  });
+  saveTiers();
+  // Re-apply to saisonnier data and re-render
+  if (state.budgetSeas.data.length) {
+    applyClientTiers(state.budgetSeas.data);
+    for (const m of state.budgetSeas.data)
+      state.budgetSeas.multipliers[m.manufacturer] = m.hypothesis?.multiplier ?? 1.0;
+    saveMultipliers();
+    renderBudgetTable('budgetSeas');
+    updateAllBudgetTotals();
+  }
+  const note = document.getElementById('tiersNote');
+  note.classList.remove('hidden');
+  setTimeout(() => note.classList.add('hidden'), 3000);
+});
+
+document.getElementById('tiersReset').addEventListener('click', () => {
+  state.tiers = DEFAULT_TIERS.map(t => ({ ...t }));
+  saveTiers();
+  renderTiersTable();
+  if (state.budgetSeas.data.length) {
+    applyClientTiers(state.budgetSeas.data);
+    for (const m of state.budgetSeas.data)
+      state.budgetSeas.multipliers[m.manufacturer] = m.hypothesis?.multiplier ?? 1.0;
+    saveMultipliers();
+    renderBudgetTable('budgetSeas');
+    updateAllBudgetTotals();
+  }
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────
+loadTiers();
 loadMultipliers();
 buildFilterBar();
 bindBudgetTableListeners();
