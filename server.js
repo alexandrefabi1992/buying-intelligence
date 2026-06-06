@@ -2231,7 +2231,6 @@ app.get('/api/budget/marque', async (req, res, next) => {
           GROUP BY item_id
         ) sl_agg ON sl_agg.item_id = p.item_id
         WHERE p.tags ILIKE $${rxTagIdx}
-          AND p.archived = false
           AND p.default_cost > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
@@ -2255,7 +2254,6 @@ app.get('/api/budget/marque', async (req, res, next) => {
           AND sl.completed_time IS NOT NULL
           AND sl.qty > 0
           AND p.tags ILIKE $${slTagIdx}
-          AND p.archived = false
           AND p.default_cost > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
