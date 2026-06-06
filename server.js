@@ -2166,19 +2166,22 @@ app.put('/api/settings/multipliers', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/budget/marque — Buying budget per brand based on implied historical receivings
+// GET /api/budget/marque — Buying budget per brand based on historical transfer receivings
 //
-// SOURCE: inventory-based (qty_on_hand + qty_sold_all_time) for season-tagged products.
-// This captures ALL stock entries regardless of how they were added in Lightspeed
-// (transfer, inventory adjustment, direct entry, etc.). Product season tags are the
-// authoritative indicator of which season an item belongs to.
+// SOURCE: transfers table (transfer_received=true) per brand per reference season.
+// recv_from extends 4 months before season start to catch pre-season deliveries.
 //
 // CALC:
-//   implied_received[season] = SUM(qty_on_hand + qty_sold_ever) for season-tagged products
-//   received_cost[season]    = implied_received × default_cost
-//   st_rate[season]          = units_sold_in_season_dates / implied_received
-//   proposed_budget          = avg(received_cost over ref seasons) × multiplier
-//   multiplier               = from app_settings tiers, based on avg sell-through
+//   units_received[season]  = SUM(qty_received) from transfers in recv window
+//   received_cost[season]   = SUM(qty_received × default_cost)
+//   units_sold[season]      = SUM(qty) from sale_lines in season window
+//   st_rate[season]         = units_sold / units_received
+//   avg_received_cost       = avg(received_cost over ref seasons with data)
+//   avg_st                  = avg(st_rate over ref seasons with data)
+//   multiplier              = from app_settings tiers based on avg_st
+//   adjusted_budget         = avg_received_cost × multiplier
+//   net_budget              = MAX(0, adjusted_budget − current_stock_at_cost)
+//   low_st_alert            = ST < 40% for 2 most recent consecutive seasons
 // ---------------------------------------------------------------------------
 app.get('/api/budget/marque', async (req, res, next) => {
   try {
@@ -2193,8 +2196,10 @@ app.get('/api/budget/marque', async (req, res, next) => {
 
     const tiers = await getMultiplierTiers();
 
-    const baseParams = shops?.length ? [shops] : [];
-    const shopCondSL = shops?.length ? `AND sl.shop_id = ANY($1)` : '';
+    const baseParams  = shops?.length ? [shops] : [];
+    const shopCondT   = shops?.length ? `AND t.to_shop_id = ANY($1)` : '';
+    const shopCondSL  = shops?.length ? `AND sl.shop_id = ANY($1)` : '';
+    const shopCondInv = shops?.length ? `AND i.shop_id = ANY($1)` : '';
 
     const seasonResults = {};
 
@@ -2202,20 +2207,39 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const refSeason = SEASON_RANGES[refCode];
       if (!refSeason) continue;
 
-      // Single query: all non-NOS sales during the season window, per manufacturer.
-      // No season-tag filter — tags are inconsistently applied across products.
-      // Sales data is the only complete, reliable source: everything sold was bought.
-      // received_cost = SUM(qty × default_cost) is a lower bound on actual spend
-      // (doesn't account for unsold inventory), but gives consistent cross-season data.
+      // Receivings: transfers received within the pre-season + season window
+      const tParams   = [...baseParams, refSeason.recv_from, refSeason.to];
+      const tFromIdx  = tParams.length - 1;
+      const tToIdx    = tParams.length;
+
+      const { rows: tRows } = await pool.query(`
+        SELECT
+          COALESCE(p.manufacturer, 'Sans marque')                        AS manufacturer,
+          SUM(t.qty_received)::float8                                     AS units_received,
+          SUM(t.qty_received * COALESCE(p.default_cost, 0))::float8       AS received_cost
+        FROM transfers t
+        JOIN products p ON p.item_id = t.item_id
+        WHERE t.transfer_received = true
+          AND t.qty_received > 0
+          AND t.transfer_date >= $${tFromIdx}::date
+          AND t.transfer_date <= $${tToIdx}::date
+          AND p.tags NOT ILIKE '%nos%'
+          AND p.default_cost > 0
+          AND p.category    NOT ILIKE 'Alt%ration%'
+          AND p.description NOT ILIKE '%shopify%'
+          ${shopCondT}
+        GROUP BY p.manufacturer
+      `, tParams);
+
+      // Sales: for ST = units_sold / units_received
       const slParams  = [...baseParams, refSeason.from, refSeason.to];
       const slFromIdx = slParams.length - 1;
       const slToIdx   = slParams.length;
 
       const { rows: slRows } = await pool.query(`
         SELECT
-          COALESCE(p.manufacturer, 'Sans marque')           AS manufacturer,
-          SUM(sl.qty)::float8                               AS units_sold,
-          SUM(sl.qty * COALESCE(p.default_cost, 0))::float8 AS received_cost
+          COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+          SUM(sl.qty)::float8                     AS units_sold
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE sl.completed_time >= $${slFromIdx}::date
@@ -2230,25 +2254,29 @@ app.get('/api/budget/marque', async (req, res, next) => {
         GROUP BY p.manufacturer
       `, slParams);
 
+      const soldMap = {};
+      for (const r of slRows) soldMap[r.manufacturer] = parseFloat(r.units_sold ?? 0);
+
       seasonResults[refCode] = {};
-      for (const r of slRows) {
-        const sold = parseFloat(r.units_sold ?? 0);
+      for (const r of tRows) {
+        const recv = parseFloat(r.units_received ?? 0);
         const cost = parseFloat(r.received_cost ?? 0);
+        const sold = soldMap[r.manufacturer] ?? 0;
+        const st   = recv > 0 ? sold / recv : null;
         seasonResults[refCode][r.manufacturer] = {
-          units_sold:    Math.round(sold),
-          received_cost: Math.round(cost * 100) / 100,
-          // ST not computable from sales-only data; set null so UI shows '—'
-          st_rate:       null,
+          units_received: Math.round(recv),
+          units_sold:     Math.round(sold),
+          received_cost:  Math.round(cost * 100) / 100,
+          st_rate:        st !== null ? Math.round(st * 1000) / 1000 : null,
         };
       }
     }
 
     // Current non-NOS inventory at cost per manufacturer — used to offset budget
-    const shopCondInv = shops?.length ? `AND i.shop_id = ANY($1)` : '';
     const { rows: invRows } = await pool.query(`
       SELECT
-        COALESCE(p.manufacturer, 'Sans marque')                        AS manufacturer,
-        SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8 AS stock_at_cost
+        COALESCE(p.manufacturer, 'Sans marque')                                  AS manufacturer,
+        SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8   AS stock_at_cost
       FROM products p
       JOIN inventory i ON i.item_id = p.item_id
       WHERE p.tags NOT ILIKE '%nos%'
@@ -2263,6 +2291,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const stockMap = {};
     for (const r of invRows) stockMap[r.manufacturer] = Math.round(parseFloat(r.stock_at_cost ?? 0) * 100) / 100;
 
+    // Only brands that appear in transfer receivings (others have no historical data)
     const allMfr = new Set();
     for (const code of refSeasonCodes) {
       Object.keys(seasonResults[code] ?? {}).forEach(m => allMfr.add(m));
@@ -2272,21 +2301,29 @@ app.get('/api/budget/marque', async (req, res, next) => {
     for (const mfr of allMfr) {
       const seasons = {};
       const costs   = [];
+      const stRates = [];
 
       for (const code of refSeasonCodes) {
         const d = seasonResults[code]?.[mfr];
         if (d) {
           seasons[code] = d;
           if (d.received_cost > 0) costs.push(d.received_cost);
+          if (d.st_rate !== null)  stRates.push({ code, st: d.st_rate });
         }
       }
 
+      // Exclude brands with no transfer receivings (données insuffisantes)
       if (!costs.length) continue;
 
-      const avgCost    = costs.reduce((a, b) => a + b, 0) / costs.length;
-      const minCost    = Math.min(...costs);
-      const maxCost    = Math.max(...costs);
-      const stockCost  = stockMap[mfr] ?? 0;
+      const avgCost   = costs.reduce((a, b) => a + b, 0) / costs.length;
+      const minCost   = Math.min(...costs);
+      const maxCost   = Math.max(...costs);
+      const stockCost = stockMap[mfr] ?? 0;
+
+      // Average ST across seasons that have both receiving and sales data
+      const avgSt = stRates.length
+        ? stRates.reduce((s, x) => s + x.st, 0) / stRates.length
+        : null;
 
       // Trend: compare most-recent vs oldest season with data
       let trend = 'stable';
@@ -2298,30 +2335,44 @@ app.get('/api/budget/marque', async (req, res, next) => {
         else if (latest < oldest * 0.90) trend = 'baisse';
       }
 
-      const hyp            = applyMultiplierTiers(null, tiers); // ST not available from sales-only data
-      const proposedBudget = Math.round(avgCost * 100) / 100;
-      // Net budget deducts current on-hand stock at cost; floor at 0
-      const netBudget      = Math.max(0, Math.round((proposedBudget - stockCost) * 100) / 100);
+      // Alert: ST < 40% for the two most recent consecutive seasons
+      const recentSts = refSeasonCodes
+        .slice(0, 2)
+        .map(c => seasonResults[c]?.[mfr]?.st_rate ?? null);
+      const lowStAlert = recentSts.length === 2
+        && recentSts[0] !== null && recentSts[1] !== null
+        && recentSts[0] < 0.40 && recentSts[1] < 0.40;
+
+      const hyp            = applyMultiplierTiers(avgSt, tiers);
+      const avgCostRounded = Math.round(avgCost * 100) / 100;
+      const adjustedBudget = Math.round(avgCostRounded * hyp.multiplier * 100) / 100;
+      const netBudget      = Math.max(0, Math.round((adjustedBudget - stockCost) * 100) / 100);
 
       byManufacturer.push({
-        manufacturer:      mfr,
-        seasons_count:     costs.length,
+        manufacturer:          mfr,
+        seasons_count:         costs.length,
         seasons,
-        avg_received_cost: proposedBudget,
-        min_received_cost: Math.round(minCost * 100) / 100,
-        max_received_cost: Math.round(maxCost * 100) / 100,
+        avg_received_cost:     avgCostRounded,
+        min_received_cost:     Math.round(minCost * 100) / 100,
+        max_received_cost:     Math.round(maxCost * 100) / 100,
+        avg_st:                avgSt !== null ? Math.round(avgSt * 1000) / 1000 : null,
         current_stock_at_cost: stockCost,
         trend,
-        proposed_budget:   proposedBudget,
-        net_budget:        netBudget,
-        hypothesis: { ...hyp, adjusted_budget: Math.round(netBudget * hyp.multiplier * 100) / 100 },
+        low_st_alert:          lowStAlert,
+        multiplier:            hyp.multiplier,
+        multiplier_label:      hyp.label,
+        tier_threshold:        hyp.tier_threshold,
+        proposed_budget:       avgCostRounded,   // backwards compat field = avg hist. cost
+        adjusted_budget:       adjustedBudget,
+        net_budget:            netBudget,
       });
     }
 
     byManufacturer.sort((a, b) => b.net_budget - a.net_budget);
 
-    const total    = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
-    const totalNet = byManufacturer.reduce((s, m) => s + m.net_budget, 0);
+    const totalHist = byManufacturer.reduce((s, m) => s + m.avg_received_cost, 0);
+    const totalAdj  = byManufacturer.reduce((s, m) => s + m.adjusted_budget, 0);
+    const totalNet  = byManufacturer.reduce((s, m) => s + m.net_budget, 0);
 
     const result = {
       target_season:           targetSeasonCode,
@@ -2329,7 +2380,8 @@ app.get('/api/budget/marque', async (req, res, next) => {
       reference_seasons:       refSeasonCodes,
       reference_seasons_label: refSeasonCodes.map(c => c.toUpperCase()).join(', '),
       generated_at:            new Date().toISOString(),
-      total_proposed_budget:   Math.round(total * 100) / 100,
+      total_proposed_budget:   Math.round(totalHist * 100) / 100,  // backwards compat
+      total_adjusted_budget:   Math.round(totalAdj * 100) / 100,
       total_net_budget:        Math.round(totalNet * 100) / 100,
       manufacturer_count:      byManufacturer.length,
       by_manufacturer:         byManufacturer,
