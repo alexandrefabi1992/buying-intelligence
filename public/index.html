@@ -147,12 +147,12 @@
               <tr>
                 <th class="px-3 py-2 text-left">Marque</th>
                 <th class="px-3 py-2 text-center">Saisons</th>
-                <th class="px-3 py-2 text-right">Budget moyen historique</th>
+                <th class="px-3 py-2 text-right">Ventes moy. historiques</th>
                 <th class="px-3 py-2 text-right">Fourchette</th>
-                <th class="px-3 py-2 text-right">ST moyen</th>
+                <th class="px-3 py-2 text-right">Stock actuel</th>
                 <th class="px-3 py-2 text-center">Tendance</th>
-                <th class="px-3 py-2 text-right">Budget de base</th>
-                <th class="px-3 py-2 text-right">Hypothèse</th>
+                <th class="px-3 py-2 text-right">Budget historique</th>
+                <th class="px-3 py-2 text-right">Budget net</th>
               </tr>
             </thead>
             <tbody id="budgetSeasBody" class="divide-y divide-gray-100"></tbody>
@@ -758,6 +758,13 @@ function renderMarqueBudgetTable() {
       ? `<span class="text-gray-400">${fmtC(m.min_received_cost)}</span><span class="text-gray-300 mx-0.5">–</span><span class="text-gray-400">${fmtC(m.max_received_cost)}</span>`
       : `<span class="text-gray-400">${fmtC(m.min_received_cost ?? m.avg_received_cost)}</span>`;
 
+    const stockCost  = m.current_stock_at_cost ?? 0;
+    const netBudget  = m.net_budget ?? m.proposed_budget;
+    const hasStock   = stockCost > 0;
+    const stockHtml  = hasStock
+      ? `<span class="text-orange-600 font-semibold">${fmtC(stockCost)}</span><span class="text-gray-400 text-[10px] block">déduit</span>`
+      : `<span class="text-gray-300">—</span>`;
+
     rows.push(`
       <tr class="mfr-row hover:bg-amber-50/40" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
         <td class="px-3 py-2.5 font-medium text-gray-900">
@@ -767,14 +774,10 @@ function renderMarqueBudgetTable() {
         <td class="px-3 py-2.5 text-center">${seasonBadges || `<span class="text-gray-300">—</span>`}</td>
         <td class="px-3 py-2.5 text-right font-semibold">${fmtC(m.avg_received_cost)}</td>
         <td class="px-3 py-2.5 text-right text-[11px]">${rangeHtml}</td>
-        ${stPctCell(m.avg_st_rate, 0.65)}
+        <td class="px-3 py-2.5 text-right">${stockHtml}</td>
         <td class="px-3 py-2.5 text-center">${trendBadge(m.trend)}</td>
-        <td class="px-3 py-2.5 text-right font-semibold ${color}">${fmtC(m.proposed_budget)}</td>
-        <td class="px-3 py-2.5 text-right" style="white-space:nowrap">
-          <span class="px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${hypStyle.bg} ${hypStyle.text} mr-1">${hyp?.multiplier?.toFixed(2)}× ${hyp?.label ?? ''}</span>
-          ${hyp?.tier_threshold ? `<span class="text-gray-400 text-[10px] block">(${escHtml(hyp.tier_threshold)})</span>` : ''}
-          <span class="font-semibold ${color}">${fmtC(hyp?.adjusted_budget)}</span>
-        </td>
+        <td class="px-3 py-2.5 text-right text-gray-500">${fmtC(m.proposed_budget)}</td>
+        <td class="px-3 py-2.5 text-right font-bold ${netBudget === 0 ? 'text-gray-400' : color}">${netBudget === 0 ? '—' : fmtC(netBudget)}</td>
       </tr>`);
   }
 
@@ -889,30 +892,20 @@ function bindBudgetTableListeners() {
 function updateAllBudgetTotals() {
   let grandBase = 0, grandAdj = 0;
   for (const key of ['budgetSeas']) {
-    const { data, multipliers } = state[key];
-    const hasHyp = BUDGET_CFG[key].hasHyp;
+    const { data } = state[key];
     if (!data.length) continue;
-    const base = data.reduce((s, m) => s + m.proposed_budget, 0);
-    const adj  = data.reduce((s, m) => {
-      const mult = multipliers[m.manufacturer] ?? (hasHyp ? (m.hypothesis?.multiplier ?? 1) : 1);
-      return s + m.proposed_budget * mult;
-    }, 0);
-    grandBase += base; grandAdj += adj;
-    const diff = adj - base, hasAdj = Math.abs(diff) > 0.01;
-    let html = `${BUDGET_CFG[key].label} : ${fmtC(base)} · ${data.length} marques`;
-    if (hasAdj) html += ` <span style="${diff>=0?'color:#d97706':'color:#dc2626'};font-size:11px">(ajusté : ${fmtC(adj)}, ${fmtDiff(diff)})</span>`;
+    const historique = data.reduce((s, m) => s + (m.proposed_budget ?? 0), 0);
+    const net        = data.reduce((s, m) => s + (m.net_budget ?? m.proposed_budget ?? 0), 0);
+    grandBase += net; grandAdj += net;
+    const stockDed = historique - net;
+    let html = `Saisonnier : <strong>${fmtC(net)}</strong> net · ${data.length} marques`;
+    if (stockDed > 0.01) html += ` <span style="color:#d97706;font-size:11px">(hist. ${fmtC(historique)}, stock déduit : ${fmtC(stockDed)})</span>`;
     document.getElementById(BUDGET_CFG[key].totalId).innerHTML = html;
   }
   if (grandBase > 0) {
     document.getElementById('budgetBaseTotal').textContent = fmtC(grandBase);
     document.getElementById('budgetBanner').classList.remove('hidden');
-    const adjEl = document.getElementById('budgetAdjTotal');
-    const diff  = grandAdj - grandBase;
-    if (Math.abs(diff) > 0.01) {
-      adjEl.textContent = `Ajusté : ${fmtC(grandAdj)} (${fmtDiff(diff)})`;
-      adjEl.className = `text-sm font-semibold ${diff >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
-      adjEl.classList.remove('hidden');
-    } else { adjEl.classList.add('hidden'); }
+    document.getElementById('budgetAdjTotal').classList.add('hidden');
   }
 }
 

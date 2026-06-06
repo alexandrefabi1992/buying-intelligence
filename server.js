@@ -2243,6 +2243,26 @@ app.get('/api/budget/marque', async (req, res, next) => {
       }
     }
 
+    // Current non-NOS inventory at cost per manufacturer — used to offset budget
+    const shopCondInv = shops?.length ? `AND i.shop_id = ANY($1)` : '';
+    const { rows: invRows } = await pool.query(`
+      SELECT
+        COALESCE(p.manufacturer, 'Sans marque')                        AS manufacturer,
+        SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8 AS stock_at_cost
+      FROM products p
+      JOIN inventory i ON i.item_id = p.item_id
+      WHERE p.tags NOT ILIKE '%nos%'
+        AND p.default_cost > 0
+        AND p.category    NOT ILIKE 'Alt%ration%'
+        AND p.description NOT ILIKE '%shopify%'
+        AND i.qty_on_hand > 0
+        ${shopCondInv}
+      GROUP BY p.manufacturer
+    `, baseParams);
+
+    const stockMap = {};
+    for (const r of invRows) stockMap[r.manufacturer] = Math.round(parseFloat(r.stock_at_cost ?? 0) * 100) / 100;
+
     const allMfr = new Set();
     for (const code of refSeasonCodes) {
       Object.keys(seasonResults[code] ?? {}).forEach(m => allMfr.add(m));
@@ -2252,25 +2272,21 @@ app.get('/api/budget/marque', async (req, res, next) => {
     for (const mfr of allMfr) {
       const seasons = {};
       const costs   = [];
-      const stRates = [];
 
       for (const code of refSeasonCodes) {
         const d = seasonResults[code]?.[mfr];
         if (d) {
           seasons[code] = d;
           if (d.received_cost > 0) costs.push(d.received_cost);
-          if (d.st_rate !== null)  stRates.push(d.st_rate);
         }
       }
 
       if (!costs.length) continue;
 
-      const avgCost = costs.reduce((a, b) => a + b, 0) / costs.length;
-      const minCost = Math.min(...costs);
-      const maxCost = Math.max(...costs);
-      const avgSt   = stRates.length
-        ? stRates.reduce((a, b) => a + b, 0) / stRates.length
-        : null;
+      const avgCost    = costs.reduce((a, b) => a + b, 0) / costs.length;
+      const minCost    = Math.min(...costs);
+      const maxCost    = Math.max(...costs);
+      const stockCost  = stockMap[mfr] ?? 0;
 
       // Trend: compare most-recent vs oldest season with data
       let trend = 'stable';
@@ -2282,8 +2298,10 @@ app.get('/api/budget/marque', async (req, res, next) => {
         else if (latest < oldest * 0.90) trend = 'baisse';
       }
 
-      const hyp            = applyMultiplierTiers(avgSt, tiers);
+      const hyp            = applyMultiplierTiers(null, tiers); // ST not available from sales-only data
       const proposedBudget = Math.round(avgCost * 100) / 100;
+      // Net budget deducts current on-hand stock at cost; floor at 0
+      const netBudget      = Math.max(0, Math.round((proposedBudget - stockCost) * 100) / 100);
 
       byManufacturer.push({
         manufacturer:      mfr,
@@ -2292,16 +2310,18 @@ app.get('/api/budget/marque', async (req, res, next) => {
         avg_received_cost: proposedBudget,
         min_received_cost: Math.round(minCost * 100) / 100,
         max_received_cost: Math.round(maxCost * 100) / 100,
-        avg_st_rate:       avgSt !== null ? Math.round(avgSt * 1000) / 1000 : null,
+        current_stock_at_cost: stockCost,
         trend,
         proposed_budget:   proposedBudget,
-        hypothesis: { ...hyp, adjusted_budget: Math.round(proposedBudget * hyp.multiplier * 100) / 100 },
+        net_budget:        netBudget,
+        hypothesis: { ...hyp, adjusted_budget: Math.round(netBudget * hyp.multiplier * 100) / 100 },
       });
     }
 
-    byManufacturer.sort((a, b) => b.proposed_budget - a.proposed_budget);
+    byManufacturer.sort((a, b) => b.net_budget - a.net_budget);
 
-    const total = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
+    const total    = byManufacturer.reduce((s, m) => s + m.proposed_budget, 0);
+    const totalNet = byManufacturer.reduce((s, m) => s + m.net_budget, 0);
 
     const result = {
       target_season:           targetSeasonCode,
@@ -2310,6 +2330,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
       reference_seasons_label: refSeasonCodes.map(c => c.toUpperCase()).join(', '),
       generated_at:            new Date().toISOString(),
       total_proposed_budget:   Math.round(total * 100) / 100,
+      total_net_budget:        Math.round(totalNet * 100) / 100,
       manufacturer_count:      byManufacturer.length,
       by_manufacturer:         byManufacturer,
     };
