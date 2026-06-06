@@ -58,7 +58,7 @@
     <!-- Combined total banner -->
     <div id="budgetBanner" class="hidden mb-4 p-4 bg-gray-900 rounded-xl flex items-center justify-between">
       <div>
-        <div class="text-sm text-gray-300 mb-0.5">Budget d'achat total (NOS + Saisonnier)</div>
+        <div class="text-sm text-gray-300 mb-0.5">Budget d'achat total — Saisonnier</div>
         <div class="text-xs text-gray-500">Ajuster le % de croissance par marque ci-dessous</div>
       </div>
       <div class="flex flex-col items-end gap-1">
@@ -115,43 +115,6 @@
       </div>
     </div>
 
-    <!-- NOS panel -->
-    <div class="mb-8">
-      <div class="flex flex-wrap items-end gap-4 mb-3">
-        <div>
-          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 mb-2">
-            NOS — Never Out of Stock
-          </span>
-          <div class="flex items-center gap-2">
-            <label class="text-xs text-gray-500">Couverture cible :</label>
-            <input type="range" id="budgetNosWeeks" min="1" max="26" value="4" class="w-28">
-            <span id="budgetNosWeeksLabel" class="font-semibold text-blue-700 w-5">4</span>
-            <span class="text-xs text-gray-400">semaines</span>
-          </div>
-        </div>
-        <div id="budgetNosTotal" class="text-base font-bold text-blue-700 self-end"></div>
-      </div>
-      <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-xs">
-            <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
-              <tr>
-                <th class="px-3 py-2 w-6"></th>
-                <th class="px-3 py-2 text-left">Marque</th>
-                <th class="px-3 py-2 text-right">Articles</th>
-                <th class="px-3 py-2 text-right">Stock en main</th>
-                <th class="px-3 py-2 text-right">Unités vendues (12 sem.)</th>
-                <th class="px-3 py-2 text-right">Budget suggéré $</th>
-                <th class="px-3 py-2 text-right">Ajustement %</th>
-              </tr>
-            </thead>
-            <tbody id="budgetNosBody" class="divide-y divide-gray-100"></tbody>
-          </table>
-        </div>
-        <div id="budgetNosLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
-      </div>
-    </div>
-
     <!-- Saisonnier panel -->
     <div>
       <div class="flex flex-wrap items-end gap-4 mb-3">
@@ -203,14 +166,46 @@
 
   <!-- ── NOS ────────────────────────────────────────────────────── -->
   <section id="tab-nos" class="hidden">
-    <div class="flex flex-wrap items-end gap-4 mb-4">
-      <div>
-        <label class="block text-xs text-gray-500 mb-1">Couverture (semaines)</label>
-        <div class="flex items-center gap-2">
-          <input type="range" id="nosWeeks" min="1" max="26" value="4" class="w-32">
-          <span id="nosWeeksLabel" class="font-semibold text-blue-700 w-6">4</span>
+
+    <!-- NOS budget par marque -->
+    <div class="mb-8">
+      <div class="flex flex-wrap items-end gap-4 mb-3">
+        <div>
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 mb-2">
+            NOS — Budget par marque
+          </span>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-500">Couverture cible :</label>
+            <input type="range" id="nosWeeks" min="1" max="26" value="4" class="w-28">
+            <span id="nosWeeksLabel" class="font-semibold text-blue-700 w-5">4</span>
+            <span class="text-xs text-gray-400">semaines</span>
+          </div>
         </div>
+        <div id="budgetNosTotal" class="text-base font-bold text-blue-700 self-end"></div>
       </div>
+      <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+              <tr>
+                <th class="px-3 py-2 w-6"></th>
+                <th class="px-3 py-2 text-left">Marque</th>
+                <th class="px-3 py-2 text-right">Articles</th>
+                <th class="px-3 py-2 text-right">Stock en main</th>
+                <th class="px-3 py-2 text-right">Unités vendues (12 sem.)</th>
+                <th class="px-3 py-2 text-right">Budget suggéré $</th>
+                <th class="px-3 py-2 text-right">Ajustement %</th>
+              </tr>
+            </thead>
+            <tbody id="budgetNosBody" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+        <div id="budgetNosLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Détail NOS par article -->
+    <div class="flex flex-wrap items-end gap-4 mb-4">
       <div>
         <label class="block text-xs text-gray-500 mb-1">Boutique</label>
         <select id="nosShop" class="border border-gray-300 rounded px-2 py-1 text-sm">
@@ -852,6 +847,7 @@ function renderBudgetTable(key) {
 // replacements. NOT called inside renderBudgetTable to avoid stacking.
 function bindBudgetTableListeners() {
   for (const key of ['budgetNos', 'budgetSeas']) {
+    if (!document.getElementById(BUDGET_CFG[key].bodyId)) continue;
     const tbody = document.getElementById(BUDGET_CFG[key].bodyId);
 
     tbody.addEventListener('click', e => {
@@ -892,7 +888,7 @@ function bindBudgetTableListeners() {
 // ── Budget: totals ─────────────────────────────────────────────────────────
 function updateAllBudgetTotals() {
   let grandBase = 0, grandAdj = 0;
-  for (const key of ['budgetNos', 'budgetSeas']) {
+  for (const key of ['budgetSeas']) {
     const { data, multipliers } = state[key];
     const hasHyp = BUDGET_CFG[key].hasHyp;
     if (!data.length) continue;
@@ -951,12 +947,8 @@ async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
 }
 
 async function loadBudget() {
-  const nosWeeks = document.getElementById('budgetNosWeeks').value;
-  const season   = document.getElementById('budgetSeasSeason').value;
-  await Promise.all([
-    fetchBudgetPanel('budgetNos',  '/api/budget/nos',    { weeks: nosWeeks }),
-    fetchBudgetPanel('budgetSeas', '/api/budget/marque', { season }),
-  ]);
+  const season = document.getElementById('budgetSeasSeason').value;
+  await fetchBudgetPanel('budgetSeas', '/api/budget/marque', { season });
   updateAllBudgetTotals();
 }
 
@@ -976,20 +968,6 @@ document.getElementById('budgetReset').addEventListener('click', () => {
 
 // ── Budget controls ───────────────────────────────────────────────────────
 (function () {
-  // NOS weeks slider
-  const nosSlider = document.getElementById('budgetNosWeeks');
-  nosSlider.addEventListener('input', () => {
-    document.getElementById('budgetNosWeeksLabel').textContent = nosSlider.value;
-  });
-  let nt;
-  nosSlider.addEventListener('change', () => {
-    clearTimeout(nt);
-    nt = setTimeout(async () => {
-      await fetchBudgetPanel('budgetNos', '/api/budget/nos', { weeks: nosSlider.value });
-      updateAllBudgetTotals();
-    }, 300);
-  });
-
   // Saisonnier season dropdown
   document.getElementById('budgetSeasSeason').addEventListener('change', async () => {
     const season = document.getElementById('budgetSeasSeason').value;
@@ -997,24 +975,42 @@ document.getElementById('budgetReset').addEventListener('click', () => {
     updateAllBudgetTotals();
   });
 
-  // Global manufacturer search — live filter on both tables
+  // Global manufacturer search — live filter on saisonnier table
   document.getElementById('budgetMfrSearch').addEventListener('input', () => {
-    renderBudgetTable('budgetNos');
     renderBudgetTable('budgetSeas');
+  });
+})();
+
+// ── NOS weeks slider (shared for brand budget + product table) ────────────
+(function () {
+  const nosSlider = document.getElementById('nosWeeks');
+  nosSlider.addEventListener('input', () => {
+    document.getElementById('nosWeeksLabel').textContent = nosSlider.value;
+  });
+  let nt;
+  nosSlider.addEventListener('change', () => {
+    clearTimeout(nt);
+    nt = setTimeout(() => loadNos(), 300);
   });
 })();
 
 // ── NOS tab ────────────────────────────────────────────────────────────────
 async function loadNos() {
-  showLoader('nos', true);
-  try {
-    const r = await fetch(`${BASE}/api/nos?weeks=${document.getElementById('nosWeeks').value}`);
-    const d = await r.json();
-    state.nos.data = d.items;
-    populateShopFilter(d.items, 'nosShop');
-    filterAndRenderNos();
-  } catch (e) { document.getElementById('nosBody').innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`; }
-  showLoader('nos', false);
+  const weeks = document.getElementById('nosWeeks').value;
+  await Promise.all([
+    fetchBudgetPanel('budgetNos', '/api/budget/nos', { weeks }),
+    (async () => {
+      showLoader('nos', true);
+      try {
+        const r = await fetch(`${BASE}/api/nos?weeks=${weeks}`);
+        const d = await r.json();
+        state.nos.data = d.items;
+        populateShopFilter(d.items, 'nosShop');
+        filterAndRenderNos();
+      } catch (e) { document.getElementById('nosBody').innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`; }
+      showLoader('nos', false);
+    })(),
+  ]);
 }
 function filterAndRenderNos() {
   const shop = document.getElementById('nosShop').value, search = document.getElementById('nosSearch').value.toLowerCase();
@@ -1156,10 +1152,7 @@ function populateShopFilter(items, selectId) {
 function showLoader(key, show) { const el = document.getElementById(`${key}Loader`); if (el) el.classList.toggle('hidden', !show); }
 
 // ── Event bindings ────────────────────────────────────────────────────────
-const nosWeeks = document.getElementById('nosWeeks');
-nosWeeks.addEventListener('input', () => document.getElementById('nosWeeksLabel').textContent = nosWeeks.value);
 let nosD, seasD, sizD;
-nosWeeks.addEventListener('change', () => { clearTimeout(nosD); nosD = setTimeout(() => { state.nos.data=[]; loadNos(); }, 200); });
 document.getElementById('nosShop').addEventListener('change', filterAndRenderNos);
 document.getElementById('nosSearch').addEventListener('input', () => { clearTimeout(nosD); nosD = setTimeout(filterAndRenderNos, 250); });
 bindPager('nos', renderNosPage);
