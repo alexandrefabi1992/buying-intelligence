@@ -2193,9 +2193,8 @@ app.get('/api/budget/marque', async (req, res, next) => {
 
     const tiers = await getMultiplierTiers();
 
-    const baseParams  = shops?.length ? [shops] : [];
-    const shopCondInv = shops?.length ? `AND inv.shop_id = ANY($1)` : '';
-    const shopCondSL  = shops?.length ? `AND sl.shop_id = ANY($1)`  : '';
+    const baseParams = shops?.length ? [shops] : [];
+    const shopCondSL = shops?.length ? `AND sl.shop_id = ANY($1)` : '';
 
     const seasonResults = {};
 
@@ -2203,57 +2202,27 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const refSeason = SEASON_RANGES[refCode];
       if (!refSeason) continue;
 
-      // Use inventory-based implied received: qty_on_hand + qty_sold_all_time.
-      // This captures all stock regardless of how it entered (transfer, adjustment,
-      // direct entry), and uses the product's season tag as the authoritative
-      // indicator of which season the item belongs to.
-      const tagPattern = `%${refCode}%`;
-      const rxParams   = [...baseParams, tagPattern];
-      const rxTagIdx   = rxParams.length;
-
-      const { rows: rxRows } = await pool.query(`
-        SELECT
-          COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
-          SUM(COALESCE(inv_agg.qty_on_hand, 0) + COALESCE(sl_agg.units_sold, 0))::float8 AS units_received,
-          SUM((COALESCE(inv_agg.qty_on_hand, 0) + COALESCE(sl_agg.units_sold, 0))
-              * COALESCE(p.default_cost, 0))::float8 AS received_cost
-        FROM products p
-        LEFT JOIN (
-          SELECT item_id, SUM(COALESCE(qty_on_hand, 0)) AS qty_on_hand
-          FROM inventory
-          WHERE 1=1 ${shopCondInv}
-          GROUP BY item_id
-        ) inv_agg ON inv_agg.item_id = p.item_id
-        LEFT JOIN (
-          SELECT item_id, SUM(qty) AS units_sold
-          FROM sale_lines
-          WHERE qty > 0
-          GROUP BY item_id
-        ) sl_agg ON sl_agg.item_id = p.item_id
-        WHERE p.tags ILIKE $${rxTagIdx}
-          AND p.default_cost > 0
-          AND p.category    NOT ILIKE 'Alt%ration%'
-          AND p.description NOT ILIKE '%shopify%'
-        GROUP BY p.manufacturer
-      `, rxParams);
-
-      // ST uses sales within the season's calendar window
-      const slParams  = [...baseParams, tagPattern, refSeason.from, refSeason.to];
-      const slTagIdx  = slParams.length - 2;
+      // Single query: all non-NOS sales during the season window, per manufacturer.
+      // No season-tag filter — tags are inconsistently applied across products.
+      // Sales data is the only complete, reliable source: everything sold was bought.
+      // received_cost = SUM(qty × default_cost) is a lower bound on actual spend
+      // (doesn't account for unsold inventory), but gives consistent cross-season data.
+      const slParams  = [...baseParams, refSeason.from, refSeason.to];
       const slFromIdx = slParams.length - 1;
       const slToIdx   = slParams.length;
 
       const { rows: slRows } = await pool.query(`
         SELECT
-          COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
-          SUM(sl.qty)::float8                      AS units_sold
+          COALESCE(p.manufacturer, 'Sans marque')           AS manufacturer,
+          SUM(sl.qty)::float8                               AS units_sold,
+          SUM(sl.qty * COALESCE(p.default_cost, 0))::float8 AS received_cost
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE sl.completed_time >= $${slFromIdx}::date
           AND sl.completed_time <= $${slToIdx}::date
           AND sl.completed_time IS NOT NULL
           AND sl.qty > 0
-          AND p.tags ILIKE $${slTagIdx}
+          AND p.tags NOT ILIKE '%nos%'
           AND p.default_cost > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
@@ -2261,18 +2230,15 @@ app.get('/api/budget/marque', async (req, res, next) => {
         GROUP BY p.manufacturer
       `, slParams);
 
-      const salesMap = {};
-      for (const r of slRows) salesMap[r.manufacturer] = parseFloat(r.units_sold ?? 0);
-
       seasonResults[refCode] = {};
-      for (const r of rxRows) {
-        const recv = parseFloat(r.units_received ?? 0);
-        const sold = salesMap[r.manufacturer] ?? 0;
+      for (const r of slRows) {
+        const sold = parseFloat(r.units_sold ?? 0);
+        const cost = parseFloat(r.received_cost ?? 0);
         seasonResults[refCode][r.manufacturer] = {
-          units_received: Math.round(recv),
-          units_sold:     Math.round(sold),
-          received_cost:  Math.round(parseFloat(r.received_cost ?? 0) * 100) / 100,
-          st_rate:        recv > 0 ? Math.round(sold / recv * 1000) / 1000 : null,
+          units_sold:    Math.round(sold),
+          received_cost: Math.round(cost * 100) / 100,
+          // ST not computable from sales-only data; set null so UI shows '—'
+          st_rate:       null,
         };
       }
     }
