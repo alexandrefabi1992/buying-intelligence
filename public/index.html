@@ -147,11 +147,12 @@
               <tr>
                 <th class="px-3 py-2 text-left">Marque</th>
                 <th class="px-3 py-2 text-center">Saisons</th>
-                <th class="px-3 py-2 text-right">Ventes moy. historiques</th>
+                <th class="px-3 py-2 text-right">Réceptions moy.</th>
                 <th class="px-3 py-2 text-right">Fourchette</th>
-                <th class="px-3 py-2 text-right">Stock actuel</th>
+                <th class="px-3 py-2 text-right">ST moyen</th>
                 <th class="px-3 py-2 text-center">Tendance</th>
-                <th class="px-3 py-2 text-right">Budget historique</th>
+                <th class="px-3 py-2 text-center">Multiplicateur</th>
+                <th class="px-3 py-2 text-right">Stock résiduel</th>
                 <th class="px-3 py-2 text-right">Budget net</th>
               </tr>
             </thead>
@@ -705,7 +706,7 @@ function updateFilterBadge() {
 // ── BUDGET — config ────────────────────────────────────────────────────────
 const BUDGET_CFG = {
   budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetMfrSearch', totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS',        cols:7, hasHyp:false },
-  budgetSeas: { refField:'avg_received_cost',    color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'budgetMfrSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:8, hasHyp:true  },
+  budgetSeas: { refField:'avg_received_cost',    color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'budgetMfrSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:9, hasHyp:false },
 };
 
 const HYP_STYLE = {
@@ -738,45 +739,55 @@ function renderMarqueBudgetTable() {
   const key = 'budgetSeas';
   const { color, bodyId, searchId, cols } = BUDGET_CFG[key];
   const search  = document.getElementById(searchId).value.toLowerCase().trim();
-  const { data, multipliers } = state[key];
+  const { data } = state[key];
   const visible = search ? data.filter(m => m.manufacturer.toLowerCase().includes(search)) : data;
 
   const rows = [];
   for (const m of visible) {
-    const hyp      = m.hypothesis;
-    const hypStyle = HYP_STYLE[hyp?.label] ?? HYP_STYLE['Reconduire'];
-
-    // Season badges: show which reference seasons have data
+    // Season badges
     const seasonBadges = Object.keys(m.seasons ?? {})
       .sort().reverse()
       .map(c => `<span class="px-1 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 mr-0.5">${c.toUpperCase()}</span>`)
       .join('');
 
-    // Fourchette display
+    // Fourchette
     const rangeHtml = (m.min_received_cost != null && m.max_received_cost != null
       && m.min_received_cost !== m.max_received_cost)
       ? `<span class="text-gray-400">${fmtC(m.min_received_cost)}</span><span class="text-gray-300 mx-0.5">–</span><span class="text-gray-400">${fmtC(m.max_received_cost)}</span>`
       : `<span class="text-gray-400">${fmtC(m.min_received_cost ?? m.avg_received_cost)}</span>`;
 
-    const stockCost  = m.current_stock_at_cost ?? 0;
-    const netBudget  = m.net_budget ?? m.proposed_budget;
-    const hasStock   = stockCost > 0;
-    const stockHtml  = hasStock
+    // Multiplicateur cell
+    const multLabel  = m.multiplier_label ?? 'Reconduire';
+    const multStyle  = HYP_STYLE[multLabel] ?? HYP_STYLE['Reconduire'];
+    const multPct    = m.multiplier != null ? `×${m.multiplier.toFixed(2)}` : '×1.00';
+    const multHtml   = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${multStyle.bg} ${multStyle.text}">${multPct} ${multLabel}</span>`;
+
+    // Stock résiduel
+    const stockCost = m.current_stock_at_cost ?? 0;
+    const stockHtml = stockCost > 0
       ? `<span class="text-orange-600 font-semibold">${fmtC(stockCost)}</span><span class="text-gray-400 text-[10px] block">déduit</span>`
       : `<span class="text-gray-300">—</span>`;
+
+    // Brand name with optional alert badge
+    const alertBadge = m.low_st_alert
+      ? ` <span class="ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700">Réviser la marque</span>`
+      : '';
+
+    const netBudget = m.net_budget ?? 0;
 
     rows.push(`
       <tr class="mfr-row hover:bg-amber-50/40" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
         <td class="px-3 py-2.5 font-medium text-gray-900">
           <span class="mfr-link hover:text-blue-600 hover:underline cursor-pointer"
-                data-mfr="${escHtml(m.manufacturer)}">${escHtml(m.manufacturer)}</span>
+                data-mfr="${escHtml(m.manufacturer)}">${escHtml(m.manufacturer)}</span>${alertBadge}
         </td>
         <td class="px-3 py-2.5 text-center">${seasonBadges || `<span class="text-gray-300">—</span>`}</td>
         <td class="px-3 py-2.5 text-right font-semibold">${fmtC(m.avg_received_cost)}</td>
         <td class="px-3 py-2.5 text-right text-[11px]">${rangeHtml}</td>
-        <td class="px-3 py-2.5 text-right">${stockHtml}</td>
+        ${stPctCell(m.avg_st, 0.60)}
         <td class="px-3 py-2.5 text-center">${trendBadge(m.trend)}</td>
-        <td class="px-3 py-2.5 text-right text-gray-500">${fmtC(m.proposed_budget)}</td>
+        <td class="px-3 py-2.5 text-center">${multHtml}</td>
+        <td class="px-3 py-2.5 text-right">${stockHtml}</td>
         <td class="px-3 py-2.5 text-right font-bold ${netBudget === 0 ? 'text-gray-400' : color}">${netBudget === 0 ? '—' : fmtC(netBudget)}</td>
       </tr>`);
   }
@@ -890,20 +901,23 @@ function bindBudgetTableListeners() {
 
 // ── Budget: totals ─────────────────────────────────────────────────────────
 function updateAllBudgetTotals() {
-  let grandBase = 0, grandAdj = 0;
+  let grandNet = 0;
   for (const key of ['budgetSeas']) {
     const { data } = state[key];
     if (!data.length) continue;
-    const historique = data.reduce((s, m) => s + (m.proposed_budget ?? 0), 0);
-    const net        = data.reduce((s, m) => s + (m.net_budget ?? m.proposed_budget ?? 0), 0);
-    grandBase += net; grandAdj += net;
-    const stockDed = historique - net;
+    const hist     = data.reduce((s, m) => s + (m.avg_received_cost ?? 0), 0);
+    const adj      = data.reduce((s, m) => s + (m.adjusted_budget ?? m.avg_received_cost ?? 0), 0);
+    const net      = data.reduce((s, m) => s + (m.net_budget ?? 0), 0);
+    const stockDed = adj - net;
+    grandNet += net;
     let html = `Saisonnier : <strong>${fmtC(net)}</strong> net · ${data.length} marques`;
-    if (stockDed > 0.01) html += ` <span style="color:#d97706;font-size:11px">(hist. ${fmtC(historique)}, stock déduit : ${fmtC(stockDed)})</span>`;
+    if (adj !== hist) html += ` <span style="color:#6b7280;font-size:11px">(hist. ${fmtC(hist)} → ajusté ${fmtC(adj)}</span>`;
+    if (stockDed > 0.01) html += ` <span style="color:#d97706;font-size:11px">· stock déduit : ${fmtC(stockDed)})</span>`;
+    else if (adj !== hist) html += `)`;
     document.getElementById(BUDGET_CFG[key].totalId).innerHTML = html;
   }
-  if (grandBase > 0) {
-    document.getElementById('budgetBaseTotal').textContent = fmtC(grandBase);
+  if (grandNet > 0) {
+    document.getElementById('budgetBaseTotal').textContent = fmtC(grandNet);
     document.getElementById('budgetBanner').classList.remove('hidden');
     document.getElementById('budgetAdjTotal').classList.add('hidden');
   }
@@ -918,10 +932,6 @@ async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
     state[key].data     = d.by_manufacturer ?? [];
     state[key].expanded = new Set();
     if (key === 'budgetSeas') {
-      // Hypothesis comes from server; no client-side tier re-application
-      for (const m of state[key].data) {
-        state[key].multipliers[m.manufacturer] = m.hypothesis?.multiplier ?? 1.0;
-      }
       document.getElementById('budgetSeasPeriod').textContent =
         d.reference_seasons_label ? `Réf. histor. : ${d.reference_seasons_label}` : '';
     } else if (BUDGET_CFG[key].hasHyp) {
