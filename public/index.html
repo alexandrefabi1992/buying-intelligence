@@ -120,7 +120,7 @@
       <div class="flex flex-wrap items-end gap-4 mb-3">
         <div>
           <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 mb-2">
-            Saisonnier — Budget basé sur les réceptions historiques
+            Saisonnier — Budget basé sur vélocité P26 + réceptions historiques
           </span>
           <div class="flex items-center gap-2">
             <label class="text-xs text-gray-500">Saison d'achat :</label>
@@ -152,6 +152,7 @@
                 <th class="px-3 py-2 text-right">ST moyen</th>
                 <th class="px-3 py-2 text-center">Tendance</th>
                 <th class="px-3 py-2 text-center">Multiplicateur</th>
+                <th class="px-3 py-2 text-right">Projection restante</th>
                 <th class="px-3 py-2 text-right">Stock résiduel</th>
                 <th class="px-3 py-2 text-right">Budget net</th>
               </tr>
@@ -426,7 +427,7 @@ const state = {
   seasonal:   { data: [], filtered: [], page: 0 },
   sizes:      { data: [], filtered: [], page: 0 },
   budgetNos:  { data: [], expanded: new Set(), multipliers: {} },
-  budgetSeas: { data: [], expanded: new Set(), multipliers: {} },
+  budgetSeas: { data: [], expanded: new Set(), multipliers: {}, season: 'p26' },
   filters:    { shops: new Set(), collections: new Set(), sizes: new Set() },
   tiers:      DEFAULT_TIERS.map(t => ({ ...t })),
 };
@@ -706,7 +707,7 @@ function updateFilterBadge() {
 // ── BUDGET — config ────────────────────────────────────────────────────────
 const BUDGET_CFG = {
   budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetMfrSearch', totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS',        cols:7, hasHyp:false },
-  budgetSeas: { refField:'avg_received_cost',    color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'budgetMfrSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:9, hasHyp:false },
+  budgetSeas: { refField:'avg_received_cost',    color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'budgetMfrSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:10, hasHyp:false },
 };
 
 const HYP_STYLE = {
@@ -744,10 +745,17 @@ function renderMarqueBudgetTable() {
 
   const rows = [];
   for (const m of visible) {
-    // Season badges
+    // Season badges — current season gets a distinct blue badge if it has partial data
+    const targetCode = (state.budgetSeas.season ?? 'p26').toLowerCase();
     const seasonBadges = Object.keys(m.seasons ?? {})
       .sort().reverse()
-      .map(c => `<span class="px-1 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 mr-0.5">${c.toUpperCase()}</span>`)
+      .map(c => {
+        const isCurrent = c === targetCode;
+        const isPartial = m.seasons[c]?.partial;
+        const bg  = isCurrent ? 'bg-blue-100 text-blue-700' : 'bg-amber-50 text-amber-700';
+        const lbl = isCurrent && isPartial ? `${c.toUpperCase()}*` : c.toUpperCase();
+        return `<span class="px-1 py-0.5 rounded text-[9px] font-semibold ${bg} mr-0.5" title="${isPartial ? 'Saison en cours (partiel)' : ''}">${lbl}</span>`;
+      })
       .join('');
 
     // Fourchette
@@ -768,6 +776,15 @@ function renderMarqueBudgetTable() {
       ? `<span class="text-orange-600 font-semibold">${fmtC(stockCost)}</span><span class="text-gray-400 text-[10px] block">déduit</span>`
       : `<span class="text-gray-300">—</span>`;
 
+    // Velocity mode: show projected remaining vs sales YTD
+    const isVelocity = m.budget_mode === 'velocity';
+    const avgRecvHtml = isVelocity
+      ? `<span class="font-semibold">${fmtC(m.avg_received_cost)}</span><span class="text-[10px] text-blue-500 block">incl. ${targetCode.toUpperCase()}*</span>`
+      : `<span class="font-semibold">${fmtC(m.avg_received_cost)}</span>`;
+    const projHtml = isVelocity
+      ? `<span class="text-blue-600 font-semibold">${fmtC(m.projected_remaining)}</span><span class="text-[10px] text-gray-400 block">${m.remaining_days}j restants</span>`
+      : `<span class="text-gray-300">—</span>`;
+
     // Brand name with optional alert badge
     const alertBadge = m.low_st_alert
       ? ` <span class="ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700">Réviser la marque</span>`
@@ -782,11 +799,12 @@ function renderMarqueBudgetTable() {
                 data-mfr="${escHtml(m.manufacturer)}">${escHtml(m.manufacturer)}</span>${alertBadge}
         </td>
         <td class="px-3 py-2.5 text-center">${seasonBadges || `<span class="text-gray-300">—</span>`}</td>
-        <td class="px-3 py-2.5 text-right font-semibold">${fmtC(m.avg_received_cost)}</td>
+        <td class="px-3 py-2.5 text-right">${avgRecvHtml}</td>
         <td class="px-3 py-2.5 text-right text-[11px]">${rangeHtml}</td>
         ${stPctCell(m.avg_st, 0.60)}
         <td class="px-3 py-2.5 text-center">${trendBadge(m.trend)}</td>
         <td class="px-3 py-2.5 text-center">${multHtml}</td>
+        <td class="px-3 py-2.5 text-right">${projHtml}</td>
         <td class="px-3 py-2.5 text-right">${stockHtml}</td>
         <td class="px-3 py-2.5 text-right font-bold ${netBudget === 0 ? 'text-gray-400' : color}">${netBudget === 0 ? '—' : fmtC(netBudget)}</td>
       </tr>`);
@@ -932,8 +950,11 @@ async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
     state[key].data     = d.by_manufacturer ?? [];
     state[key].expanded = new Set();
     if (key === 'budgetSeas') {
+      state.budgetSeas.season = d.target_season ?? extraParams?.season ?? 'p26';
+      const remDays = d.remaining_days ?? 0;
+      const remInfo = remDays > 0 ? ` • ${remDays}j restants en saison` : '';
       document.getElementById('budgetSeasPeriod').textContent =
-        d.reference_seasons_label ? `Réf. histor. : ${d.reference_seasons_label}` : '';
+        d.reference_seasons_label ? `Réf. histor. : ${d.reference_seasons_label}${remInfo}` : '';
     } else if (BUDGET_CFG[key].hasHyp) {
       applyClientTiers(state[key].data);
       for (const m of state[key].data) {

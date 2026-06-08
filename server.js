@@ -2201,6 +2201,64 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const shopCondSL  = shops?.length ? `AND sl.shop_id = ANY($1)` : '';
     const shopCondInv = shops?.length ? `AND i.shop_id = ANY($1)` : '';
 
+    // Current season date math for projection
+    const targetSeason  = SEASON_RANGES[targetSeasonCode];
+    const todayDate     = new Date(); todayDate.setHours(0,0,0,0);
+    const seasonStart   = new Date(targetSeason.from);
+    const seasonEnd     = new Date(targetSeason.to);
+    const elapsedDays   = Math.max(1, (todayDate - seasonStart) / 86400000);
+    const remainingDays = Math.max(0, (seasonEnd - todayDate) / 86400000);
+    const completionRatio = Math.min(1, elapsedDays / ((seasonEnd - seasonStart) / 86400000));
+    const todayStr      = todayDate.toISOString().split('T')[0];
+
+    // P26 receivings so far (to include in RÉCEPTIONS MOY. average)
+    const p26RecvParams  = [...baseParams, targetSeason.recv_from, todayStr];
+    const p26RecvFromIdx = p26RecvParams.length - 1;
+    const p26RecvToIdx   = p26RecvParams.length;
+    const { rows: p26RecvRows } = await pool.query(`
+      SELECT
+        COALESCE(p.manufacturer, 'Sans marque')                           AS manufacturer,
+        SUM(t.qty_received * COALESCE(p.default_cost, 0))::float8         AS recv_cost_ytd
+      FROM transfers t
+      JOIN products p ON p.item_id = t.item_id
+      WHERE t.transfer_received = true
+        AND t.qty_received > 0
+        AND t.transfer_date >= $${p26RecvFromIdx}::date
+        AND t.transfer_date <= $${p26RecvToIdx}::date
+        AND p.tags NOT ILIKE '%nos%'
+        AND p.default_cost > 0
+        AND p.category    NOT ILIKE 'Alt%ration%'
+        AND p.description NOT ILIKE '%shopify%'
+        ${shopCondT}
+      GROUP BY p.manufacturer
+    `, p26RecvParams);
+    const p26RecvMap = {};
+    for (const r of p26RecvRows) p26RecvMap[r.manufacturer] = parseFloat(r.recv_cost_ytd ?? 0);
+
+    // P26 sales so far at cost (for remaining-season velocity projection)
+    const p26SalesParams  = [...baseParams, targetSeason.from, todayStr];
+    const p26SalesFromIdx = p26SalesParams.length - 1;
+    const p26SalesToIdx   = p26SalesParams.length;
+    const { rows: p26SalesRows } = await pool.query(`
+      SELECT
+        COALESCE(p.manufacturer, 'Sans marque')                               AS manufacturer,
+        SUM(sl.qty * COALESCE(p.default_cost, 0))::float8                     AS sales_cost_ytd
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.completed_time >= $${p26SalesFromIdx}::date
+        AND sl.completed_time <= $${p26SalesToIdx}::date
+        AND sl.completed_time IS NOT NULL
+        AND sl.qty > 0
+        AND p.tags NOT ILIKE '%nos%'
+        AND p.default_cost > 0
+        AND p.category    NOT ILIKE 'Alt%ration%'
+        AND p.description NOT ILIKE '%shopify%'
+        ${shopCondSL}
+      GROUP BY p.manufacturer
+    `, p26SalesParams);
+    const p26SalesMap = {};
+    for (const r of p26SalesRows) p26SalesMap[r.manufacturer] = parseFloat(r.sales_cost_ytd ?? 0);
+
     const seasonResults = {};
 
     for (const refCode of refSeasonCodes) {
@@ -2315,9 +2373,19 @@ app.get('/api/budget/marque', async (req, res, next) => {
       // Exclude brands with no transfer receivings (données insuffisantes)
       if (!costs.length) continue;
 
-      const avgCost   = costs.reduce((a, b) => a + b, 0) / costs.length;
-      const minCost   = Math.min(...costs);
-      const maxCost   = Math.max(...costs);
+      // Current season (P26) data for this brand
+      const p26RecvYtd   = p26RecvMap[mfr]  ?? 0;
+      const p26SalesYtd  = p26SalesMap[mfr] ?? 0;
+      // Project P26 receivings to full season so it's comparable to historical full-season costs
+      const p26Projected = completionRatio > 0.05 ? Math.round(p26RecvYtd / completionRatio * 100) / 100 : 0;
+
+      // Include P26 projected cost in historical average when available
+      const allCosts = [...costs];
+      if (p26Projected > 0) allCosts.push(p26Projected);
+
+      const avgCost   = allCosts.reduce((a, b) => a + b, 0) / allCosts.length;
+      const minCost   = Math.min(...allCosts);
+      const maxCost   = Math.max(...allCosts);
       const stockCost = stockMap[mfr] ?? 0;
 
       // Average ST across seasons that have both receiving and sales data
@@ -2346,7 +2414,28 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const hyp            = applyMultiplierTiers(avgSt, tiers);
       const avgCostRounded = Math.round(avgCost * 100) / 100;
       const adjustedBudget = Math.round(avgCostRounded * hyp.multiplier * 100) / 100;
-      const netBudget      = Math.max(0, Math.round((adjustedBudget - stockCost) * 100) / 100);
+
+      // Net budget: if P26 has sales data, project remaining demand from velocity;
+      // otherwise fall back to historical adjusted budget minus stock.
+      let netBudget;
+      let projectedRemaining = 0;
+      if (p26SalesYtd > 0 && remainingDays > 0) {
+        projectedRemaining = Math.round(p26SalesYtd * (remainingDays / elapsedDays) * 100) / 100;
+        netBudget = Math.max(0, Math.round((projectedRemaining - stockCost) * 100) / 100);
+      } else {
+        netBudget = Math.max(0, Math.round((adjustedBudget - stockCost) * 100) / 100);
+      }
+
+      // Add current season to badges if we have receivings
+      if (p26RecvYtd > 0) {
+        seasons[targetSeasonCode] = {
+          units_received: null,
+          units_sold:     null,
+          received_cost:  Math.round(p26RecvYtd * 100) / 100,
+          st_rate:        null,
+          partial:        true,
+        };
+      }
 
       byManufacturer.push({
         manufacturer:          mfr,
@@ -2362,8 +2451,15 @@ app.get('/api/budget/marque', async (req, res, next) => {
         multiplier:            hyp.multiplier,
         multiplier_label:      hyp.label,
         tier_threshold:        hyp.tier_threshold,
-        proposed_budget:       avgCostRounded,   // backwards compat field = avg hist. cost
+        proposed_budget:       avgCostRounded,
         adjusted_budget:       adjustedBudget,
+        p26_recv_ytd:          Math.round(p26RecvYtd * 100) / 100,
+        p26_sales_ytd:         Math.round(p26SalesYtd * 100) / 100,
+        p26_projected_full:    p26Projected,
+        projected_remaining:   projectedRemaining,
+        elapsed_days:          Math.round(elapsedDays),
+        remaining_days:        Math.round(remainingDays),
+        budget_mode:           p26SalesYtd > 0 && remainingDays > 0 ? 'velocity' : 'historical',
         net_budget:            netBudget,
       });
     }
@@ -2380,7 +2476,9 @@ app.get('/api/budget/marque', async (req, res, next) => {
       reference_seasons:       refSeasonCodes,
       reference_seasons_label: refSeasonCodes.map(c => c.toUpperCase()).join(', '),
       generated_at:            new Date().toISOString(),
-      total_proposed_budget:   Math.round(totalHist * 100) / 100,  // backwards compat
+      elapsed_days:            Math.round(elapsedDays),
+      remaining_days:          Math.round(remainingDays),
+      total_proposed_budget:   Math.round(totalHist * 100) / 100,
       total_adjusted_budget:   Math.round(totalAdj * 100) / 100,
       total_net_budget:        Math.round(totalNet * 100) / 100,
       manufacturer_count:      byManufacturer.length,
