@@ -2235,10 +2235,12 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const p26RecvMap = {};
     for (const r of p26RecvRows) p26RecvMap[r.manufacturer] = parseFloat(r.recv_cost_ytd ?? 0);
 
-    // P26 sales so far at cost (for remaining-season velocity projection)
-    const p26SalesParams  = [...baseParams, targetSeason.from, todayStr];
-    const p26SalesFromIdx = p26SalesParams.length - 1;
-    const p26SalesToIdx   = p26SalesParams.length;
+    // P26 sales so far at cost — filtered to target-season-tagged items only so the
+    // velocity projection is consistent with the season-tagged stock deduction.
+    const p26SalesParams  = [...baseParams, targetSeason.from, todayStr, `%${targetSeasonCode}%`];
+    const p26SalesFromIdx = p26SalesParams.length - 2;
+    const p26SalesToIdx   = p26SalesParams.length - 1;
+    const p26SalesTagIdx  = p26SalesParams.length;
     const { rows: p26SalesRows } = await pool.query(`
       SELECT
         COALESCE(p.manufacturer, 'Sans marque')                               AS manufacturer,
@@ -2249,6 +2251,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         AND sl.completed_time <= $${p26SalesToIdx}::date
         AND sl.completed_time IS NOT NULL
         AND sl.qty > 0
+        AND p.tags ILIKE $${p26SalesTagIdx}
         AND p.tags NOT ILIKE '%nos%'
         AND p.default_cost > 0
         AND p.category    NOT ILIKE 'Alt%ration%'
@@ -2333,21 +2336,27 @@ app.get('/api/budget/marque', async (req, res, next) => {
       }
     }
 
-    // Current non-NOS inventory at cost per manufacturer — used to offset budget
+    // Current stock for target-season-tagged items only (non-NOS).
+    // Filtering to the target season tag ensures we only deduct stock that's actually
+    // part of this season's buy — not NOS or leftover items from previous seasons.
+    const invParams = [...baseParams, `%${targetSeasonCode}%`];
+    const invTagIdx = invParams.length;
+    const shopCondInvTag = shops?.length ? `AND i.shop_id = ANY($1)` : '';
     const { rows: invRows } = await pool.query(`
       SELECT
         COALESCE(p.manufacturer, 'Sans marque')                                  AS manufacturer,
         SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8   AS stock_at_cost
       FROM products p
       JOIN inventory i ON i.item_id = p.item_id
-      WHERE p.tags NOT ILIKE '%nos%'
+      WHERE p.tags ILIKE $${invTagIdx}
+        AND p.tags NOT ILIKE '%nos%'
         AND p.default_cost > 0
         AND p.category    NOT ILIKE 'Alt%ration%'
         AND p.description NOT ILIKE '%shopify%'
         AND i.qty_on_hand > 0
-        ${shopCondInv}
+        ${shopCondInvTag}
       GROUP BY p.manufacturer
-    `, baseParams);
+    `, invParams);
 
     const stockMap = {};
     for (const r of invRows) stockMap[r.manufacturer] = Math.round(parseFloat(r.stock_at_cost ?? 0) * 100) / 100;
