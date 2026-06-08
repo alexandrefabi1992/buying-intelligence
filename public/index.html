@@ -26,6 +26,7 @@
     .tog-btn { transition: all 0.1s; }
     .tog-btn.active { background:#dbeafe; border-color:#3b82f6; color:#1d4ed8; font-weight:600; }
     .col-tip { cursor: help; }
+    th.sort-col:hover { background-color: #f3f4f6; }
     #col-tooltip {
       position: fixed;
       z-index: 9999;
@@ -142,17 +143,26 @@
           <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 mb-2">
             Saisonnier — Budget basé sur vélocité P26 + réceptions historiques
           </span>
-          <div class="flex items-center gap-2">
-            <label class="text-xs text-gray-500">Saison d'achat :</label>
-            <select id="budgetSeasSeason"
-              class="border border-gray-300 rounded px-2 py-1 text-xs font-semibold text-amber-700 bg-white">
-              <option value="p26" selected>P26 — Printemps 2026</option>
-              <option value="a26">A26 — Automne 2026</option>
-              <option value="p25">P25 — Printemps 2025</option>
-              <option value="a25">A25 — Automne 2025</option>
-              <option value="p24">P24 — Printemps 2024</option>
-              <option value="a24">A24 — Automne 2024</option>
-            </select>
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500">Saison d'achat :</label>
+              <select id="budgetSeasSeason"
+                class="border border-gray-300 rounded px-2 py-1 text-xs font-semibold text-amber-700 bg-white">
+                <option value="p26" selected>P26 — Printemps 2026</option>
+                <option value="a26">A26 — Automne 2026</option>
+                <option value="p25">P25 — Printemps 2025</option>
+                <option value="a25">A25 — Automne 2025</option>
+                <option value="p24">P24 — Printemps 2024</option>
+                <option value="a24">A24 — Automne 2024</option>
+              </select>
+            </div>
+            <div class="relative">
+              <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+              <input id="seasBudgetSearch" type="text" placeholder="Rechercher une marque…"
+                class="border border-gray-300 rounded pl-6 pr-2 py-1 text-xs w-44 focus:outline-none focus:border-blue-400">
+            </div>
           </div>
         </div>
         <div class="flex flex-col items-end self-end gap-1">
@@ -165,25 +175,31 @@
           <table class="w-full text-xs">
             <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
               <tr>
-                <th class="px-3 py-2 text-left">Marque</th>
+                <th class="px-3 py-2 text-left sort-col cursor-pointer select-none" data-sort="manufacturer"
+                    >Marque <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
                 <th class="px-3 py-2 text-center col-tip"
                     data-tip="Saisons pour lesquelles on a des données de réception.&#10;* = saison en cours (données partielles, projetées à plein-saison).">Saisons</th>
-                <th class="px-3 py-2 text-right col-tip"
-                    data-tip="Montant moyen reçu (en coût) par saison de référence.&#10;&#10;Calcul : moyenne des coûts de réception sur P25, P24, P23.&#10;Si la saison en cours (P26*) a des données, sa projection plein-saison est incluse dans la moyenne.&#10;&#10;Formule P26 projeté = reçu_ytd ÷ (jours_écoulés ÷ jours_totaux)">Réceptions moy.</th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="avg_received_cost"
+                    data-tip="Montant moyen reçu (en coût) par saison de référence.&#10;&#10;Calcul : moyenne des coûts de réception sur P25, P24, P23.&#10;Si la saison en cours (P26*) a des données, sa projection plein-saison est incluse dans la moyenne.&#10;&#10;Formule P26 projeté = reçu_ytd ÷ (jours_écoulés ÷ jours_totaux)"
+                    >Réceptions moy. <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
                 <th class="px-3 py-2 text-right col-tip"
                     data-tip="Étendue des réceptions selon les saisons historiques disponibles.&#10;&#10;Min $ – Max $ observés sur les saisons de référence (P25, P24, P23 + P26 projeté si disponible).&#10;&#10;Utile pour voir la variabilité d'une saison à l'autre.">Fourchette</th>
-                <th class="px-3 py-2 text-right col-tip"
-                    data-tip="Taux de vente moyen (sell-through) sur les saisons historiques.&#10;&#10;Calcul : unités vendues ÷ unités reçues via transfert, moyenné sur P25, P24, P23.&#10;&#10;100% = tout vendu · 50% = la moitié vendue · 0% = rien vendu.&#10;Seuil cible : ≥ 60% (vert).&#10;&#10;«n/d» = données insuffisantes (moins de 5 unités reçues via transfert pour cette saison — la marque est principalement approvisionnée par commandes directes).">ST moyen</th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="avg_st"
+                    data-tip="Taux de vente moyen (sell-through) sur les saisons historiques.&#10;&#10;Calcul : unités vendues ÷ unités reçues via transfert, moyenné sur P25, P24, P23.&#10;&#10;100% = tout vendu · 50% = la moitié vendue · 0% = rien vendu.&#10;Seuil cible : ≥ 60% (vert).&#10;&#10;«n/d» = données insuffisantes (moins de 5 unités reçues via transfert pour cette saison — la marque est principalement approvisionnée par commandes directes)."
+                    >ST moyen <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
                 <th class="px-3 py-2 text-center col-tip"
                     data-tip="Direction des réceptions d'une saison à l'autre.&#10;&#10;Hausse : saison la plus récente &gt; saison la plus ancienne de +10%&#10;Baisse : saison la plus récente &lt; saison la plus ancienne de -10%&#10;Stable : variation &lt; 10%">Tendance</th>
                 <th class="px-3 py-2 text-center col-tip"
                     data-tip="Facteur appliqué aux réceptions moyennes historiques.&#10;&#10;Basé sur le ST moyen via les paliers configurés dans l'onglet Paramètres.&#10;&#10;Exemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper.&#10;&#10;Note : ce multiplicateur s'applique au calcul historique (fallback). En mode vélocité P26, le budget net est directement issu de la projection.">Multiplicateur</th>
-                <th class="px-3 py-2 text-right col-tip"
-                    data-tip="Demande projetée pour les jours restants de la saison en cours.&#10;&#10;Calcul (mode vélocité) :&#10;ventes_P26_à_ce_jour × (jours_restants ÷ jours_écoulés)&#10;&#10;Représente combien on s'attend à vendre d'ici la fin de saison si la vélocité actuelle se maintient.&#10;&#10;Affiché seulement si des ventes P26 existent.">Projection restante</th>
-                <th class="px-3 py-2 text-right col-tip"
-                    data-tip="Valeur au coût du stock actuellement en inventaire pour cette marque (articles non-NOS).&#10;&#10;Ce montant est déduit du budget net : le stock en main couvrira une partie de la demande future, donc inutile de le racheter.">Stock résiduel</th>
-                <th class="px-3 py-2 text-right col-tip"
-                    data-tip="Budget d'achat recommandé pour la saison.&#10;&#10;Mode vélocité (P26 actif) :&#10;MAX(0, projection_restante − stock_résiduel)&#10;&#10;Mode historique (pas de données P26) :&#10;MAX(0, réceptions_moy × multiplicateur − stock_résiduel)&#10;&#10;Un tiret (—) indique que le stock en main couvre déjà la demande projetée.">Budget net</th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="projected_remaining"
+                    data-tip="Demande projetée pour les jours restants de la saison en cours.&#10;&#10;Calcul (mode vélocité) :&#10;ventes_P26_à_ce_jour × (jours_restants ÷ jours_écoulés)&#10;&#10;Représente combien on s'attend à vendre d'ici la fin de saison si la vélocité actuelle se maintient.&#10;&#10;Affiché seulement si des ventes P26 existent."
+                    >Projection restante <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="current_stock_at_cost"
+                    data-tip="Valeur au coût du stock actuellement en inventaire pour cette marque (articles non-NOS).&#10;&#10;Ce montant est déduit du budget net : le stock en main couvrira une partie de la demande future, donc inutile de le racheter."
+                    >Stock résiduel <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="net_budget"
+                    data-tip="Budget d'achat recommandé pour la saison.&#10;&#10;Mode vélocité (P26 actif) :&#10;MAX(0, projection_restante − stock_résiduel)&#10;&#10;Mode historique (pas de données P26) :&#10;MAX(0, réceptions_moy × multiplicateur − stock_résiduel)&#10;&#10;Un tiret (—) indique que le stock en main couvre déjà la demande projetée."
+                    >Budget net <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
               </tr>
             </thead>
             <tbody id="budgetSeasBody" class="divide-y divide-gray-100"></tbody>
@@ -456,7 +472,7 @@ const state = {
   seasonal:   { data: [], filtered: [], page: 0 },
   sizes:      { data: [], filtered: [], page: 0 },
   budgetNos:  { data: [], expanded: new Set(), multipliers: {} },
-  budgetSeas: { data: [], expanded: new Set(), multipliers: {}, season: 'p26' },
+  budgetSeas: { data: [], expanded: new Set(), multipliers: {}, season: 'p26', sort: { col: null, dir: 'desc' } },
   filters:    { shops: new Set(), collections: new Set(), sizes: new Set() },
   tiers:      DEFAULT_TIERS.map(t => ({ ...t })),
 };
@@ -736,7 +752,7 @@ function updateFilterBadge() {
 // ── BUDGET — config ────────────────────────────────────────────────────────
 const BUDGET_CFG = {
   budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetMfrSearch', totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS',        cols:7, hasHyp:false },
-  budgetSeas: { refField:'avg_received_cost',    color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'budgetMfrSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:10, hasHyp:false },
+  budgetSeas: { refField:'avg_received_cost',    color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'seasBudgetSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:10, hasHyp:false },
 };
 
 const HYP_STYLE = {
@@ -769,9 +785,38 @@ function trendBadge(trend) {
 function renderMarqueBudgetTable() {
   const key = 'budgetSeas';
   const { color, bodyId, searchId, cols } = BUDGET_CFG[key];
-  const search  = document.getElementById(searchId).value.toLowerCase().trim();
-  const { data } = state[key];
-  const visible = search ? data.filter(m => m.manufacturer.toLowerCase().includes(search)) : data;
+  const search  = (document.getElementById(searchId)?.value ?? '').toLowerCase().trim();
+  const { data, sort } = state[key];
+
+  // Filter by search
+  let visible = search ? data.filter(m => m.manufacturer.toLowerCase().includes(search)) : [...data];
+
+  // Sort
+  if (sort.col) {
+    visible.sort((a, b) => {
+      let va = a[sort.col], vb = b[sort.col];
+      if (sort.col === 'manufacturer') {
+        va = (va ?? '').toLowerCase(); vb = (vb ?? '').toLowerCase();
+        return sort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      va = va ?? -Infinity; vb = vb ?? -Infinity;
+      return sort.dir === 'asc' ? va - vb : vb - va;
+    });
+  }
+
+  // Update sort arrows in thead
+  document.querySelectorAll('#budgetSeasBody').forEach(() => {});
+  document.querySelectorAll('th.sort-col[data-sort]').forEach(th => {
+    const arrow = th.querySelector('.sort-arrow');
+    if (!arrow) return;
+    if (th.dataset.sort === sort.col) {
+      arrow.textContent = sort.dir === 'asc' ? '↑' : '↓';
+      arrow.className = 'sort-arrow text-amber-600 ml-0.5';
+    } else {
+      arrow.textContent = '↕';
+      arrow.className = 'sort-arrow text-gray-300 ml-0.5';
+    }
+  });
 
   const rows = [];
   for (const m of visible) {
@@ -1029,8 +1074,25 @@ document.getElementById('budgetReset').addEventListener('click', () => {
     updateAllBudgetTotals();
   });
 
-  // Global manufacturer search — live filter on saisonnier table
-  document.getElementById('budgetMfrSearch').addEventListener('input', () => {
+  // Dedicated saisonnier search — live filter
+  document.getElementById('seasBudgetSearch').addEventListener('input', () => {
+    renderBudgetTable('budgetSeas');
+  });
+
+  // Column sort — delegate click on any th.sort-col in the saisonnier table
+  document.addEventListener('click', e => {
+    const th = e.target.closest('th.sort-col');
+    if (!th) return;
+    // Only handle if it's inside the saisonnier table
+    if (!th.closest('table')?.querySelector('#budgetSeasBody')) return;
+    const col = th.dataset.sort;
+    const s   = state.budgetSeas.sort;
+    if (s.col === col) {
+      s.dir = s.dir === 'desc' ? 'asc' : 'desc';
+    } else {
+      s.col = col;
+      s.dir = col === 'manufacturer' ? 'asc' : 'desc';
+    }
     renderBudgetTable('budgetSeas');
   });
 })();
