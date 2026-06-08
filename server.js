@@ -2320,12 +2320,15 @@ app.get('/api/budget/marque', async (req, res, next) => {
         const recv = parseFloat(r.units_received ?? 0);
         const cost = parseFloat(r.received_cost ?? 0);
         const sold = soldMap[r.manufacturer] ?? 0;
-        const st   = recv > 0 ? sold / recv : null;
+        // ST is only meaningful when enough units were received via transfer (≥5).
+        // Fewer units = brand mainly stocks via direct PO, not transfers → ratio is misleading.
+        const st = recv >= 5 ? sold / recv : null;
         seasonResults[refCode][r.manufacturer] = {
-          units_received: Math.round(recv),
-          units_sold:     Math.round(sold),
-          received_cost:  Math.round(cost * 100) / 100,
-          st_rate:        st !== null ? Math.round(st * 1000) / 1000 : null,
+          units_received:  Math.round(recv),
+          units_sold:      Math.round(sold),
+          received_cost:   Math.round(cost * 100) / 100,
+          st_rate:         st !== null ? Math.round(st * 1000) / 1000 : null,
+          st_insufficient: recv < 5,
         };
       }
     }

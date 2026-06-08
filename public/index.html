@@ -25,46 +25,26 @@
     /* Filter toggle buttons */
     .tog-btn { transition: all 0.1s; }
     .tog-btn.active { background:#dbeafe; border-color:#3b82f6; color:#1d4ed8; font-weight:600; }
-    /* Column header tooltips */
-    .col-tip { position: relative; cursor: help; }
-    .col-tip::after {
-      content: attr(data-tip);
-      position: absolute;
-      bottom: calc(100% + 8px);
-      left: 50%;
-      transform: translateX(-50%);
+    .col-tip { cursor: help; }
+    #col-tooltip {
+      position: fixed;
+      z-index: 9999;
       background: #1e293b;
       color: #f1f5f9;
       font-size: 11px;
       font-weight: 400;
-      line-height: 1.5;
-      padding: 8px 12px;
-      border-radius: 6px;
+      line-height: 1.6;
+      padding: 9px 13px;
+      border-radius: 7px;
       white-space: pre-line;
-      width: max-content;
-      max-width: 280px;
+      max-width: 300px;
+      pointer-events: none;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.3);
       text-transform: none;
       letter-spacing: 0;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.15s;
-      z-index: 100;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      font-family: inherit;
+      display: none;
     }
-    .col-tip::before {
-      content: '';
-      position: absolute;
-      bottom: calc(100% + 2px);
-      left: 50%;
-      transform: translateX(-50%);
-      border: 5px solid transparent;
-      border-top-color: #1e293b;
-      opacity: 0;
-      transition: opacity 0.15s;
-      z-index: 100;
-      pointer-events: none;
-    }
-    .col-tip:hover::after, .col-tip:hover::before { opacity: 1; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans text-sm text-gray-800">
@@ -193,7 +173,7 @@
                 <th class="px-3 py-2 text-right col-tip"
                     data-tip="Étendue des réceptions selon les saisons historiques disponibles.&#10;&#10;Min $ – Max $ observés sur les saisons de référence (P25, P24, P23 + P26 projeté si disponible).&#10;&#10;Utile pour voir la variabilité d'une saison à l'autre.">Fourchette</th>
                 <th class="px-3 py-2 text-right col-tip"
-                    data-tip="Taux de vente moyen (sell-through) sur les saisons historiques.&#10;&#10;Calcul : unités vendues ÷ unités reçues, moyenné sur P25, P24, P23.&#10;&#10;100% = tout vendu · 50% = la moitié vendue · 0% = rien vendu.&#10;Seuil cible : ≥ 60% (vert).">ST moyen</th>
+                    data-tip="Taux de vente moyen (sell-through) sur les saisons historiques.&#10;&#10;Calcul : unités vendues ÷ unités reçues via transfert, moyenné sur P25, P24, P23.&#10;&#10;100% = tout vendu · 50% = la moitié vendue · 0% = rien vendu.&#10;Seuil cible : ≥ 60% (vert).&#10;&#10;«n/d» = données insuffisantes (moins de 5 unités reçues via transfert pour cette saison — la marque est principalement approvisionnée par commandes directes).">ST moyen</th>
                 <th class="px-3 py-2 text-center col-tip"
                     data-tip="Direction des réceptions d'une saison à l'autre.&#10;&#10;Hausse : saison la plus récente &gt; saison la plus ancienne de +10%&#10;Baisse : saison la plus récente &lt; saison la plus ancienne de -10%&#10;Stable : variation &lt; 10%">Tendance</th>
                 <th class="px-3 py-2 text-center col-tip"
@@ -769,6 +749,7 @@ const HYP_STYLE = {
 
 function stPctCell(val, threshold) {
   if (val === null || val === undefined) return '<td class="px-3 py-2.5 text-right text-gray-300">—</td>';
+  if (val > 1.5) return '<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-400" title="Données insuffisantes : moins de 5 unités reçues via transfert — ratio non représentatif">n/d</span></td>';
   const pct = Math.round(val * 100);
   const ok  = val >= threshold;
   const mid = val >= threshold * 0.75;
@@ -1283,6 +1264,35 @@ loadTiers().then(() => {
   tabLoaded['budget'] = true;
   loadBudget();
 });
+
+// ── Column tooltips (JS-based to bypass overflow:hidden on containers) ────
+(function() {
+  const tip = document.createElement('div');
+  tip.id = 'col-tooltip';
+  document.body.appendChild(tip);
+
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest('.col-tip');
+    if (!el || !el.dataset.tip) return;
+    tip.textContent = el.dataset.tip;
+    tip.style.display = 'block';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (tip.style.display !== 'block') return;
+    const gap = 12;
+    let x = e.clientX + gap;
+    let y = e.clientY - tip.offsetHeight - gap;
+    if (x + tip.offsetWidth > window.innerWidth - 8) x = e.clientX - tip.offsetWidth - gap;
+    if (y < 8) y = e.clientY + gap;
+    tip.style.left = x + 'px';
+    tip.style.top  = y + 'px';
+  });
+
+  document.addEventListener('mouseout', e => {
+    if (e.target.closest('.col-tip')) tip.style.display = 'none';
+  });
+})();
 </script>
 </body>
 </html>
