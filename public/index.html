@@ -148,12 +148,13 @@
               <label class="text-xs text-gray-500">Saison d'achat :</label>
               <select id="budgetSeasSeason"
                 class="border border-gray-300 rounded px-2 py-1 text-xs font-semibold text-amber-700 bg-white">
-                <option value="p26" selected>P26 — Printemps 2026</option>
+                <option value="p27">P27 — Printemps 2027</option>
                 <option value="a26">A26 — Automne 2026</option>
-                <option value="p25">P25 — Printemps 2025</option>
+                <option value="p26" selected>P26 — Printemps 2026</option>
                 <option value="a25">A25 — Automne 2025</option>
-                <option value="p24">P24 — Printemps 2024</option>
+                <option value="p25">P25 — Printemps 2025</option>
                 <option value="a24">A24 — Automne 2024</option>
+                <option value="p24">P24 — Printemps 2024</option>
               </select>
             </div>
             <div class="relative">
@@ -472,7 +473,7 @@ const state = {
   seasonal:   { data: [], filtered: [], page: 0 },
   sizes:      { data: [], filtered: [], page: 0 },
   budgetNos:  { data: [], expanded: new Set(), multipliers: {} },
-  budgetSeas: { data: [], expanded: new Set(), multipliers: {}, season: 'p26', sort: { col: null, dir: 'desc' } },
+  budgetSeas: { data: [], expanded: new Set(), multipliers: {}, season: 'p26', isFuture: false, sort: { col: null, dir: 'desc' } },
   filters:    { shops: new Set(), collections: new Set(), sizes: new Set() },
   tiers:      DEFAULT_TIERS.map(t => ({ ...t })),
 };
@@ -851,14 +852,22 @@ function renderMarqueBudgetTable() {
       ? `<span class="text-orange-600 font-semibold">${fmtC(stockCost)}</span><span class="text-gray-400 text-[10px] block">déduit</span>`
       : `<span class="text-gray-300">—</span>`;
 
-    // Velocity mode: show projected remaining vs sales YTD
+    // Projection / carryover cell depending on budget mode
     const isVelocity = m.budget_mode === 'velocity';
+    const isFuture   = m.budget_mode === 'future';
     const avgRecvHtml = isVelocity
       ? `<span class="font-semibold">${fmtC(m.avg_received_cost)}</span><span class="text-[10px] text-blue-500 block">incl. ${targetCode.toUpperCase()}*</span>`
       : `<span class="font-semibold">${fmtC(m.avg_received_cost)}</span>`;
-    const projHtml = isVelocity
-      ? `<span class="text-blue-600 font-semibold">${fmtC(m.projected_remaining)}</span><span class="text-[10px] text-gray-400 block">${m.remaining_days}j restants</span>`
-      : `<span class="text-gray-300">—</span>`;
+    let projHtml;
+    if (isFuture) {
+      projHtml = m.estimated_carryover > 0
+        ? `<span class="text-purple-600 font-semibold">${fmtC(m.estimated_carryover)}</span><span class="text-[10px] text-gray-400 block">carryover estimé</span>`
+        : `<span class="text-gray-300">—</span>`;
+    } else if (isVelocity) {
+      projHtml = `<span class="text-blue-600 font-semibold">${fmtC(m.projected_remaining)}</span><span class="text-[10px] text-gray-400 block">${m.remaining_days}j restants</span>`;
+    } else {
+      projHtml = `<span class="text-gray-300">—</span>`;
+    }
 
     // Brand name with optional alert badge
     const alertBadge = m.low_st_alert
@@ -1025,11 +1034,19 @@ async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
     state[key].data     = d.by_manufacturer ?? [];
     state[key].expanded = new Set();
     if (key === 'budgetSeas') {
-      state.budgetSeas.season = d.target_season ?? extraParams?.season ?? 'p26';
+      state.budgetSeas.season   = d.target_season ?? extraParams?.season ?? 'p26';
+      state.budgetSeas.isFuture = d.is_future_season ?? false;
       const remDays = d.remaining_days ?? 0;
       const remInfo = remDays > 0 ? ` • ${remDays}j restants en saison` : '';
+      const futureInfo = d.is_future_season ? ' • Planification saison future' : '';
       document.getElementById('budgetSeasPeriod').textContent =
-        d.reference_seasons_label ? `Réf. histor. : ${d.reference_seasons_label}${remInfo}` : '';
+        d.reference_seasons_label ? `Réf. histor. : ${d.reference_seasons_label}${remInfo}${futureInfo}` : '';
+      // Update projection column header label
+      const projTh = document.querySelector('th.sort-col[data-sort="projected_remaining"]');
+      if (projTh) {
+        const arrow = projTh.querySelector('.sort-arrow')?.outerHTML ?? '';
+        projTh.innerHTML = (d.is_future_season ? 'Carryover estimé ' : 'Projection restante ') + arrow;
+      }
     } else if (BUDGET_CFG[key].hasHyp) {
       applyClientTiers(state[key].data);
       for (const m of state[key].data) {
