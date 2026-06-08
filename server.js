@@ -824,6 +824,8 @@ const SEASON_RANGES = {
   a25: { from: '2025-09-01', to: '2026-02-28', recv_from: '2025-05-01', label: 'A25 — Automne 2025'   },
   p26: { from: '2026-02-01', to: '2026-09-30', recv_from: '2025-10-01', label: 'P26 — Printemps 2026' },
   a26: { from: '2026-09-01', to: '2027-02-28', recv_from: '2026-05-01', label: 'A26 — Automne 2026'   },
+  p27: { from: '2027-02-01', to: '2027-09-30', recv_from: '2026-10-01', label: 'P27 — Printemps 2027' },
+  a27: { from: '2027-09-01', to: '2028-02-28', recv_from: '2027-05-01', label: 'A27 — Automne 2027'   },
 };
 
 // Returns the up-to-3 previous equivalent seasons for a given code.
@@ -2206,9 +2208,10 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const todayDate     = new Date(); todayDate.setHours(0,0,0,0);
     const seasonStart   = new Date(targetSeason.from);
     const seasonEnd     = new Date(targetSeason.to);
-    const elapsedDays   = Math.max(1, (todayDate - seasonStart) / 86400000);
+    const isFutureSeason = todayDate < seasonStart;  // target season hasn't started yet
+    const elapsedDays   = isFutureSeason ? 0 : Math.max(1, (todayDate - seasonStart) / 86400000);
     const remainingDays = Math.max(0, (seasonEnd - todayDate) / 86400000);
-    const completionRatio = Math.min(1, elapsedDays / ((seasonEnd - seasonStart) / 86400000));
+    const completionRatio = isFutureSeason ? 0 : Math.min(1, elapsedDays / ((seasonEnd - seasonStart) / 86400000));
     const todayStr      = todayDate.toISOString().split('T')[0];
 
     // P26 receivings so far (to include in RÉCEPTIONS MOY. average)
@@ -2336,12 +2339,16 @@ app.get('/api/budget/marque', async (req, res, next) => {
       }
     }
 
-    // Current stock for target-season-tagged items only (non-NOS).
-    // Filtering to the target season tag ensures we only deduct stock that's actually
-    // part of this season's buy — not NOS or leftover items from previous seasons.
-    const invParams = [...baseParams, `%${targetSeasonCode}%`];
-    const invTagIdx = invParams.length;
+    // Stock to deduct from budget:
+    // - Current season (P26): stock of target-season-tagged items
+    // - Future season (P27+): estimated carryover from the previous season
+    //   = max(0, prev_season_stock - projected_remaining_prev_season_sales)
     const shopCondInvTag = shops?.length ? `AND i.shop_id = ANY($1)` : '';
+
+    // For future seasons, query the PREVIOUS season's stock to estimate carryover
+    const prevSeasonCode = isFutureSeason ? refSeasonCodes[0] : targetSeasonCode;
+    const invParams = [...baseParams, `%${prevSeasonCode}%`];
+    const invTagIdx = invParams.length;
     const { rows: invRows } = await pool.query(`
       SELECT
         COALESCE(p.manufacturer, 'Sans marque')                                  AS manufacturer,
@@ -2427,14 +2434,27 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const avgCostRounded = Math.round(avgCost * 100) / 100;
       const adjustedBudget = Math.round(avgCostRounded * hyp.multiplier * 100) / 100;
 
-      // Net budget: if P26 has sales data, project remaining demand from velocity;
-      // otherwise fall back to historical adjusted budget minus stock.
+      // Net budget calculation depends on whether target season is in the future or current.
       let netBudget;
       let projectedRemaining = 0;
-      if (p26SalesYtd > 0 && remainingDays > 0) {
+      let estimatedCarryover = 0;
+
+      if (isFutureSeason) {
+        // FUTURE SEASON (e.g. P27): pre-season buying budget
+        // Deduct estimated carryover from the previous season:
+        //   carryover = max(0, prev_season_stock - projected remaining prev_season_sales)
+        // Projected remaining prev_season_sales uses current p26 velocity
+        const prevSeasonProjectedRemaining = p26SalesYtd > 0 && elapsedDays > 0
+          ? Math.round(p26SalesYtd * (remainingDays / elapsedDays) * 100) / 100
+          : 0;
+        estimatedCarryover = Math.max(0, Math.round((stockCost - prevSeasonProjectedRemaining) * 100) / 100);
+        netBudget = Math.max(0, Math.round((adjustedBudget - estimatedCarryover) * 100) / 100);
+      } else if (p26SalesYtd > 0 && remainingDays > 0) {
+        // CURRENT SEASON with velocity data: project remaining demand
         projectedRemaining = Math.round(p26SalesYtd * (remainingDays / elapsedDays) * 100) / 100;
         netBudget = Math.max(0, Math.round((projectedRemaining - stockCost) * 100) / 100);
       } else {
+        // CURRENT or PAST SEASON with no velocity data: historical formula
         netBudget = Math.max(0, Math.round((adjustedBudget - stockCost) * 100) / 100);
       }
 
@@ -2469,9 +2489,10 @@ app.get('/api/budget/marque', async (req, res, next) => {
         p26_sales_ytd:         Math.round(p26SalesYtd * 100) / 100,
         p26_projected_full:    p26Projected,
         projected_remaining:   projectedRemaining,
+        estimated_carryover:   estimatedCarryover,
         elapsed_days:          Math.round(elapsedDays),
         remaining_days:        Math.round(remainingDays),
-        budget_mode:           p26SalesYtd > 0 && remainingDays > 0 ? 'velocity' : 'historical',
+        budget_mode:           isFutureSeason ? 'future' : (p26SalesYtd > 0 && remainingDays > 0 ? 'velocity' : 'historical'),
         net_budget:            netBudget,
       });
     }
@@ -2485,6 +2506,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const result = {
       target_season:           targetSeasonCode,
       target_season_label:     SEASON_RANGES[targetSeasonCode]?.label ?? targetSeasonCode.toUpperCase(),
+      is_future_season:        isFutureSeason,
       reference_seasons:       refSeasonCodes,
       reference_seasons_label: refSeasonCodes.map(c => c.toUpperCase()).join(', '),
       generated_at:            new Date().toISOString(),
