@@ -25,6 +25,46 @@
     /* Filter toggle buttons */
     .tog-btn { transition: all 0.1s; }
     .tog-btn.active { background:#dbeafe; border-color:#3b82f6; color:#1d4ed8; font-weight:600; }
+    /* Column header tooltips */
+    .col-tip { position: relative; cursor: help; }
+    .col-tip::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: #f1f5f9;
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.5;
+      padding: 8px 12px;
+      border-radius: 6px;
+      white-space: pre-line;
+      width: max-content;
+      max-width: 280px;
+      text-transform: none;
+      letter-spacing: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .col-tip::before {
+      content: '';
+      position: absolute;
+      bottom: calc(100% + 2px);
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: #1e293b;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 100;
+      pointer-events: none;
+    }
+    .col-tip:hover::after, .col-tip:hover::before { opacity: 1; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans text-sm text-gray-800">
@@ -146,15 +186,24 @@
             <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
               <tr>
                 <th class="px-3 py-2 text-left">Marque</th>
-                <th class="px-3 py-2 text-center">Saisons</th>
-                <th class="px-3 py-2 text-right">Réceptions moy.</th>
-                <th class="px-3 py-2 text-right">Fourchette</th>
-                <th class="px-3 py-2 text-right">ST moyen</th>
-                <th class="px-3 py-2 text-center">Tendance</th>
-                <th class="px-3 py-2 text-center">Multiplicateur</th>
-                <th class="px-3 py-2 text-right">Projection restante</th>
-                <th class="px-3 py-2 text-right">Stock résiduel</th>
-                <th class="px-3 py-2 text-right">Budget net</th>
+                <th class="px-3 py-2 text-center col-tip"
+                    data-tip="Saisons pour lesquelles on a des données de réception.&#10;* = saison en cours (données partielles, projetées à plein-saison).">Saisons</th>
+                <th class="px-3 py-2 text-right col-tip"
+                    data-tip="Montant moyen reçu (en coût) par saison de référence.&#10;&#10;Calcul : moyenne des coûts de réception sur P25, P24, P23.&#10;Si la saison en cours (P26*) a des données, sa projection plein-saison est incluse dans la moyenne.&#10;&#10;Formule P26 projeté = reçu_ytd ÷ (jours_écoulés ÷ jours_totaux)">Réceptions moy.</th>
+                <th class="px-3 py-2 text-right col-tip"
+                    data-tip="Étendue des réceptions selon les saisons historiques disponibles.&#10;&#10;Min $ – Max $ observés sur les saisons de référence (P25, P24, P23 + P26 projeté si disponible).&#10;&#10;Utile pour voir la variabilité d'une saison à l'autre.">Fourchette</th>
+                <th class="px-3 py-2 text-right col-tip"
+                    data-tip="Taux de vente moyen (sell-through) sur les saisons historiques.&#10;&#10;Calcul : unités vendues ÷ unités reçues, moyenné sur P25, P24, P23.&#10;&#10;100% = tout vendu · 50% = la moitié vendue · 0% = rien vendu.&#10;Seuil cible : ≥ 60% (vert).">ST moyen</th>
+                <th class="px-3 py-2 text-center col-tip"
+                    data-tip="Direction des réceptions d'une saison à l'autre.&#10;&#10;Hausse : saison la plus récente &gt; saison la plus ancienne de +10%&#10;Baisse : saison la plus récente &lt; saison la plus ancienne de -10%&#10;Stable : variation &lt; 10%">Tendance</th>
+                <th class="px-3 py-2 text-center col-tip"
+                    data-tip="Facteur appliqué aux réceptions moyennes historiques.&#10;&#10;Basé sur le ST moyen via les paliers configurés dans l'onglet Paramètres.&#10;&#10;Exemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper.&#10;&#10;Note : ce multiplicateur s'applique au calcul historique (fallback). En mode vélocité P26, le budget net est directement issu de la projection.">Multiplicateur</th>
+                <th class="px-3 py-2 text-right col-tip"
+                    data-tip="Demande projetée pour les jours restants de la saison en cours.&#10;&#10;Calcul (mode vélocité) :&#10;ventes_P26_à_ce_jour × (jours_restants ÷ jours_écoulés)&#10;&#10;Représente combien on s'attend à vendre d'ici la fin de saison si la vélocité actuelle se maintient.&#10;&#10;Affiché seulement si des ventes P26 existent.">Projection restante</th>
+                <th class="px-3 py-2 text-right col-tip"
+                    data-tip="Valeur au coût du stock actuellement en inventaire pour cette marque (articles non-NOS).&#10;&#10;Ce montant est déduit du budget net : le stock en main couvrira une partie de la demande future, donc inutile de le racheter.">Stock résiduel</th>
+                <th class="px-3 py-2 text-right col-tip"
+                    data-tip="Budget d'achat recommandé pour la saison.&#10;&#10;Mode vélocité (P26 actif) :&#10;MAX(0, projection_restante − stock_résiduel)&#10;&#10;Mode historique (pas de données P26) :&#10;MAX(0, réceptions_moy × multiplicateur − stock_résiduel)&#10;&#10;Un tiret (—) indique que le stock en main couvre déjà la demande projetée.">Budget net</th>
               </tr>
             </thead>
             <tbody id="budgetSeasBody" class="divide-y divide-gray-100"></tbody>
