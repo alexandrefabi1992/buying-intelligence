@@ -2291,6 +2291,7 @@ app.put('/api/settings/budget-params', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/budget/marque', async (req, res, next) => {
   try {
+    const targetSeasonCode = (req.query.season ?? 'p26').toLowerCase();
     const shops = req.query.shops ? req.query.shops.split(',').filter(Boolean) : null;
 
     const cacheKey = JSON.stringify({ r: 'marque2', season: targetSeasonCode, shops });
