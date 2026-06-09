@@ -205,16 +205,13 @@
                     data-tip="Direction des réceptions d'une saison à l'autre.&#10;&#10;Hausse : saison la plus récente &gt; saison la plus ancienne de +10%&#10;Baisse : saison la plus récente &lt; saison la plus ancienne de -10%&#10;Stable : variation &lt; 10%"
                     ><span data-i18n="col_trend">Tendance</span></th>
                 <th class="px-3 py-2 text-center col-tip" data-i18n-tip="tip_multiplier"
-                    data-tip="Facteur appliqué aux réceptions moyennes historiques.&#10;&#10;Basé sur le ST moyen via les paliers configurés dans l'onglet Paramètres.&#10;&#10;Exemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper.&#10;&#10;Note : ce multiplicateur s'applique au calcul historique (fallback). En mode vélocité P26, le budget net est directement issu de la projection."
+                    data-tip="Facteur appliqué aux réceptions moyennes historiques.&#10;&#10;Basé sur le TM moyen via les paliers configurés dans l'onglet Paramètres.&#10;&#10;Exemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper."
                     ><span data-i18n="col_multiplier">Multiplicateur</span></th>
-                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="projected_remaining" data-i18n-tip="tip_projection"
-                    data-tip="Demande projetée pour les jours restants de la saison en cours.&#10;&#10;Calcul (mode vélocité) :&#10;ventes_P26_à_ce_jour × (jours_restants ÷ jours_écoulés)&#10;&#10;Représente combien on s'attend à vendre d'ici la fin de saison si la vélocité actuelle se maintient.&#10;&#10;Affiché seulement si des ventes P26 existent."
-                    ><span data-i18n="col_projection">Projection restante</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
-                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="current_stock_at_cost" data-i18n-tip="tip_stock"
-                    data-tip="Valeur au coût du stock actuellement en inventaire pour cette marque (articles non-NOS).&#10;&#10;Ce montant est déduit du budget net : le stock en main couvrira une partie de la demande future, donc inutile de le racheter."
-                    ><span data-i18n="col_stock">Stock résiduel</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="adjusted_budget" data-i18n-tip="tip_adj_budget"
+                    data-tip="Réceptions moy. × multiplicateur.&#10;&#10;Budget cible avant déduction du carryover.&#10;&#10;Formule : réceptions_moy × multiplicateur"
+                    ><span data-i18n="col_adj_budget">Budget ajusté</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
                 <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="net_budget" data-i18n-tip="tip_net_budget"
-                    data-tip="Budget d'achat recommandé pour la saison.&#10;&#10;Mode vélocité (P26 actif) :&#10;MAX(0, projection_restante − stock_résiduel)&#10;&#10;Mode historique (pas de données P26) :&#10;MAX(0, réceptions_moy × multiplicateur − stock_résiduel)&#10;&#10;Un tiret (—) indique que le stock en main couvre déjà la demande projetée."
+                    data-tip="Budget net = Budget ajusté − (carryover × taux déduction).&#10;&#10;Carryover = MAX(0, stock − ventes_ytd × (jours_restants ÷ jours_écoulés))&#10;&#10;Le taux de déduction (défaut 50%) est configurable dans Paramètres.&#10;&#10;Un tiret (—) indique que le carryover couvre le budget ajusté."
                     ><span data-i18n="col_net_budget">Budget net</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
               </tr>
             </thead>
@@ -472,6 +469,34 @@
 
       <div id="tiersNote" class="mt-4 text-xs text-emerald-700 font-semibold hidden"
            data-i18n="params_applied">Paramètres appliqués — budgets recalculés.</div>
+
+      <div class="mt-6 border-t border-gray-200 pt-5">
+        <h3 class="text-xs font-semibold text-gray-700 mb-3" data-i18n="params_budget_title">Paramètres du budget d'achat</h3>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-3">
+            <label class="text-xs text-gray-600 w-52 col-tip" data-tip="Nombre de saisons passées équivalentes utilisées pour calculer la moyenne historique (ex : 3 = P25, P24, P23 pour P26)."
+                   data-i18n="params_nb_saisons_lbl">Saisons de référence (N)</label>
+            <input id="budgetNbSaisons" type="number" min="1" max="10" value="3"
+                   class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="text-xs text-gray-600 w-52 col-tip" data-tip="Part du carryover déduite du budget ajusté. 50% = on garde 50% de marge pour le nouveau stock qui aide à écouler l'ancien stock."
+                   data-i18n="params_carryover_lbl">Taux déduction carryover</label>
+            <div class="flex items-center gap-1">
+              <input id="budgetCarryoverRate" type="number" min="0" max="100" step="5" value="50"
+                     class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+              <span class="text-xs text-gray-500">%</span>
+            </div>
+          </div>
+          <button id="budgetParamsApply"
+            class="self-start px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors mt-1"
+            data-i18n="btn_apply_recalc">
+            Appliquer &amp; Recalculer
+          </button>
+          <div id="budgetParamsNote" class="text-xs text-emerald-700 font-semibold hidden"
+               data-i18n="params_applied">Paramètres appliqués — budgets recalculés.</div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -501,9 +526,8 @@ const TRANSLATIONS = {
     season_p25:'P25 — Printemps 2025', season_a24:'A24 — Automne 2024',
     season_p24:'P24 — Printemps 2024',
     col_brand:'Marque', col_seasons:'Saisons', col_avg_recv:'Réceptions moy.',
-    col_range:'Fourchette', col_avg_st:'ST moyen', col_trend:'Tendance',
-    col_multiplier:'Multiplicateur', col_projection:'Projection restante',
-    col_carryover:'Carryover estimé', col_stock:'Stock résiduel', col_net_budget:'Budget net',
+    col_range:'Fourchette', col_avg_st:'TM moyen', col_trend:'Tendance',
+    col_multiplier:'Multiplicateur', col_adj_budget:'Budget ajusté', col_net_budget:'Budget net',
     col_description:'Description', col_boutique:'Boutique', col_category:'Catégorie',
     col_stock_short:'Stock', col_qty_suggested:'Qté suggérée',
     tip_seasons:"Saisons pour lesquelles on a des données de réception.\n* = saison en cours (données partielles, projetées à plein-saison).",
@@ -511,18 +535,22 @@ const TRANSLATIONS = {
     tip_range:"Étendue des réceptions selon les saisons historiques disponibles.\n\nMin $ – Max $ observés sur les saisons de référence (P25, P24, P23 + P26 projeté si disponible).\n\nUtile pour voir la variabilité d'une saison à l'autre.",
     tip_avg_st:"Taux de vente moyen (sell-through) sur les saisons historiques.\n\nCalcul : unités vendues ÷ unités reçues via transfert, moyenné sur P25, P24, P23.\n\n100% = tout vendu · 50% = la moitié vendue · 0% = rien vendu.\nSeuil cible : ≥ 60% (vert).\n\n«n/d» = données insuffisantes (moins de 5 unités reçues via transfert — la marque est principalement approvisionnée par commandes directes).",
     tip_trend:"Direction des réceptions d'une saison à l'autre.\n\nHausse : saison la plus récente > saison la plus ancienne de +10%\nBaisse : saison la plus récente < saison la plus ancienne de -10%\nStable : variation < 10%",
-    tip_multiplier:"Facteur appliqué aux réceptions moyennes historiques.\n\nBasé sur le ST moyen via les paliers configurés dans l'onglet Paramètres.\n\nExemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper.\n\nNote : ce multiplicateur s'applique au calcul historique (fallback). En mode vélocité P26, le budget net est directement issu de la projection.",
-    tip_projection:"Demande projetée pour les jours restants de la saison en cours.\n\nCalcul (mode vélocité) :\nventes_P26_à_ce_jour × (jours_restants ÷ jours_écoulés)\n\nReprésente combien on s'attend à vendre d'ici la fin de saison si la vélocité actuelle se maintient.\n\nAffiché seulement si des ventes P26 existent.",
-    tip_stock:"Valeur au coût du stock actuellement en inventaire pour cette marque (articles non-NOS).\n\nCe montant est déduit du budget net : le stock en main couvrira une partie de la demande future, donc inutile de le racheter.",
-    tip_net_budget:"Budget d'achat recommandé pour la saison.\n\nMode vélocité (P26 actif) :\nMAX(0, projection_restante − stock_résiduel)\n\nMode historique (pas de données P26) :\nMAX(0, réceptions_moy × multiplicateur − stock_résiduel)\n\nUn tiret (—) indique que le stock en main couvre déjà la demande projetée.",
+    tip_multiplier:"Facteur appliqué aux réceptions moyennes historiques.\n\nBasé sur le TM moyen via les paliers configurés dans l'onglet Paramètres.\n\nExemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper.",
+    tip_adj_budget:"Réceptions moy. × multiplicateur.\n\nBudget cible avant déduction du carryover.\n\nFormule : réceptions_moy × multiplicateur",
+    tip_net_budget:"Budget net = Budget ajusté − (carryover × taux déduction).\n\nCarryover = MAX(0, stock − ventes_ytd × (jours_restants ÷ jours_écoulés))\n\nLe taux de déduction (défaut 50%) est configurable dans Paramètres.\n\nUn tiret (—) indique que le carryover couvre le budget ajusté.",
     total_seasonal:'Saisonnier', total_brands:'marques',
-    total_hist:'hist.', total_adjusted:'ajusté', total_stock_ded:'stock déduit',
+    total_hist:'hist.', total_adjusted:'ajusté', total_carryover_ded:'carryover déduit',
     no_data:'Aucune donnée de réception historique disponible', no_results:'Aucun résultat',
-    carryover_lbl:'carryover estimé', deducted_lbl:'déduit',
+    carryover_lbl:'carryover', deducted_lbl:'déduit',
     review_brand:'Réviser la marque', partial_season:'Saison en cours (partiel)',
     days_remaining: n => `${n}j restants`, incl_season: c => `incl. ${c}*`,
     hist_ref:'Réf. histor.', days_left_season:'j restants en saison',
     future_season_lbl:'Planification saison future',
+    params_budget_title:'Paramètres du budget d\'achat',
+    params_nb_saisons_lbl:'Saisons de référence (N)',
+    params_carryover_lbl:'Taux déduction carryover',
+    params_nb_saisons_tip:'Nombre de saisons passées équivalentes utilisées pour calculer la moyenne historique (ex : 3 = P25, P24, P23 pour P26).',
+    params_carryover_tip:'Part du carryover déduite du budget ajusté. 50% = on garde 50% de marge pour le nouveau stock qui aide à écouler l\'ancien stock.',
     trend_hausse:'hausse', trend_stable:'stable', trend_baisse:'baisse',
     st_nd:'n/d', st_na_title:"Données insuffisantes : moins de 5 unités reçues via transfert — ratio non représentatif",
     nos_badge:'NOS — Budget par marque', nos_coverage:'Couverture cible :', nos_weeks:'semaines',
@@ -571,8 +599,7 @@ const TRANSLATIONS = {
     season_p24:'P24 — Spring 2024',
     col_brand:'Brand', col_seasons:'Seasons', col_avg_recv:'Avg. Receivings',
     col_range:'Range', col_avg_st:'Avg. ST', col_trend:'Trend',
-    col_multiplier:'Multiplier', col_projection:'Remaining Projection',
-    col_carryover:'Est. Carryover', col_stock:'Residual Stock', col_net_budget:'Net Budget',
+    col_multiplier:'Multiplier', col_adj_budget:'Adjusted Budget', col_net_budget:'Net Budget',
     col_description:'Description', col_boutique:'Store', col_category:'Category',
     col_stock_short:'Stock', col_qty_suggested:'Suggested Qty',
     tip_seasons:"Seasons for which we have receiving data.\n* = current season (partial data, projected to full season).",
@@ -580,18 +607,22 @@ const TRANSLATIONS = {
     tip_range:"Range of receivings across available historical seasons.\n\nMin $ – Max $ observed on reference seasons (P25, P24, P23 + P26 projected if available).\n\nUseful to see season-to-season variability.",
     tip_avg_st:"Average sell-through rate across historical seasons.\n\nCalculation: units sold ÷ units received via transfer, averaged over P25, P24, P23.\n\n100% = all sold · 50% = half sold · 0% = nothing sold.\nTarget threshold: ≥ 60% (green).\n\n\"n/a\" = insufficient data (less than 5 units received via transfer — brand is primarily supplied by direct orders).",
     tip_trend:"Direction of receivings from one season to the next.\n\nRising: most recent season > oldest season by +10%\nFalling: most recent season < oldest season by -10%\nStable: variation < 10%",
-    tip_multiplier:"Factor applied to average historical receivings.\n\nBased on average ST through tiers configured in the Settings tab.\n\nExamples: ×1.25 Grow, ×1.00 Renew, ×0.50 Cut.\n\nNote: this multiplier applies to the historical calculation (fallback). In P26 velocity mode, the net budget is directly derived from the projection.",
-    tip_projection:"Projected demand for the remaining days of the current season.\n\nCalculation (velocity mode):\nytd_P26_sales × (remaining_days ÷ elapsed_days)\n\nRepresents how much is expected to sell by season end if current velocity holds.\n\nDisplayed only if P26 sales data exists.",
-    tip_stock:"Cost value of stock currently in inventory for this brand (non-NOS items).\n\nThis amount is deducted from the net budget: on-hand stock will cover part of future demand, so no need to reorder it.",
-    tip_net_budget:"Recommended purchase budget for the season.\n\nVelocity mode (P26 active):\nMAX(0, remaining_projection − residual_stock)\n\nHistorical mode (no P26 data):\nMAX(0, avg_receivings × multiplier − residual_stock)\n\nA dash (—) means on-hand stock already covers the projected demand.",
+    tip_multiplier:"Factor applied to average historical receivings.\n\nBased on average ST through tiers configured in the Settings tab.\n\nExamples: ×1.25 Grow, ×1.00 Renew, ×0.50 Cut.",
+    tip_adj_budget:"Avg. Receivings × Multiplier.\n\nTarget budget before carryover deduction.\n\nFormula: avg_receivings × multiplier",
+    tip_net_budget:"Net Budget = Adjusted Budget − (carryover × deduction rate).\n\nCarryover = MAX(0, stock − ytd_sales × (remaining_days ÷ elapsed_days))\n\nThe deduction rate (default 50%) is configurable in Settings.\n\nA dash (—) means carryover covers the adjusted budget.",
     total_seasonal:'Seasonal', total_brands:'brands',
-    total_hist:'hist.', total_adjusted:'adjusted', total_stock_ded:'deducted stock',
+    total_hist:'hist.', total_adjusted:'adjusted', total_carryover_ded:'carryover deducted',
     no_data:'No historical receiving data available', no_results:'No results',
-    carryover_lbl:'estimated carryover', deducted_lbl:'deducted',
+    carryover_lbl:'carryover', deducted_lbl:'deducted',
     review_brand:'Review brand', partial_season:'Current season (partial)',
     days_remaining: n => `${n}d remaining`, incl_season: c => `incl. ${c}*`,
     hist_ref:'Hist. ref.', days_left_season:'d remaining in season',
     future_season_lbl:'Future season planning',
+    params_budget_title:'Purchase Budget Settings',
+    params_nb_saisons_lbl:'Reference seasons (N)',
+    params_carryover_lbl:'Carryover deduction rate',
+    params_nb_saisons_tip:'Number of past equivalent seasons used to compute the historical average (e.g. 3 = P25, P24, P23 for P26).',
+    params_carryover_tip:'Share of carryover deducted from the adjusted budget. 50% = keep 50% headroom for new stock that helps move existing stock.',
     trend_hausse:'rising', trend_stable:'stable', trend_baisse:'falling',
     st_nd:'n/a', st_na_title:"Insufficient data: less than 5 units received via transfer — ratio not representative",
     nos_badge:'NOS — Budget by Brand', nos_coverage:'Target coverage:', nos_weeks:'weeks',
@@ -665,20 +696,6 @@ function setLanguage(lang) {
     } else {
       frBtn.className = 'text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600 border-r border-gray-200';
       enBtn.className = 'text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700';
-    }
-  }
-  // Update projection column header (future vs current)
-  const projTh = document.querySelector('th.sort-col[data-sort="projected_remaining"]');
-  if (projTh) {
-    const arrow = projTh.querySelector('.sort-arrow')?.outerHTML ?? '';
-    const labelSpan = projTh.querySelector('[data-i18n]');
-    const labelKey = state.budgetSeas.isFuture ? 'col_carryover' : 'col_projection';
-    if (labelSpan) {
-      labelSpan.dataset.i18n = labelKey;
-      labelSpan.textContent = t(labelKey);
-    }
-    if (arrow && projTh.querySelector('.sort-arrow')) {
-      projTh.querySelector('.sort-arrow').outerHTML = arrow;
     }
   }
   // Re-render dynamic tables
@@ -990,7 +1007,7 @@ function updateFilterBadge() {
 // ── BUDGET — config ────────────────────────────────────────────────────────
 const BUDGET_CFG = {
   budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetMfrSearch', totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS',        cols:7, hasHyp:false },
-  budgetSeas: { refField:'avg_received_cost',    color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'seasBudgetSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:10, hasHyp:false },
+  budgetSeas: { refField:'avg_received_cost',    color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'seasBudgetSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:9,  hasHyp:false },
 };
 
 const HYP_STYLE = {
@@ -1079,40 +1096,40 @@ function renderMarqueBudgetTable() {
       : `<span class="text-gray-400">${fmtC(m.min_received_cost ?? m.avg_received_cost)}</span>`;
 
     // Multiplicateur cell
-    const multLabel  = m.multiplier_label ?? 'Reconduire';
-    const multStyle  = HYP_STYLE[multLabel] ?? HYP_STYLE['Reconduire'];
-    const multPct    = m.multiplier != null ? `×${m.multiplier.toFixed(2)}` : '×1.00';
-    const multHtml   = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${multStyle.bg} ${multStyle.text}">${multPct} ${tTierLabel(multLabel)}</span>`;
+    const multLabel = m.multiplier_label ?? 'Reconduire';
+    const multStyle = HYP_STYLE[multLabel] ?? HYP_STYLE['Reconduire'];
+    const multPct   = m.multiplier != null ? `×${m.multiplier.toFixed(2)}` : '×1.00';
+    const multHtml  = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${multStyle.bg} ${multStyle.text}">${multPct} ${tTierLabel(multLabel)}</span>`;
 
-    // Stock résiduel
-    const stockCost = m.current_stock_at_cost ?? 0;
-    const stockHtml = stockCost > 0
-      ? `<span class="text-orange-600 font-semibold">${fmtC(stockCost)}</span><span class="text-gray-400 text-[10px] block">${t('deducted_lbl')}</span>`
-      : `<span class="text-gray-300">—</span>`;
+    // Avg receivings — show partial note if most-recent reference is in progress
+    const avgRecvHtml = `<span class="font-semibold">${fmtC(m.avg_received_cost ?? m.avg_hist)}</span>`;
 
-    // Projection / carryover cell depending on budget mode
-    const isVelocity = m.budget_mode === 'velocity';
-    const isFuture   = m.budget_mode === 'future';
-    const avgRecvHtml = isVelocity
-      ? `<span class="font-semibold">${fmtC(m.avg_received_cost)}</span><span class="text-[10px] text-blue-500 block">${t('incl_season')(targetCode.toUpperCase())}</span>`
-      : `<span class="font-semibold">${fmtC(m.avg_received_cost)}</span>`;
-    let projHtml;
-    if (isFuture) {
-      projHtml = m.estimated_carryover > 0
-        ? `<span class="text-purple-600 font-semibold">${fmtC(m.estimated_carryover)}</span><span class="text-[10px] text-gray-400 block">${t('carryover_lbl')}</span>`
-        : `<span class="text-gray-300">—</span>`;
-    } else if (isVelocity) {
-      projHtml = `<span class="text-blue-600 font-semibold">${fmtC(m.projected_remaining)}</span><span class="text-[10px] text-gray-400 block">${t('days_remaining')(m.remaining_days)}</span>`;
+    // Budget ajusté
+    const adjBudget = m.adjusted_budget ?? 0;
+    const adjHtml   = `<span class="font-semibold">${fmtC(adjBudget)}</span>`;
+
+    // Budget net with carryover sub-line
+    const netBudget      = m.net_budget ?? 0;
+    const carryoverDed   = m.carryover_deduction ?? 0;
+    let netHtml;
+    if (netBudget === 0 && adjBudget === 0) {
+      netHtml = `<span class="text-gray-300">—</span>`;
+    } else if (netBudget === 0) {
+      netHtml = `<span class="text-gray-400">—</span>`;
+      if (carryoverDed > 0) {
+        netHtml += `<span class="text-[10px] text-gray-400 block">−${fmtC(carryoverDed)} ${t('carryover_lbl')}</span>`;
+      }
     } else {
-      projHtml = `<span class="text-gray-300">—</span>`;
+      netHtml = `<span class="font-bold ${color}">${fmtC(netBudget)}</span>`;
+      if (carryoverDed > 0) {
+        netHtml += `<span class="text-[10px] text-gray-400 block">−${fmtC(carryoverDed)} ${t('carryover_lbl')}</span>`;
+      }
     }
 
     // Brand name with optional alert badge
     const alertBadge = m.low_st_alert
       ? ` <span class="ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700">${t('review_brand')}</span>`
       : '';
-
-    const netBudget = m.net_budget ?? 0;
 
     rows.push(`
       <tr class="mfr-row hover:bg-amber-50/40" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
@@ -1126,9 +1143,8 @@ function renderMarqueBudgetTable() {
         ${stPctCell(m.avg_st, 0.60)}
         <td class="px-3 py-2.5 text-center">${trendBadge(m.trend)}</td>
         <td class="px-3 py-2.5 text-center">${multHtml}</td>
-        <td class="px-3 py-2.5 text-right">${projHtml}</td>
-        <td class="px-3 py-2.5 text-right">${stockHtml}</td>
-        <td class="px-3 py-2.5 text-right font-bold ${netBudget === 0 ? 'text-gray-400' : color}">${netBudget === 0 ? '—' : fmtC(netBudget)}</td>
+        <td class="px-3 py-2.5 text-right">${adjHtml}</td>
+        <td class="px-3 py-2.5 text-right">${netHtml}</td>
       </tr>`);
   }
 
@@ -1245,15 +1261,15 @@ function updateAllBudgetTotals() {
   for (const key of ['budgetSeas']) {
     const { data } = state[key];
     if (!data.length) continue;
-    const hist     = data.reduce((s, m) => s + (m.avg_received_cost ?? 0), 0);
-    const adj      = data.reduce((s, m) => s + (m.adjusted_budget ?? m.avg_received_cost ?? 0), 0);
+    const hist     = data.reduce((s, m) => s + (m.avg_hist ?? m.avg_received_cost ?? 0), 0);
+    const adj      = data.reduce((s, m) => s + (m.adjusted_budget ?? 0), 0);
+    const coDeduct = data.reduce((s, m) => s + (m.carryover_deduction ?? 0), 0);
     const net      = data.reduce((s, m) => s + (m.net_budget ?? 0), 0);
-    const stockDed = adj - net;
     grandNet += net;
     let html = `${t('total_seasonal')} : <strong>${fmtC(net)}</strong> net · ${data.length} ${t('total_brands')}`;
-    if (adj !== hist) html += ` <span style="color:#6b7280;font-size:11px">(${t('total_hist')} ${fmtC(hist)} → ${t('total_adjusted')} ${fmtC(adj)}</span>`;
-    if (stockDed > 0.01) html += ` <span style="color:#d97706;font-size:11px">· ${t('total_stock_ded')} : ${fmtC(stockDed)})</span>`;
-    else if (adj !== hist) html += `)`;
+    html += ` <span style="color:#6b7280;font-size:11px">(${t('total_hist')} ${fmtC(hist)} → ${t('total_adjusted')} ${fmtC(adj)}`;
+    if (coDeduct > 0.01) html += ` → ${t('total_carryover_ded')} ${fmtC(coDeduct)}`;
+    html += `)</span>`;
     document.getElementById(BUDGET_CFG[key].totalId).innerHTML = html;
   }
   if (grandNet > 0) {
@@ -1277,15 +1293,9 @@ async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
       const remDays = d.remaining_days ?? 0;
       const remInfo = remDays > 0 ? ` • ${remDays}${t('days_left_season')}` : '';
       const futureInfo = d.is_future_season ? ` • ${t('future_season_lbl')}` : '';
+      const coRate = d.carryover_deduction_rate != null ? ` • ${Math.round(d.carryover_deduction_rate * 100)}% carryover` : '';
       document.getElementById('budgetSeasPeriod').textContent =
-        d.reference_seasons_label ? `${t('hist_ref')} : ${d.reference_seasons_label}${remInfo}${futureInfo}` : '';
-      // Update projection column header label
-      const projTh = document.querySelector('th.sort-col[data-sort="projected_remaining"]');
-      if (projTh) {
-        const labelSpan = projTh.querySelector('[data-i18n]');
-        const labelKey = d.is_future_season ? 'col_carryover' : 'col_projection';
-        if (labelSpan) { labelSpan.dataset.i18n = labelKey; labelSpan.textContent = t(labelKey); }
-      }
+        d.reference_seasons_label ? `${t('hist_ref')} : ${d.reference_seasons_label}${remInfo}${coRate}${futureInfo}` : '';
     } else if (BUDGET_CFG[key].hasHyp) {
       applyClientTiers(state[key].data);
       for (const m of state[key].data) {
@@ -1540,6 +1550,29 @@ document.getElementById('sizesShop').addEventListener('change', filterAndRenderS
 document.getElementById('sizesSearch').addEventListener('input', () => { clearTimeout(sizD); sizD = setTimeout(filterAndRenderSizes, 250); });
 bindPager('sizes', renderSizesPage);
 
+// ── Paramètres — budget params load/save ─────────────────────────────────
+async function loadBudgetParams() {
+  try {
+    const d = await fetch(`${BASE}/api/settings/budget-params`).then(r => r.json());
+    const nbEl = document.getElementById('budgetNbSaisons');
+    const coEl = document.getElementById('budgetCarryoverRate');
+    if (nbEl && d.nb_saisons_reference != null) nbEl.value = d.nb_saisons_reference;
+    if (coEl && d.carryover_deduction_rate != null) coEl.value = Math.round(d.carryover_deduction_rate * 100);
+  } catch (e) {
+    console.warn('[budget-params] Failed to load:', e.message);
+  }
+}
+
+async function saveBudgetParamsToServer() {
+  const nb = parseInt(document.getElementById('budgetNbSaisons')?.value ?? 3, 10);
+  const co = parseFloat(document.getElementById('budgetCarryoverRate')?.value ?? 50) / 100;
+  await fetch(`${BASE}/api/settings/budget-params`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nb_saisons_reference: nb, carryover_deduction_rate: co }),
+  });
+}
+
 // ── Paramètres — events ───────────────────────────────────────────────────
 document.getElementById('tiersApply').addEventListener('click', async () => {
   document.querySelectorAll('.tiers-input').forEach(inp => {
@@ -1573,8 +1606,24 @@ document.getElementById('tiersReset').addEventListener('click', async () => {
   }
 });
 
+document.getElementById('budgetParamsApply').addEventListener('click', async () => {
+  try {
+    await saveBudgetParamsToServer();
+    if (state.budgetSeas.data.length) {
+      const season = document.getElementById('budgetSeasSeason').value;
+      await fetchBudgetPanel('budgetSeas', '/api/budget/marque', { season });
+      updateAllBudgetTotals();
+    }
+    const note = document.getElementById('budgetParamsNote');
+    note.classList.remove('hidden');
+    setTimeout(() => note.classList.add('hidden'), 3000);
+  } catch (e) {
+    console.warn('[budget-params] Failed to apply:', e.message);
+  }
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────
-loadTiers().then(() => {
+Promise.all([loadTiers(), loadBudgetParams()]).then(() => {
   loadMultipliers();
   buildFilterBar();
   bindBudgetTableListeners();
