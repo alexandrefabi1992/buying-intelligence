@@ -77,6 +77,57 @@ function applyMultiplierTiers(st, tiers) {
 }
 
 // ---------------------------------------------------------------------------
+// Seasons config and budget params — defaults; overridden by app_settings DB table.
+// Each season: { code, label, reception_from, reception_to, sell_from, sell_to, tag_pattern }
+// ---------------------------------------------------------------------------
+const DEFAULT_SEASONS_CONFIG = [
+  { code:'p23', label:'P23 — Printemps 2023', reception_from:'2022-10-01', reception_to:'2023-09-30', sell_from:'2023-02-01', sell_to:'2023-09-30', tag_pattern:'p23' },
+  { code:'a23', label:'A23 — Automne 2023',   reception_from:'2023-05-01', reception_to:'2024-02-28', sell_from:'2023-09-01', sell_to:'2024-02-28', tag_pattern:'a23' },
+  { code:'p24', label:'P24 — Printemps 2024', reception_from:'2023-10-01', reception_to:'2024-09-30', sell_from:'2024-02-01', sell_to:'2024-09-30', tag_pattern:'p24' },
+  { code:'a24', label:'A24 — Automne 2024',   reception_from:'2024-05-01', reception_to:'2025-02-28', sell_from:'2024-09-01', sell_to:'2025-02-28', tag_pattern:'a24' },
+  { code:'p25', label:'P25 — Printemps 2025', reception_from:'2024-10-01', reception_to:'2025-09-30', sell_from:'2025-02-01', sell_to:'2025-09-30', tag_pattern:'p25' },
+  { code:'a25', label:'A25 — Automne 2025',   reception_from:'2025-05-01', reception_to:'2026-02-28', sell_from:'2025-09-01', sell_to:'2026-02-28', tag_pattern:'a25' },
+  { code:'p26', label:'P26 — Printemps 2026', reception_from:'2025-10-01', reception_to:'2026-09-30', sell_from:'2026-02-01', sell_to:'2026-09-30', tag_pattern:'p26' },
+  { code:'a26', label:'A26 — Automne 2026',   reception_from:'2026-05-01', reception_to:'2027-02-28', sell_from:'2026-09-01', sell_to:'2027-02-28', tag_pattern:'a26' },
+  { code:'p27', label:'P27 — Printemps 2027', reception_from:'2026-10-01', reception_to:'2027-09-30', sell_from:'2027-02-01', sell_to:'2027-09-30', tag_pattern:'p27' },
+  { code:'a27', label:'A27 — Automne 2027',   reception_from:'2027-05-01', reception_to:'2028-02-28', sell_from:'2027-09-01', sell_to:'2028-02-28', tag_pattern:'a27' },
+];
+
+const DEFAULT_BUDGET_PARAMS = {
+  nb_saisons_reference:    3,
+  carryover_deduction_rate: 0.50,
+};
+
+async function getSeasonsConfig() {
+  try {
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'seasons_config'");
+    if (rows.length && Array.isArray(rows[0].value) && rows[0].value.length > 0) return rows[0].value;
+  } catch {}
+  return DEFAULT_SEASONS_CONFIG;
+}
+
+async function getBudgetParams() {
+  try {
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'budget_params'");
+    if (rows.length && rows[0].value && typeof rows[0].value === 'object') {
+      return { ...DEFAULT_BUDGET_PARAMS, ...rows[0].value };
+    }
+  } catch {}
+  return { ...DEFAULT_BUDGET_PARAMS };
+}
+
+function getReferenceSeasonsFromConfig(targetCode, config, n) {
+  const type = targetCode[0];
+  const year = parseInt(targetCode.slice(1), 10);
+  const result = [];
+  for (let y = year - 1; y >= year - 10 && result.length < n; y--) {
+    const s = config.find(c => c.code === `${type}${y}`);
+    if (s) result.push(s);
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // In-memory TTL cache — 5-minute TTL for slow budget queries
 // Key: JSON string of route + params. Auto-expires on get.
 // ---------------------------------------------------------------------------
@@ -2168,85 +2219,128 @@ app.put('/api/settings/multipliers', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/budget/marque — Buying budget per brand based on historical transfer receivings
+// GET /api/settings/seasons — read season config
+// PUT /api/settings/seasons — update season config
+// ---------------------------------------------------------------------------
+app.get('/api/settings/seasons', async (req, res, next) => {
+  try {
+    const seasons = await getSeasonsConfig();
+    res.json({ seasons });
+  } catch (err) { next(err); }
+});
+
+app.put('/api/settings/seasons', async (req, res, next) => {
+  try {
+    const { seasons } = req.body;
+    if (!Array.isArray(seasons) || seasons.length === 0) {
+      return res.status(400).json({ error: 'seasons must be a non-empty array' });
+    }
+    await pool.query(
+      `INSERT INTO app_settings(key, value, updated_at)
+       VALUES ('seasons_config', $1::jsonb, now())
+       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
+      [JSON.stringify(seasons)]
+    );
+    budgetCache.clear();
+    res.json({ ok: true, seasons });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/settings/budget-params — read budget params (nb_saisons_reference, carryover_deduction_rate)
+// PUT /api/settings/budget-params — update budget params
+// ---------------------------------------------------------------------------
+app.get('/api/settings/budget-params', async (req, res, next) => {
+  try {
+    const params = await getBudgetParams();
+    res.json(params);
+  } catch (err) { next(err); }
+});
+
+app.put('/api/settings/budget-params', async (req, res, next) => {
+  try {
+    const params = {
+      nb_saisons_reference:    Math.max(1, Math.min(10, parseInt(req.body.nb_saisons_reference ?? 3, 10))),
+      carryover_deduction_rate: Math.max(0, Math.min(1, parseFloat(req.body.carryover_deduction_rate ?? 0.5))),
+    };
+    await pool.query(
+      `INSERT INTO app_settings(key, value, updated_at)
+       VALUES ('budget_params', $1::jsonb, now())
+       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
+      [JSON.stringify(params)]
+    );
+    budgetCache.clear();
+    res.json({ ok: true, ...params });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/budget/marque — Pre-season buying budget per brand (config-driven)
 //
-// SOURCE: transfers table (transfer_received=true) per brand per reference season.
-// recv_from extends 4 months before season start to catch pre-season deliveries.
+// Config loaded from app_settings: seasons_config, budget_params, multiplier_tiers.
+// Data source: implied received = tagged items sold since reception_from + tagged inventory today.
 //
-// CALC:
-//   units_received[season]  = SUM(qty_received) from transfers in recv window
-//   received_cost[season]   = SUM(qty_received × default_cost)
-//   units_sold[season]      = SUM(qty) from sale_lines in season window
-//   st_rate[season]         = units_sold / units_received
-//   avg_received_cost       = avg(received_cost over ref seasons with data)
-//   avg_st                  = avg(st_rate over ref seasons with data)
-//   multiplier              = from app_settings tiers based on avg_st
-//   adjusted_budget         = avg_received_cost × multiplier
-//   net_budget              = MAX(0, adjusted_budget − current_stock_at_cost)
-//   low_st_alert            = ST < 40% for 2 most recent consecutive seasons
+// 7-step formula per brand:
+//   1. implied_received = sold_since_recv_from + on_hand  (for each reference season)
+//   2. ST = units_sold_during_season / implied_received_units
+//   3. multiplier = from tiers based on avg_st
+//   4. budget_ajuste = avg_hist × multiplier
+//   5. carryover = MAX(0, stock_at_cost − ytd_sales × (remaining / elapsed))
+//   6. budget_ajuste − (carryover × carryover_deduction_rate)
+//   7. net_budget = MAX(0, step_6)
 // ---------------------------------------------------------------------------
 app.get('/api/budget/marque', async (req, res, next) => {
   try {
-    const targetSeasonCode = (req.query.season ?? 'p26').toLowerCase();
-    const refSeasonCodes   = getPreviousSeasons(targetSeasonCode);
-
     const shops = req.query.shops ? req.query.shops.split(',').filter(Boolean) : null;
 
-    const cacheKey = JSON.stringify({ r: 'marque', season: targetSeasonCode, shops });
+    const cacheKey = JSON.stringify({ r: 'marque2', season: targetSeasonCode, shops });
     const hit = cacheGet(cacheKey);
     if (hit) return res.json({ ...hit, cached: true });
 
-    const tiers = await getMultiplierTiers();
+    const [tiers, seasonsConfig, budgetParams] = await Promise.all([
+      getMultiplierTiers(),
+      getSeasonsConfig(),
+      getBudgetParams(),
+    ]);
+    const { nb_saisons_reference: nbRef, carryover_deduction_rate: coRate } = budgetParams;
+
+    const targetSeason = seasonsConfig.find(s => s.code === targetSeasonCode);
+    if (!targetSeason) return res.status(404).json({ error: `Season ${targetSeasonCode} not found in config` });
+
+    const refSeasons = getReferenceSeasonsFromConfig(targetSeasonCode, seasonsConfig, nbRef);
+    if (!refSeasons.length) return res.status(400).json({ error: `No reference seasons found for ${targetSeasonCode}` });
 
     const baseParams  = shops?.length ? [shops] : [];
-    const shopCondT   = shops?.length ? `AND t.to_shop_id = ANY($1)` : '';
     const shopCondSL  = shops?.length ? `AND sl.shop_id = ANY($1)` : '';
     const shopCondInv = shops?.length ? `AND i.shop_id = ANY($1)` : '';
 
-    // Current season date math for projection
-    const targetSeason  = SEASON_RANGES[targetSeasonCode];
-    const todayDate     = new Date(); todayDate.setHours(0,0,0,0);
-    const seasonStart   = new Date(targetSeason.from);
-    const seasonEnd     = new Date(targetSeason.to);
-    const isFutureSeason = todayDate < seasonStart;  // target season hasn't started yet
-    const elapsedDays   = isFutureSeason ? 0 : Math.max(1, (todayDate - seasonStart) / 86400000);
-    const remainingDays = Math.max(0, (seasonEnd - todayDate) / 86400000);
-    const completionRatio = isFutureSeason ? 0 : Math.min(1, elapsedDays / ((seasonEnd - seasonStart) / 86400000));
-    const todayStr      = todayDate.toISOString().split('T')[0];
+    // Date math for target season
+    const todayDate       = new Date(); todayDate.setHours(0,0,0,0);
+    const todayStr        = todayDate.toISOString().split('T')[0];
+    const targetSellStart = new Date(targetSeason.sell_from);
+    const targetSellEnd   = new Date(targetSeason.sell_to);
+    const isFutureSeason  = todayDate < targetSellStart;
+    const isCurrentSeason = todayDate >= targetSellStart && todayDate <= targetSellEnd;
 
-    // P26 implied receivings YTD = (items tagged targetSeason sold since recv_from) + (tagged items in inventory today)
-    // This gives the true receiving picture without relying on inter-shop transfer data.
-    const p26Tag        = `%${targetSeasonCode}%`;
-    const p26IrSlParams = [...baseParams, targetSeason.recv_from, p26Tag];
-    const p26IrSlFrom   = p26IrSlParams.length - 1;
-    const p26IrSlTag    = p26IrSlParams.length;
-    const { rows: p26IrSlRows } = await pool.query(`
-      SELECT
-        COALESCE(p.manufacturer, 'Sans marque')                               AS manufacturer,
-        SUM(sl.qty * COALESCE(p.default_cost, 0))::float8                     AS sold_cost
-      FROM sale_lines sl
-      JOIN products p ON p.item_id = sl.item_id
-      WHERE sl.completed_time >= $${p26IrSlFrom}::date
-        AND sl.completed_time IS NOT NULL
-        AND sl.qty > 0
-        AND p.tags ILIKE $${p26IrSlTag}
-        AND p.tags NOT ILIKE '%nos%'
-        AND p.default_cost > 0
-        AND p.category    NOT ILIKE 'Alt%ration%'
-        AND p.description NOT ILIKE '%shopify%'
-        ${shopCondSL}
-      GROUP BY p.manufacturer
-    `, p26IrSlParams);
+    // Carryover season = most-recent reference (for future buying) or target (for current/past)
+    const carryoverSeason = isFutureSeason ? refSeasons[0] : targetSeason;
+    const coSellStart     = new Date(carryoverSeason.sell_from);
+    const coSellEnd       = new Date(carryoverSeason.sell_to);
+    const coTotalDays     = (coSellEnd - coSellStart) / 86400000;
+    const coElapsed       = Math.max(1, Math.min(coTotalDays, (todayDate - coSellStart) / 86400000));
+    const coRemaining     = Math.max(0, (coSellEnd - todayDate) / 86400000);
 
-    const p26IrInvParams = [...baseParams, p26Tag];
-    const p26IrInvTag    = p26IrInvParams.length;
-    const { rows: p26IrInvRows } = await pool.query(`
+    // Current stock tagged with carryover season
+    const coTag       = `%${carryoverSeason.tag_pattern}%`;
+    const coInvParams = [...baseParams, coTag];
+    const coInvTagIdx = coInvParams.length;
+    const { rows: coInvRows } = await pool.query(`
       SELECT
         COALESCE(p.manufacturer, 'Sans marque')                                  AS manufacturer,
-        SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8   AS stock_cost
+        SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8   AS stock_at_cost
       FROM products p
       JOIN inventory i ON i.item_id = p.item_id
-      WHERE p.tags ILIKE $${p26IrInvTag}
+      WHERE p.tags ILIKE $${coInvTagIdx}
         AND p.tags NOT ILIKE '%nos%'
         AND p.default_cost > 0
         AND p.category    NOT ILIKE 'Alt%ration%'
@@ -2254,51 +2348,50 @@ app.get('/api/budget/marque', async (req, res, next) => {
         AND i.qty_on_hand > 0
         ${shopCondInv}
       GROUP BY p.manufacturer
-    `, p26IrInvParams);
+    `, coInvParams);
+    const stockMap = {};
+    for (const r of coInvRows) stockMap[r.manufacturer] = parseFloat(r.stock_at_cost ?? 0);
 
-    const p26RecvMap = {};
-    for (const r of p26IrSlRows)  p26RecvMap[r.manufacturer] = (p26RecvMap[r.manufacturer] ?? 0) + parseFloat(r.sold_cost  ?? 0);
-    for (const r of p26IrInvRows) p26RecvMap[r.manufacturer] = (p26RecvMap[r.manufacturer] ?? 0) + parseFloat(r.stock_cost ?? 0);
-
-    // P26 sales so far at cost — filtered to target-season-tagged items only so the
-    // velocity projection is consistent with the season-tagged stock deduction.
-    const p26SalesParams  = [...baseParams, targetSeason.from, todayStr, `%${targetSeasonCode}%`];
-    const p26SalesFromIdx = p26SalesParams.length - 2;
-    const p26SalesToIdx   = p26SalesParams.length - 1;
-    const p26SalesTagIdx  = p26SalesParams.length;
-    const { rows: p26SalesRows } = await pool.query(`
+    // YTD sales tagged with carryover season (from sell_from to today)
+    const coSalesParams  = [...baseParams, carryoverSeason.sell_from, todayStr, coTag];
+    const coSalesFromIdx = coSalesParams.length - 2;
+    const coSalesToIdx   = coSalesParams.length - 1;
+    const coSalesTagIdx  = coSalesParams.length;
+    const { rows: coSalesRows } = await pool.query(`
       SELECT
         COALESCE(p.manufacturer, 'Sans marque')                               AS manufacturer,
         SUM(sl.qty * COALESCE(p.default_cost, 0))::float8                     AS sales_cost_ytd
       FROM sale_lines sl
       JOIN products p ON p.item_id = sl.item_id
-      WHERE sl.completed_time >= $${p26SalesFromIdx}::date
-        AND sl.completed_time <= $${p26SalesToIdx}::date
+      WHERE sl.completed_time >= $${coSalesFromIdx}::date
+        AND sl.completed_time <= $${coSalesToIdx}::date
         AND sl.completed_time IS NOT NULL
         AND sl.qty > 0
-        AND p.tags ILIKE $${p26SalesTagIdx}
+        AND p.tags ILIKE $${coSalesTagIdx}
         AND p.tags NOT ILIKE '%nos%'
         AND p.default_cost > 0
         AND p.category    NOT ILIKE 'Alt%ration%'
         AND p.description NOT ILIKE '%shopify%'
         ${shopCondSL}
       GROUP BY p.manufacturer
-    `, p26SalesParams);
-    const p26SalesMap = {};
-    for (const r of p26SalesRows) p26SalesMap[r.manufacturer] = parseFloat(r.sales_cost_ytd ?? 0);
+    `, coSalesParams);
+    const ytdSalesMap = {};
+    for (const r of coSalesRows) ytdSalesMap[r.manufacturer] = parseFloat(r.sales_cost_ytd ?? 0);
 
+    // For each reference season: compute implied received + units sold
     const seasonResults = {};
+    for (const refSeason of refSeasons) {
+      const refSellStart = new Date(refSeason.sell_from);
+      const refSellEnd   = new Date(refSeason.sell_to);
+      if (todayDate < refSellStart) continue; // future reference — no data yet
 
-    for (const refCode of refSeasonCodes) {
-      const refSeason = SEASON_RANGES[refCode];
-      if (!refSeason) continue;
+      const isRefInProgress = todayDate >= refSellStart && todayDate <= refSellEnd;
+      const refTag          = `%${refSeason.tag_pattern}%`;
 
-      // Implied receivings for refCode = (tagged items sold since recv_from) + (tagged items in inventory today)
-      const refTag        = `%${refCode}%`;
-      const irSlParams    = [...baseParams, refSeason.recv_from, refTag];
-      const irSlFromIdx   = irSlParams.length - 1;
-      const irSlTagIdx    = irSlParams.length;
-
+      // Implied received: tagged items sold since reception_from + tagged items in inventory today
+      const irSlParams  = [...baseParams, refSeason.reception_from, refTag];
+      const irSlFromIdx = irSlParams.length - 1;
+      const irSlTagIdx  = irSlParams.length;
       const { rows: irSlRows } = await pool.query(`
         SELECT
           COALESCE(p.manufacturer, 'Sans marque')                               AS manufacturer,
@@ -2318,9 +2411,8 @@ app.get('/api/budget/marque', async (req, res, next) => {
         GROUP BY p.manufacturer
       `, irSlParams);
 
-      const irInvParams   = [...baseParams, refTag];
-      const irInvTagIdx   = irInvParams.length;
-
+      const irInvParams  = [...baseParams, refTag];
+      const irInvTagIdx  = irInvParams.length;
       const { rows: irInvRows } = await pool.query(`
         SELECT
           COALESCE(p.manufacturer, 'Sans marque')                                  AS manufacturer,
@@ -2338,12 +2430,11 @@ app.get('/api/budget/marque', async (req, res, next) => {
         GROUP BY p.manufacturer
       `, irInvParams);
 
-      // Sales DURING the season (for ST numerator) — filtered by season tag for consistency
-      const slParams  = [...baseParams, refSeason.from, refSeason.to, refTag];
+      // Units sold DURING season (ST numerator)
+      const slParams  = [...baseParams, refSeason.sell_from, refSeason.sell_to, refTag];
       const slFromIdx = slParams.length - 2;
       const slToIdx   = slParams.length - 1;
       const slTagIdx  = slParams.length;
-
       const { rows: slRows } = await pool.query(`
         SELECT
           COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
@@ -2363,73 +2454,52 @@ app.get('/api/budget/marque', async (req, res, next) => {
         GROUP BY p.manufacturer
       `, slParams);
 
-      // Merge implied received maps
       const irSlMap  = {};
-      for (const r of irSlRows)  irSlMap[r.manufacturer]  = { qty: parseFloat(r.qty_sold_all ?? 0), cost: parseFloat(r.sold_cost  ?? 0) };
+      for (const r of irSlRows)  irSlMap[r.manufacturer]  = { qty: parseFloat(r.qty_sold_all ?? 0), cost: parseFloat(r.sold_cost ?? 0) };
       const irInvMap = {};
-      for (const r of irInvRows) irInvMap[r.manufacturer] = { qty: parseFloat(r.qty_on_hand  ?? 0), cost: parseFloat(r.stock_cost ?? 0) };
+      for (const r of irInvRows) irInvMap[r.manufacturer] = { qty: parseFloat(r.qty_on_hand ?? 0),  cost: parseFloat(r.stock_cost ?? 0) };
       const soldMap  = {};
       for (const r of slRows)    soldMap[r.manufacturer]  = parseFloat(r.units_sold ?? 0);
 
-      // Build tRows-equivalent from implied received
       const allMfrsRef = new Set([...Object.keys(irSlMap), ...Object.keys(irInvMap)]);
-      const tRows = [];
+      seasonResults[refSeason.code] = {};
+
       for (const mfr of allMfrsRef) {
         const sl  = irSlMap[mfr]  ?? { qty: 0, cost: 0 };
         const inv = irInvMap[mfr] ?? { qty: 0, cost: 0 };
-        const impliedUnits = sl.qty + inv.qty;
-        const impliedCost  = sl.cost + inv.cost;
-        if (impliedCost > 0) tRows.push({ manufacturer: mfr, units_received: impliedUnits, received_cost: impliedCost });
-      }
+        let impliedUnits = sl.qty + inv.qty;
+        let impliedCost  = sl.cost + inv.cost;
+        if (impliedCost <= 0) continue;
 
-      seasonResults[refCode] = {};
-      for (const r of tRows) {
-        const recv = r.units_received;
-        const cost = r.received_cost;
-        const sold = soldMap[r.manufacturer] ?? 0;
+        // Project to full season if currently in progress
+        if (isRefInProgress) {
+          const refTotalDays  = (refSellEnd - refSellStart) / 86400000;
+          const refElapsed    = Math.max(1, (todayDate - refSellStart) / 86400000);
+          const refCompletion = Math.min(1, refElapsed / refTotalDays);
+          if (refCompletion > 0.05) {
+            impliedCost  = impliedCost  / refCompletion;
+            impliedUnits = impliedUnits / refCompletion;
+          }
+        }
+
+        const sold = soldMap[mfr] ?? 0;
+        const recv = impliedUnits;
         const st   = recv >= 5 ? sold / recv : null;
-        seasonResults[refCode][r.manufacturer] = {
+
+        seasonResults[refSeason.code][mfr] = {
           units_received:  Math.round(recv),
           units_sold:      Math.round(sold),
-          received_cost:   Math.round(cost * 100) / 100,
+          received_cost:   Math.round(impliedCost * 100) / 100,
           st_rate:         st !== null ? Math.round(st * 1000) / 1000 : null,
           st_insufficient: recv < 5,
+          partial:         isRefInProgress,
         };
       }
     }
 
-    // Stock to deduct from budget:
-    // - Current season (P26): stock of target-season-tagged items
-    // - Future season (P27+): estimated carryover from the previous season
-    //   = max(0, prev_season_stock - projected_remaining_prev_season_sales)
-    const shopCondInvTag = shops?.length ? `AND i.shop_id = ANY($1)` : '';
-
-    // For future seasons, query the PREVIOUS season's stock to estimate carryover
-    const prevSeasonCode = isFutureSeason ? refSeasonCodes[0] : targetSeasonCode;
-    const invParams = [...baseParams, `%${prevSeasonCode}%`];
-    const invTagIdx = invParams.length;
-    const { rows: invRows } = await pool.query(`
-      SELECT
-        COALESCE(p.manufacturer, 'Sans marque')                                  AS manufacturer,
-        SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8   AS stock_at_cost
-      FROM products p
-      JOIN inventory i ON i.item_id = p.item_id
-      WHERE p.tags ILIKE $${invTagIdx}
-        AND p.tags NOT ILIKE '%nos%'
-        AND p.default_cost > 0
-        AND p.category    NOT ILIKE 'Alt%ration%'
-        AND p.description NOT ILIKE '%shopify%'
-        AND i.qty_on_hand > 0
-        ${shopCondInvTag}
-      GROUP BY p.manufacturer
-    `, invParams);
-
-    const stockMap = {};
-    for (const r of invRows) stockMap[r.manufacturer] = Math.round(parseFloat(r.stock_at_cost ?? 0) * 100) / 100;
-
-    // Brands that appear in implied receivings for any reference season
+    // Aggregate per brand
     const allMfr = new Set();
-    for (const code of refSeasonCodes) {
+    for (const code of Object.keys(seasonResults)) {
       Object.keys(seasonResults[code] ?? {}).forEach(m => allMfr.add(m));
     }
 
@@ -2439,41 +2509,28 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const costs   = [];
       const stRates = [];
 
-      for (const code of refSeasonCodes) {
-        const d = seasonResults[code]?.[mfr];
+      for (const refSeason of refSeasons) {
+        const d = seasonResults[refSeason.code]?.[mfr];
         if (d) {
-          seasons[code] = d;
+          seasons[refSeason.code] = d;
           if (d.received_cost > 0) costs.push(d.received_cost);
-          if (d.st_rate !== null)  stRates.push({ code, st: d.st_rate });
+          if (d.st_rate !== null)  stRates.push({ code: refSeason.code, st: d.st_rate });
         }
       }
 
-      // Exclude brands with no transfer receivings (données insuffisantes)
       if (!costs.length) continue;
 
-      // Current season (P26) data for this brand
-      const p26RecvYtd   = p26RecvMap[mfr]  ?? 0;
-      const p26SalesYtd  = p26SalesMap[mfr] ?? 0;
-      // Project P26 receivings to full season so it's comparable to historical full-season costs
-      const p26Projected = completionRatio > 0.05 ? Math.round(p26RecvYtd / completionRatio * 100) / 100 : 0;
+      const avgHist = costs.reduce((a, b) => a + b, 0) / costs.length;
+      const minHist = Math.min(...costs);
+      const maxHist = Math.max(...costs);
 
-      // Include P26 projected cost in historical average when available
-      const allCosts = [...costs];
-      if (p26Projected > 0) allCosts.push(p26Projected);
-
-      const avgCost   = allCosts.reduce((a, b) => a + b, 0) / allCosts.length;
-      const minCost   = Math.min(...allCosts);
-      const maxCost   = Math.max(...allCosts);
-      const stockCost = stockMap[mfr] ?? 0;
-
-      // Average ST across seasons that have both receiving and sales data
       const avgSt = stRates.length
         ? stRates.reduce((s, x) => s + x.st, 0) / stRates.length
         : null;
 
-      // Trend: compare most-recent vs oldest season with data
+      // Trend: most-recent vs oldest reference season with data
       let trend = 'stable';
-      const codesWithData = refSeasonCodes.filter(c => (seasonResults[c]?.[mfr]?.received_cost ?? 0) > 0);
+      const codesWithData = refSeasons.map(s => s.code).filter(c => (seasonResults[c]?.[mfr]?.received_cost ?? 0) > 0);
       if (codesWithData.length >= 2) {
         const latest = seasonResults[codesWithData[0]][mfr].received_cost;
         const oldest = seasonResults[codesWithData[codesWithData.length - 1]][mfr].received_cost;
@@ -2481,101 +2538,97 @@ app.get('/api/budget/marque', async (req, res, next) => {
         else if (latest < oldest * 0.90) trend = 'baisse';
       }
 
-      // Alert: ST < 40% for the two most recent consecutive seasons
-      const recentSts = refSeasonCodes
+      // Low ST alert: ST < 40% for two most recent consecutive seasons
+      const recentSts = refSeasons
         .slice(0, 2)
-        .map(c => seasonResults[c]?.[mfr]?.st_rate ?? null);
+        .map(s => seasonResults[s.code]?.[mfr]?.st_rate ?? null);
       const lowStAlert = recentSts.length === 2
         && recentSts[0] !== null && recentSts[1] !== null
         && recentSts[0] < 0.40 && recentSts[1] < 0.40;
 
       const hyp            = applyMultiplierTiers(avgSt, tiers);
-      const avgCostRounded = Math.round(avgCost * 100) / 100;
-      const adjustedBudget = Math.round(avgCostRounded * hyp.multiplier * 100) / 100;
+      const avgHistRounded = Math.round(avgHist * 100) / 100;
+      const adjustedBudget = Math.round(avgHistRounded * hyp.multiplier * 100) / 100;
 
-      // Net budget calculation depends on whether target season is in the future or current.
-      let netBudget;
-      let projectedRemaining = 0;
-      let estimatedCarryover = 0;
+      // Step 5: carryover = MAX(0, stock − ytd_sales × (remaining / elapsed))
+      const stockCost = stockMap[mfr]    ?? 0;
+      const ytdSales  = ytdSalesMap[mfr] ?? 0;
+      let carryover   = 0;
+      let budgetMode  = 'historical';
 
-      if (isFutureSeason) {
-        // FUTURE SEASON (e.g. P27): pre-season buying budget
-        // Deduct estimated carryover from the previous season:
-        //   carryover = max(0, prev_season_stock - projected remaining prev_season_sales)
-        // Projected remaining prev_season_sales uses current p26 velocity
-        const prevSeasonProjectedRemaining = p26SalesYtd > 0 && elapsedDays > 0
-          ? Math.round(p26SalesYtd * (remainingDays / elapsedDays) * 100) / 100
+      if (coElapsed > 1) {
+        const projectedRemaining = ytdSales > 0
+          ? ytdSales * (coRemaining / coElapsed)
           : 0;
-        estimatedCarryover = Math.max(0, Math.round((stockCost - prevSeasonProjectedRemaining) * 100) / 100);
-        netBudget = Math.max(0, Math.round((adjustedBudget - estimatedCarryover) * 100) / 100);
-      } else if (p26SalesYtd > 0 && remainingDays > 0) {
-        // CURRENT SEASON with velocity data: project remaining demand
-        projectedRemaining = Math.round(p26SalesYtd * (remainingDays / elapsedDays) * 100) / 100;
-        netBudget = Math.max(0, Math.round((projectedRemaining - stockCost) * 100) / 100);
-      } else {
-        // CURRENT or PAST SEASON with no velocity data: historical formula
-        netBudget = Math.max(0, Math.round((adjustedBudget - stockCost) * 100) / 100);
+        carryover  = Math.max(0, Math.round((stockCost - projectedRemaining) * 100) / 100);
+        budgetMode = isFutureSeason ? 'future' : (isCurrentSeason ? 'current' : 'historical');
+      } else if (stockCost > 0) {
+        carryover  = Math.round(stockCost * 100) / 100;
+        budgetMode = isFutureSeason ? 'future' : 'historical';
       }
 
-      // Add current season to badges if we have receivings
-      if (p26RecvYtd > 0) {
-        seasons[targetSeasonCode] = {
-          units_received: null,
-          units_sold:     null,
-          received_cost:  Math.round(p26RecvYtd * 100) / 100,
-          st_rate:        null,
-          partial:        true,
-        };
-      }
+      // Steps 6–7
+      const carryoverDeduction = Math.round(carryover * coRate * 100) / 100;
+      const netBudget          = Math.max(0, Math.round((adjustedBudget - carryoverDeduction) * 100) / 100);
 
       byManufacturer.push({
-        manufacturer:          mfr,
-        seasons_count:         costs.length,
+        manufacturer:        mfr,
+        seasons_count:       costs.length,
         seasons,
-        avg_received_cost:     avgCostRounded,
-        min_received_cost:     Math.round(minCost * 100) / 100,
-        max_received_cost:     Math.round(maxCost * 100) / 100,
-        avg_st:                avgSt !== null ? Math.round(avgSt * 1000) / 1000 : null,
-        current_stock_at_cost: stockCost,
+        avg_hist:            avgHistRounded,
+        avg_received_cost:   avgHistRounded,
+        min_received_cost:   Math.round(minHist * 100) / 100,
+        max_received_cost:   Math.round(maxHist * 100) / 100,
+        avg_st:              avgSt !== null ? Math.round(avgSt * 1000) / 1000 : null,
         trend,
-        low_st_alert:          lowStAlert,
-        multiplier:            hyp.multiplier,
-        multiplier_label:      hyp.label,
-        tier_threshold:        hyp.tier_threshold,
-        proposed_budget:       avgCostRounded,
-        adjusted_budget:       adjustedBudget,
-        p26_recv_ytd:          Math.round(p26RecvYtd * 100) / 100,
-        p26_sales_ytd:         Math.round(p26SalesYtd * 100) / 100,
-        p26_projected_full:    p26Projected,
-        projected_remaining:   projectedRemaining,
-        estimated_carryover:   estimatedCarryover,
-        elapsed_days:          Math.round(elapsedDays),
-        remaining_days:        Math.round(remainingDays),
-        budget_mode:           isFutureSeason ? 'future' : (p26SalesYtd > 0 && remainingDays > 0 ? 'velocity' : 'historical'),
-        net_budget:            netBudget,
+        low_st_alert:        lowStAlert,
+        multiplier:          hyp.multiplier,
+        multiplier_label:    hyp.label,
+        tier_threshold:      hyp.tier_threshold,
+        adjusted_budget:     adjustedBudget,
+        stock_at_cost:       Math.round(stockCost * 100) / 100,
+        ytd_sales:           Math.round(ytdSales * 100) / 100,
+        carryover:           carryover,
+        carryover_deduction: carryoverDeduction,
+        net_budget:          netBudget,
+        budget_mode:         budgetMode,
+        elapsed_days:        Math.round(coElapsed),
+        remaining_days:      Math.round(coRemaining),
+        carryover_season:    carryoverSeason.code,
       });
     }
 
     byManufacturer.sort((a, b) => b.net_budget - a.net_budget);
 
-    const totalHist = byManufacturer.reduce((s, m) => s + m.avg_received_cost, 0);
-    const totalAdj  = byManufacturer.reduce((s, m) => s + m.adjusted_budget, 0);
-    const totalNet  = byManufacturer.reduce((s, m) => s + m.net_budget, 0);
+    const totalHist     = byManufacturer.reduce((s, m) => s + m.avg_hist, 0);
+    const totalAdj      = byManufacturer.reduce((s, m) => s + m.adjusted_budget, 0);
+    const totalCarryDed = byManufacturer.reduce((s, m) => s + m.carryover_deduction, 0);
+    const totalNet      = byManufacturer.reduce((s, m) => s + m.net_budget, 0);
 
     const result = {
-      target_season:           targetSeasonCode,
-      target_season_label:     SEASON_RANGES[targetSeasonCode]?.label ?? targetSeasonCode.toUpperCase(),
-      is_future_season:        isFutureSeason,
-      reference_seasons:       refSeasonCodes,
-      reference_seasons_label: refSeasonCodes.map(c => c.toUpperCase()).join(', '),
-      generated_at:            new Date().toISOString(),
-      elapsed_days:            Math.round(elapsedDays),
-      remaining_days:          Math.round(remainingDays),
-      total_proposed_budget:   Math.round(totalHist * 100) / 100,
-      total_adjusted_budget:   Math.round(totalAdj * 100) / 100,
-      total_net_budget:        Math.round(totalNet * 100) / 100,
-      manufacturer_count:      byManufacturer.length,
-      by_manufacturer:         byManufacturer,
+      target_season:            targetSeasonCode,
+      target_season_label:      targetSeason.label,
+      is_future_season:         isFutureSeason,
+      reference_seasons:        refSeasons.map(s => s.code),
+      reference_seasons_label:  refSeasons.map(s => s.code.toUpperCase()).join(', '),
+      nb_saisons_reference:     nbRef,
+      carryover_deduction_rate: coRate,
+      generated_at:             new Date().toISOString(),
+      elapsed_days:             Math.round(coElapsed),
+      remaining_days:           Math.round(coRemaining),
+      carryover_season:         carryoverSeason.code,
+      totals: {
+        hist:               Math.round(totalHist * 100) / 100,
+        adjusted:           Math.round(totalAdj * 100) / 100,
+        carryover_deducted: Math.round(totalCarryDed * 100) / 100,
+        net:                Math.round(totalNet * 100) / 100,
+        brands_count:       byManufacturer.length,
+      },
+      total_proposed_budget:  Math.round(totalHist * 100) / 100,
+      total_adjusted_budget:  Math.round(totalAdj * 100) / 100,
+      total_net_budget:       Math.round(totalNet * 100) / 100,
+      manufacturer_count:     byManufacturer.length,
+      by_manufacturer:        byManufacturer,
     };
 
     cacheSet(cacheKey, result);
