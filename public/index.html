@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" id="html-root">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -58,17 +58,23 @@
     </svg>
     <h1 class="text-lg font-bold text-gray-900">Buying Intelligence</h1>
   </div>
-  <div id="syncStatus" class="text-xs text-gray-400">Chargement…</div>
+  <div class="flex items-center gap-4">
+    <div id="syncStatus" class="text-xs text-gray-400">Chargement…</div>
+    <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+      <button id="lang-fr" onclick="setLanguage('fr')" class="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 border-r border-gray-200">FR</button>
+      <button id="lang-en" onclick="setLanguage('en')" class="text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600">EN</button>
+    </div>
+  </div>
 </header>
 
 <nav class="bg-white border-b border-gray-200 px-6 flex gap-6 items-center">
-  <button class="tab py-3 tab-active"   data-tab="budget">Budget</button>
-  <button class="tab py-3 tab-inactive" data-tab="nos">NOS</button>
-  <button class="tab py-3 tab-inactive" data-tab="seasonal">Saisonnier</button>
-  <button class="tab py-3 tab-inactive" data-tab="sizes">Courbes tailles</button>
-  <button class="tab py-3 tab-inactive" data-tab="transfers">Transferts / Actions</button>
-  <button class="tab py-3 tab-inactive" data-tab="params">Paramètres</button>
-  <a href="/velocity" class="ml-auto py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">Vélocité →</a>
+  <button class="tab py-3 tab-active"   data-tab="budget"    data-i18n="tab_budget">Budget</button>
+  <button class="tab py-3 tab-inactive" data-tab="nos"       data-i18n="tab_nos">NOS</button>
+  <button class="tab py-3 tab-inactive" data-tab="seasonal"  data-i18n="tab_seasonal">Saisonnier</button>
+  <button class="tab py-3 tab-inactive" data-tab="sizes"     data-i18n="tab_sizes">Courbes tailles</button>
+  <button class="tab py-3 tab-inactive" data-tab="transfers" data-i18n="tab_transfers">Transferts / Actions</button>
+  <button class="tab py-3 tab-inactive" data-tab="params"    data-i18n="tab_params">Paramètres</button>
+  <a href="/velocity" class="ml-auto py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors" data-i18n="tab_velocity">Vélocité →</a>
 </nav>
 
 <main class="p-6 max-w-7xl mx-auto">
@@ -94,29 +100,30 @@
 
         <!-- Boutiques -->
         <div>
-          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Boutiques</div>
+          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2" data-i18n="filter_boutiques">Boutiques</div>
           <div id="shopCheckboxes" class="flex flex-col gap-1"></div>
         </div>
 
         <!-- Collections -->
         <div>
-          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Collections</div>
+          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2" data-i18n="filter_collections">Collections</div>
           <div id="collButtons" class="flex flex-col gap-1.5"></div>
         </div>
 
         <!-- Grandeurs -->
         <div>
-          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Grandeurs</div>
-          <div class="text-[10px] text-gray-400 mb-1.5">Lettres</div>
+          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2" data-i18n="filter_sizes">Grandeurs</div>
+          <div class="text-[10px] text-gray-400 mb-1.5" data-i18n="filter_letters">Lettres</div>
           <div id="letterSizeButtons" class="flex flex-wrap gap-1 mb-3"></div>
-          <div class="text-[10px] text-gray-400 mb-1.5">Numériques</div>
+          <div class="text-[10px] text-gray-400 mb-1.5" data-i18n="filter_numeric">Numériques</div>
           <div id="numSizeButtons" class="flex flex-wrap gap-1"></div>
         </div>
 
         <!-- Marque -->
         <div>
-          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Marque</div>
+          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2" data-i18n="filter_brand">Marque</div>
           <input id="budgetMfrSearch" type="text" placeholder="ex: Brax, Eton…"
+            data-i18n-ph="filter_brand_ph"
             class="border border-gray-300 rounded px-2 py-1 text-xs w-36">
         </div>
 
@@ -124,11 +131,13 @@
         <div class="ml-auto self-end flex flex-col items-end gap-2">
           <div id="filterBadge" class="text-xs text-blue-600 font-medium hidden"></div>
           <button id="budgetApply"
-            class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors">
+            class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
+            data-i18n="btn_apply">
             Appliquer
           </button>
           <button id="budgetReset"
-            class="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs rounded-lg transition-colors">
+            class="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs rounded-lg transition-colors"
+            data-i18n="btn_reset">
             Réinitialiser
           </button>
         </div>
@@ -140,21 +149,22 @@
     <div>
       <div class="flex flex-wrap items-end gap-4 mb-3">
         <div>
-          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 mb-2">
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 mb-2"
+                data-i18n="seas_badge">
             Saisonnier — Budget basé sur vélocité P26 + réceptions historiques
           </span>
           <div class="flex items-center gap-3">
             <div class="flex items-center gap-2">
-              <label class="text-xs text-gray-500">Saison d'achat :</label>
+              <label class="text-xs text-gray-500" data-i18n="seas_season_lbl">Saison d'achat :</label>
               <select id="budgetSeasSeason"
                 class="border border-gray-300 rounded px-2 py-1 text-xs font-semibold text-amber-700 bg-white">
-                <option value="p27">P27 — Printemps 2027</option>
-                <option value="a26">A26 — Automne 2026</option>
-                <option value="p26" selected>P26 — Printemps 2026</option>
-                <option value="a25">A25 — Automne 2025</option>
-                <option value="p25">P25 — Printemps 2025</option>
-                <option value="a24">A24 — Automne 2024</option>
-                <option value="p24">P24 — Printemps 2024</option>
+                <option value="p27" data-i18n="season_p27">P27 — Printemps 2027</option>
+                <option value="a26" data-i18n="season_a26">A26 — Automne 2026</option>
+                <option value="p26" selected data-i18n="season_p26">P26 — Printemps 2026</option>
+                <option value="a25" data-i18n="season_a25">A25 — Automne 2025</option>
+                <option value="p25" data-i18n="season_p25">P25 — Printemps 2025</option>
+                <option value="a24" data-i18n="season_a24">A24 — Automne 2024</option>
+                <option value="p24" data-i18n="season_p24">P24 — Printemps 2024</option>
               </select>
             </div>
             <div class="relative">
@@ -162,6 +172,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
               </svg>
               <input id="seasBudgetSearch" type="text" placeholder="Rechercher une marque…"
+                data-i18n-ph="seas_search_ph"
                 class="border border-gray-300 rounded pl-6 pr-2 py-1 text-xs w-44 focus:outline-none focus:border-blue-400">
             </div>
           </div>
@@ -177,30 +188,34 @@
             <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
               <tr>
                 <th class="px-3 py-2 text-left sort-col cursor-pointer select-none" data-sort="manufacturer"
-                    >Marque <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
-                <th class="px-3 py-2 text-center col-tip"
-                    data-tip="Saisons pour lesquelles on a des données de réception.&#10;* = saison en cours (données partielles, projetées à plein-saison).">Saisons</th>
-                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="avg_received_cost"
+                    ><span data-i18n="col_brand">Marque</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
+                <th class="px-3 py-2 text-center col-tip" data-i18n-tip="tip_seasons"
+                    data-tip="Saisons pour lesquelles on a des données de réception.&#10;* = saison en cours (données partielles, projetées à plein-saison)."
+                    ><span data-i18n="col_seasons">Saisons</span></th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="avg_received_cost" data-i18n-tip="tip_avg_recv"
                     data-tip="Montant moyen reçu (en coût) par saison de référence.&#10;&#10;Calcul : moyenne des coûts de réception sur P25, P24, P23.&#10;Si la saison en cours (P26*) a des données, sa projection plein-saison est incluse dans la moyenne.&#10;&#10;Formule P26 projeté = reçu_ytd ÷ (jours_écoulés ÷ jours_totaux)"
-                    >Réceptions moy. <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
-                <th class="px-3 py-2 text-right col-tip"
-                    data-tip="Étendue des réceptions selon les saisons historiques disponibles.&#10;&#10;Min $ – Max $ observés sur les saisons de référence (P25, P24, P23 + P26 projeté si disponible).&#10;&#10;Utile pour voir la variabilité d'une saison à l'autre.">Fourchette</th>
-                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="avg_st"
+                    ><span data-i18n="col_avg_recv">Réceptions moy.</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
+                <th class="px-3 py-2 text-right col-tip" data-i18n-tip="tip_range"
+                    data-tip="Étendue des réceptions selon les saisons historiques disponibles.&#10;&#10;Min $ – Max $ observés sur les saisons de référence (P25, P24, P23 + P26 projeté si disponible).&#10;&#10;Utile pour voir la variabilité d'une saison à l'autre."
+                    ><span data-i18n="col_range">Fourchette</span></th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="avg_st" data-i18n-tip="tip_avg_st"
                     data-tip="Taux de vente moyen (sell-through) sur les saisons historiques.&#10;&#10;Calcul : unités vendues ÷ unités reçues via transfert, moyenné sur P25, P24, P23.&#10;&#10;100% = tout vendu · 50% = la moitié vendue · 0% = rien vendu.&#10;Seuil cible : ≥ 60% (vert).&#10;&#10;«n/d» = données insuffisantes (moins de 5 unités reçues via transfert pour cette saison — la marque est principalement approvisionnée par commandes directes)."
-                    >ST moyen <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
-                <th class="px-3 py-2 text-center col-tip"
-                    data-tip="Direction des réceptions d'une saison à l'autre.&#10;&#10;Hausse : saison la plus récente &gt; saison la plus ancienne de +10%&#10;Baisse : saison la plus récente &lt; saison la plus ancienne de -10%&#10;Stable : variation &lt; 10%">Tendance</th>
-                <th class="px-3 py-2 text-center col-tip"
-                    data-tip="Facteur appliqué aux réceptions moyennes historiques.&#10;&#10;Basé sur le ST moyen via les paliers configurés dans l'onglet Paramètres.&#10;&#10;Exemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper.&#10;&#10;Note : ce multiplicateur s'applique au calcul historique (fallback). En mode vélocité P26, le budget net est directement issu de la projection.">Multiplicateur</th>
-                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="projected_remaining"
+                    ><span data-i18n="col_avg_st">ST moyen</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
+                <th class="px-3 py-2 text-center col-tip" data-i18n-tip="tip_trend"
+                    data-tip="Direction des réceptions d'une saison à l'autre.&#10;&#10;Hausse : saison la plus récente &gt; saison la plus ancienne de +10%&#10;Baisse : saison la plus récente &lt; saison la plus ancienne de -10%&#10;Stable : variation &lt; 10%"
+                    ><span data-i18n="col_trend">Tendance</span></th>
+                <th class="px-3 py-2 text-center col-tip" data-i18n-tip="tip_multiplier"
+                    data-tip="Facteur appliqué aux réceptions moyennes historiques.&#10;&#10;Basé sur le ST moyen via les paliers configurés dans l'onglet Paramètres.&#10;&#10;Exemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper.&#10;&#10;Note : ce multiplicateur s'applique au calcul historique (fallback). En mode vélocité P26, le budget net est directement issu de la projection."
+                    ><span data-i18n="col_multiplier">Multiplicateur</span></th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="projected_remaining" data-i18n-tip="tip_projection"
                     data-tip="Demande projetée pour les jours restants de la saison en cours.&#10;&#10;Calcul (mode vélocité) :&#10;ventes_P26_à_ce_jour × (jours_restants ÷ jours_écoulés)&#10;&#10;Représente combien on s'attend à vendre d'ici la fin de saison si la vélocité actuelle se maintient.&#10;&#10;Affiché seulement si des ventes P26 existent."
-                    >Projection restante <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
-                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="current_stock_at_cost"
+                    ><span data-i18n="col_projection">Projection restante</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="current_stock_at_cost" data-i18n-tip="tip_stock"
                     data-tip="Valeur au coût du stock actuellement en inventaire pour cette marque (articles non-NOS).&#10;&#10;Ce montant est déduit du budget net : le stock en main couvrira une partie de la demande future, donc inutile de le racheter."
-                    >Stock résiduel <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
-                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="net_budget"
+                    ><span data-i18n="col_stock">Stock résiduel</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="net_budget" data-i18n-tip="tip_net_budget"
                     data-tip="Budget d'achat recommandé pour la saison.&#10;&#10;Mode vélocité (P26 actif) :&#10;MAX(0, projection_restante − stock_résiduel)&#10;&#10;Mode historique (pas de données P26) :&#10;MAX(0, réceptions_moy × multiplicateur − stock_résiduel)&#10;&#10;Un tiret (—) indique que le stock en main couvre déjà la demande projetée."
-                    >Budget net <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
+                    ><span data-i18n="col_net_budget">Budget net</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
               </tr>
             </thead>
             <tbody id="budgetSeasBody" class="divide-y divide-gray-100"></tbody>
@@ -219,14 +234,15 @@
     <div class="mb-8">
       <div class="flex flex-wrap items-end gap-4 mb-3">
         <div>
-          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 mb-2">
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 mb-2"
+                data-i18n="nos_badge">
             NOS — Budget par marque
           </span>
           <div class="flex items-center gap-2">
-            <label class="text-xs text-gray-500">Couverture cible :</label>
+            <label class="text-xs text-gray-500" data-i18n="nos_coverage">Couverture cible :</label>
             <input type="range" id="nosWeeks" min="1" max="26" value="4" class="w-28">
             <span id="nosWeeksLabel" class="font-semibold text-blue-700 w-5">4</span>
-            <span class="text-xs text-gray-400">semaines</span>
+            <span class="text-xs text-gray-400" data-i18n="nos_weeks">semaines</span>
           </div>
         </div>
         <div id="budgetNosTotal" class="text-base font-bold text-blue-700 self-end"></div>
@@ -237,12 +253,12 @@
             <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
               <tr>
                 <th class="px-3 py-2 w-6"></th>
-                <th class="px-3 py-2 text-left">Marque</th>
-                <th class="px-3 py-2 text-right">Articles</th>
-                <th class="px-3 py-2 text-right">Stock en main</th>
-                <th class="px-3 py-2 text-right">Unités vendues (12 sem.)</th>
-                <th class="px-3 py-2 text-right">Budget suggéré $</th>
-                <th class="px-3 py-2 text-right">Ajustement %</th>
+                <th class="px-3 py-2 text-left"     data-i18n="nos_col_brand">Marque</th>
+                <th class="px-3 py-2 text-right"    data-i18n="nos_col_items">Articles</th>
+                <th class="px-3 py-2 text-right"    data-i18n="nos_col_stock">Stock en main</th>
+                <th class="px-3 py-2 text-right"    data-i18n="nos_col_sold">Unités vendues (12 sem.)</th>
+                <th class="px-3 py-2 text-right"    data-i18n="nos_col_budget">Budget suggéré $</th>
+                <th class="px-3 py-2 text-right"    data-i18n="nos_col_adj">Ajustement %</th>
               </tr>
             </thead>
             <tbody id="budgetNosBody" class="divide-y divide-gray-100"></tbody>
@@ -255,14 +271,15 @@
     <!-- Détail NOS par article -->
     <div class="flex flex-wrap items-end gap-4 mb-4">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Boutique</label>
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="nos_shop_lbl">Boutique</label>
         <select id="nosShop" class="border border-gray-300 rounded px-2 py-1 text-sm">
-          <option value="">Toutes</option>
+          <option value="" data-i18n="opt_all">Toutes</option>
         </select>
       </div>
       <div class="flex-1">
-        <label class="block text-xs text-gray-500 mb-1">Recherche</label>
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_search">Recherche</label>
         <input id="nosSearch" type="text" placeholder="Description, catégorie…"
+          data-i18n-ph="nos_search_ph"
           class="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-xs">
       </div>
       <div id="nosCount" class="text-xs text-gray-500 ml-auto self-end"></div>
@@ -272,13 +289,13 @@
         <table class="w-full text-xs">
           <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
             <tr>
-              <th class="px-3 py-2 text-left">Description</th>
-              <th class="px-3 py-2 text-left">Boutique</th>
-              <th class="px-3 py-2 text-left">Catégorie</th>
-              <th class="px-3 py-2 text-right">Stock</th>
-              <th class="px-3 py-2 text-right">Moy. / sem.</th>
-              <th class="px-3 py-2 text-right">Couverture</th>
-              <th class="px-3 py-2 text-right">Qté suggérée</th>
+              <th class="px-3 py-2 text-left"  data-i18n="col_description">Description</th>
+              <th class="px-3 py-2 text-left"  data-i18n="col_boutique">Boutique</th>
+              <th class="px-3 py-2 text-left"  data-i18n="col_category">Catégorie</th>
+              <th class="px-3 py-2 text-right" data-i18n="col_stock_short">Stock</th>
+              <th class="px-3 py-2 text-right" data-i18n="nos_col_avg_wk">Moy. / sem.</th>
+              <th class="px-3 py-2 text-right" data-i18n="nos_col_cover">Couverture</th>
+              <th class="px-3 py-2 text-right" data-i18n="col_qty_suggested">Qté suggérée</th>
             </tr>
           </thead>
           <tbody id="nosBody" class="divide-y divide-gray-100"></tbody>
@@ -286,9 +303,9 @@
       </div>
       <div id="nosLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
       <div id="nosPager" class="flex items-center justify-between px-4 py-2 border-t border-gray-100 hidden">
-        <button id="nosPrev" class="text-xs text-blue-600 disabled:text-gray-300">← Précédent</button>
+        <button id="nosPrev" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_prev">← Précédent</button>
         <span id="nosPage" class="text-xs text-gray-500"></span>
-        <button id="nosNext" class="text-xs text-blue-600 disabled:text-gray-300">Suivant →</button>
+        <button id="nosNext" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_next">Suivant →</button>
       </div>
     </div>
   </section>
@@ -297,21 +314,22 @@
   <section id="tab-seasonal" class="hidden">
     <div class="flex flex-wrap items-end gap-4 mb-4">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Horizon (semaines)</label>
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="seas_horizon_lbl">Horizon (semaines)</label>
         <div class="flex items-center gap-2">
           <input type="range" id="seasWeeks" min="1" max="26" value="8" class="w-32">
           <span id="seasWeeksLabel" class="font-semibold text-blue-700 w-6">8</span>
         </div>
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Boutique</label>
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_boutique">Boutique</label>
         <select id="seasShop" class="border border-gray-300 rounded px-2 py-1 text-sm">
-          <option value="">Toutes</option>
+          <option value="" data-i18n="opt_all">Toutes</option>
         </select>
       </div>
       <div class="flex-1">
-        <label class="block text-xs text-gray-500 mb-1">Recherche</label>
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_search">Recherche</label>
         <input id="seasSearch" type="text" placeholder="Description…"
+          data-i18n-ph="search_desc_ph"
           class="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-xs">
       </div>
       <div id="seasCount" class="text-xs text-gray-500 ml-auto self-end"></div>
@@ -321,13 +339,13 @@
         <table class="w-full text-xs">
           <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
             <tr>
-              <th class="px-3 py-2 text-left">Description</th>
-              <th class="px-3 py-2 text-left">Boutique</th>
-              <th class="px-3 py-2 text-left">Catégorie</th>
-              <th class="px-3 py-2 text-right">Stock</th>
-              <th class="px-3 py-2 text-right">Prévision (unités)</th>
-              <th class="px-3 py-2 text-right">Qté suggérée</th>
-              <th class="px-3 py-2 text-right">Coût estimé</th>
+              <th class="px-3 py-2 text-left"  data-i18n="col_description">Description</th>
+              <th class="px-3 py-2 text-left"  data-i18n="col_boutique">Boutique</th>
+              <th class="px-3 py-2 text-left"  data-i18n="col_category">Catégorie</th>
+              <th class="px-3 py-2 text-right" data-i18n="col_stock_short">Stock</th>
+              <th class="px-3 py-2 text-right" data-i18n="seas_col_forecast">Prévision (unités)</th>
+              <th class="px-3 py-2 text-right" data-i18n="col_qty_suggested">Qté suggérée</th>
+              <th class="px-3 py-2 text-right" data-i18n="seas_col_cost">Coût estimé</th>
             </tr>
           </thead>
           <tbody id="seasBody" class="divide-y divide-gray-100"></tbody>
@@ -335,9 +353,9 @@
       </div>
       <div id="seasonalLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
       <div id="seasonalPager" class="flex items-center justify-between px-4 py-2 border-t border-gray-100 hidden">
-        <button id="seasonalPrev" class="text-xs text-blue-600 disabled:text-gray-300">← Précédent</button>
+        <button id="seasonalPrev" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_prev">← Précédent</button>
         <span id="seasonalPage" class="text-xs text-gray-500"></span>
-        <button id="seasonalNext" class="text-xs text-blue-600 disabled:text-gray-300">Suivant →</button>
+        <button id="seasonalNext" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_next">Suivant →</button>
       </div>
     </div>
   </section>
@@ -346,14 +364,15 @@
   <section id="tab-sizes" class="hidden">
     <div class="flex flex-wrap items-end gap-4 mb-4">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Boutique</label>
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_boutique">Boutique</label>
         <select id="sizesShop" class="border border-gray-300 rounded px-2 py-1 text-sm">
-          <option value="">Toutes</option>
+          <option value="" data-i18n="opt_all">Toutes</option>
         </select>
       </div>
       <div class="flex-1">
-        <label class="block text-xs text-gray-500 mb-1">Recherche</label>
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_search">Recherche</label>
         <input id="sizesSearch" type="text" placeholder="Description…"
+          data-i18n-ph="search_desc_ph"
           class="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-xs">
       </div>
       <div id="sizesCount" class="text-xs text-gray-500 ml-auto self-end"></div>
@@ -363,12 +382,12 @@
         <table class="w-full text-xs">
           <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
             <tr>
-              <th class="px-3 py-2 text-left">Description</th>
-              <th class="px-3 py-2 text-left">Boutique</th>
-              <th class="px-3 py-2 text-right">Unités vendues</th>
-              <th class="px-3 py-2 text-right">Total matrice</th>
-              <th class="px-3 py-2 text-right">% matrice</th>
-              <th class="px-3 py-2 text-right">Stock actuel</th>
+              <th class="px-3 py-2 text-left"  data-i18n="col_description">Description</th>
+              <th class="px-3 py-2 text-left"  data-i18n="col_boutique">Boutique</th>
+              <th class="px-3 py-2 text-right" data-i18n="sizes_col_sold">Unités vendues</th>
+              <th class="px-3 py-2 text-right" data-i18n="sizes_col_total">Total matrice</th>
+              <th class="px-3 py-2 text-right" data-i18n="sizes_col_pct">% matrice</th>
+              <th class="px-3 py-2 text-right" data-i18n="sizes_col_stock">Stock actuel</th>
             </tr>
           </thead>
           <tbody id="sizesBody" class="divide-y divide-gray-100"></tbody>
@@ -376,9 +395,9 @@
       </div>
       <div id="sizesLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
       <div id="sizesPager" class="flex items-center justify-between px-4 py-2 border-t border-gray-100 hidden">
-        <button id="sizesPrev" class="text-xs text-blue-600 disabled:text-gray-300">← Précédent</button>
+        <button id="sizesPrev" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_prev">← Précédent</button>
         <span id="sizesPage" class="text-xs text-gray-500"></span>
-        <button id="sizesNext" class="text-xs text-blue-600 disabled:text-gray-300">Suivant →</button>
+        <button id="sizesNext" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_next">Suivant →</button>
       </div>
     </div>
   </section>
@@ -393,17 +412,18 @@
         <table class="w-full text-xs">
           <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
             <tr>
-              <th class="px-3 py-2 text-left">Description</th>
-              <th class="px-3 py-2 text-left">De</th>
-              <th class="px-3 py-2 text-left">Vers</th>
-              <th class="px-3 py-2 text-right">Qté à transférer</th>
+              <th class="px-3 py-2 text-left"  data-i18n="col_description">Description</th>
+              <th class="px-3 py-2 text-left"  data-i18n="transfers_col_from">De</th>
+              <th class="px-3 py-2 text-left"  data-i18n="transfers_col_to">Vers</th>
+              <th class="px-3 py-2 text-right" data-i18n="transfers_col_qty">Qté à transférer</th>
             </tr>
           </thead>
           <tbody id="transfersBody" class="divide-y divide-gray-100"></tbody>
         </table>
       </div>
       <div id="transfersLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
-      <div id="transfersEmpty" class="hidden text-center text-gray-400 py-12">
+      <div id="transfersEmpty" class="hidden text-center text-gray-400 py-12"
+           data-i18n="transfers_empty">
         Aucun transfert recommandé pour le moment.
       </div>
     </div>
@@ -413,11 +433,12 @@
   <section id="tab-params" class="hidden">
     <div class="max-w-2xl">
       <div class="flex items-center gap-3 mb-4">
-        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800"
+              data-i18n="params_badge">
           Hypothèses d'achat — Multiplicateurs
         </span>
       </div>
-      <p class="text-xs text-gray-500 mb-5">
+      <p class="text-xs text-gray-500 mb-5" data-i18n-html="params_desc">
         Le seuil de sell-through détermine le multiplicateur appliqué au budget historique moyen de chaque marque.
         Le niveau <strong>Couper</strong> est le repli par défaut si aucun seuil n'est atteint.
         Les modifications s'appliquent uniquement au budget Saisonnier et sont sauvegardées sur le serveur.
@@ -427,9 +448,9 @@
         <table class="w-full text-xs">
           <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
             <tr>
-              <th class="px-4 py-2.5 text-left">Niveau</th>
-              <th class="px-4 py-2.5 text-center">Sell-through min</th>
-              <th class="px-4 py-2.5 text-center">Multiplicateur</th>
+              <th class="px-4 py-2.5 text-left"   data-i18n="params_col_level">Niveau</th>
+              <th class="px-4 py-2.5 text-center"  data-i18n="params_col_st">Sell-through min</th>
+              <th class="px-4 py-2.5 text-center"  data-i18n="params_col_mult">Multiplicateur</th>
             </tr>
           </thead>
           <tbody id="tiersTableBody" class="divide-y divide-gray-100"></tbody>
@@ -438,22 +459,237 @@
 
       <div class="flex gap-3">
         <button id="tiersApply"
-          class="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+          class="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+          data-i18n="btn_apply_recalc">
           Appliquer &amp; Recalculer
         </button>
         <button id="tiersReset"
-          class="px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          class="px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          data-i18n="btn_reset_defaults">
           Réinitialiser les défauts
         </button>
       </div>
 
-      <div id="tiersNote" class="mt-4 text-xs text-emerald-700 font-semibold hidden">Paramètres appliqués — budgets recalculés.</div>
+      <div id="tiersNote" class="mt-4 text-xs text-emerald-700 font-semibold hidden"
+           data-i18n="params_applied">Paramètres appliqués — budgets recalculés.</div>
     </div>
   </section>
 
 </main>
 
 <script>
+// ── i18n ──────────────────────────────────────────────────────────────────
+const TRANSLATIONS = {
+  fr: {
+    loading:'Chargement…', lastSync:'Dernier sync',
+    tab_budget:'Budget', tab_nos:'NOS', tab_seasonal:'Saisonnier',
+    tab_sizes:'Courbes tailles', tab_transfers:'Transferts / Actions',
+    tab_params:'Paramètres', tab_velocity:'Vélocité →',
+    filter_boutiques:'Boutiques', filter_collections:'Collections',
+    filter_sizes:'Grandeurs', filter_letters:'Lettres', filter_numeric:'Numériques',
+    filter_brand:'Marque', filter_brand_ph:'ex: Brax, Eton…',
+    btn_apply:'Appliquer', btn_reset:'Réinitialiser',
+    btn_apply_recalc:'Appliquer & Recalculer', btn_reset_defaults:'Réinitialiser les défauts',
+    btn_prev:'← Précédent', btn_next:'Suivant →',
+    lbl_boutique:'Boutique', lbl_search:'Recherche',
+    opt_all:'Toutes', search_desc_ph:'Description…',
+    seas_badge:'Saisonnier — Budget basé sur vélocité P26 + réceptions historiques',
+    seas_season_lbl:"Saison d'achat :", seas_search_ph:'Rechercher une marque…',
+    seas_horizon_lbl:'Horizon (semaines)',
+    season_p27:'P27 — Printemps 2027', season_a26:'A26 — Automne 2026',
+    season_p26:'P26 — Printemps 2026', season_a25:'A25 — Automne 2025',
+    season_p25:'P25 — Printemps 2025', season_a24:'A24 — Automne 2024',
+    season_p24:'P24 — Printemps 2024',
+    col_brand:'Marque', col_seasons:'Saisons', col_avg_recv:'Réceptions moy.',
+    col_range:'Fourchette', col_avg_st:'ST moyen', col_trend:'Tendance',
+    col_multiplier:'Multiplicateur', col_projection:'Projection restante',
+    col_carryover:'Carryover estimé', col_stock:'Stock résiduel', col_net_budget:'Budget net',
+    col_description:'Description', col_boutique:'Boutique', col_category:'Catégorie',
+    col_stock_short:'Stock', col_qty_suggested:'Qté suggérée',
+    tip_seasons:"Saisons pour lesquelles on a des données de réception.\n* = saison en cours (données partielles, projetées à plein-saison).",
+    tip_avg_recv:"Montant moyen reçu (en coût) par saison de référence.\n\nCalcul : moyenne des coûts de réception sur P25, P24, P23.\nSi la saison en cours (P26*) a des données, sa projection plein-saison est incluse dans la moyenne.\n\nFormule P26 projeté = reçu_ytd ÷ (jours_écoulés ÷ jours_totaux)",
+    tip_range:"Étendue des réceptions selon les saisons historiques disponibles.\n\nMin $ – Max $ observés sur les saisons de référence (P25, P24, P23 + P26 projeté si disponible).\n\nUtile pour voir la variabilité d'une saison à l'autre.",
+    tip_avg_st:"Taux de vente moyen (sell-through) sur les saisons historiques.\n\nCalcul : unités vendues ÷ unités reçues via transfert, moyenné sur P25, P24, P23.\n\n100% = tout vendu · 50% = la moitié vendue · 0% = rien vendu.\nSeuil cible : ≥ 60% (vert).\n\n«n/d» = données insuffisantes (moins de 5 unités reçues via transfert — la marque est principalement approvisionnée par commandes directes).",
+    tip_trend:"Direction des réceptions d'une saison à l'autre.\n\nHausse : saison la plus récente > saison la plus ancienne de +10%\nBaisse : saison la plus récente < saison la plus ancienne de -10%\nStable : variation < 10%",
+    tip_multiplier:"Facteur appliqué aux réceptions moyennes historiques.\n\nBasé sur le ST moyen via les paliers configurés dans l'onglet Paramètres.\n\nExemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper.\n\nNote : ce multiplicateur s'applique au calcul historique (fallback). En mode vélocité P26, le budget net est directement issu de la projection.",
+    tip_projection:"Demande projetée pour les jours restants de la saison en cours.\n\nCalcul (mode vélocité) :\nventes_P26_à_ce_jour × (jours_restants ÷ jours_écoulés)\n\nReprésente combien on s'attend à vendre d'ici la fin de saison si la vélocité actuelle se maintient.\n\nAffiché seulement si des ventes P26 existent.",
+    tip_stock:"Valeur au coût du stock actuellement en inventaire pour cette marque (articles non-NOS).\n\nCe montant est déduit du budget net : le stock en main couvrira une partie de la demande future, donc inutile de le racheter.",
+    tip_net_budget:"Budget d'achat recommandé pour la saison.\n\nMode vélocité (P26 actif) :\nMAX(0, projection_restante − stock_résiduel)\n\nMode historique (pas de données P26) :\nMAX(0, réceptions_moy × multiplicateur − stock_résiduel)\n\nUn tiret (—) indique que le stock en main couvre déjà la demande projetée.",
+    total_seasonal:'Saisonnier', total_brands:'marques',
+    total_hist:'hist.', total_adjusted:'ajusté', total_stock_ded:'stock déduit',
+    no_data:'Aucune donnée de réception historique disponible', no_results:'Aucun résultat',
+    carryover_lbl:'carryover estimé', deducted_lbl:'déduit',
+    review_brand:'Réviser la marque', partial_season:'Saison en cours (partiel)',
+    days_remaining: n => `${n}j restants`, incl_season: c => `incl. ${c}*`,
+    hist_ref:'Réf. histor.', days_left_season:'j restants en saison',
+    future_season_lbl:'Planification saison future',
+    trend_hausse:'hausse', trend_stable:'stable', trend_baisse:'baisse',
+    st_nd:'n/d', st_na_title:"Données insuffisantes : moins de 5 unités reçues via transfert — ratio non représentatif",
+    nos_badge:'NOS — Budget par marque', nos_coverage:'Couverture cible :', nos_weeks:'semaines',
+    nos_col_brand:'Marque', nos_col_items:'Articles', nos_col_stock:'Stock en main',
+    nos_col_sold:'Unités vendues (12 sem.)', nos_col_budget:'Budget suggéré $', nos_col_adj:'Ajustement %',
+    nos_shop_lbl:'Boutique', nos_search_ph:'Description, catégorie…',
+    nos_col_avg_wk:'Moy. / sem.', nos_col_cover:'Couverture',
+    nos_count: n => `${n.toLocaleString('fr-CA')} articles`,
+    seas_col_forecast:'Prévision (unités)', seas_col_cost:'Coût estimé',
+    seas_count: n => `${n.toLocaleString('fr-CA')} articles`,
+    sizes_col_sold:'Unités vendues', sizes_col_total:'Total matrice',
+    sizes_col_pct:'% matrice', sizes_col_stock:'Stock actuel',
+    sizes_count: n => `${n.toLocaleString('fr-CA')} lignes`,
+    transfers_col_from:'De', transfers_col_to:'Vers', transfers_col_qty:'Qté à transférer',
+    transfers_empty:'Aucun transfert recommandé pour le moment.',
+    transfers_count: n => `${n.toLocaleString('fr-CA')} transferts recommandés`,
+    params_badge:'Hypothèses d\'achat — Multiplicateurs',
+    params_desc:"Le seuil de sell-through détermine le multiplicateur appliqué au budget historique moyen de chaque marque. Le niveau <strong>Couper</strong> est le repli par défaut si aucun seuil n'est atteint. Les modifications s'appliquent uniquement au budget Saisonnier et sont sauvegardées sur le serveur.",
+    params_col_level:'Niveau', params_col_st:'Sell-through min', params_col_mult:'Multiplicateur',
+    params_fallback:'— (repli)', btn_apply_recalc_long:'Appliquer & Recalculer',
+    params_applied:'Paramètres appliqués — budgets recalculés.',
+    page_of: (c,t,n) => `Page ${c} / ${t} (${n.toLocaleString('fr-CA')})`,
+    filter_active: n => `${n} filtre${n>1?'s':''} actif${n>1?'s':''}`,
+    tier_Augmenter:'Augmenter', 'tier_Légère hausse':'Légère hausse',
+    tier_Reconduire:'Reconduire', 'tier_Réduire':'Réduire', tier_Couper:'Couper',
+  },
+  en: {
+    loading:'Loading…', lastSync:'Last sync',
+    tab_budget:'Budget', tab_nos:'NOS', tab_seasonal:'Seasonal',
+    tab_sizes:'Size Curves', tab_transfers:'Transfers / Actions',
+    tab_params:'Settings', tab_velocity:'Velocity →',
+    filter_boutiques:'Boutiques', filter_collections:'Collections',
+    filter_sizes:'Sizes', filter_letters:'Letters', filter_numeric:'Numeric',
+    filter_brand:'Brand', filter_brand_ph:'e.g. Brax, Eton…',
+    btn_apply:'Apply', btn_reset:'Reset',
+    btn_apply_recalc:'Apply & Recalculate', btn_reset_defaults:'Reset Defaults',
+    btn_prev:'← Previous', btn_next:'Next →',
+    lbl_boutique:'Store', lbl_search:'Search',
+    opt_all:'All', search_desc_ph:'Description…',
+    seas_badge:'Seasonal — Budget based on P26 velocity + historical receivings',
+    seas_season_lbl:'Buying season:', seas_search_ph:'Search a brand…',
+    seas_horizon_lbl:'Horizon (weeks)',
+    season_p27:'P27 — Spring 2027', season_a26:'A26 — Fall 2026',
+    season_p26:'P26 — Spring 2026', season_a25:'A25 — Fall 2025',
+    season_p25:'P25 — Spring 2025', season_a24:'A24 — Fall 2024',
+    season_p24:'P24 — Spring 2024',
+    col_brand:'Brand', col_seasons:'Seasons', col_avg_recv:'Avg. Receivings',
+    col_range:'Range', col_avg_st:'Avg. ST', col_trend:'Trend',
+    col_multiplier:'Multiplier', col_projection:'Remaining Projection',
+    col_carryover:'Est. Carryover', col_stock:'Residual Stock', col_net_budget:'Net Budget',
+    col_description:'Description', col_boutique:'Store', col_category:'Category',
+    col_stock_short:'Stock', col_qty_suggested:'Suggested Qty',
+    tip_seasons:"Seasons for which we have receiving data.\n* = current season (partial data, projected to full season).",
+    tip_avg_recv:"Average amount received (at cost) per reference season.\n\nCalculation: average of receiving costs for P25, P24, P23.\nIf the current season (P26*) has data, its full-season projection is included in the average.\n\nFormula P26 projected = ytd_received ÷ (elapsed_days ÷ total_days)",
+    tip_range:"Range of receivings across available historical seasons.\n\nMin $ – Max $ observed on reference seasons (P25, P24, P23 + P26 projected if available).\n\nUseful to see season-to-season variability.",
+    tip_avg_st:"Average sell-through rate across historical seasons.\n\nCalculation: units sold ÷ units received via transfer, averaged over P25, P24, P23.\n\n100% = all sold · 50% = half sold · 0% = nothing sold.\nTarget threshold: ≥ 60% (green).\n\n\"n/a\" = insufficient data (less than 5 units received via transfer — brand is primarily supplied by direct orders).",
+    tip_trend:"Direction of receivings from one season to the next.\n\nRising: most recent season > oldest season by +10%\nFalling: most recent season < oldest season by -10%\nStable: variation < 10%",
+    tip_multiplier:"Factor applied to average historical receivings.\n\nBased on average ST through tiers configured in the Settings tab.\n\nExamples: ×1.25 Grow, ×1.00 Renew, ×0.50 Cut.\n\nNote: this multiplier applies to the historical calculation (fallback). In P26 velocity mode, the net budget is directly derived from the projection.",
+    tip_projection:"Projected demand for the remaining days of the current season.\n\nCalculation (velocity mode):\nytd_P26_sales × (remaining_days ÷ elapsed_days)\n\nRepresents how much is expected to sell by season end if current velocity holds.\n\nDisplayed only if P26 sales data exists.",
+    tip_stock:"Cost value of stock currently in inventory for this brand (non-NOS items).\n\nThis amount is deducted from the net budget: on-hand stock will cover part of future demand, so no need to reorder it.",
+    tip_net_budget:"Recommended purchase budget for the season.\n\nVelocity mode (P26 active):\nMAX(0, remaining_projection − residual_stock)\n\nHistorical mode (no P26 data):\nMAX(0, avg_receivings × multiplier − residual_stock)\n\nA dash (—) means on-hand stock already covers the projected demand.",
+    total_seasonal:'Seasonal', total_brands:'brands',
+    total_hist:'hist.', total_adjusted:'adjusted', total_stock_ded:'deducted stock',
+    no_data:'No historical receiving data available', no_results:'No results',
+    carryover_lbl:'estimated carryover', deducted_lbl:'deducted',
+    review_brand:'Review brand', partial_season:'Current season (partial)',
+    days_remaining: n => `${n}d remaining`, incl_season: c => `incl. ${c}*`,
+    hist_ref:'Hist. ref.', days_left_season:'d remaining in season',
+    future_season_lbl:'Future season planning',
+    trend_hausse:'rising', trend_stable:'stable', trend_baisse:'falling',
+    st_nd:'n/a', st_na_title:"Insufficient data: less than 5 units received via transfer — ratio not representative",
+    nos_badge:'NOS — Budget by Brand', nos_coverage:'Target coverage:', nos_weeks:'weeks',
+    nos_col_brand:'Brand', nos_col_items:'Items', nos_col_stock:'Stock on Hand',
+    nos_col_sold:'Units Sold (12 wks.)', nos_col_budget:'Suggested Budget $', nos_col_adj:'Adjustment %',
+    nos_shop_lbl:'Store', nos_search_ph:'Description, category…',
+    nos_col_avg_wk:'Avg. / wk.', nos_col_cover:'Coverage',
+    nos_count: n => `${n.toLocaleString('en-CA')} items`,
+    seas_col_forecast:'Forecast (units)', seas_col_cost:'Estimated Cost',
+    seas_count: n => `${n.toLocaleString('en-CA')} items`,
+    sizes_col_sold:'Units Sold', sizes_col_total:'Total Matrix',
+    sizes_col_pct:'% Matrix', sizes_col_stock:'Current Stock',
+    sizes_count: n => `${n.toLocaleString('en-CA')} rows`,
+    transfers_col_from:'From', transfers_col_to:'To', transfers_col_qty:'Qty to Transfer',
+    transfers_empty:'No transfers recommended at this time.',
+    transfers_count: n => `${n.toLocaleString('en-CA')} recommended transfers`,
+    params_badge:'Purchase Assumptions — Multipliers',
+    params_desc:"The sell-through threshold determines the multiplier applied to each brand's average historical budget. The <strong>Cut</strong> level is the default fallback if no threshold is reached. Changes apply only to the Seasonal budget and are saved to the server.",
+    params_col_level:'Level', params_col_st:'Min Sell-through', params_col_mult:'Multiplier',
+    params_fallback:'— (fallback)', btn_apply_recalc_long:'Apply & Recalculate',
+    params_applied:'Settings applied — budgets recalculated.',
+    page_of: (c,t,n) => `Page ${c} / ${t} (${n.toLocaleString('en-CA')})`,
+    filter_active: n => `${n} active filter${n>1?'s':''}`,
+    tier_Augmenter:'Grow', 'tier_Légère hausse':'Slight Growth',
+    tier_Reconduire:'Renew', 'tier_Réduire':'Reduce', tier_Couper:'Cut',
+  },
+};
+
+let _lang = (() => { try { return localStorage.getItem('buying_lang') || 'fr'; } catch { return 'fr'; } })();
+
+function t(key) {
+  const val = TRANSLATIONS[_lang]?.[key] ?? TRANSLATIONS['fr']?.[key];
+  return val ?? key;
+}
+
+function tTierLabel(frLabel) {
+  return t(`tier_${frLabel}`) || frLabel;
+}
+
+function setLanguage(lang) {
+  _lang = lang;
+  try { localStorage.setItem('buying_lang', lang); } catch {}
+  document.getElementById('html-root').lang = lang;
+  // Static text
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const v = TRANSLATIONS[lang]?.[el.dataset.i18n] ?? TRANSLATIONS['fr']?.[el.dataset.i18n];
+    if (v != null && typeof v === 'string') el.textContent = v;
+  });
+  // Placeholders
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    const v = TRANSLATIONS[lang]?.[el.dataset.i18nPh] ?? TRANSLATIONS['fr']?.[el.dataset.i18nPh];
+    if (v != null) el.placeholder = v;
+  });
+  // innerHTML (for elements with embedded HTML like <strong>)
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    const v = TRANSLATIONS[lang]?.[el.dataset.i18nHtml] ?? TRANSLATIONS['fr']?.[el.dataset.i18nHtml];
+    if (v != null) el.innerHTML = v;
+  });
+  // Tooltip data-tip
+  document.querySelectorAll('[data-i18n-tip]').forEach(el => {
+    const v = TRANSLATIONS[lang]?.[el.dataset.i18nTip] ?? TRANSLATIONS['fr']?.[el.dataset.i18nTip];
+    if (v != null) el.dataset.tip = v;
+  });
+  // Language toggle button styling
+  const frBtn = document.getElementById('lang-fr');
+  const enBtn = document.getElementById('lang-en');
+  if (frBtn && enBtn) {
+    if (lang === 'fr') {
+      frBtn.className = 'text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 border-r border-gray-200';
+      enBtn.className = 'text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600';
+    } else {
+      frBtn.className = 'text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600 border-r border-gray-200';
+      enBtn.className = 'text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700';
+    }
+  }
+  // Update projection column header (future vs current)
+  const projTh = document.querySelector('th.sort-col[data-sort="projected_remaining"]');
+  if (projTh) {
+    const arrow = projTh.querySelector('.sort-arrow')?.outerHTML ?? '';
+    const labelSpan = projTh.querySelector('[data-i18n]');
+    const labelKey = state.budgetSeas.isFuture ? 'col_carryover' : 'col_projection';
+    if (labelSpan) {
+      labelSpan.dataset.i18n = labelKey;
+      labelSpan.textContent = t(labelKey);
+    }
+    if (arrow && projTh.querySelector('.sort-arrow')) {
+      projTh.querySelector('.sort-arrow').outerHTML = arrow;
+    }
+  }
+  // Re-render dynamic tables
+  if (state.budgetSeas.data.length) renderBudgetTable('budgetSeas');
+  if (state.budgetNos.data.length)  renderBudgetTable('budgetNos');
+  if (state.nos.filtered?.length)   renderNosPage();
+  if (state.seasonal.filtered?.length) renderSeasonalPage();
+  if (state.sizes.filtered?.length) renderSizesPage();
+  if (document.getElementById('tiersTableBody')?.children.length) renderTiersTable();
+}
+
 const BASE      = 'https://buying-intelligence-production.up.railway.app';
 const PAGE_SIZE = 50;
 const LS_KEY       = 'buying_hypothesis';
@@ -583,7 +819,7 @@ function renderTiersTable() {
     const isFallback = i === tiers.length - 1;
     const badge = TIERS_BADGE[t.label] ?? 'bg-gray-100 text-gray-600';
     const stCell = isFallback
-      ? `<td class="px-4 py-3 text-center text-gray-300 text-xs">— (repli)</td>`
+      ? `<td class="px-4 py-3 text-center text-gray-300 text-xs">${t('params_fallback')}</td>`
       : `<td class="px-4 py-3 text-center">
            <div class="flex items-center justify-center gap-1">
              <span class="text-gray-400 text-xs">≥</span>
@@ -596,7 +832,7 @@ function renderTiersTable() {
     return `
       <tr class="${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}">
         <td class="px-4 py-3">
-          <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${badge}">${escHtml(t.label)}</span>
+          <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${badge}">${escHtml(tTierLabel(t.label))}</span>
         </td>
         ${stCell}
         <td class="px-4 py-3 text-center">
@@ -639,8 +875,9 @@ async function loadSyncStatus() {
     const d = await r.json();
     const latest = d.checkpoints?.filter(c => c.status === 'completed').sort((a,b) => new Date(b.updated_at)-new Date(a.updated_at))[0];
     if (latest) {
-      const dt = new Date(latest.updated_at).toLocaleString('fr-CA', { dateStyle:'short', timeStyle:'short' });
-      document.getElementById('syncStatus').textContent = `Dernier sync : ${dt}`;
+      const locale = _lang === 'en' ? 'en-CA' : 'fr-CA';
+      const dt = new Date(latest.updated_at).toLocaleString(locale, { dateStyle:'short', timeStyle:'short' });
+      document.getElementById('syncStatus').textContent = `${t('lastSync')} : ${dt}`;
     }
   } catch {}
 }
@@ -743,7 +980,7 @@ function updateFilterBadge() {
   const count = shops.length + colls.length + sizes.length;
   const badge = document.getElementById('filterBadge');
   if (count > 0) {
-    badge.textContent = `${count} filtre${count > 1 ? 's' : ''} actif${count > 1 ? 's' : ''}`;
+    badge.textContent = t('filter_active')(count);
     badge.classList.remove('hidden');
   } else {
     badge.classList.add('hidden');
@@ -766,7 +1003,7 @@ const HYP_STYLE = {
 
 function stPctCell(val, threshold) {
   if (val === null || val === undefined) return '<td class="px-3 py-2.5 text-right text-gray-300">—</td>';
-  if (val > 1.5) return '<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-400" title="Données insuffisantes : moins de 5 unités reçues via transfert — ratio non représentatif">n/d</span></td>';
+  if (val > 1.5) return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-400" title="${escHtml(t('st_na_title'))}">${t('st_nd')}</span></td>`;
   const pct = Math.round(val * 100);
   const ok  = val >= threshold;
   const mid = val >= threshold * 0.75;
@@ -779,7 +1016,8 @@ function trendBadge(trend) {
   const s = { hausse: 'bg-green-100 text-green-700', stable: 'bg-gray-100 text-gray-600', baisse: 'bg-red-100 text-red-700' };
   const i = { hausse: '▲', stable: '→', baisse: '▼' };
   const cls = s[trend] ?? s.stable;
-  return `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}">${i[trend] ?? ''} ${trend}</span>`;
+  const label = t(`trend_${trend}`) || trend;
+  return `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}">${i[trend] ?? ''} ${label}</span>`;
 }
 
 // ── Budget: render saisonnier table (marque format) ───────────────────────
@@ -830,7 +1068,7 @@ function renderMarqueBudgetTable() {
         const isPartial = m.seasons[c]?.partial;
         const bg  = isCurrent ? 'bg-blue-100 text-blue-700' : 'bg-amber-50 text-amber-700';
         const lbl = isCurrent && isPartial ? `${c.toUpperCase()}*` : c.toUpperCase();
-        return `<span class="px-1 py-0.5 rounded text-[9px] font-semibold ${bg} mr-0.5" title="${isPartial ? 'Saison en cours (partiel)' : ''}">${lbl}</span>`;
+        return `<span class="px-1 py-0.5 rounded text-[9px] font-semibold ${bg} mr-0.5" title="${isPartial ? escHtml(t('partial_season')) : ''}">${lbl}</span>`;
       })
       .join('');
 
@@ -844,34 +1082,34 @@ function renderMarqueBudgetTable() {
     const multLabel  = m.multiplier_label ?? 'Reconduire';
     const multStyle  = HYP_STYLE[multLabel] ?? HYP_STYLE['Reconduire'];
     const multPct    = m.multiplier != null ? `×${m.multiplier.toFixed(2)}` : '×1.00';
-    const multHtml   = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${multStyle.bg} ${multStyle.text}">${multPct} ${multLabel}</span>`;
+    const multHtml   = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${multStyle.bg} ${multStyle.text}">${multPct} ${tTierLabel(multLabel)}</span>`;
 
     // Stock résiduel
     const stockCost = m.current_stock_at_cost ?? 0;
     const stockHtml = stockCost > 0
-      ? `<span class="text-orange-600 font-semibold">${fmtC(stockCost)}</span><span class="text-gray-400 text-[10px] block">déduit</span>`
+      ? `<span class="text-orange-600 font-semibold">${fmtC(stockCost)}</span><span class="text-gray-400 text-[10px] block">${t('deducted_lbl')}</span>`
       : `<span class="text-gray-300">—</span>`;
 
     // Projection / carryover cell depending on budget mode
     const isVelocity = m.budget_mode === 'velocity';
     const isFuture   = m.budget_mode === 'future';
     const avgRecvHtml = isVelocity
-      ? `<span class="font-semibold">${fmtC(m.avg_received_cost)}</span><span class="text-[10px] text-blue-500 block">incl. ${targetCode.toUpperCase()}*</span>`
+      ? `<span class="font-semibold">${fmtC(m.avg_received_cost)}</span><span class="text-[10px] text-blue-500 block">${t('incl_season')(targetCode.toUpperCase())}</span>`
       : `<span class="font-semibold">${fmtC(m.avg_received_cost)}</span>`;
     let projHtml;
     if (isFuture) {
       projHtml = m.estimated_carryover > 0
-        ? `<span class="text-purple-600 font-semibold">${fmtC(m.estimated_carryover)}</span><span class="text-[10px] text-gray-400 block">carryover estimé</span>`
+        ? `<span class="text-purple-600 font-semibold">${fmtC(m.estimated_carryover)}</span><span class="text-[10px] text-gray-400 block">${t('carryover_lbl')}</span>`
         : `<span class="text-gray-300">—</span>`;
     } else if (isVelocity) {
-      projHtml = `<span class="text-blue-600 font-semibold">${fmtC(m.projected_remaining)}</span><span class="text-[10px] text-gray-400 block">${m.remaining_days}j restants</span>`;
+      projHtml = `<span class="text-blue-600 font-semibold">${fmtC(m.projected_remaining)}</span><span class="text-[10px] text-gray-400 block">${t('days_remaining')(m.remaining_days)}</span>`;
     } else {
       projHtml = `<span class="text-gray-300">—</span>`;
     }
 
     // Brand name with optional alert badge
     const alertBadge = m.low_st_alert
-      ? ` <span class="ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700">Réviser la marque</span>`
+      ? ` <span class="ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700">${t('review_brand')}</span>`
       : '';
 
     const netBudget = m.net_budget ?? 0;
@@ -895,7 +1133,7 @@ function renderMarqueBudgetTable() {
   }
 
   const tbody = document.getElementById(bodyId);
-  tbody.innerHTML = rows.join('') || `<tr><td colspan="${cols}" class="text-center py-8 text-gray-400">Aucune donnée de réception historique disponible</td></tr>`;
+  tbody.innerHTML = rows.join('') || `<tr><td colspan="${cols}" class="text-center py-8 text-gray-400">${t('no_data')}</td></tr>`;
 }
 
 // ── Budget: render NOS table ───────────────────────────────────────────────
@@ -955,7 +1193,7 @@ function renderBudgetTable(key) {
   }
 
   const tbody = document.getElementById(bodyId);
-  tbody.innerHTML = rows.join('') || `<tr><td colspan="${cols}" class="text-center py-8 text-gray-400">Aucun résultat</td></tr>`;
+  tbody.innerHTML = rows.join('') || `<tr><td colspan="${cols}" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
 }
 
 // ── Budget: attach table event listeners once at startup ───────────────────
@@ -1012,9 +1250,9 @@ function updateAllBudgetTotals() {
     const net      = data.reduce((s, m) => s + (m.net_budget ?? 0), 0);
     const stockDed = adj - net;
     grandNet += net;
-    let html = `Saisonnier : <strong>${fmtC(net)}</strong> net · ${data.length} marques`;
-    if (adj !== hist) html += ` <span style="color:#6b7280;font-size:11px">(hist. ${fmtC(hist)} → ajusté ${fmtC(adj)}</span>`;
-    if (stockDed > 0.01) html += ` <span style="color:#d97706;font-size:11px">· stock déduit : ${fmtC(stockDed)})</span>`;
+    let html = `${t('total_seasonal')} : <strong>${fmtC(net)}</strong> net · ${data.length} ${t('total_brands')}`;
+    if (adj !== hist) html += ` <span style="color:#6b7280;font-size:11px">(${t('total_hist')} ${fmtC(hist)} → ${t('total_adjusted')} ${fmtC(adj)}</span>`;
+    if (stockDed > 0.01) html += ` <span style="color:#d97706;font-size:11px">· ${t('total_stock_ded')} : ${fmtC(stockDed)})</span>`;
     else if (adj !== hist) html += `)`;
     document.getElementById(BUDGET_CFG[key].totalId).innerHTML = html;
   }
@@ -1037,15 +1275,16 @@ async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
       state.budgetSeas.season   = d.target_season ?? extraParams?.season ?? 'p26';
       state.budgetSeas.isFuture = d.is_future_season ?? false;
       const remDays = d.remaining_days ?? 0;
-      const remInfo = remDays > 0 ? ` • ${remDays}j restants en saison` : '';
-      const futureInfo = d.is_future_season ? ' • Planification saison future' : '';
+      const remInfo = remDays > 0 ? ` • ${remDays}${t('days_left_season')}` : '';
+      const futureInfo = d.is_future_season ? ` • ${t('future_season_lbl')}` : '';
       document.getElementById('budgetSeasPeriod').textContent =
-        d.reference_seasons_label ? `Réf. histor. : ${d.reference_seasons_label}${remInfo}${futureInfo}` : '';
+        d.reference_seasons_label ? `${t('hist_ref')} : ${d.reference_seasons_label}${remInfo}${futureInfo}` : '';
       // Update projection column header label
       const projTh = document.querySelector('th.sort-col[data-sort="projected_remaining"]');
       if (projTh) {
-        const arrow = projTh.querySelector('.sort-arrow')?.outerHTML ?? '';
-        projTh.innerHTML = (d.is_future_season ? 'Carryover estimé ' : 'Projection restante ') + arrow;
+        const labelSpan = projTh.querySelector('[data-i18n]');
+        const labelKey = d.is_future_season ? 'col_carryover' : 'col_projection';
+        if (labelSpan) { labelSpan.dataset.i18n = labelKey; labelSpan.textContent = t(labelKey); }
       }
     } else if (BUDGET_CFG[key].hasHyp) {
       applyClientTiers(state[key].data);
@@ -1153,7 +1392,7 @@ function filterAndRenderNos() {
 function renderNosPage() {
   const { filtered, page } = state.nos;
   const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  document.getElementById('nosCount').textContent = `${filtered.length.toLocaleString()} articles`;
+  document.getElementById('nosCount').textContent = t('nos_count')(filtered.length);
   document.getElementById('nosBody').innerHTML = slice.map(r => `
     <tr class="transition-colors">
       <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
@@ -1163,7 +1402,7 @@ function renderNosPage() {
       <td class="px-3 py-2 text-right font-medium">${fmt(r.avg_weekly_units)}</td>
       <td class="px-3 py-2 text-right">${coverBadge(r.weeks_of_cover)}</td>
       <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(r.suggested_order_qty)}</td>
-    </tr>`).join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">Aucun résultat</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
   renderPager('nos', filtered.length);
 }
 
@@ -1187,7 +1426,7 @@ function filterAndRenderSeasonal() {
 function renderSeasonalPage() {
   const { filtered, page } = state.seasonal;
   const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  document.getElementById('seasCount').textContent = `${filtered.length.toLocaleString()} articles`;
+  document.getElementById('seasCount').textContent = t('seas_count')(filtered.length);
   document.getElementById('seasBody').innerHTML = slice.map(r => `
     <tr class="transition-colors">
       <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
@@ -1197,7 +1436,7 @@ function renderSeasonalPage() {
       <td class="px-3 py-2 text-right font-medium">${fmt(r.forecasted_units)}</td>
       <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(r.suggested_order_qty)}</td>
       <td class="px-3 py-2 text-right">${r.estimated_cost > 0 ? fmtC(r.estimated_cost) : '—'}</td>
-    </tr>`).join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">Aucun résultat</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
   renderPager('seasonal', filtered.length);
 }
 
@@ -1221,7 +1460,7 @@ function filterAndRenderSizes() {
 function renderSizesPage() {
   const { filtered, page } = state.sizes;
   const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  document.getElementById('sizesCount').textContent = `${filtered.length.toLocaleString()} lignes`;
+  document.getElementById('sizesCount').textContent = t('sizes_count')(filtered.length);
   document.getElementById('sizesBody').innerHTML = slice.map(r => `
     <tr class="transition-colors">
       <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
@@ -1230,7 +1469,7 @@ function renderSizesPage() {
       <td class="px-3 py-2 text-right text-gray-500">${fmt(r.total_units)}</td>
       <td class="px-3 py-2 text-right font-semibold text-blue-700">${r.pct_of_matrix}%</td>
       <td class="px-3 py-2 text-right">${fmt(r.qty_on_hand)}</td>
-    </tr>`).join('') || `<tr><td colspan="6" class="text-center py-8 text-gray-400">Aucun résultat</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="6" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
   renderPager('sizes', filtered.length);
 }
 
@@ -1240,7 +1479,7 @@ async function loadTransfers() {
   try {
     const r = await fetch(`${BASE}/api/transfers`);
     const d = await r.json();
-    document.getElementById('transfersCount').textContent = d.count > 0 ? `${d.count.toLocaleString()} transferts recommandés` : '';
+    document.getElementById('transfersCount').textContent = d.count > 0 ? t('transfers_count')(d.count) : '';
     if (d.count === 0) {
       document.getElementById('transfersEmpty').classList.remove('hidden');
       document.getElementById('transfersBody').innerHTML = '';
@@ -1264,7 +1503,7 @@ function renderPager(key, total) {
   const pager = document.getElementById(`${key}Pager`);
   if (pages <= 1) { pager.classList.add('hidden'); return; }
   pager.classList.remove('hidden');
-  document.getElementById(`${key}Page`).textContent = `Page ${page+1} / ${pages} (${total.toLocaleString()})`;
+  document.getElementById(`${key}Page`).textContent = t('page_of')(page + 1, pages, total);
   document.getElementById(`${key}Prev`).disabled = page === 0;
   document.getElementById(`${key}Next`).disabled = page >= pages - 1;
 }
@@ -1341,6 +1580,8 @@ loadTiers().then(() => {
   bindBudgetTableListeners();
   loadSyncStatus();
   tabLoaded['budget'] = true;
+  // Apply saved language (updates static elements + button styling)
+  setLanguage(_lang);
   loadBudget();
 });
 
