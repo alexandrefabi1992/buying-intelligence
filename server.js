@@ -2214,29 +2214,51 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const completionRatio = isFutureSeason ? 0 : Math.min(1, elapsedDays / ((seasonEnd - seasonStart) / 86400000));
     const todayStr      = todayDate.toISOString().split('T')[0];
 
-    // P26 receivings so far (to include in RÉCEPTIONS MOY. average)
-    const p26RecvParams  = [...baseParams, targetSeason.recv_from, todayStr];
-    const p26RecvFromIdx = p26RecvParams.length - 1;
-    const p26RecvToIdx   = p26RecvParams.length;
-    const { rows: p26RecvRows } = await pool.query(`
+    // P26 implied receivings YTD = (items tagged targetSeason sold since recv_from) + (tagged items in inventory today)
+    // This gives the true receiving picture without relying on inter-shop transfer data.
+    const p26Tag        = `%${targetSeasonCode}%`;
+    const p26IrSlParams = [...baseParams, targetSeason.recv_from, p26Tag];
+    const p26IrSlFrom   = p26IrSlParams.length - 1;
+    const p26IrSlTag    = p26IrSlParams.length;
+    const { rows: p26IrSlRows } = await pool.query(`
       SELECT
-        COALESCE(p.manufacturer, 'Sans marque')                           AS manufacturer,
-        SUM(t.qty_received * COALESCE(p.default_cost, 0))::float8         AS recv_cost_ytd
-      FROM transfers t
-      JOIN products p ON p.item_id = t.item_id
-      WHERE t.transfer_received = true
-        AND t.qty_received > 0
-        AND t.transfer_date >= $${p26RecvFromIdx}::date
-        AND t.transfer_date <= $${p26RecvToIdx}::date
+        COALESCE(p.manufacturer, 'Sans marque')                               AS manufacturer,
+        SUM(sl.qty * COALESCE(p.default_cost, 0))::float8                     AS sold_cost
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.completed_time >= $${p26IrSlFrom}::date
+        AND sl.completed_time IS NOT NULL
+        AND sl.qty > 0
+        AND p.tags ILIKE $${p26IrSlTag}
         AND p.tags NOT ILIKE '%nos%'
         AND p.default_cost > 0
         AND p.category    NOT ILIKE 'Alt%ration%'
         AND p.description NOT ILIKE '%shopify%'
-        ${shopCondT}
+        ${shopCondSL}
       GROUP BY p.manufacturer
-    `, p26RecvParams);
+    `, p26IrSlParams);
+
+    const p26IrInvParams = [...baseParams, p26Tag];
+    const p26IrInvTag    = p26IrInvParams.length;
+    const { rows: p26IrInvRows } = await pool.query(`
+      SELECT
+        COALESCE(p.manufacturer, 'Sans marque')                                  AS manufacturer,
+        SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8   AS stock_cost
+      FROM products p
+      JOIN inventory i ON i.item_id = p.item_id
+      WHERE p.tags ILIKE $${p26IrInvTag}
+        AND p.tags NOT ILIKE '%nos%'
+        AND p.default_cost > 0
+        AND p.category    NOT ILIKE 'Alt%ration%'
+        AND p.description NOT ILIKE '%shopify%'
+        AND i.qty_on_hand > 0
+        ${shopCondInv}
+      GROUP BY p.manufacturer
+    `, p26IrInvParams);
+
     const p26RecvMap = {};
-    for (const r of p26RecvRows) p26RecvMap[r.manufacturer] = parseFloat(r.recv_cost_ytd ?? 0);
+    for (const r of p26IrSlRows)  p26RecvMap[r.manufacturer] = (p26RecvMap[r.manufacturer] ?? 0) + parseFloat(r.sold_cost  ?? 0);
+    for (const r of p26IrInvRows) p26RecvMap[r.manufacturer] = (p26RecvMap[r.manufacturer] ?? 0) + parseFloat(r.stock_cost ?? 0);
 
     // P26 sales so far at cost — filtered to target-season-tagged items only so the
     // velocity projection is consistent with the season-tagged stock deduction.
@@ -2271,34 +2293,56 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const refSeason = SEASON_RANGES[refCode];
       if (!refSeason) continue;
 
-      // Receivings: transfers received within the pre-season + season window
-      const tParams   = [...baseParams, refSeason.recv_from, refSeason.to];
-      const tFromIdx  = tParams.length - 1;
-      const tToIdx    = tParams.length;
+      // Implied receivings for refCode = (tagged items sold since recv_from) + (tagged items in inventory today)
+      const refTag        = `%${refCode}%`;
+      const irSlParams    = [...baseParams, refSeason.recv_from, refTag];
+      const irSlFromIdx   = irSlParams.length - 1;
+      const irSlTagIdx    = irSlParams.length;
 
-      const { rows: tRows } = await pool.query(`
+      const { rows: irSlRows } = await pool.query(`
         SELECT
-          COALESCE(p.manufacturer, 'Sans marque')                        AS manufacturer,
-          SUM(t.qty_received)::float8                                     AS units_received,
-          SUM(t.qty_received * COALESCE(p.default_cost, 0))::float8       AS received_cost
-        FROM transfers t
-        JOIN products p ON p.item_id = t.item_id
-        WHERE t.transfer_received = true
-          AND t.qty_received > 0
-          AND t.transfer_date >= $${tFromIdx}::date
-          AND t.transfer_date <= $${tToIdx}::date
+          COALESCE(p.manufacturer, 'Sans marque')                               AS manufacturer,
+          SUM(sl.qty)::float8                                                    AS qty_sold_all,
+          SUM(sl.qty * COALESCE(p.default_cost, 0))::float8                     AS sold_cost
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE sl.completed_time >= $${irSlFromIdx}::date
+          AND sl.completed_time IS NOT NULL
+          AND sl.qty > 0
+          AND p.tags ILIKE $${irSlTagIdx}
           AND p.tags NOT ILIKE '%nos%'
           AND p.default_cost > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
-          ${shopCondT}
+          ${shopCondSL}
         GROUP BY p.manufacturer
-      `, tParams);
+      `, irSlParams);
 
-      // Sales: for ST = units_sold / units_received
-      const slParams  = [...baseParams, refSeason.from, refSeason.to];
-      const slFromIdx = slParams.length - 1;
-      const slToIdx   = slParams.length;
+      const irInvParams   = [...baseParams, refTag];
+      const irInvTagIdx   = irInvParams.length;
+
+      const { rows: irInvRows } = await pool.query(`
+        SELECT
+          COALESCE(p.manufacturer, 'Sans marque')                                  AS manufacturer,
+          SUM(COALESCE(i.qty_on_hand, 0))::float8                                   AS qty_on_hand,
+          SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8    AS stock_cost
+        FROM products p
+        JOIN inventory i ON i.item_id = p.item_id
+        WHERE p.tags ILIKE $${irInvTagIdx}
+          AND p.tags NOT ILIKE '%nos%'
+          AND p.default_cost > 0
+          AND p.category    NOT ILIKE 'Alt%ration%'
+          AND p.description NOT ILIKE '%shopify%'
+          AND i.qty_on_hand > 0
+          ${shopCondInv}
+        GROUP BY p.manufacturer
+      `, irInvParams);
+
+      // Sales DURING the season (for ST numerator) — filtered by season tag for consistency
+      const slParams  = [...baseParams, refSeason.from, refSeason.to, refTag];
+      const slFromIdx = slParams.length - 2;
+      const slToIdx   = slParams.length - 1;
+      const slTagIdx  = slParams.length;
 
       const { rows: slRows } = await pool.query(`
         SELECT
@@ -2310,6 +2354,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
           AND sl.completed_time <= $${slToIdx}::date
           AND sl.completed_time IS NOT NULL
           AND sl.qty > 0
+          AND p.tags ILIKE $${slTagIdx}
           AND p.tags NOT ILIKE '%nos%'
           AND p.default_cost > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
@@ -2318,17 +2363,31 @@ app.get('/api/budget/marque', async (req, res, next) => {
         GROUP BY p.manufacturer
       `, slParams);
 
-      const soldMap = {};
-      for (const r of slRows) soldMap[r.manufacturer] = parseFloat(r.units_sold ?? 0);
+      // Merge implied received maps
+      const irSlMap  = {};
+      for (const r of irSlRows)  irSlMap[r.manufacturer]  = { qty: parseFloat(r.qty_sold_all ?? 0), cost: parseFloat(r.sold_cost  ?? 0) };
+      const irInvMap = {};
+      for (const r of irInvRows) irInvMap[r.manufacturer] = { qty: parseFloat(r.qty_on_hand  ?? 0), cost: parseFloat(r.stock_cost ?? 0) };
+      const soldMap  = {};
+      for (const r of slRows)    soldMap[r.manufacturer]  = parseFloat(r.units_sold ?? 0);
+
+      // Build tRows-equivalent from implied received
+      const allMfrsRef = new Set([...Object.keys(irSlMap), ...Object.keys(irInvMap)]);
+      const tRows = [];
+      for (const mfr of allMfrsRef) {
+        const sl  = irSlMap[mfr]  ?? { qty: 0, cost: 0 };
+        const inv = irInvMap[mfr] ?? { qty: 0, cost: 0 };
+        const impliedUnits = sl.qty + inv.qty;
+        const impliedCost  = sl.cost + inv.cost;
+        if (impliedCost > 0) tRows.push({ manufacturer: mfr, units_received: impliedUnits, received_cost: impliedCost });
+      }
 
       seasonResults[refCode] = {};
       for (const r of tRows) {
-        const recv = parseFloat(r.units_received ?? 0);
-        const cost = parseFloat(r.received_cost ?? 0);
+        const recv = r.units_received;
+        const cost = r.received_cost;
         const sold = soldMap[r.manufacturer] ?? 0;
-        // ST is only meaningful when enough units were received via transfer (≥5).
-        // Fewer units = brand mainly stocks via direct PO, not transfers → ratio is misleading.
-        const st = recv >= 5 ? sold / recv : null;
+        const st   = recv >= 5 ? sold / recv : null;
         seasonResults[refCode][r.manufacturer] = {
           units_received:  Math.round(recv),
           units_sold:      Math.round(sold),
@@ -2368,7 +2427,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const stockMap = {};
     for (const r of invRows) stockMap[r.manufacturer] = Math.round(parseFloat(r.stock_at_cost ?? 0) * 100) / 100;
 
-    // Only brands that appear in transfer receivings (others have no historical data)
+    // Brands that appear in implied receivings for any reference season
     const allMfr = new Set();
     for (const code of refSeasonCodes) {
       Object.keys(seasonResults[code] ?? {}).forEach(m => allMfr.add(m));
