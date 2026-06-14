@@ -2473,6 +2473,9 @@ app.get('/api/budget/marque', async (req, res, next) => {
         if (impliedCost <= 0) continue;
 
         // Project to full season if currently in progress
+        // Both implied received AND units sold are projected so the ST ratio stays coherent.
+        let soldRaw = soldMap[mfr] ?? 0;
+        let soldForSt = soldRaw;
         if (isRefInProgress) {
           const refTotalDays  = (refSellEnd - refSellStart) / 86400000;
           const refElapsed    = Math.max(1, (todayDate - refSellStart) / 86400000);
@@ -2480,16 +2483,17 @@ app.get('/api/budget/marque', async (req, res, next) => {
           if (refCompletion > 0.05) {
             impliedCost  = impliedCost  / refCompletion;
             impliedUnits = impliedUnits / refCompletion;
+            soldForSt    = soldRaw      / refCompletion;
           }
         }
 
-        const sold = soldMap[mfr] ?? 0;
         const recv = impliedUnits;
-        const st   = recv >= 5 ? sold / recv : null;
+        const st   = recv >= 5 ? soldForSt / recv : null;
 
         seasonResults[refSeason.code][mfr] = {
           units_received:  Math.round(recv),
-          units_sold:      Math.round(sold),
+          units_sold:      Math.round(soldForSt),
+          units_sold_ytd:  Math.round(soldRaw),
           received_cost:   Math.round(impliedCost * 100) / 100,
           st_rate:         st !== null ? Math.round(st * 1000) / 1000 : null,
           st_insufficient: recv < 5,
