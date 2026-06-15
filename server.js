@@ -2405,7 +2405,6 @@ app.get('/api/budget/marque', async (req, res, next) => {
           AND sl.qty > 0
           AND p.tags ILIKE $${irSlTagIdx}
           AND p.tags NOT ILIKE '%nos%'
-          AND p.default_cost > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
           ${shopCondSL}
@@ -2423,7 +2422,6 @@ app.get('/api/budget/marque', async (req, res, next) => {
         JOIN inventory i ON i.item_id = p.item_id
         WHERE p.tags ILIKE $${irInvTagIdx}
           AND p.tags NOT ILIKE '%nos%'
-          AND p.default_cost > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
           AND i.qty_on_hand > 0
@@ -2448,7 +2446,6 @@ app.get('/api/budget/marque', async (req, res, next) => {
           AND sl.qty > 0
           AND p.tags ILIKE $${slTagIdx}
           AND p.tags NOT ILIKE '%nos%'
-          AND p.default_cost > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
           ${shopCondSL}
