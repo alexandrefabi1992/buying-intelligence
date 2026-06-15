@@ -2713,7 +2713,6 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
           AND sl.completed_time IS NOT NULL
-          AND p.archived = false
           ${slS}
       `, p);
     } else if (hasShop) {
@@ -2741,7 +2740,6 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         WHERE p.manufacturer ILIKE $1
           AND sl.shop_id = $2
           AND sl.completed_time IS NOT NULL
-          AND p.archived = false
       `, [mfr, shopId, stFrom, stTo, seasonTag]);
     } else {
       // $1=mfr $2=stFrom $3=stTo $4='%tag%'
@@ -2767,7 +2765,6 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
           AND sl.completed_time IS NOT NULL
-          AND p.archived = false
       `, [mfr, stFrom, stTo, seasonTag]);
     }
 
