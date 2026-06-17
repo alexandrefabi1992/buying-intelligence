@@ -98,6 +98,7 @@ const DEFAULT_BUDGET_PARAMS = {
   carryover_deduction_rate:   0.50,
   use_global_carryover_rate:  true,
   carryover_rates_by_shop:    {},
+  recency_factor:             2.0,
 };
 
 async function getSeasonsConfig() {
@@ -2273,6 +2274,7 @@ app.put('/api/settings/budget-params', async (req, res, next) => {
       carryover_deduction_rate:  Math.max(0, Math.min(1, parseFloat(req.body.carryover_deduction_rate ?? 0.5))),
       use_global_carryover_rate: req.body.use_global_carryover_rate !== false,
       carryover_rates_by_shop:   ratesByShop,
+      recency_factor:            Math.max(1, Math.min(10, parseFloat(req.body.recency_factor ?? 2.0))),
     };
     await pool.query(
       `INSERT INTO app_settings(key, value, updated_at)
@@ -2315,7 +2317,8 @@ app.get('/api/budget/marque', async (req, res, next) => {
       getBudgetParams(),
     ]);
     const { nb_saisons_reference: nbRef, carryover_deduction_rate: globalCoRate,
-            use_global_carryover_rate: useGlobal, carryover_rates_by_shop: ratesByShop } = budgetParams;
+            use_global_carryover_rate: useGlobal, carryover_rates_by_shop: ratesByShop,
+            recency_factor: recencyFactor } = budgetParams;
     const coRate = (!useGlobal && shops?.length === 1 && ratesByShop?.[shops[0]] != null)
       ? ratesByShop[shops[0]]
       : globalCoRate;
@@ -2602,27 +2605,37 @@ app.get('/api/budget/marque', async (req, res, next) => {
 
     const byManufacturer = [];
     for (const mfr of allMfr) {
-      const seasons = {};
-      const costs   = [];
-      const stRates = [];
+      const seasons      = {};
+      const weightedData = []; // { cost, st, weight } — index 0 = most recent
 
-      for (const refSeason of refSeasons) {
+      for (let i = 0; i < refSeasons.length; i++) {
+        const refSeason = refSeasons[i];
         const d = seasonResults[refSeason.code]?.[mfr];
         if (d) {
           seasons[refSeason.code] = d;
-          if (d.received_cost > 0) costs.push(d.received_cost);
-          if (d.st_rate !== null)  stRates.push({ code: refSeason.code, st: d.st_rate });
+          // Most recent (i=0) gets highest weight: recencyFactor^(N-1), oldest gets 1
+          const weight = Math.pow(recencyFactor, refSeasons.length - 1 - i);
+          weightedData.push({
+            cost:   d.received_cost > 0 ? d.received_cost : null,
+            st:     d.st_rate,
+            weight,
+            code:   refSeason.code,
+          });
         }
       }
 
-      if (!costs.length) continue;
+      const costEntries = weightedData.filter(x => x.cost !== null);
+      if (!costEntries.length) continue;
 
-      const avgHist = costs.reduce((a, b) => a + b, 0) / costs.length;
-      const minHist = Math.min(...costs);
-      const maxHist = Math.max(...costs);
+      const totalCostWeight = costEntries.reduce((s, x) => s + x.weight, 0);
+      const avgHist = costEntries.reduce((s, x) => s + x.cost * x.weight, 0) / totalCostWeight;
+      const minHist = Math.min(...costEntries.map(x => x.cost));
+      const maxHist = Math.max(...costEntries.map(x => x.cost));
 
-      const avgSt = stRates.length
-        ? stRates.reduce((s, x) => s + x.st, 0) / stRates.length
+      const stEntries  = weightedData.filter(x => x.st !== null);
+      const totalStWeight = stEntries.reduce((s, x) => s + x.weight, 0);
+      const avgSt = stEntries.length
+        ? stEntries.reduce((s, x) => s + x.st * x.weight, 0) / totalStWeight
         : null;
 
       // Trend: most-recent vs oldest reference season with data
