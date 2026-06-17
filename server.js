@@ -3441,37 +3441,6 @@ app.post('/api/admin/refresh-view', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// Diagnostic: raw sale lines for a given manufacturer + tag (temp)
-// ---------------------------------------------------------------------------
-app.get('/api/diag/sales', async (req, res, next) => {
-  try {
-    const mfr = req.query.mfr ?? 'corneliani';
-    const tag = req.query.tag ?? 'p26';
-    const { rows } = await pool.query(`
-      SELECT
-        sl.completed_time::date          AS date_vente,
-        p.item_id,
-        LEFT(p.description, 40)          AS description,
-        p.tags,
-        p.default_cost,
-        p.archived,
-        sl.qty,
-        ROUND(sl.unit_price, 2)          AS unit_price
-      FROM sale_lines sl
-      JOIN products p ON p.item_id = sl.item_id
-      WHERE p.manufacturer ILIKE $1
-        AND p.tags ILIKE $2
-        AND sl.completed_time IS NOT NULL
-      ORDER BY sl.completed_time
-    `, [mfr, `%${tag}%`]);
-    const net = rows.reduce((s, r) => s + parseFloat(r.qty ?? 0), 0);
-    const positives = rows.filter(r => parseFloat(r.qty) > 0).length;
-    const negatives = rows.filter(r => parseFloat(r.qty) < 0).length;
-    res.json({ count: rows.length, positives, negatives, net_qty: net, rows });
-  } catch (err) { next(err); }
-});
-
-// ---------------------------------------------------------------------------
 // Error handler
 // ---------------------------------------------------------------------------
 app.use((err, req, res, _next) => {
