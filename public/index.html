@@ -479,14 +479,21 @@
             <input id="budgetNbSaisons" type="number" min="1" max="10" value="3"
                    class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex flex-col gap-2">
             <label class="text-xs text-gray-600 w-52 col-tip" data-tip="Part du carryover déduite du budget ajusté. 50% = on garde 50% de marge pour le nouveau stock qui aide à écouler l'ancien stock."
                    data-i18n="params_carryover_lbl">Taux déduction carryover</label>
-            <div class="flex items-center gap-1">
-              <input id="budgetCarryoverRate" type="number" min="0" max="100" step="5" value="50"
-                     class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
-              <span class="text-xs text-gray-500">%</span>
+            <div class="flex items-center gap-3 pl-0">
+              <div class="flex items-center gap-1">
+                <input id="budgetCarryoverRate" type="number" min="0" max="100" step="5" value="50"
+                       class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+                <span class="text-xs text-gray-500">%</span>
+              </div>
+              <label class="flex items-center gap-1.5 text-xs text-gray-500 select-none cursor-pointer">
+                <input id="budgetSameRate" type="checkbox" checked class="accent-indigo-600">
+                <span data-i18n="params_same_rate_lbl">Même taux pour toutes les boutiques</span>
+              </label>
             </div>
+            <div id="budgetShopRates" class="hidden flex-col gap-2 pl-3 border-l-2 border-gray-200 mt-1"></div>
           </div>
           <button id="budgetParamsApply"
             class="self-start px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors mt-1"
@@ -549,6 +556,7 @@ const TRANSLATIONS = {
     params_budget_title:'Paramètres du budget d\'achat',
     params_nb_saisons_lbl:'Saisons de référence (N)',
     params_carryover_lbl:'Taux déduction carryover',
+    params_same_rate_lbl:'Même taux pour toutes les boutiques',
     params_nb_saisons_tip:'Nombre de saisons passées équivalentes utilisées pour calculer la moyenne historique (ex : 3 = P25, P24, P23 pour P26).',
     params_carryover_tip:'Part du carryover déduite du budget ajusté. 50% = on garde 50% de marge pour le nouveau stock qui aide à écouler l\'ancien stock.',
     trend_hausse:'hausse', trend_stable:'stable', trend_baisse:'baisse',
@@ -621,6 +629,7 @@ const TRANSLATIONS = {
     params_budget_title:'Purchase Budget Settings',
     params_nb_saisons_lbl:'Reference seasons (N)',
     params_carryover_lbl:'Carryover deduction rate',
+    params_same_rate_lbl:'Apply same rate to all stores',
     params_nb_saisons_tip:'Number of past equivalent seasons used to compute the historical average (e.g. 3 = P25, P24, P23 for P26).',
     params_carryover_tip:'Share of carryover deducted from the adjusted budget. 50% = keep 50% headroom for new stock that helps move existing stock.',
     trend_hausse:'rising', trend_stable:'stable', trend_baisse:'falling',
@@ -1551,25 +1560,79 @@ document.getElementById('sizesSearch').addEventListener('input', () => { clearTi
 bindPager('sizes', renderSizesPage);
 
 // ── Paramètres — budget params load/save ─────────────────────────────────
+function buildShopRateInputs(ratesByShop) {
+  const container = document.getElementById('budgetShopRates');
+  if (!container) return;
+  container.innerHTML = '';
+  SHOPS.forEach(({ id, name }) => {
+    const pct = ratesByShop?.[id] != null ? Math.round(ratesByShop[id] * 100) : 50;
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    row.innerHTML = `
+      <span class="text-xs text-gray-600 w-44 truncate">${name}</span>
+      <input id="budgetShopRate_${id}" type="number" min="0" max="100" step="5" value="${pct}"
+             class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+      <span class="text-xs text-gray-500">%</span>`;
+    container.appendChild(row);
+  });
+}
+
+function applyBudgetSameRateToggle() {
+  const checked = document.getElementById('budgetSameRate')?.checked ?? true;
+  const container = document.getElementById('budgetShopRates');
+  const globalInput = document.getElementById('budgetCarryoverRate');
+  if (!container) return;
+  if (checked) {
+    container.classList.add('hidden');
+    container.classList.remove('flex');
+  } else {
+    container.classList.remove('hidden');
+    container.classList.add('flex');
+    // Sync global rate to any shop that still has the default
+    const globalPct = parseFloat(globalInput?.value ?? 50);
+    SHOPS.forEach(({ id }) => {
+      const el = document.getElementById(`budgetShopRate_${id}`);
+      if (el && el.value === '50') el.value = globalPct;
+    });
+  }
+}
+
 async function loadBudgetParams() {
   try {
     const d = await fetch(`${BASE}/api/settings/budget-params`).then(r => r.json());
     const nbEl = document.getElementById('budgetNbSaisons');
     const coEl = document.getElementById('budgetCarryoverRate');
+    const cbEl = document.getElementById('budgetSameRate');
     if (nbEl && d.nb_saisons_reference != null) nbEl.value = d.nb_saisons_reference;
     if (coEl && d.carryover_deduction_rate != null) coEl.value = Math.round(d.carryover_deduction_rate * 100);
+    if (cbEl) cbEl.checked = d.use_global_carryover_rate !== false;
+    buildShopRateInputs(d.carryover_rates_by_shop ?? {});
+    applyBudgetSameRateToggle();
   } catch (e) {
     console.warn('[budget-params] Failed to load:', e.message);
   }
 }
 
 async function saveBudgetParamsToServer() {
-  const nb = parseInt(document.getElementById('budgetNbSaisons')?.value ?? 3, 10);
-  const co = parseFloat(document.getElementById('budgetCarryoverRate')?.value ?? 50) / 100;
+  const nb   = parseInt(document.getElementById('budgetNbSaisons')?.value ?? 3, 10);
+  const co   = parseFloat(document.getElementById('budgetCarryoverRate')?.value ?? 50) / 100;
+  const same = document.getElementById('budgetSameRate')?.checked ?? true;
+  const ratesByShop = {};
+  if (!same) {
+    SHOPS.forEach(({ id }) => {
+      const el = document.getElementById(`budgetShopRate_${id}`);
+      if (el) ratesByShop[id] = parseFloat(el.value) / 100;
+    });
+  }
   await fetch(`${BASE}/api/settings/budget-params`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nb_saisons_reference: nb, carryover_deduction_rate: co }),
+    body: JSON.stringify({
+      nb_saisons_reference:      nb,
+      carryover_deduction_rate:  co,
+      use_global_carryover_rate: same,
+      carryover_rates_by_shop:   ratesByShop,
+    }),
   });
 }
 
@@ -1605,6 +1668,8 @@ document.getElementById('tiersReset').addEventListener('click', async () => {
     updateAllBudgetTotals();
   }
 });
+
+document.getElementById('budgetSameRate').addEventListener('change', applyBudgetSameRateToggle);
 
 document.getElementById('budgetParamsApply').addEventListener('click', async () => {
   try {
