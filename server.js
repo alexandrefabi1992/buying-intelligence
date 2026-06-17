@@ -94,8 +94,10 @@ const DEFAULT_SEASONS_CONFIG = [
 ];
 
 const DEFAULT_BUDGET_PARAMS = {
-  nb_saisons_reference:    3,
-  carryover_deduction_rate: 0.50,
+  nb_saisons_reference:       3,
+  carryover_deduction_rate:   0.50,
+  use_global_carryover_rate:  true,
+  carryover_rates_by_shop:    {},
 };
 
 async function getSeasonsConfig() {
@@ -2259,9 +2261,18 @@ app.get('/api/settings/budget-params', async (req, res, next) => {
 
 app.put('/api/settings/budget-params', async (req, res, next) => {
   try {
+    const ratesByShop = {};
+    if (req.body.carryover_rates_by_shop && typeof req.body.carryover_rates_by_shop === 'object') {
+      for (const [shopId, rate] of Object.entries(req.body.carryover_rates_by_shop)) {
+        const r = parseFloat(rate);
+        if (!isNaN(r)) ratesByShop[shopId] = Math.max(0, Math.min(1, r));
+      }
+    }
     const params = {
-      nb_saisons_reference:    Math.max(1, Math.min(10, parseInt(req.body.nb_saisons_reference ?? 3, 10))),
-      carryover_deduction_rate: Math.max(0, Math.min(1, parseFloat(req.body.carryover_deduction_rate ?? 0.5))),
+      nb_saisons_reference:      Math.max(1, Math.min(10, parseInt(req.body.nb_saisons_reference ?? 3, 10))),
+      carryover_deduction_rate:  Math.max(0, Math.min(1, parseFloat(req.body.carryover_deduction_rate ?? 0.5))),
+      use_global_carryover_rate: req.body.use_global_carryover_rate !== false,
+      carryover_rates_by_shop:   ratesByShop,
     };
     await pool.query(
       `INSERT INTO app_settings(key, value, updated_at)
@@ -2303,7 +2314,11 @@ app.get('/api/budget/marque', async (req, res, next) => {
       getSeasonsConfig(),
       getBudgetParams(),
     ]);
-    const { nb_saisons_reference: nbRef, carryover_deduction_rate: coRate } = budgetParams;
+    const { nb_saisons_reference: nbRef, carryover_deduction_rate: globalCoRate,
+            use_global_carryover_rate: useGlobal, carryover_rates_by_shop: ratesByShop } = budgetParams;
+    const coRate = (!useGlobal && shops?.length === 1 && ratesByShop?.[shops[0]] != null)
+      ? ratesByShop[shops[0]]
+      : globalCoRate;
 
     const targetSeason = seasonsConfig.find(s => s.code === targetSeasonCode);
     if (!targetSeason) return res.status(404).json({ error: `Season ${targetSeasonCode} not found in config` });
