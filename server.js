@@ -3462,10 +3462,12 @@ app.get('/api/diag/sales', async (req, res, next) => {
       WHERE p.manufacturer ILIKE $1
         AND p.tags ILIKE $2
         AND sl.completed_time IS NOT NULL
-        AND sl.qty > 0
       ORDER BY sl.completed_time
     `, [mfr, `%${tag}%`]);
-    res.json({ count: rows.length, rows });
+    const net = rows.reduce((s, r) => s + parseFloat(r.qty ?? 0), 0);
+    const positives = rows.filter(r => parseFloat(r.qty) > 0).length;
+    const negatives = rows.filter(r => parseFloat(r.qty) < 0).length;
+    res.json({ count: rows.length, positives, negatives, net_qty: net, rows });
   } catch (err) { next(err); }
 });
 
