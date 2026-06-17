@@ -2451,8 +2451,9 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const slTagIdx  = slParams.length;
       const { rows: slRows } = await pool.query(`
         SELECT
-          COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
-          SUM(sl.qty)::float8                     AS units_sold
+          COALESCE(p.manufacturer, 'Sans marque')                AS manufacturer,
+          SUM(sl.qty)::float8                                     AS units_sold,
+          SUM(sl.qty * COALESCE(p.default_cost, 0))::float8      AS sold_cost
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE sl.completed_time >= $${slFromIdx}::date
@@ -2467,12 +2468,16 @@ app.get('/api/budget/marque', async (req, res, next) => {
         GROUP BY p.manufacturer
       `, slParams);
 
-      const irSlMap  = {};
+      const irSlMap    = {};
       for (const r of irSlRows)  irSlMap[r.manufacturer]  = { qty: parseFloat(r.qty_sold_all ?? 0), cost: parseFloat(r.sold_cost ?? 0) };
-      const irInvMap = {};
+      const irInvMap   = {};
       for (const r of irInvRows) irInvMap[r.manufacturer] = { qty: parseFloat(r.qty_on_hand ?? 0),  cost: parseFloat(r.stock_cost ?? 0) };
-      const soldMap  = {};
-      for (const r of slRows)    soldMap[r.manufacturer]  = parseFloat(r.units_sold ?? 0);
+      const soldMap      = {};
+      const soldCostMap  = {};
+      for (const r of slRows) {
+        soldMap[r.manufacturer]     = parseFloat(r.units_sold ?? 0);
+        soldCostMap[r.manufacturer] = parseFloat(r.sold_cost  ?? 0);
+      }
 
       const allMfrsRef = new Set([...Object.keys(irSlMap), ...Object.keys(irInvMap)]);
       seasonResults[refSeason.code] = {};
@@ -2545,36 +2550,46 @@ app.get('/api/budget/marque', async (req, res, next) => {
         let impliedCost  = sl.cost + inv.cost;
         if (impliedCost <= 0) continue;
 
-        let soldRaw   = soldMap[mfr] ?? 0;
-        let soldForSt = soldRaw;
+        let soldRaw      = soldMap[mfr]     ?? 0;
+        let soldCostRaw  = soldCostMap[mfr] ?? 0;
+        let soldForSt    = soldRaw;
+        let soldCostProj = soldCostRaw;
         if (isRefInProgress && refCompletion > 0.05) {
           const rem = histRemaining?.[mfr];
           if (rem && rem.count > 0) {
             // Average only over seasons that actually had sales for this brand in remaining window
             const avgRemCost  = rem.totalCost  / rem.count;
             const avgRemUnits = rem.totalUnits / rem.count;
-            impliedCost  += avgRemCost;
-            impliedUnits += avgRemUnits;
-            soldForSt    += avgRemUnits;
+            impliedCost   += avgRemCost;
+            impliedUnits  += avgRemUnits;
+            soldForSt     += avgRemUnits;
+            soldCostProj  += avgRemCost;
           } else {
             // No past history for this brand in remaining window → linear fallback
-            impliedCost  = impliedCost  / refCompletion;
-            impliedUnits = impliedUnits / refCompletion;
-            soldForSt    = soldRaw      / refCompletion;
+            impliedCost   = impliedCost  / refCompletion;
+            impliedUnits  = impliedUnits / refCompletion;
+            soldForSt     = soldRaw      / refCompletion;
+            soldCostProj  = soldCostRaw  / refCompletion;
           }
         }
+
+        // Budget base = avg(received cost, sold cost) — anchors buying to actual demand.
+        // When ST=100%: same as received. When ST drops: budget naturally dampened.
+        const blendedCost = (impliedCost + soldCostProj) / 2;
 
         const recv = impliedUnits;
         const st   = recv >= 5 ? soldForSt / recv : null;
 
         seasonResults[refSeason.code][mfr] = {
-          units_received:  Math.round(recv),
-          units_sold:      Math.round(soldForSt),
-          units_sold_ytd:  Math.round(soldRaw),
-          received_cost:   Math.round(impliedCost * 100) / 100,
-          st_rate:         st !== null ? Math.round(st * 1000) / 1000 : null,
-          st_insufficient: recv < 5,
-          partial:         isRefInProgress,
+          units_received:   Math.round(recv),
+          units_sold:       Math.round(soldForSt),
+          units_sold_ytd:   Math.round(soldRaw),
+          received_cost:    Math.round(blendedCost * 100) / 100,
+          received_cost_raw: Math.round(impliedCost * 100) / 100,
+          sold_cost:        Math.round(soldCostProj * 100) / 100,
+          st_rate:          st !== null ? Math.round(st * 1000) / 1000 : null,
+          st_insufficient:  recv < 5,
+          partial:          isRefInProgress,
         };
       }
     }
