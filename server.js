@@ -2477,6 +2477,67 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const allMfrsRef = new Set([...Object.keys(irSlMap), ...Object.keys(irInvMap)]);
       seasonResults[refSeason.code] = {};
 
+      // For in-progress reference seasons: estimate remaining using historical window avg.
+      // projected = YTD actuals + avg(sales during equivalent remaining window in past N seasons).
+      // Brands with no past-season history in that window fall back to linear (÷ completion).
+      let histRemaining  = null;
+      let refElapsedDays = 0;
+      let refCompletion  = 1;
+      if (isRefInProgress) {
+        const refTotalDays   = (refSellEnd - refSellStart) / 86400000;
+        refElapsedDays = Math.max(1, (todayDate - refSellStart) / 86400000);
+        refCompletion  = Math.min(1, refElapsedDays / refTotalDays);
+
+        if (refCompletion > 0.05) {
+          const prevSeasonsForRef    = getReferenceSeasonsFromConfig(refSeason.code, seasonsConfig, nbRef);
+          const completedPrevSeasons = prevSeasonsForRef.filter(s => todayDate > new Date(s.sell_to));
+
+          if (completedPrevSeasons.length > 0) {
+            histRemaining = {};
+            for (const prevSeas of completedPrevSeasons) {
+              const prevSellStart  = new Date(prevSeas.sell_from);
+              const prevSellEnd    = new Date(prevSeas.sell_to);
+              // Map today's position in refSeason to the equivalent date in prevSeas
+              const prevWindowFrom = new Date(prevSellStart.getTime() + refElapsedDays * 86400000);
+              if (prevWindowFrom >= prevSellEnd) continue;
+
+              const prevTag   = `%${prevSeas.tag_pattern}%`;
+              const rwParams  = [...baseParams, prevWindowFrom.toISOString().slice(0, 10), prevSeas.sell_to, prevTag];
+              const rwFromIdx = rwParams.length - 2;
+              const rwToIdx   = rwParams.length - 1;
+              const rwTagIdx  = rwParams.length;
+
+              const { rows: rwRows } = await pool.query(`
+                SELECT
+                  COALESCE(p.manufacturer, 'Sans marque')                AS manufacturer,
+                  SUM(sl.qty * COALESCE(p.default_cost, 0))::float8      AS remaining_cost,
+                  SUM(sl.qty)::float8                                     AS remaining_units
+                FROM sale_lines sl
+                JOIN products p ON p.item_id = sl.item_id
+                WHERE sl.completed_time >= $${rwFromIdx}::date
+                  AND sl.completed_time <= $${rwToIdx}::date
+                  AND sl.completed_time IS NOT NULL
+                  AND sl.qty > 0
+                  AND p.tags ILIKE $${rwTagIdx}
+                  AND p.tags NOT ILIKE '%nos%'
+                  AND p.category    NOT ILIKE 'Alt%ration%'
+                  AND p.description NOT ILIKE '%shopify%'
+                  ${shopCondSL}
+                GROUP BY p.manufacturer
+              `, rwParams);
+
+              for (const r of rwRows) {
+                const m = r.manufacturer;
+                if (!histRemaining[m]) histRemaining[m] = { totalCost: 0, totalUnits: 0, count: 0 };
+                histRemaining[m].totalCost  += parseFloat(r.remaining_cost  ?? 0);
+                histRemaining[m].totalUnits += parseFloat(r.remaining_units ?? 0);
+                histRemaining[m].count++;
+              }
+            }
+          }
+        }
+      }
+
       for (const mfr of allMfrsRef) {
         const sl  = irSlMap[mfr]  ?? { qty: 0, cost: 0 };
         const inv = irInvMap[mfr] ?? { qty: 0, cost: 0 };
@@ -2484,15 +2545,19 @@ app.get('/api/budget/marque', async (req, res, next) => {
         let impliedCost  = sl.cost + inv.cost;
         if (impliedCost <= 0) continue;
 
-        // Project to full season if currently in progress
-        // Both implied received AND units sold are projected so the ST ratio stays coherent.
-        let soldRaw = soldMap[mfr] ?? 0;
+        let soldRaw   = soldMap[mfr] ?? 0;
         let soldForSt = soldRaw;
-        if (isRefInProgress) {
-          const refTotalDays  = (refSellEnd - refSellStart) / 86400000;
-          const refElapsed    = Math.max(1, (todayDate - refSellStart) / 86400000);
-          const refCompletion = Math.min(1, refElapsed / refTotalDays);
-          if (refCompletion > 0.05) {
+        if (isRefInProgress && refCompletion > 0.05) {
+          const rem = histRemaining?.[mfr];
+          if (rem && rem.count > 0) {
+            // Average only over seasons that actually had sales for this brand in remaining window
+            const avgRemCost  = rem.totalCost  / rem.count;
+            const avgRemUnits = rem.totalUnits / rem.count;
+            impliedCost  += avgRemCost;
+            impliedUnits += avgRemUnits;
+            soldForSt    += avgRemUnits;
+          } else {
+            // No past history for this brand in remaining window → linear fallback
             impliedCost  = impliedCost  / refCompletion;
             impliedUnits = impliedUnits / refCompletion;
             soldForSt    = soldRaw      / refCompletion;
