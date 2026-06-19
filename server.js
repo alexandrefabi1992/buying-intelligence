@@ -2714,7 +2714,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         recent_st_ytd:         recentStYtd       !== null ? Math.round(recentStYtd * 1000)       / 1000 : null,
         recent_st_projected:   recentStProjected !== null ? Math.round(recentStProjected * 1000) / 1000 : null,
         recent_season_code:    recentSeasonCode,
-        recent_received_cost:  mostRecentData    != null  ? Math.round((mostRecentData.received_cost_raw ?? 0) * 100) / 100 : null,
+        recent_received_cost:  seasons[refSeasons[0]?.code]?.received_cost_raw ?? null,
         trend,
         low_st_alert:          lowStAlert,
         multiplier:            hyp.multiplier,
