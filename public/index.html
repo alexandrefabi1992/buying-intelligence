@@ -440,12 +440,33 @@
       <div id="planShopFilter" class="flex flex-wrap gap-x-4 gap-y-1.5"></div>
     </div>
     <!-- Totals bar -->
-    <div class="flex gap-6 mb-4 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-5 py-3 flex-wrap">
-      <span><span class="font-semibold text-gray-700" id="planTotalSuggested">—</span> <span data-i18n="plan_total_suggested">budget suggéré</span></span>
+    <div class="flex gap-6 mb-4 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-5 py-3 flex-wrap items-center">
+      <span>
+        <span class="text-[10px] text-gray-400 uppercase font-semibold block leading-none mb-0.5">Recommandé</span>
+        <span class="font-semibold text-gray-600" id="planTotalRecommended">—</span>
+      </span>
       <span class="text-gray-300">|</span>
-      <span><span class="font-semibold text-indigo-700" id="planTotalPlanned">—</span> <span data-i18n="plan_total_planned">planifié</span></span>
+      <span>
+        <span class="text-[10px] text-gray-400 uppercase font-semibold block leading-none mb-0.5" data-i18n="plan_total_suggested">Ajusté</span>
+        <span class="font-semibold text-gray-700" id="planTotalSuggested">—</span>
+      </span>
+      <span id="planBalanceWrap" class="hidden">
+        <span class="text-gray-300 mr-6">|</span>
+        <span>
+          <span class="text-[10px] text-gray-400 uppercase font-semibold block leading-none mb-0.5">Solde</span>
+          <span class="font-semibold" id="planTotalBalance">—</span>
+        </span>
+      </span>
       <span class="text-gray-300">|</span>
-      <span><span class="font-semibold" id="planTotalDiff">—</span> <span data-i18n="plan_total_diff">écart</span></span>
+      <span>
+        <span class="text-[10px] text-gray-400 uppercase font-semibold block leading-none mb-0.5" data-i18n="plan_total_planned">Planifié</span>
+        <span class="font-semibold text-indigo-700" id="planTotalPlanned">—</span>
+      </span>
+      <span class="text-gray-300">|</span>
+      <span>
+        <span class="text-[10px] text-gray-400 uppercase font-semibold block leading-none mb-0.5" data-i18n="plan_total_diff">Écart</span>
+        <span class="font-semibold" id="planTotalDiff">—</span>
+      </span>
     </div>
     <!-- Table -->
     <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
@@ -1767,7 +1788,7 @@ function renderPlanTable() {
   const visibleTotal = visibleBrands.reduce((s, m) => s + (m.net_budget ?? 0), 0);
 
   const rows = [];
-  let totalSuggested = 0, totalPlanned = 0;
+  let totalCalcSuggested = 0, totalSuggested = 0, totalPlanned = 0;
 
   for (const m of visibleBrands) {
     const mfr     = m.manufacturer;
@@ -1777,6 +1798,7 @@ function renderPlanTable() {
     const calcSuggested      = Math.round((base + excludedBudget * share) * 100) / 100;
     const isOverridden       = planState.overrides[mfr] !== undefined;
     const effectiveSuggested = isOverridden ? planState.overrides[mfr] : calcSuggested;
+    totalCalcSuggested      += calcSuggested;
     totalSuggested          += effectiveSuggested;
     const totalPlan          = planTotalForMfr(mfr);
     totalPlanned            += totalPlan;
@@ -1788,20 +1810,26 @@ function renderPlanTable() {
       : `<span class="text-gray-300">—</span>`;
 
     const resetBtn = isOverridden
-      ? `<button class="plan-suggested-reset shrink-0 text-indigo-300 hover:text-indigo-600"
-           title="Réinitialiser le budget suggéré"
+      ? `<button class="plan-suggested-reset shrink-0 text-indigo-300 hover:text-indigo-600 text-sm leading-none"
+           title="Réinitialiser au montant recommandé (${fmtC(calcSuggested)})"
            data-mfr="${escHtml(mfr)}" data-calc="${calcSuggested}">↺</button>`
+      : '';
+    const calcRef = isOverridden
+      ? `<div class="text-[9px] text-gray-400 text-right mt-0.5">rec. ${fmtC(calcSuggested)}</div>`
       : '';
     const suggestedCell = m._manual
       ? `<span class="text-gray-300 italic text-[10px]">nouvelle</span>`
-      : `<div class="flex items-center justify-end gap-1" onclick="event.stopPropagation()">
-           ${resetBtn}
-           <input type="number" min="0" step="100"
-             class="plan-suggested-input text-right text-xs w-24 bg-transparent border-b
-               ${isOverridden ? 'border-indigo-400 text-indigo-700 font-semibold' : 'border-transparent text-gray-500 hover:border-gray-300'}
-               focus:border-indigo-400 focus:outline-none"
-             data-mfr="${escHtml(mfr)}" data-calc="${calcSuggested}"
-             value="${effectiveSuggested}">
+      : `<div class="text-right">
+           <div class="flex items-center justify-end gap-1">
+             ${resetBtn}
+             <input type="number" min="0" step="100"
+               class="plan-suggested-input text-right text-xs w-24 bg-transparent border-b
+                 ${isOverridden ? 'border-indigo-400 text-indigo-700 font-semibold' : 'border-transparent text-gray-500 hover:border-gray-300'}
+                 focus:border-indigo-400 focus:outline-none"
+               data-mfr="${escHtml(mfr)}" data-calc="${calcSuggested}"
+               value="${effectiveSuggested}">
+           </div>
+           ${calcRef}
          </div>`;
 
     rows.push(`
@@ -1829,18 +1857,34 @@ function renderPlanTable() {
   tbody.innerHTML = rows.join('') || `<tr><td colspan="5" class="text-center py-8 text-gray-400">${t('no_data')}</td></tr>`;
 
   // Totals bar
+  const balance      = Math.round((totalCalcSuggested - totalSuggested) * 100) / 100;
+  const hasOverrides = Object.keys(planState.overrides).length > 0;
+  document.getElementById('planTotalRecommended').textContent = fmtC(totalCalcSuggested);
+  document.getElementById('planTotalSuggested').textContent   = fmtC(totalSuggested);
+
+  const balanceWrap = document.getElementById('planBalanceWrap');
+  const balanceEl   = document.getElementById('planTotalBalance');
+  if (hasOverrides) {
+    balanceWrap.classList.remove('hidden');
+    balanceEl.textContent = `${balance >= 0 ? '+' : ''}${fmtC(balance)}`;
+    balanceEl.className   = 'font-semibold ' + (balance > 0 ? 'text-emerald-600' : balance < 0 ? 'text-red-500' : 'text-gray-400');
+  } else {
+    balanceWrap.classList.add('hidden');
+  }
+
   const diff    = totalPlanned - totalSuggested;
   const diffCls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
-  document.getElementById('planTotalSuggested').textContent = fmtC(totalSuggested);
-  document.getElementById('planTotalPlanned').textContent   = totalPlanned > 0 ? fmtC(totalPlanned) : '—';
+  document.getElementById('planTotalPlanned').textContent = totalPlanned > 0 ? fmtC(totalPlanned) : '—';
   const diffEl = document.getElementById('planTotalDiff');
   diffEl.textContent = totalPlanned > 0 ? `${diff >= 0 ? '+' : ''}${fmtC(diff)}` : '—';
   diffEl.className   = 'font-semibold ' + diffCls;
 
-  // Row click → expand (but not when clicking the exclude button)
+  // Row click → expand (but not when clicking action buttons or the editable input)
   document.querySelectorAll('.plan-row').forEach(row => {
     row.addEventListener('click', e => {
-      if (e.target.closest('.plan-exclude-btn')) return;
+      if (e.target.closest('.plan-exclude-btn'))    return;
+      if (e.target.closest('.plan-suggested-input')) return;
+      if (e.target.closest('.plan-suggested-reset')) return;
       const mfr    = row.dataset.mfr;
       const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
       const toggle = row.querySelector('.plan-toggle');
