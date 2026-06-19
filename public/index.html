@@ -1749,15 +1749,24 @@ function renderPlanTable() {
       .map(mfr => ({ manufacturer: mfr, net_budget: 0, _manual: true })),
   ];
 
+  // Budget from excluded brands redistributed proportionally among visible brands
+  const excludedBudget = planState.budget
+    .filter(m => planState.excluded.has(m.manufacturer))
+    .reduce((s, m) => s + (m.net_budget ?? 0), 0);
+  const visibleTotal = visibleBrands.reduce((s, m) => s + (m.net_budget ?? 0), 0);
+
   const rows = [];
   let totalSuggested = 0, totalPlanned = 0;
 
   for (const m of visibleBrands) {
-    const mfr       = m.manufacturer;
-    const suggested  = m.net_budget ?? 0;
-    totalSuggested  += suggested;
-    const totalPlan  = planTotalForMfr(mfr);
-    totalPlanned    += totalPlan;
+    const mfr     = m.manufacturer;
+    const base    = m.net_budget ?? 0;
+    // Redistribute excluded budget proportionally; if visibleTotal is 0, spread equally
+    const share   = visibleTotal > 0 ? base / visibleTotal : (visibleBrands.length ? 1 / visibleBrands.length : 0);
+    const suggested = Math.round((base + excludedBudget * share) * 100) / 100;
+    totalSuggested += suggested;
+    const totalPlan = planTotalForMfr(mfr);
+    totalPlanned   += totalPlan;
 
     const diff    = totalPlan - suggested;
     const diffCls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
