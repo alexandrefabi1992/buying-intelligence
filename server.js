@@ -2646,9 +2646,11 @@ app.get('/api/budget/marque', async (req, res, next) => {
         ? stEntries.reduce((s, x) => s + x.st * x.weight, 0) / totalStWeight
         : null;
 
-      // YTD ST for the most recent in-progress reference season (if any)
-      const mostRecentData = seasonResults[refSeasons[0]?.code]?.[mfr];
-      const recentStYtd    = mostRecentData?.partial ? mostRecentData.st_rate_ytd : null;
+      // YTD + projected ST for the most recent in-progress reference season
+      const mostRecentData      = seasonResults[refSeasons[0]?.code]?.[mfr];
+      const recentStYtd         = mostRecentData?.partial ? mostRecentData.st_rate_ytd         : null;
+      const recentStProjected   = mostRecentData?.partial ? mostRecentData.st_rate              : null;
+      const recentSeasonCode    = mostRecentData?.partial ? refSeasons[0]?.code                 : null;
 
       // Trend: ST direction from oldest to most-recent reference season with data
       // +10 pts → hausse, -10 pts → baisse (absolute percentage points, not relative)
@@ -2709,7 +2711,9 @@ app.get('/api/budget/marque', async (req, res, next) => {
         min_received_cost:     Math.round(minHist * 100) / 100,
         max_received_cost:     Math.round(maxHist * 100) / 100,
         avg_st:                avgSt !== null ? Math.round(avgSt * 1000) / 1000 : null,
-        avg_st_ytd:            recentStYtd !== null ? Math.round(recentStYtd * 1000) / 1000 : null,
+        recent_st_ytd:         recentStYtd       !== null ? Math.round(recentStYtd * 1000)       / 1000 : null,
+        recent_st_projected:   recentStProjected !== null ? Math.round(recentStProjected * 1000) / 1000 : null,
+        recent_season_code:    recentSeasonCode,
         trend,
         low_st_alert:          lowStAlert,
         multiplier:            hyp.multiplier,
