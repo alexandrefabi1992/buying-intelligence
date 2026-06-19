@@ -2717,10 +2717,28 @@ app.get('/api/budget/marque', async (req, res, next) => {
       });
     }
 
-    // Filter absent brands if mode is 'hide'
+    // Filter absent brands if mode is 'hide', and redistribute their budget proportionally
     const filteredManufacturers = absentBrandMode === 'hide'
       ? byManufacturer.filter(m => !m.absent_recent_season)
       : byManufacturer;
+
+    if (absentBrandMode === 'hide' && filteredManufacturers.length > 0) {
+      const hiddenTotal   = byManufacturer
+        .filter(m => m.absent_recent_season)
+        .reduce((s, m) => s + m.net_budget, 0);
+
+      if (hiddenTotal > 0) {
+        const visibleTotal = filteredManufacturers.reduce((s, m) => s + m.net_budget, 0);
+        filteredManufacturers.forEach(m => {
+          const share = visibleTotal > 0
+            ? m.net_budget / visibleTotal
+            : 1 / filteredManufacturers.length;
+          const redistribution = Math.round(hiddenTotal * share * 100) / 100;
+          m.redistributed_amount = redistribution;
+          m.net_budget           = Math.round((m.net_budget + redistribution) * 100) / 100;
+        });
+      }
+    }
 
     filteredManufacturers.sort((a, b) => b.net_budget - a.net_budget);
 
