@@ -585,6 +585,8 @@ const TRANSLATIONS = {
     params_absent_show:'Afficher avec badge',
     params_absent_hide:'Masquer',
     absent_recent_badge:'Absente en',
+    redistributed_lbl:'redistribué',
+    redistributed_tip:'Montant redistribué des marques masquées (absentes de la saison récente)',
     params_nb_saisons_tip:'Nombre de saisons passées équivalentes utilisées pour calculer la moyenne historique (ex : 3 = P25, P24, P23 pour P26).',
     params_carryover_tip:'Détermine combien du stock restant (carryover) vient réduire ton budget d\'achat.\n\n100% → le stock restant est entièrement déduit (tu n\'achètes pas ce que tu as déjà).\n50%  → la moitié est déduite (garde une marge : l\'ancien stock ne se vendra pas tout seul).\n0%   → le carryover est ignoré, budget complet conservé.\n\nFormule : budget net = budget ajusté − (carryover × taux)',
     trend_hausse:'hausse', trend_stable:'stable', trend_baisse:'baisse',
@@ -663,6 +665,8 @@ const TRANSLATIONS = {
     params_absent_show:'Show with badge',
     params_absent_hide:'Hide',
     absent_recent_badge:'Absent in',
+    redistributed_lbl:'redistributed',
+    redistributed_tip:'Amount redistributed from hidden brands (absent from recent season)',
     params_nb_saisons_tip:'Number of past equivalent seasons used to compute the historical average (e.g. 3 = P25, P24, P23 for P26).',
     params_carryover_tip:'Controls how much of your remaining stock (carryover) reduces your buying budget.\n\n100% → full carryover is deducted (don\'t buy what you already have).\n50%  → half is deducted (keeps headroom — old stock won\'t sell itself).\n0%   → carryover ignored, full budget kept.\n\nFormula: net budget = adjusted budget − (carryover × rate)',
     trend_hausse:'rising', trend_stable:'stable', trend_baisse:'falling',
@@ -1165,6 +1169,9 @@ function renderMarqueBudgetTable() {
       netHtml = `<span class="font-bold ${color}">${fmtC(netBudget)}</span>`;
       if (carryoverDed > 0) {
         netHtml += `<span class="text-[10px] text-gray-400 block">−${fmtC(carryoverDed)} ${t('carryover_lbl')}</span>`;
+      }
+      if (m.redistributed_amount > 0) {
+        netHtml += `<span class="text-[10px] text-indigo-400 block" title="${escHtml(t('redistributed_tip'))}">+${fmtC(m.redistributed_amount)} ${t('redistributed_lbl')}</span>`;
       }
     }
 
