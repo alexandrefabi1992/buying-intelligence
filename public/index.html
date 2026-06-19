@@ -589,7 +589,7 @@ const TRANSLATIONS = {
     redistributed_tip:'Montant redistribué des marques masquées (absentes de la saison récente)',
     params_nb_saisons_tip:'Nombre de saisons passées équivalentes utilisées pour calculer la moyenne historique (ex : 3 = P25, P24, P23 pour P26).',
     params_carryover_tip:'Détermine combien du stock restant (carryover) vient réduire ton budget d\'achat.\n\n100% → le stock restant est entièrement déduit (tu n\'achètes pas ce que tu as déjà).\n50%  → la moitié est déduite (garde une marge : l\'ancien stock ne se vendra pas tout seul).\n0%   → le carryover est ignoré, budget complet conservé.\n\nFormule : budget net = budget ajusté − (carryover × taux)',
-    st_ytd_lbl:'YTD', st_ytd_tip:'TM actuel à date (ventes YTD ÷ reçus YTD)', st_projected_tip:'TM projeté fin de saison',
+    st_ytd_lbl:'YTD', st_ytd_tip:'TM actuel à date (ventes YTD ÷ reçus YTD)', st_projected_tip:'TM projeté fin de saison (saison en cours)', st_avg_tip:'TM moyen pondéré sur les saisons de référence — détermine le multiplicateur',
     trend_hausse:'hausse', trend_stable:'stable', trend_baisse:'baisse',
     st_nd:'n/d', st_na_title:"Données insuffisantes : moins de 5 unités reçues via transfert — ratio non représentatif",
     nos_badge:'NOS — Budget par marque', nos_coverage:'Couverture cible :', nos_weeks:'semaines',
@@ -670,7 +670,7 @@ const TRANSLATIONS = {
     redistributed_tip:'Amount redistributed from hidden brands (absent from recent season)',
     params_nb_saisons_tip:'Number of past equivalent seasons used to compute the historical average (e.g. 3 = P25, P24, P23 for P26).',
     params_carryover_tip:'Controls how much of your remaining stock (carryover) reduces your buying budget.\n\n100% → full carryover is deducted (don\'t buy what you already have).\n50%  → half is deducted (keeps headroom — old stock won\'t sell itself).\n0%   → carryover ignored, full budget kept.\n\nFormula: net budget = adjusted budget − (carryover × rate)',
-    st_ytd_lbl:'YTD', st_ytd_tip:'Current sell-through to date (YTD sales ÷ YTD receivings)', st_projected_tip:'Projected ST at end of season',
+    st_ytd_lbl:'YTD', st_ytd_tip:'Current sell-through to date (YTD sales ÷ YTD receivings)', st_projected_tip:'Projected ST at end of season (current season)', st_avg_tip:'Weighted avg ST across reference seasons — drives the multiplier',
     trend_hausse:'rising', trend_stable:'stable', trend_baisse:'falling',
     st_nd:'n/a', st_na_title:"Insufficient data: less than 5 units received via transfer — ratio not representative",
     nos_badge:'NOS — Budget by Brand', nos_coverage:'Target coverage:', nos_weeks:'weeks',
@@ -1076,17 +1076,22 @@ function stPctCell(val, threshold) {
   return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${bg}">${pct}%</span></td>`;
 }
 
-function stPctCellDual(projected, ytd, threshold) {
-  if (projected === null || projected === undefined) return '<td class="px-3 py-2.5 text-right text-gray-300">—</td>';
-  if (projected > 1.5) return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-400" title="${escHtml(t('st_na_title'))}">${t('st_nd')}</span></td>`;
-  const pct  = Math.round(projected * 100);
-  const ok   = projected >= threshold;
-  const mid  = projected >= threshold * 0.75;
-  const bg   = ok ? 'bg-green-50 text-green-700' : mid ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
-  let html   = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${bg}" title="${escHtml(t('st_projected_tip'))}">${pct}%</span>`;
-  if (ytd !== null && ytd !== undefined && ytd !== projected) {
-    const ytdPct = Math.round(ytd * 100);
-    html += `<span class="block text-[10px] text-gray-400 mt-0.5" title="${escHtml(t('st_ytd_tip'))}">${ytdPct}% ${t('st_ytd_lbl')}</span>`;
+function stPctCellDual(avgSt, recentProj, recentYtd, seasonCode, threshold) {
+  if (avgSt === null || avgSt === undefined) return '<td class="px-3 py-2.5 text-right text-gray-300">—</td>';
+  if (avgSt > 1.5) return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-400" title="${escHtml(t('st_na_title'))}">${t('st_nd')}</span></td>`;
+  const pct = Math.round(avgSt * 100);
+  const ok  = avgSt >= threshold;
+  const mid = avgSt >= threshold * 0.75;
+  const bg  = ok ? 'bg-green-50 text-green-700' : mid ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
+  let html  = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${bg}" title="${escHtml(t('st_avg_tip'))}">${pct}%</span>`;
+  if (recentProj !== null && recentProj !== undefined && seasonCode) {
+    const projPct = Math.round(recentProj * 100);
+    const ytdPct  = recentYtd !== null && recentYtd !== undefined ? Math.round(recentYtd * 100) : null;
+    const season  = seasonCode.toUpperCase();
+    const ytdPart = ytdPct !== null && ytdPct !== projPct
+      ? ` <span class="text-gray-400">(${ytdPct}% ${t('st_ytd_lbl')})</span>`
+      : '';
+    html += `<span class="block text-[10px] text-indigo-500 mt-0.5" title="${escHtml(t('st_projected_tip'))}">${season}: ${projPct}% proj${ytdPart}</span>`;
   }
   return `<td class="px-3 py-2.5 text-right">${html}</td>`;
 }
@@ -1209,7 +1214,7 @@ function renderMarqueBudgetTable() {
         <td class="px-3 py-2.5 text-center">${seasonBadges || `<span class="text-gray-300">—</span>`}</td>
         <td class="px-3 py-2.5 text-right">${avgRecvHtml}</td>
         <td class="px-3 py-2.5 text-right text-[11px]">${rangeHtml}</td>
-        ${stPctCellDual(m.avg_st, m.avg_st_ytd, 0.60)}
+        ${stPctCellDual(m.avg_st, m.recent_st_projected, m.recent_st_ytd, m.recent_season_code, 0.60)}
         <td class="px-3 py-2.5 text-center">${trendBadge(m.trend)}</td>
         <td class="px-3 py-2.5 text-center">${multHtml}</td>
         <td class="px-3 py-2.5 text-right">${adjHtml}</td>
