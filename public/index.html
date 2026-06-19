@@ -432,7 +432,12 @@
     <div class="flex items-center gap-3 mb-4 flex-wrap">
       <h2 class="text-base font-semibold text-gray-800" data-i18n="plan_title">Création de budget</h2>
       <select id="planSeason" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 bg-white shadow-sm"></select>
-      <span id="planSavedMsg" class="text-xs text-emerald-600 font-semibold hidden" data-i18n="plan_saved">Sauvegardé</span>
+      <span id="planSavedMsg" class="text-xs text-emerald-600 font-semibold hidden">✓ <span data-i18n="plan_saved">Sauvegardé</span></span>
+    </div>
+    <!-- Shop filter -->
+    <div class="bg-white border border-gray-200 rounded-xl px-4 py-3 mb-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+      <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider" data-i18n="filter_boutiques">Boutiques</span>
+      <div id="planShopFilter" class="flex flex-wrap gap-x-4 gap-y-1.5"></div>
     </div>
     <!-- Totals bar -->
     <div class="flex gap-6 mb-4 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-5 py-3 flex-wrap">
@@ -451,7 +456,7 @@
             <th class="px-4 py-2 text-right" data-i18n="plan_col_suggested">Budget suggéré</th>
             <th class="px-4 py-2 text-right" data-i18n="plan_col_planned">Total planifié</th>
             <th class="px-4 py-2 text-right" data-i18n="plan_col_diff">Écart</th>
-            <th class="px-4 py-2 text-right" data-i18n="plan_col_actions"></th>
+            <th class="px-4 py-2"></th>
           </tr>
         </thead>
         <tbody id="planBody"></tbody>
@@ -1595,14 +1600,37 @@ function renderSizesPage() {
 
 // ── Transfers tab ─────────────────────────────────────────────────────────
 // ── Création de budget ────────────────────────────────────────────────────
-const planState = { budget: [], plan: {}, season: 'p26' };
+const planState = {
+  budget: [], plan: {}, drops: {}, season: 'p26',
+  selectedShops: new Set(SHOPS.map(s => s.id)),
+};
+
+function buildPlanShopFilter() {
+  const container = document.getElementById('planShopFilter');
+  if (!container || container.dataset.built) return;
+  container.dataset.built = '1';
+  SHOPS.forEach(({ id, name }) => {
+    const lbl = document.createElement('label');
+    lbl.className = 'flex items-center gap-1.5 text-xs cursor-pointer select-none';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = id; cb.checked = true;
+    cb.className = 'plan-shop-cb accent-indigo-600';
+    cb.addEventListener('change', () => {
+      if (cb.checked) planState.selectedShops.add(id);
+      else planState.selectedShops.delete(id);
+      renderPlanTable();
+    });
+    lbl.append(cb, document.createTextNode(' ' + name));
+    container.appendChild(lbl);
+  });
+}
 
 function planSeasonFromBudget() {
   return document.getElementById('budgetSeasSeason')?.value ?? 'p26';
 }
 
 async function loadBudgetPlan() {
-  // Populate season selector from budget tab selector
+  buildPlanShopFilter();
   const budgetSeasEl = document.getElementById('budgetSeasSeason');
   const planSeasEl   = document.getElementById('planSeason');
   if (budgetSeasEl && planSeasEl && !planSeasEl.options.length) {
@@ -1623,11 +1651,20 @@ async function fetchAndRenderPlan() {
     ]);
     planState.budget = budgetRes.by_manufacturer ?? [];
     planState.plan   = planRes.by_manufacturer   ?? {};
+    planState.drops  = planRes.drops             ?? {};
     renderPlanTable();
   } catch (e) {
     document.getElementById('planBody').innerHTML =
-      `<tr><td colspan="5" class="text-center py-8 text-red-400">${e.message}</td></tr>`;
+      `<tr><td colspan="5" class="text-center py-8 text-red-400">${escHtml(e.message)}</td></tr>`;
   }
+}
+
+function planTotalForMfr(mfr) {
+  const dropMap = planState.plan[mfr] ?? {};
+  let total = 0;
+  for (const shopMap of Object.values(dropMap))
+    for (const amt of Object.values(shopMap)) total += amt;
+  return total;
 }
 
 function renderPlanTable() {
@@ -1638,20 +1675,16 @@ function renderPlanTable() {
   let totalSuggested = 0, totalPlanned = 0;
 
   for (const m of planState.budget) {
-    const mfr      = m.manufacturer;
-    const suggested = m.net_budget ?? 0;
-    totalSuggested += suggested;
+    const mfr       = m.manufacturer;
+    const suggested  = m.net_budget ?? 0;
+    totalSuggested  += suggested;
+    const totalPlan  = planTotalForMfr(mfr);
+    totalPlanned    += totalPlan;
 
-    // Sum planned across all shops
-    const shopEntries = planState.plan[mfr] ?? {};
-    const totalPlan   = Object.values(shopEntries).reduce((s, v) => s + v, 0);
-    totalPlanned     += totalPlan;
-
-    const diff     = totalPlan - suggested;
-    const diffCls  = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
-    const diffSign = diff > 0 ? '+' : '';
+    const diff    = totalPlan - suggested;
+    const diffCls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
     const diffHtml = totalPlan > 0
-      ? `<span class="${diffCls}">${diffSign}${fmtC(diff)}</span>`
+      ? `<span class="${diffCls}">${diff >= 0 ? '+' : ''}${fmtC(diff)}</span>`
       : `<span class="text-gray-300">—</span>`;
 
     rows.push(`
@@ -1665,25 +1698,25 @@ function renderPlanTable() {
         <td class="px-4 py-2.5 text-right text-gray-500">${fmtC(suggested)}</td>
         <td class="px-4 py-2.5 text-right font-semibold text-indigo-700">${totalPlan > 0 ? fmtC(totalPlan) : '<span class="text-gray-300">—</span>'}</td>
         <td class="px-4 py-2.5 text-right">${diffHtml}</td>
-        <td class="px-4 py-2.5 text-right"></td>
+        <td class="px-4 py-2.5"></td>
       </tr>
       <tr class="plan-detail hidden" data-mfr="${escHtml(mfr)}">
-        <td colspan="5" class="px-6 py-3 bg-gray-50 border-t border-gray-100">
-          ${renderPlanShopInputs(mfr, suggested, shopEntries)}
+        <td colspan="5" class="px-6 py-4 bg-gray-50 border-t border-gray-100">
+          ${renderDropsBlock(mfr, suggested)}
         </td>
       </tr>`);
   }
 
   tbody.innerHTML = rows.join('') || `<tr><td colspan="5" class="text-center py-8 text-gray-400">${t('no_data')}</td></tr>`;
 
-  // Totals
-  const diff = totalPlanned - totalSuggested;
+  // Totals bar
+  const diff    = totalPlanned - totalSuggested;
   const diffCls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
   document.getElementById('planTotalSuggested').textContent = fmtC(totalSuggested);
   document.getElementById('planTotalPlanned').textContent   = totalPlanned > 0 ? fmtC(totalPlanned) : '—';
   const diffEl = document.getElementById('planTotalDiff');
-  diffEl.textContent  = totalPlanned > 0 ? `${diff >= 0 ? '+' : ''}${fmtC(diff)}` : '—';
-  diffEl.className    = 'font-semibold ' + diffCls;
+  diffEl.textContent = totalPlanned > 0 ? `${diff >= 0 ? '+' : ''}${fmtC(diff)}` : '—';
+  diffEl.className   = 'font-semibold ' + diffCls;
 
   // Row click → expand
   document.querySelectorAll('.plan-row').forEach(row => {
@@ -1700,57 +1733,191 @@ function renderPlanTable() {
   });
 }
 
-function renderPlanShopInputs(mfr, suggested, shopEntries) {
-  const perShop = Math.round(suggested / Math.max(1, SHOPS.length));
-  const shopRows = SHOPS.map(({ id, name }) => {
-    const val = shopEntries[id] ?? 0;
-    return `
-      <div class="flex items-center gap-3 mb-1.5">
-        <span class="text-xs text-gray-500 w-36 truncate">${escHtml(name)}</span>
-        <div class="flex items-center gap-1">
-          <span class="text-xs text-gray-400">$</span>
-          <input type="number" min="0" step="100"
-            class="plan-shop-input border border-gray-200 rounded px-2 py-1 text-xs w-28 text-right focus:border-indigo-400 focus:outline-none"
-            data-mfr="${escHtml(mfr)}" data-shop="${id}"
-            value="${val > 0 ? val : ''}" placeholder="${perShop}">
-        </div>
-      </div>`;
-  }).join('');
+function renderDropsBlock(mfr, suggested) {
+  // Ensure at least drop_1 exists in planState.drops
+  let drops = planState.drops[mfr];
+  if (!drops || !drops.length) drops = [{ drop_id: 'drop_1', drop_name: 'Drop 1', drop_order: 1 }];
 
-  return `<div class="flex flex-wrap gap-6">
-    <div>
-      <div class="text-[10px] font-semibold text-gray-400 uppercase mb-2" data-i18n="plan_by_shop">Par boutique</div>
-      ${shopRows}
-    </div>
-    <div class="text-xs text-gray-400 self-end mb-1">
-      <span data-i18n="plan_suggested_lbl">Suggéré :</span> <span class="font-semibold text-gray-600">${fmtC(suggested)}</span>
-    </div>
-  </div>`;
+  const visibleShops = SHOPS.filter(s => planState.selectedShops.has(s.id));
+
+  const dropBlocks = drops.map(drop => {
+    const { drop_id, drop_name } = drop;
+    const shopMap  = (planState.plan[mfr] ?? {})[drop_id] ?? {};
+    const dropTotal = visibleShops.reduce((s, sh) => s + (shopMap[sh.id] ?? 0), 0);
+    const isDrop1  = drop_id === 'drop_1';
+
+    const shopRows = visibleShops.map(({ id, name }) => {
+      const val = shopMap[id] ?? 0;
+      return `
+        <div class="flex items-center gap-3 mb-1.5">
+          <span class="text-xs text-gray-500 w-40 truncate">${escHtml(name)}</span>
+          <div class="flex items-center gap-1">
+            <span class="text-xs text-gray-400">$</span>
+            <input type="number" min="0" step="100"
+              class="plan-shop-input border border-gray-200 rounded px-2 py-1 text-xs w-28 text-right focus:border-indigo-400 focus:outline-none"
+              data-mfr="${escHtml(mfr)}" data-drop="${drop_id}" data-shop="${id}"
+              value="${val > 0 ? val : ''}" placeholder="0">
+          </div>
+        </div>`;
+    }).join('');
+
+    const deleteBtn = isDrop1 ? '' :
+      `<button class="plan-drop-delete ml-2 text-gray-300 hover:text-red-400 text-xs" title="Supprimer"
+         data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">✕</button>`;
+
+    return `
+      <div class="plan-drop-block mb-4 last:mb-0" data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">
+        <div class="flex items-center gap-2 mb-2">
+          <input type="text"
+            class="plan-drop-name border-b border-gray-200 bg-transparent text-xs font-semibold text-gray-600 px-1 py-0.5 focus:outline-none focus:border-indigo-400 w-40"
+            data-mfr="${escHtml(mfr)}" data-drop="${drop_id}"
+            value="${escHtml(drop_name)}">
+          ${deleteBtn}
+          ${dropTotal > 0 ? `<span class="text-xs text-indigo-600 font-semibold ml-2">${fmtC(dropTotal)}</span>` : ''}
+        </div>
+        ${visibleShops.length ? shopRows : '<span class="text-xs text-gray-300">Aucune boutique sélectionnée</span>'}
+      </div>`;
+  }).join('<div class="border-t border-gray-200 my-3"></div>');
+
+  return `
+    <div class="flex gap-8 flex-wrap">
+      <div class="min-w-72">
+        <div class="text-xs text-gray-400 mb-3">Suggéré total : <span class="font-semibold text-gray-600">${fmtC(suggested)}</span></div>
+        ${dropBlocks}
+        <button class="plan-add-drop mt-3 flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-medium"
+          data-mfr="${escHtml(mfr)}">
+          <span class="text-base leading-none">+</span> Ajouter une livraison
+        </button>
+      </div>
+    </div>`;
 }
 
-// Auto-save on input blur
+function flashPlanSaved() {
+  const msg = document.getElementById('planSavedMsg');
+  if (!msg) return;
+  msg.classList.remove('hidden');
+  clearTimeout(msg._timer);
+  msg._timer = setTimeout(() => msg.classList.add('hidden'), 2000);
+}
+
+// Auto-save amount inputs on change
 document.addEventListener('change', async e => {
   const input = e.target.closest('.plan-shop-input');
   if (!input) return;
   const mfr    = input.dataset.mfr;
+  const dropId = input.dataset.drop ?? 'drop_1';
   const shopId = input.dataset.shop;
   const amount = parseFloat(input.value) || 0;
   const season = planState.season;
 
-  // Update local state
   if (!planState.plan[mfr]) planState.plan[mfr] = {};
-  planState.plan[mfr][shopId] = amount;
+  if (!planState.plan[mfr][dropId]) planState.plan[mfr][dropId] = {};
+  planState.plan[mfr][dropId][shopId] = amount;
+
+  // Ensure this drop exists in planState.drops
+  if (!planState.drops[mfr]) planState.drops[mfr] = [];
+  if (!planState.drops[mfr].find(d => d.drop_id === dropId)) {
+    planState.drops[mfr].push({ drop_id: dropId, drop_name: 'Drop 1', drop_order: 1 });
+  }
 
   try {
     await fetch(`${BASE}/api/budget-plan`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ season_code: season, manufacturer: mfr, shop_id: shopId, planned_amount: amount }),
+      body: JSON.stringify({ season_code: season, manufacturer: mfr, drop_id: dropId, shop_id: shopId, planned_amount: amount }),
     });
-    // Flash saved message
-    const msg = document.getElementById('planSavedMsg');
-    if (msg) { msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 2000); }
-    // Re-render totals
+    flashPlanSaved();
+    // Refresh only the totals cells without full re-render
+    const totalPlan = planTotalForMfr(mfr);
+    const suggested = planState.budget.find(b => b.manufacturer === mfr)?.net_budget ?? 0;
+    const row       = document.querySelector(`.plan-row[data-mfr="${CSS.escape(mfr)}"]`);
+    if (row) {
+      const cells = row.querySelectorAll('td');
+      const diff  = totalPlan - suggested;
+      cells[2].innerHTML = totalPlan > 0 ? `<span class="font-semibold text-indigo-700">${fmtC(totalPlan)}</span>` : '<span class="text-gray-300">—</span>';
+      const cls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
+      cells[3].innerHTML = totalPlan > 0 ? `<span class="${cls}">${diff >= 0 ? '+' : ''}${fmtC(diff)}</span>` : '<span class="text-gray-300">—</span>';
+    }
+    // Refresh totals bar
+    let ts = 0, tp = 0;
+    for (const m of planState.budget) { ts += m.net_budget ?? 0; tp += planTotalForMfr(m.manufacturer); }
+    document.getElementById('planTotalSuggested').textContent = fmtC(ts);
+    document.getElementById('planTotalPlanned').textContent   = tp > 0 ? fmtC(tp) : '—';
+    const d = tp - ts;
+    const diffEl = document.getElementById('planTotalDiff');
+    diffEl.textContent = tp > 0 ? `${d >= 0 ? '+' : ''}${fmtC(d)}` : '—';
+    diffEl.className   = 'font-semibold ' + (d > 0 ? 'text-red-500' : d < 0 ? 'text-amber-600' : 'text-gray-400');
+  } catch {}
+});
+
+// Save drop name on blur or Enter
+document.addEventListener('change', async e => {
+  const input = e.target.closest('.plan-drop-name');
+  if (!input) return;
+  const mfr    = input.dataset.mfr;
+  const dropId = input.dataset.drop;
+  const name   = input.value.trim() || dropId;
+  // Update local state
+  const drop = planState.drops[mfr]?.find(d => d.drop_id === dropId);
+  if (drop) drop.drop_name = name;
+  try {
+    await fetch(`${BASE}/api/budget-plan/drop`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_id: dropId, drop_name: name }),
+    });
+    flashPlanSaved();
+  } catch {}
+});
+
+// Add drop button
+document.addEventListener('click', async e => {
+  const btn = e.target.closest('.plan-add-drop');
+  if (!btn) return;
+  const mfr = btn.dataset.mfr;
+  try {
+    const res = await fetch(`${BASE}/api/budget-plan/drop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_name: '' }),
+    });
+    const data = await res.json();
+    if (!data.ok) return;
+    if (!planState.drops[mfr]) planState.drops[mfr] = [];
+    planState.drops[mfr].push({ drop_id: data.drop_id, drop_name: data.drop_name, drop_order: data.drop_order });
+    if (!planState.plan[mfr]) planState.plan[mfr] = {};
+    planState.plan[mfr][data.drop_id] = {};
+    // Re-render the detail row only
+    const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
+    if (detail) {
+      const suggested = planState.budget.find(b => b.manufacturer === mfr)?.net_budget ?? 0;
+      detail.querySelector('td').innerHTML = renderDropsBlock(mfr, suggested);
+    }
+  } catch {}
+});
+
+// Delete drop button
+document.addEventListener('click', async e => {
+  const btn = e.target.closest('.plan-drop-delete');
+  if (!btn) return;
+  const mfr    = btn.dataset.mfr;
+  const dropId = btn.dataset.drop;
+  if (!confirm(`Supprimer cette livraison et ses montants ?`)) return;
+  try {
+    await fetch(`${BASE}/api/budget-plan/drop`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_id: dropId }),
+    });
+    // Update local state
+    if (planState.drops[mfr]) planState.drops[mfr] = planState.drops[mfr].filter(d => d.drop_id !== dropId);
+    if (planState.plan[mfr]) delete planState.plan[mfr][dropId];
+    // Re-render detail + totals
+    const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
+    if (detail) {
+      const suggested = planState.budget.find(b => b.manufacturer === mfr)?.net_budget ?? 0;
+      detail.querySelector('td').innerHTML = renderDropsBlock(mfr, suggested);
+    }
     renderPlanTable();
   } catch {}
 });

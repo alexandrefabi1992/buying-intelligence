@@ -312,6 +312,36 @@ async function runMigrations() {
     );
   }
 
+  // Migration: add drop_id to budget_plans and create budget_plan_drops table
+  const { rows: planDropsMig } = await pool.query(
+    "SELECT 1 FROM sync_state WHERE step = 'budget_plans_drops_v1'"
+  );
+  if (!planDropsMig.length) {
+    await pool.query(`ALTER TABLE budget_plans ADD COLUMN IF NOT EXISTS drop_id TEXT NOT NULL DEFAULT 'drop_1'`);
+    await pool.query(`ALTER TABLE budget_plans DROP CONSTRAINT IF EXISTS budget_plans_pkey`);
+    await pool.query(`ALTER TABLE budget_plans ADD PRIMARY KEY (season_code, manufacturer, drop_id, shop_id)`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS budget_plan_drops (
+        season_code  TEXT    NOT NULL,
+        manufacturer TEXT    NOT NULL,
+        drop_id      TEXT    NOT NULL,
+        drop_name    TEXT    NOT NULL DEFAULT 'Drop 1',
+        drop_order   INTEGER NOT NULL DEFAULT 1,
+        updated_at   TIMESTAMPTZ DEFAULT now(),
+        PRIMARY KEY (season_code, manufacturer, drop_id)
+      )
+    `);
+    await pool.query(`
+      INSERT INTO budget_plan_drops (season_code, manufacturer, drop_id, drop_name, drop_order)
+      SELECT DISTINCT season_code, manufacturer, 'drop_1', 'Drop 1', 1 FROM budget_plans
+      ON CONFLICT DO NOTHING
+    `);
+    await pool.query(
+      "INSERT INTO sync_state(step, next_url) VALUES ('budget_plans_drops_v1', 'COMPLETED') ON CONFLICT(step) DO NOTHING"
+    );
+    console.log('[migration] budget_plans drops schema migrated');
+  }
+
   console.log('[migration] Schema up to date');
 }
 
@@ -2797,41 +2827,117 @@ app.get('/api/budget/marque', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET  /api/budget-plan?season=p27  — planned amounts per brand/shop
-// PUT  /api/budget-plan             — upsert one entry
-//   body: { season_code, manufacturer, shop_id?, planned_amount }
+// Budget plan routes — per (season, manufacturer, drop, shop)
 // ---------------------------------------------------------------------------
 app.get('/api/budget-plan', async (req, res, next) => {
   try {
     const season = (req.query.season ?? 'p26').toLowerCase();
-    const { rows } = await pool.query(
-      `SELECT manufacturer, shop_id, planned_amount::float8 AS planned_amount, updated_at
-       FROM budget_plans WHERE season_code = $1`,
-      [season]
-    );
-    // Shape: { [manufacturer]: { [shop_id]: amount } }
+    const [planRows, dropRows] = await Promise.all([
+      pool.query(
+        `SELECT manufacturer, drop_id, shop_id, planned_amount::float8 AS planned_amount
+         FROM budget_plans WHERE season_code = $1`,
+        [season]
+      ),
+      pool.query(
+        `SELECT manufacturer, drop_id, drop_name, drop_order
+         FROM budget_plan_drops WHERE season_code = $1
+         ORDER BY manufacturer, drop_order`,
+        [season]
+      ),
+    ]);
+
+    // Shape: { [mfr]: { [drop_id]: { [shop_id]: amount } } }
     const byMfr = {};
-    for (const r of rows) {
+    for (const r of planRows.rows) {
       if (!byMfr[r.manufacturer]) byMfr[r.manufacturer] = {};
-      byMfr[r.manufacturer][r.shop_id] = parseFloat(r.planned_amount ?? 0);
+      if (!byMfr[r.manufacturer][r.drop_id]) byMfr[r.manufacturer][r.drop_id] = {};
+      byMfr[r.manufacturer][r.drop_id][r.shop_id] = parseFloat(r.planned_amount ?? 0);
     }
-    res.json({ season_code: season, by_manufacturer: byMfr });
+
+    // Shape: { [mfr]: [{ drop_id, drop_name, drop_order }] }
+    const drops = {};
+    for (const r of dropRows.rows) {
+      if (!drops[r.manufacturer]) drops[r.manufacturer] = [];
+      drops[r.manufacturer].push({ drop_id: r.drop_id, drop_name: r.drop_name, drop_order: r.drop_order });
+    }
+
+    res.json({ season_code: season, by_manufacturer: byMfr, drops });
   } catch (err) { next(err); }
 });
 
+// Upsert one amount entry
 app.put('/api/budget-plan', async (req, res, next) => {
   try {
-    const { season_code, manufacturer, shop_id = '__all__', planned_amount } = req.body;
+    const { season_code, manufacturer, drop_id = 'drop_1', shop_id = '__all__', planned_amount } = req.body;
     if (!season_code || !manufacturer) return res.status(400).json({ error: 'season_code and manufacturer are required' });
     const amount = Math.max(0, parseFloat(planned_amount ?? 0));
+    const sc = season_code.toLowerCase();
     await pool.query(
-      `INSERT INTO budget_plans(season_code, manufacturer, shop_id, planned_amount, updated_at)
-       VALUES ($1, $2, $3, $4, now())
-       ON CONFLICT(season_code, manufacturer, shop_id)
-       DO UPDATE SET planned_amount = $4, updated_at = now()`,
-      [season_code.toLowerCase(), manufacturer, shop_id, amount]
+      `INSERT INTO budget_plans(season_code, manufacturer, drop_id, shop_id, planned_amount, updated_at)
+       VALUES ($1, $2, $3, $4, $5, now())
+       ON CONFLICT(season_code, manufacturer, drop_id, shop_id)
+       DO UPDATE SET planned_amount = $5, updated_at = now()`,
+      [sc, manufacturer, drop_id, shop_id, amount]
     );
-    res.json({ ok: true, season_code, manufacturer, shop_id, planned_amount: amount });
+    // Ensure drop metadata exists
+    await pool.query(
+      `INSERT INTO budget_plan_drops(season_code, manufacturer, drop_id, drop_name, drop_order)
+       VALUES ($1, $2, $3, 'Drop 1', 1)
+       ON CONFLICT DO NOTHING`,
+      [sc, manufacturer, drop_id]
+    );
+    res.json({ ok: true, season_code: sc, manufacturer, drop_id, shop_id, planned_amount: amount });
+  } catch (err) { next(err); }
+});
+
+// Create a new drop for a brand
+app.post('/api/budget-plan/drop', async (req, res, next) => {
+  try {
+    const { season_code, manufacturer, drop_name } = req.body;
+    if (!season_code || !manufacturer) return res.status(400).json({ error: 'season_code and manufacturer are required' });
+    const sc = season_code.toLowerCase();
+    const { rows: existing } = await pool.query(
+      `SELECT drop_id, drop_order FROM budget_plan_drops WHERE season_code = $1 AND manufacturer = $2 ORDER BY drop_order`,
+      [sc, manufacturer]
+    );
+    const nextOrder  = (existing[existing.length - 1]?.drop_order ?? 0) + 1;
+    const newDropId  = `drop_${nextOrder}`;
+    const name       = drop_name?.trim() || `Drop ${nextOrder}`;
+    await pool.query(
+      `INSERT INTO budget_plan_drops(season_code, manufacturer, drop_id, drop_name, drop_order)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT DO NOTHING`,
+      [sc, manufacturer, newDropId, name, nextOrder]
+    );
+    res.json({ ok: true, drop_id: newDropId, drop_name: name, drop_order: nextOrder });
+  } catch (err) { next(err); }
+});
+
+// Rename a drop
+app.put('/api/budget-plan/drop', async (req, res, next) => {
+  try {
+    const { season_code, manufacturer, drop_id, drop_name } = req.body;
+    if (!season_code || !manufacturer || !drop_id) return res.status(400).json({ error: 'season_code, manufacturer and drop_id are required' });
+    const name = drop_name?.trim() || drop_id;
+    await pool.query(
+      `UPDATE budget_plan_drops SET drop_name = $4, updated_at = now()
+       WHERE season_code = $1 AND manufacturer = $2 AND drop_id = $3`,
+      [season_code.toLowerCase(), manufacturer, drop_id, name]
+    );
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// Delete a drop and all its amounts
+app.delete('/api/budget-plan/drop', async (req, res, next) => {
+  try {
+    const { season_code, manufacturer, drop_id } = req.body;
+    if (!season_code || !manufacturer || !drop_id) return res.status(400).json({ error: 'season_code, manufacturer and drop_id are required' });
+    if (drop_id === 'drop_1') return res.status(400).json({ error: 'Cannot delete the primary drop' });
+    const sc = season_code.toLowerCase();
+    await pool.query(`DELETE FROM budget_plans        WHERE season_code = $1 AND manufacturer = $2 AND drop_id = $3`, [sc, manufacturer, drop_id]);
+    await pool.query(`DELETE FROM budget_plan_drops   WHERE season_code = $1 AND manufacturer = $2 AND drop_id = $3`, [sc, manufacturer, drop_id]);
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 
