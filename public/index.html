@@ -1813,6 +1813,7 @@ function renderPlanTable() {
         const open = !detail.classList.contains('hidden');
         detail.classList.toggle('hidden', open);
         if (toggle) toggle.textContent = open ? '▶' : '▼';
+        if (!open) planLoadAllDocs(mfr);
       }
     });
   });
@@ -1847,8 +1848,23 @@ function renderDropsBlock(mfr, suggested) {
     }).join('');
 
     const deleteBtn = isDrop1 ? '' :
-      `<button class="plan-drop-delete ml-2 text-gray-300 hover:text-red-400 text-xs" title="Supprimer"
+      `<button class="plan-drop-delete ml-2 text-gray-300 hover:text-red-400 text-xs" title="Supprimer la livraison"
          data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">✕</button>`;
+
+    const docsSection = `
+      <div class="mt-2 pt-2 border-t border-gray-100">
+        <div class="plan-docs-list text-[10px] text-gray-400 mb-1.5" data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">…</div>
+        <label class="flex items-center gap-1.5 text-[10px] text-indigo-400 hover:text-indigo-600 cursor-pointer font-medium">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+          </svg>
+          Ajouter un document
+          <input type="file" class="plan-doc-upload sr-only"
+            data-mfr="${escHtml(mfr)}" data-drop="${drop_id}"
+            accept=".pdf,.xlsx,.xls,.docx,.doc,.csv,.txt,.jpg,.jpeg,.png">
+        </label>
+      </div>`;
 
     return `
       <div class="plan-drop-block mb-4 last:mb-0" data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">
@@ -1861,6 +1877,7 @@ function renderDropsBlock(mfr, suggested) {
           ${dropTotal > 0 ? `<span class="text-xs text-indigo-600 font-semibold ml-2">${fmtC(dropTotal)}</span>` : ''}
         </div>
         ${visibleShops.length ? shopRows : '<span class="text-xs text-gray-300">Aucune boutique sélectionnée</span>'}
+        ${docsSection}
       </div>`;
   }).join('<div class="border-t border-gray-200 my-3"></div>');
 
@@ -1977,6 +1994,7 @@ document.addEventListener('click', async e => {
     if (detail) {
       const suggested = planState.budget.find(b => b.manufacturer === mfr)?.net_budget ?? 0;
       detail.querySelector('td').innerHTML = renderDropsBlock(mfr, suggested);
+      planLoadAllDocs(mfr);
     }
   } catch {}
 });
@@ -2056,6 +2074,91 @@ document.getElementById('planConfirmAddBrand')?.addEventListener('click', () => 
   selEl.value = ''; txtEl.value = '';
   document.getElementById('planAddBrandPanel')?.classList.add('hidden');
   renderPlanTable();
+});
+
+// ── Budget documents ──────────────────────────────────────────────────────
+
+function fmtFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' Ko';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' Mo';
+}
+
+async function loadPlanDocs(mfr, dropId) {
+  const containers = document.querySelectorAll(`.plan-docs-list[data-mfr="${CSS.escape(mfr)}"][data-drop="${CSS.escape(dropId)}"]`);
+  if (!containers.length) return;
+  try {
+    const r    = await fetch(`${BASE}/api/budget-plan/documents?season=${planState.season}&manufacturer=${encodeURIComponent(mfr)}&drop_id=${dropId}`);
+    const data = await r.json();
+    const html = data.docs && data.docs.length
+      ? data.docs.map(doc => `
+          <div class="flex items-center gap-2 py-0.5">
+            <a href="${BASE}/api/budget-plan/document/${doc.id}" target="_blank"
+               class="text-[10px] text-indigo-500 hover:underline max-w-xs truncate"
+               title="${escHtml(doc.filename)}">📄 ${escHtml(doc.filename)}</a>
+            <span class="text-[10px] text-gray-300">${fmtFileSize(doc.file_size)}</span>
+            <button class="plan-doc-delete text-gray-300 hover:text-red-400 text-[10px]"
+              data-doc-id="${doc.id}" data-mfr="${escHtml(mfr)}" data-drop="${escHtml(dropId)}" title="Supprimer">✕</button>
+          </div>`).join('')
+      : '<span class="text-[10px] text-gray-300 italic">Aucun document</span>';
+    containers.forEach(c => c.innerHTML = html);
+  } catch {
+    containers.forEach(c => c.innerHTML = '<span class="text-[10px] text-red-400">Erreur</span>');
+  }
+}
+
+function planLoadAllDocs(mfr) {
+  const drops = planState.drops[mfr] ?? [{ drop_id: 'drop_1' }];
+  drops.forEach(d => loadPlanDocs(mfr, d.drop_id));
+}
+
+// Upload file
+document.addEventListener('change', async e => {
+  const input = e.target.closest('.plan-doc-upload');
+  if (!input) return;
+  const file  = input.files[0];
+  if (!file) return;
+  const mfr   = input.dataset.mfr;
+  const drop  = input.dataset.drop;
+  // Show uploading state
+  const containers = document.querySelectorAll(`.plan-docs-list[data-mfr="${CSS.escape(mfr)}"][data-drop="${CSS.escape(drop)}"]`);
+  containers.forEach(c => c.innerHTML = '<span class="text-[10px] text-gray-400 animate-pulse">Envoi en cours…</span>');
+  const reader = new FileReader();
+  reader.onload = async evt => {
+    const base64 = evt.target.result.split(',')[1];
+    try {
+      const res = await fetch(`${BASE}/api/budget-plan/document`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          season_code: planState.season,
+          manufacturer: mfr,
+          drop_id: drop,
+          filename: file.name,
+          content_type: file.type || 'application/octet-stream',
+          data_base64: base64,
+        }),
+      });
+      if (res.ok) { flashPlanSaved(); }
+    } catch {}
+    input.value = '';
+    loadPlanDocs(mfr, drop);
+  };
+  reader.readAsDataURL(file);
+});
+
+// Delete document
+document.addEventListener('click', async e => {
+  const btn = e.target.closest('.plan-doc-delete');
+  if (!btn) return;
+  const docId = btn.dataset.docId;
+  const mfr   = btn.dataset.mfr;
+  const drop  = btn.dataset.drop;
+  if (!confirm('Supprimer ce document ?')) return;
+  try {
+    await fetch(`${BASE}/api/budget-plan/document/${docId}`, { method: 'DELETE' });
+    loadPlanDocs(mfr, drop);
+  } catch {}
 });
 
 async function loadTransfers() {

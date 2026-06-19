@@ -149,7 +149,7 @@ function cacheSet(key, data) {
   budgetCache.set(key, { data, expires: Date.now() + CACHE_TTL_MS });
 }
 
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
@@ -341,6 +341,23 @@ async function runMigrations() {
     );
     console.log('[migration] budget_plans drops schema migrated');
   }
+
+  // Budget documents — binary file storage per (season, manufacturer, drop)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS budget_documents (
+      id           BIGSERIAL PRIMARY KEY,
+      season_code  TEXT        NOT NULL,
+      manufacturer TEXT        NOT NULL,
+      drop_id      TEXT        NOT NULL DEFAULT 'drop_1',
+      filename     TEXT        NOT NULL,
+      content_type TEXT        NOT NULL DEFAULT 'application/octet-stream',
+      file_size    INTEGER     NOT NULL DEFAULT 0,
+      data         BYTEA       NOT NULL,
+      uploaded_at  TIMESTAMPTZ DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_budget_docs_lookup
+    ON budget_documents(season_code, manufacturer, drop_id)`);
 
   console.log('[migration] Schema up to date');
 }
@@ -2951,6 +2968,67 @@ app.delete('/api/budget-plan/drop', async (req, res, next) => {
     const sc = season_code.toLowerCase();
     await pool.query(`DELETE FROM budget_plans        WHERE season_code = $1 AND manufacturer = $2 AND drop_id = $3`, [sc, manufacturer, drop_id]);
     await pool.query(`DELETE FROM budget_plan_drops   WHERE season_code = $1 AND manufacturer = $2 AND drop_id = $3`, [sc, manufacturer, drop_id]);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// Budget document routes — binary file storage per (season, manufacturer, drop)
+// ---------------------------------------------------------------------------
+
+// List documents (no file data)
+app.get('/api/budget-plan/documents', async (req, res, next) => {
+  try {
+    const { season, manufacturer, drop_id } = req.query;
+    if (!season || !manufacturer) return res.status(400).json({ error: 'season and manufacturer are required' });
+    const conditions = ['season_code = $1', 'manufacturer = $2'];
+    const params     = [season.toLowerCase(), manufacturer];
+    if (drop_id) { conditions.push(`drop_id = $${params.length + 1}`); params.push(drop_id); }
+    const { rows } = await pool.query(
+      `SELECT id, drop_id, filename, content_type, file_size, uploaded_at
+       FROM budget_documents WHERE ${conditions.join(' AND ')} ORDER BY uploaded_at`,
+      params
+    );
+    res.json({ docs: rows });
+  } catch (err) { next(err); }
+});
+
+// Upload a document (base64 JSON body)
+app.post('/api/budget-plan/document', async (req, res, next) => {
+  try {
+    const { season_code, manufacturer, drop_id = 'drop_1', filename, content_type, data_base64 } = req.body;
+    if (!season_code || !manufacturer || !filename || !data_base64)
+      return res.status(400).json({ error: 'season_code, manufacturer, filename, data_base64 are required' });
+    const buf = Buffer.from(data_base64, 'base64');
+    const { rows } = await pool.query(
+      `INSERT INTO budget_documents(season_code, manufacturer, drop_id, filename, content_type, file_size, data)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+      [season_code.toLowerCase(), manufacturer, drop_id, filename,
+       content_type || 'application/octet-stream', buf.length, buf]
+    );
+    res.json({ ok: true, id: rows[0].id, filename });
+  } catch (err) { next(err); }
+});
+
+// Download a document by id
+app.get('/api/budget-plan/document/:id', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT filename, content_type, data FROM budget_documents WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    const { filename, content_type, data } = rows[0];
+    res.setHeader('Content-Type', content_type);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.send(data);
+  } catch (err) { next(err); }
+});
+
+// Delete a document
+app.delete('/api/budget-plan/document/:id', async (req, res, next) => {
+  try {
+    await pool.query(`DELETE FROM budget_documents WHERE id = $1`, [req.params.id]);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
