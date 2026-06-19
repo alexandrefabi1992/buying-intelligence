@@ -503,6 +503,21 @@
                    class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
             <span id="budgetRecencyPreview" class="text-xs text-gray-400 italic"></span>
           </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs text-gray-600 w-52 col-tip"
+                   data-tip="Contrôle comment afficher les marques absentes de la saison de référence la plus récente (ex: achetée en P24/P25 mais pas en P26).&#10;&#10;Afficher avec badge → la marque apparaît avec un avertissement orange pour décider consciemment.&#10;Masquer → la marque est exclue du budget (tu ne reconduis que ce que tu as acheté récemment)."
+                   data-i18n="params_absent_lbl">Marques absentes de la saison récente</label>
+            <div class="flex gap-3">
+              <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                <input type="radio" name="absentBrandMode" value="show" class="accent-indigo-600" checked>
+                <span data-i18n="params_absent_show">Afficher avec badge</span>
+              </label>
+              <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                <input type="radio" name="absentBrandMode" value="hide" class="accent-indigo-600">
+                <span data-i18n="params_absent_hide">Masquer</span>
+              </label>
+            </div>
+          </div>
           <button id="budgetParamsApply"
             class="self-start px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors mt-1"
             data-i18n="btn_apply_recalc">
@@ -566,6 +581,10 @@ const TRANSLATIONS = {
     params_carryover_lbl:'Taux déduction carryover',
     params_same_rate_lbl:'Même taux pour toutes les boutiques',
     params_recency_lbl:'Facteur de pondération récente',
+    params_absent_lbl:'Marques absentes de la saison récente',
+    params_absent_show:'Afficher avec badge',
+    params_absent_hide:'Masquer',
+    absent_recent_badge:'Absente en',
     params_nb_saisons_tip:'Nombre de saisons passées équivalentes utilisées pour calculer la moyenne historique (ex : 3 = P25, P24, P23 pour P26).',
     params_carryover_tip:'Détermine combien du stock restant (carryover) vient réduire ton budget d\'achat.\n\n100% → le stock restant est entièrement déduit (tu n\'achètes pas ce que tu as déjà).\n50%  → la moitié est déduite (garde une marge : l\'ancien stock ne se vendra pas tout seul).\n0%   → le carryover est ignoré, budget complet conservé.\n\nFormule : budget net = budget ajusté − (carryover × taux)',
     trend_hausse:'hausse', trend_stable:'stable', trend_baisse:'baisse',
@@ -640,6 +659,10 @@ const TRANSLATIONS = {
     params_carryover_lbl:'Carryover deduction rate',
     params_same_rate_lbl:'Apply same rate to all stores',
     params_recency_lbl:'Recency weighting factor',
+    params_absent_lbl:'Brands absent from recent season',
+    params_absent_show:'Show with badge',
+    params_absent_hide:'Hide',
+    absent_recent_badge:'Absent in',
     params_nb_saisons_tip:'Number of past equivalent seasons used to compute the historical average (e.g. 3 = P25, P24, P23 for P26).',
     params_carryover_tip:'Controls how much of your remaining stock (carryover) reduces your buying budget.\n\n100% → full carryover is deducted (don\'t buy what you already have).\n50%  → half is deducted (keeps headroom — old stock won\'t sell itself).\n0%   → carryover ignored, full budget kept.\n\nFormula: net budget = adjusted budget − (carryover × rate)',
     trend_hausse:'rising', trend_stable:'stable', trend_baisse:'falling',
@@ -1145,16 +1168,19 @@ function renderMarqueBudgetTable() {
       }
     }
 
-    // Brand name with optional alert badge
+    // Brand name with optional alert badges
     const alertBadge = m.low_st_alert
       ? ` <span class="ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700">${t('review_brand')}</span>`
+      : '';
+    const absentBadge = m.absent_recent_season
+      ? ` <span class="ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-700" title="${escHtml(t('absent_recent_badge'))} ${(m.most_recent_ref ?? '').toUpperCase()}">${t('absent_recent_badge')} ${(m.most_recent_ref ?? '').toUpperCase()}</span>`
       : '';
 
     rows.push(`
       <tr class="mfr-row hover:bg-amber-50/40" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
         <td class="px-3 py-2.5 font-medium text-gray-900">
           <span class="mfr-link hover:text-blue-600 hover:underline cursor-pointer"
-                data-mfr="${escHtml(m.manufacturer)}">${escHtml(m.manufacturer)}</span>${alertBadge}
+                data-mfr="${escHtml(m.manufacturer)}">${escHtml(m.manufacturer)}</span>${alertBadge}${absentBadge}
         </td>
         <td class="px-3 py-2.5 text-center">${seasonBadges || `<span class="text-gray-300">—</span>`}</td>
         <td class="px-3 py-2.5 text-right">${avgRecvHtml}</td>
@@ -1620,6 +1646,8 @@ async function loadBudgetParams() {
     applyBudgetSameRateToggle();
     const rfEl = document.getElementById('budgetRecencyFactor');
     if (rfEl && d.recency_factor != null) { rfEl.value = d.recency_factor; updateRecencyPreview(); }
+    const absentMode = d.absent_brand_mode ?? 'show';
+    document.querySelectorAll('input[name="absentBrandMode"]').forEach(r => { r.checked = r.value === absentMode; });
   } catch (e) {
     console.warn('[budget-params] Failed to load:', e.message);
   }
@@ -1636,7 +1664,8 @@ async function saveBudgetParamsToServer() {
       if (el) ratesByShop[id] = parseFloat(el.value) / 100;
     });
   }
-  const rf = parseFloat(document.getElementById('budgetRecencyFactor')?.value ?? 2.0);
+  const rf          = parseFloat(document.getElementById('budgetRecencyFactor')?.value ?? 2.0);
+  const absentMode  = document.querySelector('input[name="absentBrandMode"]:checked')?.value ?? 'show';
   await fetch(`${BASE}/api/settings/budget-params`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -1646,6 +1675,7 @@ async function saveBudgetParamsToServer() {
       use_global_carryover_rate: same,
       carryover_rates_by_shop:   ratesByShop,
       recency_factor:            rf,
+      absent_brand_mode:         absentMode,
     }),
   });
 }
