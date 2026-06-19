@@ -2683,7 +2683,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
 
       byManufacturer.push({
         manufacturer:        mfr,
-        seasons_count:       costs.length,
+        seasons_count:       costEntries.length,
         seasons,
         avg_hist:            avgHistRounded,
         avg_received_cost:   avgHistRounded,
