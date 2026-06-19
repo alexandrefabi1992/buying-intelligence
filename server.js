@@ -99,6 +99,7 @@ const DEFAULT_BUDGET_PARAMS = {
   use_global_carryover_rate:  true,
   carryover_rates_by_shop:    {},
   recency_factor:             2.0,
+  absent_brand_mode:          'show', // 'show' = afficher avec badge | 'hide' = masquer
 };
 
 async function getSeasonsConfig() {
@@ -2269,12 +2270,14 @@ app.put('/api/settings/budget-params', async (req, res, next) => {
         if (!isNaN(r)) ratesByShop[shopId] = Math.max(0, Math.min(1, r));
       }
     }
+    const absentMode = ['show', 'hide'].includes(req.body.absent_brand_mode) ? req.body.absent_brand_mode : 'show';
     const params = {
       nb_saisons_reference:      Math.max(1, Math.min(10, parseInt(req.body.nb_saisons_reference ?? 3, 10))),
       carryover_deduction_rate:  Math.max(0, Math.min(1, parseFloat(req.body.carryover_deduction_rate ?? 0.5))),
       use_global_carryover_rate: req.body.use_global_carryover_rate !== false,
       carryover_rates_by_shop:   ratesByShop,
       recency_factor:            Math.max(1, Math.min(10, parseFloat(req.body.recency_factor ?? 2.0))),
+      absent_brand_mode:         absentMode,
     };
     await pool.query(
       `INSERT INTO app_settings(key, value, updated_at)
@@ -2318,7 +2321,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
     ]);
     const { nb_saisons_reference: nbRef, carryover_deduction_rate: globalCoRate,
             use_global_carryover_rate: useGlobal, carryover_rates_by_shop: ratesByShop,
-            recency_factor: recencyFactor } = budgetParams;
+            recency_factor: recencyFactor, absent_brand_mode: absentBrandMode = 'show' } = budgetParams;
     const coRate = (!useGlobal && shops?.length === 1 && ratesByShop?.[shops[0]] != null)
       ? ratesByShop[shops[0]]
       : globalCoRate;
@@ -2681,39 +2684,50 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const carryoverDeduction = Math.round(carryover * coRate * 100) / 100;
       const netBudget          = Math.max(0, Math.round((adjustedBudget - carryoverDeduction) * 100) / 100);
 
+      // Flag brands absent from the most recent reference season
+      const mostRecentRef = refSeasons[0];
+      const absentRecent  = !seasonResults[mostRecentRef?.code]?.[mfr];
+
       byManufacturer.push({
-        manufacturer:        mfr,
-        seasons_count:       costEntries.length,
+        manufacturer:          mfr,
+        seasons_count:         costEntries.length,
         seasons,
-        avg_hist:            avgHistRounded,
-        avg_received_cost:   avgHistRounded,
-        min_received_cost:   Math.round(minHist * 100) / 100,
-        max_received_cost:   Math.round(maxHist * 100) / 100,
-        avg_st:              avgSt !== null ? Math.round(avgSt * 1000) / 1000 : null,
+        absent_recent_season:  absentRecent,
+        most_recent_ref:       mostRecentRef?.code ?? null,
+        avg_hist:              avgHistRounded,
+        avg_received_cost:     avgHistRounded,
+        min_received_cost:     Math.round(minHist * 100) / 100,
+        max_received_cost:     Math.round(maxHist * 100) / 100,
+        avg_st:                avgSt !== null ? Math.round(avgSt * 1000) / 1000 : null,
         trend,
-        low_st_alert:        lowStAlert,
-        multiplier:          hyp.multiplier,
-        multiplier_label:    hyp.label,
-        tier_threshold:      hyp.tier_threshold,
-        adjusted_budget:     adjustedBudget,
-        stock_at_cost:       Math.round(stockCost * 100) / 100,
-        ytd_sales:           Math.round(ytdSales * 100) / 100,
-        carryover:           carryover,
-        carryover_deduction: carryoverDeduction,
-        net_budget:          netBudget,
-        budget_mode:         budgetMode,
-        elapsed_days:        Math.round(coElapsed),
-        remaining_days:      Math.round(coRemaining),
-        carryover_season:    carryoverSeason.code,
+        low_st_alert:          lowStAlert,
+        multiplier:            hyp.multiplier,
+        multiplier_label:      hyp.label,
+        tier_threshold:        hyp.tier_threshold,
+        adjusted_budget:       adjustedBudget,
+        stock_at_cost:         Math.round(stockCost * 100) / 100,
+        ytd_sales:             Math.round(ytdSales * 100) / 100,
+        carryover:             carryover,
+        carryover_deduction:   carryoverDeduction,
+        net_budget:            netBudget,
+        budget_mode:           budgetMode,
+        elapsed_days:          Math.round(coElapsed),
+        remaining_days:        Math.round(coRemaining),
+        carryover_season:      carryoverSeason.code,
       });
     }
 
-    byManufacturer.sort((a, b) => b.net_budget - a.net_budget);
+    // Filter absent brands if mode is 'hide'
+    const filteredManufacturers = absentBrandMode === 'hide'
+      ? byManufacturer.filter(m => !m.absent_recent_season)
+      : byManufacturer;
 
-    const totalHist     = byManufacturer.reduce((s, m) => s + m.avg_hist, 0);
-    const totalAdj      = byManufacturer.reduce((s, m) => s + m.adjusted_budget, 0);
-    const totalCarryDed = byManufacturer.reduce((s, m) => s + m.carryover_deduction, 0);
-    const totalNet      = byManufacturer.reduce((s, m) => s + m.net_budget, 0);
+    filteredManufacturers.sort((a, b) => b.net_budget - a.net_budget);
+
+    const totalHist     = filteredManufacturers.reduce((s, m) => s + m.avg_hist, 0);
+    const totalAdj      = filteredManufacturers.reduce((s, m) => s + m.adjusted_budget, 0);
+    const totalCarryDed = filteredManufacturers.reduce((s, m) => s + m.carryover_deduction, 0);
+    const totalNet      = filteredManufacturers.reduce((s, m) => s + m.net_budget, 0);
 
     const result = {
       target_season:            targetSeasonCode,
@@ -2723,6 +2737,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
       reference_seasons_label:  refSeasons.map(s => s.code.toUpperCase()).join(', '),
       nb_saisons_reference:     nbRef,
       carryover_deduction_rate: coRate,
+      absent_brand_mode:        absentBrandMode,
       generated_at:             new Date().toISOString(),
       elapsed_days:             Math.round(coElapsed),
       remaining_days:           Math.round(coRemaining),
@@ -2732,13 +2747,14 @@ app.get('/api/budget/marque', async (req, res, next) => {
         adjusted:           Math.round(totalAdj * 100) / 100,
         carryover_deducted: Math.round(totalCarryDed * 100) / 100,
         net:                Math.round(totalNet * 100) / 100,
-        brands_count:       byManufacturer.length,
+        brands_count:       filteredManufacturers.length,
+        brands_hidden:      byManufacturer.length - filteredManufacturers.length,
       },
       total_proposed_budget:  Math.round(totalHist * 100) / 100,
       total_adjusted_budget:  Math.round(totalAdj * 100) / 100,
       total_net_budget:       Math.round(totalNet * 100) / 100,
-      manufacturer_count:     byManufacturer.length,
-      by_manufacturer:        byManufacturer,
+      manufacturer_count:     filteredManufacturers.length,
+      by_manufacturer:        filteredManufacturers,
     };
 
     cacheSet(cacheKey, result);
