@@ -312,35 +312,54 @@ async function runMigrations() {
     );
   }
 
-  // Migration: add drop_id to budget_plans and create budget_plan_drops table
-  const { rows: planDropsMig } = await pool.query(
-    "SELECT 1 FROM sync_state WHERE step = 'budget_plans_drops_v1'"
-  );
-  if (!planDropsMig.length) {
-    await pool.query(`ALTER TABLE budget_plans ADD COLUMN IF NOT EXISTS drop_id TEXT NOT NULL DEFAULT 'drop_1'`);
-    await pool.query(`ALTER TABLE budget_plans DROP CONSTRAINT IF EXISTS budget_plans_pkey`);
-    await pool.query(`ALTER TABLE budget_plans ADD PRIMARY KEY (season_code, manufacturer, drop_id, shop_id)`);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS budget_plan_drops (
-        season_code  TEXT    NOT NULL,
-        manufacturer TEXT    NOT NULL,
-        drop_id      TEXT    NOT NULL,
-        drop_name    TEXT    NOT NULL DEFAULT 'Drop 1',
-        drop_order   INTEGER NOT NULL DEFAULT 1,
-        updated_at   TIMESTAMPTZ DEFAULT now(),
-        PRIMARY KEY (season_code, manufacturer, drop_id)
-      )
+  // Migration: add drop_id to budget_plans + budget_plan_drops table
+  // Each step is idempotent — checks actual DB state, never deletes rows.
+  await pool.query(`ALTER TABLE budget_plans ADD COLUMN IF NOT EXISTS drop_id TEXT NOT NULL DEFAULT 'drop_1'`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS budget_plan_drops (
+      season_code  TEXT    NOT NULL,
+      manufacturer TEXT    NOT NULL,
+      drop_id      TEXT    NOT NULL,
+      drop_name    TEXT    NOT NULL DEFAULT 'Drop 1',
+      drop_order   INTEGER NOT NULL DEFAULT 1,
+      updated_at   TIMESTAMPTZ DEFAULT now(),
+      PRIMARY KEY (season_code, manufacturer, drop_id)
+    )
+  `);
+  // Check whether the primary key on budget_plans already includes drop_id
+  {
+    const { rows: pkCols } = await pool.query(`
+      SELECT a.attname
+      FROM   pg_index     i
+      JOIN   pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+      WHERE  i.indrelid = 'budget_plans'::regclass AND i.indisprimary
     `);
-    await pool.query(`
-      INSERT INTO budget_plan_drops (season_code, manufacturer, drop_id, drop_name, drop_order)
-      SELECT DISTINCT season_code, manufacturer, 'drop_1', 'Drop 1', 1 FROM budget_plans
-      ON CONFLICT DO NOTHING
-    `);
-    await pool.query(
-      "INSERT INTO sync_state(step, next_url) VALUES ('budget_plans_drops_v1', 'COMPLETED') ON CONFLICT(step) DO NOTHING"
-    );
-    console.log('[migration] budget_plans drops schema migrated');
+    const pkHasDropId = pkCols.some(r => r.attname === 'drop_id');
+    if (!pkHasDropId) {
+      // Drop whatever the current PK is named (PostgreSQL auto-names it tablename_pkey)
+      const { rows: conRows } = await pool.query(`
+        SELECT conname FROM pg_constraint
+        WHERE  conrelid = 'budget_plans'::regclass AND contype = 'p'
+      `);
+      if (conRows.length) {
+        await pool.query(`ALTER TABLE budget_plans DROP CONSTRAINT ${conRows[0].conname}`);
+      }
+      await pool.query(`ALTER TABLE budget_plans ADD PRIMARY KEY (season_code, manufacturer, drop_id, shop_id)`);
+      console.log('[migration] budget_plans PK updated to include drop_id');
+    }
   }
+  // Seed drop metadata for any existing plan rows that don't have a drop entry yet
+  await pool.query(`
+    INSERT INTO budget_plan_drops (season_code, manufacturer, drop_id, drop_name, drop_order)
+    SELECT DISTINCT season_code, manufacturer, drop_id,
+      'Drop ' || split_part(drop_id, '_', 2),
+      COALESCE(NULLIF(split_part(drop_id, '_', 2), '')::int, 1)
+    FROM budget_plans
+    ON CONFLICT DO NOTHING
+  `);
+  await pool.query(
+    "INSERT INTO sync_state(step, next_url) VALUES ('budget_plans_drops_v1', 'COMPLETED') ON CONFLICT(step) DO NOTHING"
+  );
 
   // Budget documents — binary file storage per (season, manufacturer, drop)
   await pool.query(`
@@ -2267,6 +2286,7 @@ app.get('/api/settings/multipliers', async (req, res, next) => {
 });
 
 app.put('/api/settings/multipliers', async (req, res, next) => {
+  // NOTE: only updates app_settings — budget_plans (saved plan data) is never touched
   try {
     const { tiers } = req.body;
     if (!Array.isArray(tiers) || tiers.length === 0) {
