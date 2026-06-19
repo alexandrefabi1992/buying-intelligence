@@ -467,6 +467,20 @@ app.get('/oauth/callback', async (req, res, next) => {
 
 // ---------------------------------------------------------------------------
 // /api/nos — Never-Out-of-Stock candidates
+// ---------------------------------------------------------------------------
+// GET /api/manufacturers — all distinct manufacturers in the products table
+// ---------------------------------------------------------------------------
+app.get('/api/manufacturers', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT manufacturer FROM products
+       WHERE manufacturer IS NOT NULL AND manufacturer != ''
+       ORDER BY manufacturer`
+    );
+    res.json(rows.map(r => r.manufacturer));
+  } catch (err) { next(err); }
+});
+
 // Items whose average weekly velocity exceeds their current stock cover.
 // Returns items at risk of stockout within `weeks` weeks (default 4).
 // ---------------------------------------------------------------------------
