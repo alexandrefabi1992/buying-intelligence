@@ -189,9 +189,9 @@
               <tr>
                 <th class="px-3 py-2 text-left sort-col cursor-pointer select-none" data-sort="manufacturer"
                     ><span data-i18n="col_brand">Marque</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
-                <th class="px-3 py-2 text-center col-tip" data-i18n-tip="tip_seasons"
-                    data-tip="Saisons pour lesquelles on a des données de réception.&#10;* = saison en cours (données partielles, projetées à plein-saison)."
-                    ><span data-i18n="col_seasons">Saisons</span></th>
+                <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="recent_received_cost" data-i18n-tip="tip_recent_recv"
+                    data-tip="Montant reçu (coût) pour la saison de référence la plus récente.&#10;&#10;Si la saison est en cours, c'est le montant YTD réel (sans projection).&#10;Permet de comparer ce qui a été reçu cette saison vs le budget moyen historique."
+                    ><span data-i18n="col_recent_recv">Reçu actuel</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
                 <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="avg_received_cost" data-i18n-tip="tip_avg_recv"
                     data-tip="Montant moyen reçu (en coût) par saison de référence.&#10;&#10;Calcul : moyenne des coûts de réception sur P25, P24, P23.&#10;Si la saison en cours (P26*) a des données, sa projection plein-saison est incluse dans la moyenne.&#10;&#10;Formule P26 projeté = reçu_ytd ÷ (jours_écoulés ÷ jours_totaux)"
                     ><span data-i18n="col_avg_recv">Réceptions moy.</span> <span class="sort-arrow text-gray-300 ml-0.5">↕</span></th>
@@ -555,12 +555,12 @@ const TRANSLATIONS = {
     season_p26:'P26 — Printemps 2026', season_a25:'A25 — Automne 2025',
     season_p25:'P25 — Printemps 2025', season_a24:'A24 — Automne 2024',
     season_p24:'P24 — Printemps 2024',
-    col_brand:'Marque', col_seasons:'Saisons', col_avg_recv:'Réceptions moy.',
+    col_brand:'Marque', col_recent_recv:'Reçu actuel', col_avg_recv:'Réceptions moy.',
     col_range:'Fourchette', col_avg_st:'TM moyen', col_trend:'Tendance',
     col_multiplier:'Multiplicateur', col_adj_budget:'Budget ajusté', col_net_budget:'Budget net',
     col_description:'Description', col_boutique:'Boutique', col_category:'Catégorie',
     col_stock_short:'Stock', col_qty_suggested:'Qté suggérée',
-    tip_seasons:"Saisons pour lesquelles on a des données de réception.\n* = saison en cours (données partielles, projetées à plein-saison).",
+    tip_recent_recv:"Montant reçu (coût) pour la saison de référence la plus récente.\n\nSi la saison est en cours, c'est le montant YTD réel (sans projection).\nPermet de comparer ce qui a été reçu cette saison vs le budget moyen historique.",
     tip_avg_recv:"Montant moyen reçu (en coût) par saison de référence.\n\nCalcul : moyenne des coûts de réception sur P25, P24, P23.\nSi la saison en cours (P26*) a des données, sa projection plein-saison est incluse dans la moyenne.\n\nFormule P26 projeté = reçu_ytd ÷ (jours_écoulés ÷ jours_totaux)",
     tip_range:"Étendue des réceptions selon les saisons historiques disponibles.\n\nMin $ – Max $ observés sur les saisons de référence (P25, P24, P23 + P26 projeté si disponible).\n\nUtile pour voir la variabilité d'une saison à l'autre.",
     tip_avg_st:"Taux de vente moyen (sell-through) sur les saisons historiques.\n\nCalcul : unités vendues ÷ unités reçues via transfert, moyenné sur P25, P24, P23.\n\n100% = tout vendu · 50% = la moitié vendue · 0% = rien vendu.\nSeuil cible : ≥ 60% (vert).\n\n«n/d» = données insuffisantes (moins de 5 unités reçues via transfert — la marque est principalement approvisionnée par commandes directes).",
@@ -636,12 +636,12 @@ const TRANSLATIONS = {
     season_p26:'P26 — Spring 2026', season_a25:'A25 — Fall 2025',
     season_p25:'P25 — Spring 2025', season_a24:'A24 — Fall 2024',
     season_p24:'P24 — Spring 2024',
-    col_brand:'Brand', col_seasons:'Seasons', col_avg_recv:'Avg. Receivings',
+    col_brand:'Brand', col_recent_recv:'Current recv.', col_avg_recv:'Avg. Receivings',
     col_range:'Range', col_avg_st:'Avg. ST', col_trend:'Trend',
     col_multiplier:'Multiplier', col_adj_budget:'Adjusted Budget', col_net_budget:'Net Budget',
     col_description:'Description', col_boutique:'Store', col_category:'Category',
     col_stock_short:'Stock', col_qty_suggested:'Suggested Qty',
-    tip_seasons:"Seasons for which we have receiving data.\n* = current season (partial data, projected to full season).",
+    tip_recent_recv:"Amount received (at cost) for the most recent reference season.\n\nIf the season is in progress, this is the actual YTD amount (no projection).\nUseful to compare what was received this season vs the historical average budget.",
     tip_avg_recv:"Average amount received (at cost) per reference season.\n\nCalculation: average of receiving costs for P25, P24, P23.\nIf the current season (P26*) has data, its full-season projection is included in the average.\n\nFormula P26 projected = ytd_received ÷ (elapsed_days ÷ total_days)",
     tip_range:"Range of receivings across available historical seasons.\n\nMin $ – Max $ observed on reference seasons (P25, P24, P23 + P26 projected if available).\n\nUseful to see season-to-season variability.",
     tip_avg_st:"Average sell-through rate across historical seasons.\n\nCalculation: units sold ÷ units received via transfer, averaged over P25, P24, P23.\n\n100% = all sold · 50% = half sold · 0% = nothing sold.\nTarget threshold: ≥ 60% (green).\n\n\"n/a\" = insufficient data (less than 5 units received via transfer — brand is primarily supplied by direct orders).",
@@ -1144,18 +1144,12 @@ function renderMarqueBudgetTable() {
 
   const rows = [];
   for (const m of visible) {
-    // Season badges — current season gets a distinct blue badge if it has partial data
-    const targetCode = (state.budgetSeas.season ?? 'p26').toLowerCase();
-    const seasonBadges = Object.keys(m.seasons ?? {})
-      .sort().reverse()
-      .map(c => {
-        const isCurrent = c === targetCode;
-        const isPartial = m.seasons[c]?.partial;
-        const bg  = isCurrent ? 'bg-blue-100 text-blue-700' : 'bg-amber-50 text-amber-700';
-        const lbl = isCurrent && isPartial ? `${c.toUpperCase()}*` : c.toUpperCase();
-        return `<span class="px-1 py-0.5 rounded text-[9px] font-semibold ${bg} mr-0.5" title="${isPartial ? escHtml(t('partial_season')) : ''}">${lbl}</span>`;
-      })
-      .join('');
+    // Recent received cost — raw implied received for the most recent reference season
+    const recentSeasonData = m.seasons?.[m.most_recent_ref];
+    const recentRecvCost   = recentSeasonData?.received_cost_raw ?? null;
+    const recentRecvHtml   = recentRecvCost != null
+      ? `<span class="font-semibold">${fmtC(recentRecvCost)}</span>${recentSeasonData?.partial ? `<span class="text-[10px] text-gray-400 block">${(m.most_recent_ref ?? '').toUpperCase()} YTD</span>` : `<span class="text-[10px] text-gray-400 block">${(m.most_recent_ref ?? '').toUpperCase()}</span>`}`
+      : `<span class="text-gray-300">—</span>`;
 
     // Fourchette
     const rangeHtml = (m.min_received_cost != null && m.max_received_cost != null
@@ -1211,7 +1205,7 @@ function renderMarqueBudgetTable() {
           <span class="mfr-link hover:text-blue-600 hover:underline cursor-pointer"
                 data-mfr="${escHtml(m.manufacturer)}">${escHtml(m.manufacturer)}</span>${alertBadge}${absentBadge}
         </td>
-        <td class="px-3 py-2.5 text-center">${seasonBadges || `<span class="text-gray-300">—</span>`}</td>
+        <td class="px-3 py-2.5 text-right">${recentRecvHtml}</td>
         <td class="px-3 py-2.5 text-right">${avgRecvHtml}</td>
         <td class="px-3 py-2.5 text-right text-[11px]">${rangeHtml}</td>
         ${stPctCellDual(m.avg_st, m.recent_st_projected, m.recent_st_ytd, m.recent_season_code, 0.60)}
