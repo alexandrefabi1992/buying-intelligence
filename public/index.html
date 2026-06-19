@@ -480,7 +480,7 @@
                    class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
           </div>
           <div class="flex flex-col gap-2">
-            <label class="text-xs text-gray-600 w-52 col-tip" data-tip="Part du carryover déduite du budget ajusté. 50% = on garde 50% de marge pour le nouveau stock qui aide à écouler l'ancien stock."
+            <label class="text-xs text-gray-600 w-52 col-tip" data-tip="Détermine combien du stock restant (carryover) vient réduire ton budget d'achat.&#10;&#10;100% → le stock restant est entièrement déduit (tu n'achètes pas ce que tu as déjà).&#10;50%  → la moitié est déduite (garde une marge : l'ancien stock ne se vendra pas tout seul).&#10;0%   → le carryover est ignoré, budget complet conservé.&#10;&#10;Formule : budget net = budget ajusté − (carryover × taux)"
                    data-i18n="params_carryover_lbl">Taux déduction carryover</label>
             <div class="flex items-center gap-3 pl-0">
               <div class="flex items-center gap-1">
@@ -567,7 +567,7 @@ const TRANSLATIONS = {
     params_same_rate_lbl:'Même taux pour toutes les boutiques',
     params_recency_lbl:'Facteur de pondération récente',
     params_nb_saisons_tip:'Nombre de saisons passées équivalentes utilisées pour calculer la moyenne historique (ex : 3 = P25, P24, P23 pour P26).',
-    params_carryover_tip:'Part du carryover déduite du budget ajusté. 50% = on garde 50% de marge pour le nouveau stock qui aide à écouler l\'ancien stock.',
+    params_carryover_tip:'Détermine combien du stock restant (carryover) vient réduire ton budget d\'achat.\n\n100% → le stock restant est entièrement déduit (tu n\'achètes pas ce que tu as déjà).\n50%  → la moitié est déduite (garde une marge : l\'ancien stock ne se vendra pas tout seul).\n0%   → le carryover est ignoré, budget complet conservé.\n\nFormule : budget net = budget ajusté − (carryover × taux)',
     trend_hausse:'hausse', trend_stable:'stable', trend_baisse:'baisse',
     st_nd:'n/d', st_na_title:"Données insuffisantes : moins de 5 unités reçues via transfert — ratio non représentatif",
     nos_badge:'NOS — Budget par marque', nos_coverage:'Couverture cible :', nos_weeks:'semaines',
@@ -641,7 +641,7 @@ const TRANSLATIONS = {
     params_same_rate_lbl:'Apply same rate to all stores',
     params_recency_lbl:'Recency weighting factor',
     params_nb_saisons_tip:'Number of past equivalent seasons used to compute the historical average (e.g. 3 = P25, P24, P23 for P26).',
-    params_carryover_tip:'Share of carryover deducted from the adjusted budget. 50% = keep 50% headroom for new stock that helps move existing stock.',
+    params_carryover_tip:'Controls how much of your remaining stock (carryover) reduces your buying budget.\n\n100% → full carryover is deducted (don\'t buy what you already have).\n50%  → half is deducted (keeps headroom — old stock won\'t sell itself).\n0%   → carryover ignored, full budget kept.\n\nFormula: net budget = adjusted budget − (carryover × rate)',
     trend_hausse:'rising', trend_stable:'stable', trend_baisse:'falling',
     st_nd:'n/a', st_na_title:"Insufficient data: less than 5 units received via transfer — ratio not representative",
     nos_badge:'NOS — Budget by Brand', nos_coverage:'Target coverage:', nos_weeks:'weeks',
