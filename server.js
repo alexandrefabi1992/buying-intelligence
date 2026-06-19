@@ -2650,14 +2650,15 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const mostRecentData = seasonResults[refSeasons[0]?.code]?.[mfr];
       const recentStYtd    = mostRecentData?.partial ? mostRecentData.st_rate_ytd : null;
 
-      // Trend: most-recent vs oldest reference season with data
+      // Trend: ST direction from oldest to most-recent reference season with data
+      // +10 pts → hausse, -10 pts → baisse (absolute percentage points, not relative)
       let trend = 'stable';
-      const codesWithData = refSeasons.map(s => s.code).filter(c => (seasonResults[c]?.[mfr]?.received_cost ?? 0) > 0);
-      if (codesWithData.length >= 2) {
-        const latest = seasonResults[codesWithData[0]][mfr].received_cost;
-        const oldest = seasonResults[codesWithData[codesWithData.length - 1]][mfr].received_cost;
-        if (latest > oldest * 1.10)      trend = 'hausse';
-        else if (latest < oldest * 0.90) trend = 'baisse';
+      const codesWithSt = refSeasons.map(s => s.code).filter(c => seasonResults[c]?.[mfr]?.st_rate != null);
+      if (codesWithSt.length >= 2) {
+        const latestSt = seasonResults[codesWithSt[0]][mfr].st_rate;
+        const oldestSt = seasonResults[codesWithSt[codesWithSt.length - 1]][mfr].st_rate;
+        if (latestSt > oldestSt + 0.10)      trend = 'hausse';
+        else if (latestSt < oldestSt - 0.10) trend = 'baisse';
       }
 
       // Low ST alert: ST < 40% for two most recent consecutive seasons
