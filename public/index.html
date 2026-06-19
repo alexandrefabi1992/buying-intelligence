@@ -1639,7 +1639,8 @@ function renderSizesPage() {
 const planState = {
   budget: [], plan: {}, drops: {}, season: 'p26',
   selectedShops: new Set(SHOPS.map(s => s.id)),
-  excluded: new Set(),   // brand names removed from the plan view
+  excluded:  new Set(),  // brand names removed from the plan view
+  overrides: {},         // { [mfr]: customSuggestedAmount }
   allMfrs: [],           // all manufacturers from /api/manufacturers
 };
 
@@ -1651,6 +1652,14 @@ function planLoadExcluded() {
 }
 function planSaveExcluded() {
   localStorage.setItem(`plan_excluded_${planState.season}`, JSON.stringify([...planState.excluded]));
+}
+function planLoadOverrides() {
+  try {
+    planState.overrides = JSON.parse(localStorage.getItem(`plan_overrides_${planState.season}`) || '{}');
+  } catch { planState.overrides = {}; }
+}
+function planSaveOverrides() {
+  localStorage.setItem(`plan_overrides_${planState.season}`, JSON.stringify(planState.overrides));
 }
 
 function buildPlanShopFilter() {
@@ -1688,11 +1697,13 @@ async function loadBudgetPlan() {
     planSeasEl.addEventListener('change', () => {
       planState.season = planSeasEl.value;
       planLoadExcluded();
+      planLoadOverrides();
       fetchAndRenderPlan();
     });
   }
   planState.season = planSeasEl?.value ?? planSeasonFromBudget();
   planLoadExcluded();
+  planLoadOverrides();
   // Load all manufacturers for the "add brand" dropdown (once)
   if (!planState.allMfrs.length) {
     fetch(`${BASE}/api/manufacturers`).then(r => r.json()).then(list => {
@@ -1763,20 +1774,35 @@ function renderPlanTable() {
     const base    = m.net_budget ?? 0;
     // Redistribute excluded budget proportionally; if visibleTotal is 0, spread equally
     const share   = visibleTotal > 0 ? base / visibleTotal : (visibleBrands.length ? 1 / visibleBrands.length : 0);
-    const suggested = Math.round((base + excludedBudget * share) * 100) / 100;
-    totalSuggested += suggested;
-    const totalPlan = planTotalForMfr(mfr);
-    totalPlanned   += totalPlan;
+    const calcSuggested      = Math.round((base + excludedBudget * share) * 100) / 100;
+    const isOverridden       = planState.overrides[mfr] !== undefined;
+    const effectiveSuggested = isOverridden ? planState.overrides[mfr] : calcSuggested;
+    totalSuggested          += effectiveSuggested;
+    const totalPlan          = planTotalForMfr(mfr);
+    totalPlanned            += totalPlan;
 
-    const diff    = totalPlan - suggested;
+    const diff    = totalPlan - effectiveSuggested;
     const diffCls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
     const diffHtml = totalPlan > 0
       ? `<span class="${diffCls}">${diff >= 0 ? '+' : ''}${fmtC(diff)}</span>`
       : `<span class="text-gray-300">—</span>`;
 
+    const resetBtn = isOverridden
+      ? `<button class="plan-suggested-reset shrink-0 text-indigo-300 hover:text-indigo-600"
+           title="Réinitialiser le budget suggéré"
+           data-mfr="${escHtml(mfr)}" data-calc="${calcSuggested}">↺</button>`
+      : '';
     const suggestedCell = m._manual
       ? `<span class="text-gray-300 italic text-[10px]">nouvelle</span>`
-      : fmtC(suggested);
+      : `<div class="flex items-center justify-end gap-1" onclick="event.stopPropagation()">
+           ${resetBtn}
+           <input type="number" min="0" step="100"
+             class="plan-suggested-input text-right text-xs w-24 bg-transparent border-b
+               ${isOverridden ? 'border-indigo-400 text-indigo-700 font-semibold' : 'border-transparent text-gray-500 hover:border-gray-300'}
+               focus:border-indigo-400 focus:outline-none"
+             data-mfr="${escHtml(mfr)}" data-calc="${calcSuggested}"
+             value="${effectiveSuggested}">
+         </div>`;
 
     rows.push(`
       <tr class="border-t border-gray-100 hover:bg-indigo-50/30 cursor-pointer plan-row" data-mfr="${escHtml(mfr)}">
@@ -1795,7 +1821,7 @@ function renderPlanTable() {
       </tr>
       <tr class="plan-detail hidden" data-mfr="${escHtml(mfr)}">
         <td colspan="5" class="px-6 py-4 bg-gray-50 border-t border-gray-100">
-          ${renderDropsBlock(mfr, suggested)}
+          ${renderDropsBlock(mfr, effectiveSuggested)}
         </td>
       </tr>`);
   }
@@ -2045,6 +2071,33 @@ document.addEventListener('click', e => {
   // Close its detail row if open
   const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
   if (detail) detail.classList.add('hidden');
+  renderPlanTable();
+});
+
+// Edit suggested budget inline
+document.addEventListener('change', e => {
+  const input = e.target.closest('.plan-suggested-input');
+  if (!input) return;
+  const mfr  = input.dataset.mfr;
+  const calc  = parseFloat(input.dataset.calc ?? 0);
+  const value = parseFloat(input.value) || 0;
+  if (Math.abs(value - calc) < 0.01) {
+    delete planState.overrides[mfr];
+  } else {
+    planState.overrides[mfr] = value;
+  }
+  planSaveOverrides();
+  renderPlanTable();
+});
+
+// Reset suggested budget to calculated value
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.plan-suggested-reset');
+  if (!btn) return;
+  e.stopPropagation();
+  const mfr = btn.dataset.mfr;
+  delete planState.overrides[mfr];
+  planSaveOverrides();
   renderPlanTable();
 });
 
