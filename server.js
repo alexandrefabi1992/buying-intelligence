@@ -2556,8 +2556,12 @@ app.get('/api/budget/marque', async (req, res, next) => {
         let impliedCost  = sl.cost + inv.cost;
         if (impliedCost <= 0) continue;
 
-        let soldRaw      = soldMap[mfr]     ?? 0;
-        let soldCostRaw  = soldCostMap[mfr] ?? 0;
+        // Capture YTD values before projection
+        const impliedUnitsYtd = impliedUnits;
+        const soldRaw         = soldMap[mfr]     ?? 0;
+        const soldCostRaw     = soldCostMap[mfr] ?? 0;
+        const stYtd           = impliedUnitsYtd >= 5 ? soldRaw / impliedUnitsYtd : null;
+
         let soldForSt    = soldRaw;
         let soldCostProj = soldCostRaw;
         if (isRefInProgress && refCompletion > 0.05) {
@@ -2587,15 +2591,16 @@ app.get('/api/budget/marque', async (req, res, next) => {
         const st   = recv >= 5 ? soldForSt / recv : null;
 
         seasonResults[refSeason.code][mfr] = {
-          units_received:   Math.round(recv),
-          units_sold:       Math.round(soldForSt),
-          units_sold_ytd:   Math.round(soldRaw),
-          received_cost:    Math.round(blendedCost * 100) / 100,
+          units_received:    Math.round(recv),
+          units_sold:        Math.round(soldForSt),
+          units_sold_ytd:    Math.round(soldRaw),
+          received_cost:     Math.round(blendedCost * 100) / 100,
           received_cost_raw: Math.round(impliedCost * 100) / 100,
-          sold_cost:        Math.round(soldCostProj * 100) / 100,
-          st_rate:          st !== null ? Math.round(st * 1000) / 1000 : null,
-          st_insufficient:  recv < 5,
-          partial:          isRefInProgress,
+          sold_cost:         Math.round(soldCostProj * 100) / 100,
+          st_rate:           st !== null ? Math.round(st * 1000) / 1000 : null,
+          st_rate_ytd:       stYtd !== null ? Math.round(stYtd * 1000) / 1000 : null,
+          st_insufficient:   recv < 5,
+          partial:           isRefInProgress,
         };
       }
     }
@@ -2640,6 +2645,10 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const avgSt = stEntries.length
         ? stEntries.reduce((s, x) => s + x.st * x.weight, 0) / totalStWeight
         : null;
+
+      // YTD ST for the most recent in-progress reference season (if any)
+      const mostRecentData = seasonResults[refSeasons[0]?.code]?.[mfr];
+      const recentStYtd    = mostRecentData?.partial ? mostRecentData.st_rate_ytd : null;
 
       // Trend: most-recent vs oldest reference season with data
       let trend = 'stable';
@@ -2699,6 +2708,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         min_received_cost:     Math.round(minHist * 100) / 100,
         max_received_cost:     Math.round(maxHist * 100) / 100,
         avg_st:                avgSt !== null ? Math.round(avgSt * 1000) / 1000 : null,
+        avg_st_ytd:            recentStYtd !== null ? Math.round(recentStYtd * 1000) / 1000 : null,
         trend,
         low_st_alert:          lowStAlert,
         multiplier:            hyp.multiplier,
