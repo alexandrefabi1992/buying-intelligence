@@ -3553,7 +3553,17 @@ app.post('/api/admin/refresh-view', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.use((err, req, res, _next) => {
   console.error(err);
-  res.status(500).json({ error: err.message });
+  const message = err.message || err.code || String(err) || 'Erreur interne inconnue';
+  const detail  = {
+    error:   message,
+    type:    err.constructor?.name ?? 'Error',
+    code:    err.code  ?? undefined,
+    route:   req.method + ' ' + req.path,
+  };
+  if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
+    detail.hint = 'Impossible de joindre la base de données — vérifier DATABASE_URL';
+  }
+  res.status(500).json(detail);
 });
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
