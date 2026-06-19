@@ -2797,6 +2797,45 @@ app.get('/api/budget/marque', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET  /api/budget-plan?season=p27  — planned amounts per brand/shop
+// PUT  /api/budget-plan             — upsert one entry
+//   body: { season_code, manufacturer, shop_id?, planned_amount }
+// ---------------------------------------------------------------------------
+app.get('/api/budget-plan', async (req, res, next) => {
+  try {
+    const season = (req.query.season ?? 'p26').toLowerCase();
+    const { rows } = await pool.query(
+      `SELECT manufacturer, shop_id, planned_amount::float8 AS planned_amount, updated_at
+       FROM budget_plans WHERE season_code = $1`,
+      [season]
+    );
+    // Shape: { [manufacturer]: { [shop_id]: amount } }
+    const byMfr = {};
+    for (const r of rows) {
+      if (!byMfr[r.manufacturer]) byMfr[r.manufacturer] = {};
+      byMfr[r.manufacturer][r.shop_id] = parseFloat(r.planned_amount ?? 0);
+    }
+    res.json({ season_code: season, by_manufacturer: byMfr });
+  } catch (err) { next(err); }
+});
+
+app.put('/api/budget-plan', async (req, res, next) => {
+  try {
+    const { season_code, manufacturer, shop_id = '__all__', planned_amount } = req.body;
+    if (!season_code || !manufacturer) return res.status(400).json({ error: 'season_code and manufacturer are required' });
+    const amount = Math.max(0, parseFloat(planned_amount ?? 0));
+    await pool.query(
+      `INSERT INTO budget_plans(season_code, manufacturer, shop_id, planned_amount, updated_at)
+       VALUES ($1, $2, $3, $4, now())
+       ON CONFLICT(season_code, manufacturer, shop_id)
+       DO UPDATE SET planned_amount = $4, updated_at = now()`,
+      [season_code.toLowerCase(), manufacturer, shop_id, amount]
+    );
+    res.json({ ok: true, season_code, manufacturer, shop_id, planned_amount: amount });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/brand/:manufacturer — brand detail page data
 // ?shop_id= optional shop filter (applies to sales + stock)
 // ---------------------------------------------------------------------------

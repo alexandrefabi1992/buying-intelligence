@@ -180,3 +180,14 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value      JSONB NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Budget plans — planned purchase amounts per season/brand/shop
+-- shop_id = '__all__' for global (all shops combined)
+CREATE TABLE IF NOT EXISTS budget_plans (
+  season_code      TEXT    NOT NULL,
+  manufacturer     TEXT    NOT NULL,
+  shop_id          TEXT    NOT NULL DEFAULT '__all__',
+  planned_amount   NUMERIC NOT NULL DEFAULT 0,
+  updated_at       TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (season_code, manufacturer, shop_id)
+);

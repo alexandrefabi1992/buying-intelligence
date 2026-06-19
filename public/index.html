@@ -73,6 +73,7 @@
   <button class="tab py-3 tab-inactive" data-tab="seasonal"  data-i18n="tab_seasonal">Saisonnier</button>
   <button class="tab py-3 tab-inactive" data-tab="sizes"     data-i18n="tab_sizes">Courbes tailles</button>
   <button class="tab py-3 tab-inactive" data-tab="transfers" data-i18n="tab_transfers">Transferts / Actions</button>
+  <button class="tab py-3 tab-inactive" data-tab="plan"      data-i18n="tab_plan">Création de budget</button>
   <button class="tab py-3 tab-inactive" data-tab="params"    data-i18n="tab_params">Paramètres</button>
   <a href="/velocity" class="ml-auto py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors" data-i18n="tab_velocity">Vélocité →</a>
 </nav>
@@ -426,6 +427,38 @@
     </div>
   </section>
 
+  <!-- ── CRÉATION DE BUDGET ───────────────────────────────────────── -->
+  <section id="tab-plan" class="hidden">
+    <div class="flex items-center gap-3 mb-4 flex-wrap">
+      <h2 class="text-base font-semibold text-gray-800" data-i18n="plan_title">Création de budget</h2>
+      <select id="planSeason" class="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 bg-white shadow-sm"></select>
+      <span id="planSavedMsg" class="text-xs text-emerald-600 font-semibold hidden" data-i18n="plan_saved">Sauvegardé</span>
+    </div>
+    <!-- Totals bar -->
+    <div class="flex gap-6 mb-4 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-5 py-3 flex-wrap">
+      <span><span class="font-semibold text-gray-700" id="planTotalSuggested">—</span> <span data-i18n="plan_total_suggested">budget suggéré</span></span>
+      <span class="text-gray-300">|</span>
+      <span><span class="font-semibold text-indigo-700" id="planTotalPlanned">—</span> <span data-i18n="plan_total_planned">planifié</span></span>
+      <span class="text-gray-300">|</span>
+      <span><span class="font-semibold" id="planTotalDiff">—</span> <span data-i18n="plan_total_diff">écart</span></span>
+    </div>
+    <!-- Table -->
+    <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+      <table class="min-w-full text-xs text-gray-700">
+        <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+          <tr>
+            <th class="px-4 py-2 text-left" data-i18n="col_brand">Marque</th>
+            <th class="px-4 py-2 text-right" data-i18n="plan_col_suggested">Budget suggéré</th>
+            <th class="px-4 py-2 text-right" data-i18n="plan_col_planned">Total planifié</th>
+            <th class="px-4 py-2 text-right" data-i18n="plan_col_diff">Écart</th>
+            <th class="px-4 py-2 text-right" data-i18n="plan_col_actions"></th>
+          </tr>
+        </thead>
+        <tbody id="planBody"></tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- ── PARAMÈTRES ────────────────────────────────────────────────── -->
   <section id="tab-params" class="hidden">
     <div class="max-w-2xl">
@@ -539,7 +572,11 @@ const TRANSLATIONS = {
     loading:'Chargement…', lastSync:'Dernier sync',
     tab_budget:'Budget', tab_nos:'NOS', tab_seasonal:'Saisonnier',
     tab_sizes:'Courbes tailles', tab_transfers:'Transferts / Actions',
-    tab_params:'Paramètres', tab_velocity:'Vélocité →',
+    tab_plan:'Création de budget', tab_params:'Paramètres', tab_velocity:'Vélocité →',
+    plan_title:'Création de budget', plan_saved:'✓ Sauvegardé',
+    plan_total_suggested:'budget suggéré', plan_total_planned:'planifié', plan_total_diff:'écart',
+    plan_col_suggested:'Budget suggéré', plan_col_planned:'Total planifié', plan_col_diff:'Écart', plan_col_actions:'',
+    plan_by_shop:'Par boutique', plan_suggested_lbl:'Suggéré :',
     filter_boutiques:'Boutiques', filter_collections:'Collections',
     filter_sizes:'Grandeurs', filter_letters:'Lettres', filter_numeric:'Numériques',
     filter_brand:'Marque', filter_brand_ph:'ex: Brax, Eton…',
@@ -620,7 +657,11 @@ const TRANSLATIONS = {
     loading:'Loading…', lastSync:'Last sync',
     tab_budget:'Budget', tab_nos:'NOS', tab_seasonal:'Seasonal',
     tab_sizes:'Size Curves', tab_transfers:'Transfers / Actions',
-    tab_params:'Settings', tab_velocity:'Velocity →',
+    tab_plan:'Budget Creation', tab_params:'Settings', tab_velocity:'Velocity →',
+    plan_title:'Budget Creation', plan_saved:'✓ Saved',
+    plan_total_suggested:'suggested budget', plan_total_planned:'planned', plan_total_diff:'variance',
+    plan_col_suggested:'Suggested Budget', plan_col_planned:'Total Planned', plan_col_diff:'Variance', plan_col_actions:'',
+    plan_by_shop:'By Store', plan_suggested_lbl:'Suggested:',
     filter_boutiques:'Boutiques', filter_collections:'Collections',
     filter_sizes:'Sizes', filter_letters:'Letters', filter_numeric:'Numeric',
     filter_brand:'Brand', filter_brand_ph:'e.g. Brax, Eton…',
@@ -930,6 +971,7 @@ function loadTab(id) {
   if (id === 'seasonal')  loadSeasonal();
   if (id === 'sizes')     loadSizes();
   if (id === 'transfers') loadTransfers();
+  if (id === 'plan')      loadBudgetPlan();
   if (id === 'params')    { loadTiers().then(renderTiersTable); }
 }
 
@@ -1552,6 +1594,167 @@ function renderSizesPage() {
 }
 
 // ── Transfers tab ─────────────────────────────────────────────────────────
+// ── Création de budget ────────────────────────────────────────────────────
+const planState = { budget: [], plan: {}, season: 'p26' };
+
+function planSeasonFromBudget() {
+  return document.getElementById('budgetSeasSeason')?.value ?? 'p26';
+}
+
+async function loadBudgetPlan() {
+  // Populate season selector from budget tab selector
+  const budgetSeasEl = document.getElementById('budgetSeasSeason');
+  const planSeasEl   = document.getElementById('planSeason');
+  if (budgetSeasEl && planSeasEl && !planSeasEl.options.length) {
+    planSeasEl.innerHTML = budgetSeasEl.innerHTML;
+    planSeasEl.value     = budgetSeasEl.value;
+    planSeasEl.addEventListener('change', () => { planState.season = planSeasEl.value; fetchAndRenderPlan(); });
+  }
+  planState.season = planSeasEl?.value ?? planSeasonFromBudget();
+  await fetchAndRenderPlan();
+}
+
+async function fetchAndRenderPlan() {
+  const season = planState.season;
+  try {
+    const [budgetRes, planRes] = await Promise.all([
+      fetch(`${BASE}/api/budget/marque?season=${season}`).then(r => r.json()),
+      fetch(`${BASE}/api/budget-plan?season=${season}`).then(r => r.json()),
+    ]);
+    planState.budget = budgetRes.by_manufacturer ?? [];
+    planState.plan   = planRes.by_manufacturer   ?? {};
+    renderPlanTable();
+  } catch (e) {
+    document.getElementById('planBody').innerHTML =
+      `<tr><td colspan="5" class="text-center py-8 text-red-400">${e.message}</td></tr>`;
+  }
+}
+
+function renderPlanTable() {
+  const tbody = document.getElementById('planBody');
+  if (!tbody) return;
+
+  const rows = [];
+  let totalSuggested = 0, totalPlanned = 0;
+
+  for (const m of planState.budget) {
+    const mfr      = m.manufacturer;
+    const suggested = m.net_budget ?? 0;
+    totalSuggested += suggested;
+
+    // Sum planned across all shops
+    const shopEntries = planState.plan[mfr] ?? {};
+    const totalPlan   = Object.values(shopEntries).reduce((s, v) => s + v, 0);
+    totalPlanned     += totalPlan;
+
+    const diff     = totalPlan - suggested;
+    const diffCls  = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
+    const diffSign = diff > 0 ? '+' : '';
+    const diffHtml = totalPlan > 0
+      ? `<span class="${diffCls}">${diffSign}${fmtC(diff)}</span>`
+      : `<span class="text-gray-300">—</span>`;
+
+    rows.push(`
+      <tr class="border-t border-gray-100 hover:bg-indigo-50/30 cursor-pointer plan-row" data-mfr="${escHtml(mfr)}">
+        <td class="px-4 py-2.5 font-medium text-gray-800">
+          <span class="flex items-center gap-1">
+            <span class="plan-toggle text-gray-300 text-[10px]">▶</span>
+            ${escHtml(mfr)}
+          </span>
+        </td>
+        <td class="px-4 py-2.5 text-right text-gray-500">${fmtC(suggested)}</td>
+        <td class="px-4 py-2.5 text-right font-semibold text-indigo-700">${totalPlan > 0 ? fmtC(totalPlan) : '<span class="text-gray-300">—</span>'}</td>
+        <td class="px-4 py-2.5 text-right">${diffHtml}</td>
+        <td class="px-4 py-2.5 text-right"></td>
+      </tr>
+      <tr class="plan-detail hidden" data-mfr="${escHtml(mfr)}">
+        <td colspan="5" class="px-6 py-3 bg-gray-50 border-t border-gray-100">
+          ${renderPlanShopInputs(mfr, suggested, shopEntries)}
+        </td>
+      </tr>`);
+  }
+
+  tbody.innerHTML = rows.join('') || `<tr><td colspan="5" class="text-center py-8 text-gray-400">${t('no_data')}</td></tr>`;
+
+  // Totals
+  const diff = totalPlanned - totalSuggested;
+  const diffCls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
+  document.getElementById('planTotalSuggested').textContent = fmtC(totalSuggested);
+  document.getElementById('planTotalPlanned').textContent   = totalPlanned > 0 ? fmtC(totalPlanned) : '—';
+  const diffEl = document.getElementById('planTotalDiff');
+  diffEl.textContent  = totalPlanned > 0 ? `${diff >= 0 ? '+' : ''}${fmtC(diff)}` : '—';
+  diffEl.className    = 'font-semibold ' + diffCls;
+
+  // Row click → expand
+  document.querySelectorAll('.plan-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const mfr    = row.dataset.mfr;
+      const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
+      const toggle = row.querySelector('.plan-toggle');
+      if (detail) {
+        const open = !detail.classList.contains('hidden');
+        detail.classList.toggle('hidden', open);
+        if (toggle) toggle.textContent = open ? '▶' : '▼';
+      }
+    });
+  });
+}
+
+function renderPlanShopInputs(mfr, suggested, shopEntries) {
+  const perShop = Math.round(suggested / Math.max(1, SHOPS.length));
+  const shopRows = SHOPS.map(({ id, name }) => {
+    const val = shopEntries[id] ?? 0;
+    return `
+      <div class="flex items-center gap-3 mb-1.5">
+        <span class="text-xs text-gray-500 w-36 truncate">${escHtml(name)}</span>
+        <div class="flex items-center gap-1">
+          <span class="text-xs text-gray-400">$</span>
+          <input type="number" min="0" step="100"
+            class="plan-shop-input border border-gray-200 rounded px-2 py-1 text-xs w-28 text-right focus:border-indigo-400 focus:outline-none"
+            data-mfr="${escHtml(mfr)}" data-shop="${id}"
+            value="${val > 0 ? val : ''}" placeholder="${perShop}">
+        </div>
+      </div>`;
+  }).join('');
+
+  return `<div class="flex flex-wrap gap-6">
+    <div>
+      <div class="text-[10px] font-semibold text-gray-400 uppercase mb-2" data-i18n="plan_by_shop">Par boutique</div>
+      ${shopRows}
+    </div>
+    <div class="text-xs text-gray-400 self-end mb-1">
+      <span data-i18n="plan_suggested_lbl">Suggéré :</span> <span class="font-semibold text-gray-600">${fmtC(suggested)}</span>
+    </div>
+  </div>`;
+}
+
+// Auto-save on input blur
+document.addEventListener('change', async e => {
+  const input = e.target.closest('.plan-shop-input');
+  if (!input) return;
+  const mfr    = input.dataset.mfr;
+  const shopId = input.dataset.shop;
+  const amount = parseFloat(input.value) || 0;
+  const season = planState.season;
+
+  // Update local state
+  if (!planState.plan[mfr]) planState.plan[mfr] = {};
+  planState.plan[mfr][shopId] = amount;
+
+  try {
+    await fetch(`${BASE}/api/budget-plan`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ season_code: season, manufacturer: mfr, shop_id: shopId, planned_amount: amount }),
+    });
+    // Flash saved message
+    const msg = document.getElementById('planSavedMsg');
+    if (msg) { msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 2000); }
+    // Re-render totals
+    renderPlanTable();
+  } catch {}
+});
+
 async function loadTransfers() {
   showLoader('transfers', true);
   try {
