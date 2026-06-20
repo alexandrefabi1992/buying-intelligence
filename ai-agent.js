@@ -324,8 +324,22 @@ async function executeTool(name, args, ctx) {
 async function runAgentLoop(messages, ctx) {
   const provider = createProvider();
 
-  const today = new Date().toISOString().slice(0, 10);
-  const systemContent = `${SYSTEM_PROMPT}\n\nDATE ACTUELLE: ${today}. Quand l'utilisateur dit "les 12 derniers mois", "le mois dernier", "cette année", etc., calcule les dates à partir de cette date.`;
+  const now   = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const minus12m = new Date(now); minus12m.setFullYear(minus12m.getFullYear() - 1);
+  const minus6m  = new Date(now); minus6m.setMonth(minus6m.getMonth() - 6);
+  const minus3m  = new Date(now); minus3m.setMonth(minus3m.getMonth() - 3);
+  const startOfYear = `${now.getFullYear()}-01-01`;
+
+  const dateContext = `\n\nDATE ACTUELLE: ${today}
+PÉRIODES PRÉ-CALCULÉES (utilise ces valeurs exactes):
+- "12 derniers mois" → date_from: ${minus12m.toISOString().slice(0,10)}, date_to: ${today}
+- "6 derniers mois"  → date_from: ${minus6m.toISOString().slice(0,10)}, date_to: ${today}
+- "3 derniers mois"  → date_from: ${minus3m.toISOString().slice(0,10)}, date_to: ${today}
+- "cette année"      → date_from: ${startOfYear}, date_to: ${today}
+NE JAMAIS inventer des dates — utilise toujours les valeurs ci-dessus pour les périodes relatives.`;
+
+  const systemContent = SYSTEM_PROMPT + dateContext;
 
   const fullMessages = [
     { role: 'system', content: systemContent },
