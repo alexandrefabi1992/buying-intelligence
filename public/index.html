@@ -2583,7 +2583,7 @@ Promise.all([loadTiers(), loadBudgetParams()]).then(() => {
 
   <!-- Messages -->
   <div id="ai-messages">
-    <div class="ai-msg assistant">Bonjour ! Je suis votre assistant achat. Posez-moi des questions sur vos budgets, ventes, stocks ou sell-through.\n\nExemples :\n• Quelles marques ont le meilleur ST en P26 ?\n• Quel est mon stock actuel pour la marque X ?\n• Compare mon plan vs le budget recommandé pour P26</div>
+    <div class="ai-msg assistant">Bonjour ! Je suis votre assistant achat. Posez-moi des questions sur vos budgets, ventes, stocks ou sell-through.</div>
   </div>
 
   <!-- Input -->
@@ -2669,7 +2669,6 @@ Promise.all([loadTiers(), loadBudgetParams()]).then(() => {
       const reply = data.content || '(pas de réponse)';
       appendMsg('assistant', reply);
       history = data.messages ?? history;
-      history.push({ role: 'assistant', content: reply });
 
     } catch (e) {
       msgs.removeChild(thinking);
