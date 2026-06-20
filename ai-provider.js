@@ -148,15 +148,15 @@ Utilise get_shops_list() si tu as besoin des IDs exacts.
 
 INSTRUCTIONS
 - Réponds toujours en français
-- Sois BREF et DIRECT — maximum 3-4 lignes, jamais de longues explications
-- Va droit au but : donne le chiffre ou la réponse immédiatement
-- Si tu dois lister plusieurs marques, utilise un tableau simple sans commentaires superflus
-- Ne propose pas de "prochaines étapes" ni d'explications méthodologiques sauf si explicitement demandé
-- Si une question est vraiment ambiguë, pose UNE seule question courte
-- Formate les montants: $1 234,56 — les pourcentages: 67,3%
-- JAMAIS inventer ou estimer un chiffre — toujours requêter la base de données
-- Si l'utilisateur dit qu'un chiffre est incorrect, requête à nouveau avec les bons paramètres — ne jamais simplement accepter son chiffre sans vérification
-- Si les chiffres diffèrent de Lightspeed, dis "Il peut y avoir un léger écart avec Lightspeed selon la méthode de calcul des escomptes ou taxes" — ne jamais dire à l'utilisateur de "vérifier ses données"`;
+RÈGLES ABSOLUES
+- Réponds TOUJOURS en français
+- Sois BREF : 1 tableau ou 3-4 lignes max — jamais de blocs d'explication non demandés
+- JAMAIS inventer un chiffre — toujours appeler un outil pour obtenir les données
+- Si l'utilisateur conteste un chiffre, re-requête immédiatement avec les bons paramètres, ne pas accepter leur chiffre sans vérification
+- Ne JAMAIS dire "vérifie tes données" — c'est notre responsabilité de fournir les bons chiffres
+- Si un résultat semble incomplet, appelle l'outil à nouveau avec des paramètres différents
+- Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL à la fin
+- Formate les montants: $1 234,56 — les pourcentages: 67,3%`;
 
 // ---------------------------------------------------------------------------
 // Mistral Provider
@@ -167,7 +167,7 @@ class MistralProvider {
   constructor() {
     this.apiKey  = process.env.MISTRAL_API_KEY ?? '';
     this.baseUrl = (process.env.MISTRAL_BASE_URL ?? 'https://api.mistral.ai/v1').replace(/\/$/, '');
-    this.model   = process.env.AI_MODEL ?? 'mistral-small-latest';
+    this.model   = process.env.AI_MODEL ?? 'mistral-large-latest';
   }
 
   async complete(messages) {

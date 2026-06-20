@@ -102,18 +102,17 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
   if (shop_id)      { conditions.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
 
-  // total_only = true → grand total sans GROUP BY (ex: total compagnie)
-  // sinon       → détail par boutique si marque filtrée, sinon par boutique sans limite
+  // total_only = true → grand total par boutique, LEFT JOIN pour capturer 100% des ventes
+  // (INNER JOIN exclurait les articles supprimés/non-synced → sous-comptage)
   if (total_only || (!manufacturer && !shop_id)) {
-    const groupBy = manufacturer ? 'sh.name' : 'sh.name';
     const { rows } = await pool.query(`
       SELECT
         sh.name                              AS boutique,
         SUM(sl.qty)                          AS unites,
         ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)), 2)::numeric(14,2) AS ventes_brutes,
-        SUM(sl.qty * p.default_cost)::numeric(14,2) AS cout_ventes
+        ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(14,2) AS cout_ventes
       FROM sale_lines sl
-      JOIN products p  ON p.item_id  = sl.item_id
+      LEFT JOIN products p ON p.item_id  = sl.item_id
       JOIN shops    sh ON sh.shop_id = sl.shop_id
       WHERE ${conditions.join(' AND ')}
       GROUP BY sh.name
@@ -146,7 +145,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
       sh.name                              AS boutique,
       SUM(sl.qty)                          AS unites,
       ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)), 2)::numeric(12,2) AS ventes_brutes,
-      SUM(sl.qty * p.default_cost)::numeric(12,2) AS cout_ventes
+      ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(12,2) AS cout_ventes
     FROM sale_lines sl
     JOIN products p  ON p.item_id  = sl.item_id
     JOIN shops    sh ON sh.shop_id = sl.shop_id
