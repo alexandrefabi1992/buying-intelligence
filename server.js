@@ -1542,6 +1542,34 @@ app.get('/api/admin/revenue-diag', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/revenue-check?date_from=2023-01-01&date_to=2026-06-19
+// Diagnose revenue formula coverage for a date range (no season filter)
+// ---------------------------------------------------------------------------
+app.get('/api/admin/revenue-check', async (req, res, next) => {
+  try {
+    const from = req.query.date_from || '2023-01-01';
+    const to   = req.query.date_to   || new Date().toISOString().slice(0,10);
+    const { rows } = await pool.query(`
+      SELECT
+        COUNT(*)::int                                                            AS total_lines,
+        COUNT(*) FILTER (WHERE sl.raw->>'calcTotal' IS NOT NULL)::int           AS lines_with_calc_total,
+        COUNT(*) FILTER (WHERE sl.raw->>'calcTotal' IS NULL)::int               AS lines_without_calc_total,
+        ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric,0)),2)::float8  AS formula_unit_price,
+        ROUND(SUM(CASE WHEN sl.raw->>'calcTotal' IS NOT NULL
+                  THEN (sl.raw->>'calcTotal')::numeric - COALESCE((sl.raw->>'calcTax1')::numeric,0) - COALESCE((sl.raw->>'calcTax2')::numeric,0)
+                  ELSE sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric,0)
+                  END),2)::float8                                               AS formula_hybrid,
+        ROUND(SUM((sl.raw->>'calcTotal')::numeric - COALESCE((sl.raw->>'calcTax1')::numeric,0) - COALESCE((sl.raw->>'calcTax2')::numeric,0)),2)::float8 AS formula_calctotal_pretax,
+        ROUND(SUM((sl.raw->>'calcSubtotal')::numeric),2)::float8               AS formula_calc_subtotal
+      FROM sale_lines sl
+      WHERE sl.completed_time BETWEEN $1 AND $2
+        AND sl.qty IS NOT NULL
+    `, [from, to]);
+    res.json({ periode: { from, to }, ...rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/admin/season-gap-diag
 // Diagnose the gap between Tag mode and Tag+Période mode for a given
 // manufacturer / tag / shop.
