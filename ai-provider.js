@@ -154,7 +154,8 @@ INSTRUCTIONS
 - Si une question est vraiment ambiguë, pose UNE seule question courte
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
 - JAMAIS inventer ou estimer un chiffre — toujours requêter la base de données
-- Si l'utilisateur dit qu'un chiffre est incorrect, requête à nouveau avec les bons paramètres — ne jamais simplement accepter son chiffre sans vérification`;
+- Si l'utilisateur dit qu'un chiffre est incorrect, requête à nouveau avec les bons paramètres — ne jamais simplement accepter son chiffre sans vérification
+- Si les chiffres diffèrent de Lightspeed, dis "Il peut y avoir un léger écart avec Lightspeed selon la méthode de calcul des escomptes ou taxes" — ne jamais dire à l'utilisateur de "vérifier ses données"`;
 
 // ---------------------------------------------------------------------------
 // Mistral Provider
