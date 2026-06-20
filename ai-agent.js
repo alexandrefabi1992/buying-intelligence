@@ -109,16 +109,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
       SELECT
         sh.name                              AS boutique,
         SUM(sl.qty)                          AS unites,
-        ROUND(SUM(
-  CASE
-    WHEN (sl.raw->>'calcTotal') IS NOT NULL
-    THEN (sl.raw->>'calcTotal')::numeric
-         - COALESCE((sl.raw->>'calcTax1')::numeric, 0)
-         - COALESCE((sl.raw->>'calcTax2')::numeric, 0)
-    ELSE sl.qty * sl.unit_price
-         - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)
-  END
-), 2)::numeric(14,2) AS ventes_brutes,
+        ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price)), 2)::numeric(14,2) AS ventes_brutes,
         ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(14,2) AS cout_ventes
       FROM sale_lines sl
       LEFT JOIN products p ON p.item_id  = sl.item_id
@@ -153,16 +144,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
       p.manufacturer,
       sh.name                              AS boutique,
       SUM(sl.qty)                          AS unites,
-      ROUND(SUM(
-  CASE
-    WHEN (sl.raw->>'calcTotal') IS NOT NULL
-    THEN (sl.raw->>'calcTotal')::numeric
-         - COALESCE((sl.raw->>'calcTax1')::numeric, 0)
-         - COALESCE((sl.raw->>'calcTax2')::numeric, 0)
-    ELSE sl.qty * sl.unit_price
-         - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)
-  END
-), 2)::numeric(12,2) AS ventes_brutes,
+      ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price)), 2)::numeric(12,2) AS ventes_brutes,
       ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(12,2) AS cout_ventes
     FROM sale_lines sl
     JOIN products p  ON p.item_id  = sl.item_id
