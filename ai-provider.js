@@ -167,10 +167,10 @@ class MistralProvider {
   constructor() {
     this.apiKey  = process.env.MISTRAL_API_KEY ?? '';
     this.baseUrl = (process.env.MISTRAL_BASE_URL ?? 'https://api.mistral.ai/v1').replace(/\/$/, '');
-    this.model   = process.env.AI_MODEL ?? 'mistral-large-latest';
+    this.model   = process.env.AI_MODEL ?? 'mistral-small-latest';
   }
 
-  async complete(messages) {
+  async complete(messages, attempt = 0) {
     const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method:  'POST',
       headers: {
@@ -185,6 +185,11 @@ class MistralProvider {
         temperature: 0.2,
       }),
     });
+    if (res.status === 429 && attempt < 3) {
+      const wait = (attempt + 1) * 2000;
+      await new Promise(r => setTimeout(r, wait));
+      return this.complete(messages, attempt + 1);
+    }
     if (!res.ok) throw new Error(`Mistral ${res.status}: ${await res.text()}`);
     const data = await res.json();
     const msg  = data.choices[0].message;
