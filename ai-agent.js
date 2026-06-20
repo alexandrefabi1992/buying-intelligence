@@ -84,8 +84,31 @@ async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { poo
   };
 }
 
-async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, date_to, total_only = false }, { pool, getSeasonsConfig }) {
+function resolvePeriod(period) {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const p = (period ?? '').toLowerCase().trim();
+  const yMatch = p.match(/^(\d+)\s*y(?:ear)?s?$/);
+  const mMatch = p.match(/^(\d+)\s*m(?:onth)?s?$/);
+  const wMatch = p.match(/^(\d+)\s*w(?:eek)?s?$/);
+  const dMatch = p.match(/^(\d+)\s*d(?:ay)?s?$/);
+  if (yMatch) { const d = new Date(now); d.setFullYear(d.getFullYear() - +yMatch[1]); return [d.toISOString().slice(0,10), today]; }
+  if (mMatch) { const d = new Date(now); d.setMonth(d.getMonth() - +mMatch[1]);       return [d.toISOString().slice(0,10), today]; }
+  if (wMatch) { const d = new Date(now); d.setDate(d.getDate() - +wMatch[1] * 7);     return [d.toISOString().slice(0,10), today]; }
+  if (dMatch) { const d = new Date(now); d.setDate(d.getDate() - +dMatch[1]);          return [d.toISOString().slice(0,10), today]; }
+  if (p === 'ytd')       return [`${now.getFullYear()}-01-01`, today];
+  if (p === 'last_year') return [`${now.getFullYear()-1}-01-01`, `${now.getFullYear()-1}-12-31`];
+  return null;
+}
+
+async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, date_to, period, total_only = false }, { pool, getSeasonsConfig }) {
   let from = date_from, to = date_to;
+
+  // period shorthand takes priority over raw dates
+  if (period) {
+    const resolved = resolvePeriod(period);
+    if (resolved) [from, to] = resolved;
+  }
 
   if (season && !from) {
     const seasons = await getSeasonsConfig();
@@ -94,7 +117,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
     from = s.sale_from;
     to   = s.sale_to;
   }
-  if (!from) return { erreur: 'Fournir "season" ou "date_from".' };
+  if (!from) return { erreur: 'Fournir "period" (ex: "4y", "10w", "6m", "ytd") ou "season" ou "date_from".' };
 
   const conditions = ['sl.completed_time BETWEEN $1 AND $2'];
   const params     = [from, to ?? new Date().toISOString()];
@@ -379,17 +402,8 @@ async function runAgentLoop(messages, ctx) {
   };
 
   const dateContext = `\n\nDATE ACTUELLE: ${today}
-PÉRIODES PRÉ-CALCULÉES — utilise TOUJOURS ces valeurs exactes, ne calcule jamais toi-même:
-- "1 an" / "12 mois" / "dernière année"  → date_from: ${d(1)}, date_to: ${today}
-- "2 ans" / "24 mois"                    → date_from: ${d(2)}, date_to: ${today}
-- "3 ans" / "36 mois"                    → date_from: ${d(3)}, date_to: ${today}
-- "4 ans" / "48 mois"                    → date_from: ${d(4)}, date_to: ${today}
-- "5 ans" / "60 mois"                    → date_from: ${d(5)}, date_to: ${today}
-- "6 mois"                               → date_from: ${d(0,6)}, date_to: ${today}
-- "3 mois"                               → date_from: ${d(0,3)}, date_to: ${today}
-- "cette année"                          → date_from: ${now.getFullYear()}-01-01, date_to: ${today}
-- "année passée" / "l'an dernier"        → date_from: ${now.getFullYear()-1}-01-01, date_to: ${now.getFullYear()-1}-12-31
-RÈGLE ABSOLUE: si l'utilisateur demande une période en mois ou années, utilise les dates ci-dessus. Ne jamais deviner.`;
+RÈGLE ABSOLUE SUR LES DATES: utilise TOUJOURS le paramètre "period" pour les périodes relatives — jamais date_from/date_to calculées de ta tête.
+Correspondances period: "4y"=4 ans, "3y"=3 ans, "2y"=2 ans, "1y"=1 an, "6m"=6 mois, "3m"=3 mois, "10w"=10 semaines, "ytd"=cette année, "last_year"=l'an dernier.`;
 
   const systemContent = SYSTEM_PROMPT + dateContext;
 
