@@ -107,23 +107,26 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
       p.manufacturer,
       sh.name                              AS boutique,
       SUM(sl.qty)                          AS unites,
+      ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)), 2)::numeric(12,2) AS ventes_brutes,
       SUM(sl.qty * p.default_cost)::numeric(12,2) AS cout_ventes
     FROM sale_lines sl
     JOIN products p  ON p.item_id  = sl.item_id
     JOIN shops    sh ON sh.shop_id = sl.shop_id
     WHERE ${conditions.join(' AND ')}
     GROUP BY p.manufacturer, sh.name
-    ORDER BY cout_ventes DESC NULLS LAST
+    ORDER BY ventes_brutes DESC NULLS LAST
     LIMIT 50
   `, params);
 
   return {
     periode: { de: from, a: to },
+    note: 'ventes_brutes = prix de vente HT après escompte. cout_ventes = coût d\'achat des articles vendus.',
     resultats: rows.map(r => ({
-      marque:      r.manufacturer,
-      boutique:    r.boutique,
-      unites:      r.unites,
-      cout_ventes: fmtMoney(r.cout_ventes),
+      marque:        r.manufacturer,
+      boutique:      r.boutique,
+      unites:        r.unites,
+      ventes_brutes: fmtMoney(r.ventes_brutes),
+      cout_ventes:   fmtMoney(r.cout_ventes),
     })),
   };
 }

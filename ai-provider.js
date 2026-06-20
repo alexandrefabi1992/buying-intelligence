@@ -51,7 +51,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_sales_analysis',
-    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les quantités, le chiffre et le coût des ventes.',
+    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les quantités, les ventes brutes HT (prix de vente après escompte) et le coût des ventes (prix d\'achat). Utilise ce tool pour toute question sur le chiffre d\'affaires, les ventes brutes, ou le revenu.',
     parameters: {
       type: 'object',
       properties: {
@@ -139,6 +139,8 @@ CONTEXTE DE L'APPLICATION
 - Un bon ST est généralement ≥ 65%. En dessous de 35%, la marque est sous-performante
 - Budget recommandé = moyenne pondérée des saisons précédentes × multiplicateur ST
 - Budget planifié = ce que l'acheteur a saisi manuellement dans le plan d'achat
+- Ventes brutes = prix de vente HT × quantités − escomptes (chiffre d'affaires réel)
+- Coût des ventes = prix d'achat × quantités vendues (≠ ventes brutes — ne pas confondre)
 
 BOUTIQUES DISPONIBLES
 Utilise get_shops_list() si tu as besoin des IDs exacts.
