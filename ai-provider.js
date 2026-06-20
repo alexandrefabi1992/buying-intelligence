@@ -55,13 +55,11 @@ const TOOL_DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        period:       { type: 'string',  description: 'Période relative — TOUJOURS utiliser ceci plutôt que date_from/date_to. Exemples: "1y"=1 an, "2y"=2 ans, "3y"=3 ans, "4y"=4 ans, "5y"=5 ans, "6m"=6 mois, "3m"=3 mois, "10w"=10 semaines, "30d"=30 jours, "ytd"=cette année, "last_year"=année passée' },
-        season:       { type: 'string',  description: 'Code de saison (ex: p26, a25) — utiliser seulement si la question porte sur une saison spécifique' },
+        period:       { type: 'string',  description: 'OBLIGATOIRE pour toute période relative. Valeurs: "1y" "2y" "3y" "4y" "5y" "6m" "3m" "1m" "4w" "8w" "10w" "12w" "30d" "ytd" "last_year". Ex: "4 dernières années" → "4y", "10 dernières semaines" → "10w", "cette année" → "ytd"' },
+        season:       { type: 'string',  description: 'Code de saison (ex: p26, a25) — seulement si la question porte sur une saison nommée' },
         manufacturer: { type: 'string',  description: 'Nom de la marque (optionnel)' },
         shop_id:      { type: 'string',  description: 'ID de la boutique (optionnel)' },
-        date_from:    { type: 'string',  description: 'Date ISO début — utiliser seulement si une date exacte est demandée' },
-        date_to:      { type: 'string',  description: 'Date ISO fin — utiliser seulement si une date exacte est demandée' },
-        total_only:   { type: 'boolean', description: 'Si true, retourne le total par boutique sans filtrer par marque — utiliser pour les totaux compagnie' },
+        total_only:   { type: 'boolean', description: 'true pour total toutes marques par boutique (ventes globales compagnie)' },
       },
       required: [],
     },
