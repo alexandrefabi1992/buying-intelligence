@@ -51,7 +51,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_sales_analysis',
-    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les quantités, les ventes brutes HT (prix de vente après escompte) et le coût des ventes (prix d\'achat). Utilise ce tool pour toute question sur le chiffre d\'affaires, les ventes brutes, ou le revenu.',
+    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les ventes brutes HT (prix de vente après escompte) et le coût des ventes. Pour les totaux compagnie (toutes marques), utilise total_only=true — sinon la requête est limitée aux 50 premiers résultats.',
     parameters: {
       type: 'object',
       properties: {
@@ -60,6 +60,7 @@ const TOOL_DEFS = [
         shop_id:      { type: 'string',  description: 'ID de la boutique (optionnel)' },
         date_from:    { type: 'string',  description: 'Date de début ISO (optionnel si season fourni)' },
         date_to:      { type: 'string',  description: 'Date de fin ISO (optionnel)' },
+        total_only:   { type: 'boolean', description: 'Si true, retourne le total par boutique sans filtrer par marque — utiliser pour les totaux compagnie' },
       },
       required: [],
     },

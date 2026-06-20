@@ -84,7 +84,7 @@ async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { poo
   };
 }
 
-async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, date_to }, { pool, getSeasonsConfig }) {
+async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, date_to, total_only = false }, { pool, getSeasonsConfig }) {
   let from = date_from, to = date_to;
 
   if (season && !from) {
@@ -102,6 +102,44 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
   if (shop_id)      { conditions.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
 
+  // total_only = true → grand total sans GROUP BY (ex: total compagnie)
+  // sinon       → détail par boutique si marque filtrée, sinon par boutique sans limite
+  if (total_only || (!manufacturer && !shop_id)) {
+    const groupBy = manufacturer ? 'sh.name' : 'sh.name';
+    const { rows } = await pool.query(`
+      SELECT
+        sh.name                              AS boutique,
+        SUM(sl.qty)                          AS unites,
+        ROUND(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)), 2)::numeric(14,2) AS ventes_brutes,
+        SUM(sl.qty * p.default_cost)::numeric(14,2) AS cout_ventes
+      FROM sale_lines sl
+      JOIN products p  ON p.item_id  = sl.item_id
+      JOIN shops    sh ON sh.shop_id = sl.shop_id
+      WHERE ${conditions.join(' AND ')}
+      GROUP BY sh.name
+      ORDER BY ventes_brutes DESC NULLS LAST
+    `, params);
+
+    const totVentes = rows.reduce((s, r) => s + parseFloat(r.ventes_brutes ?? 0), 0);
+    const totCout   = rows.reduce((s, r) => s + parseFloat(r.cout_ventes   ?? 0), 0);
+    const totUnites = rows.reduce((s, r) => s + parseInt(r.unites          ?? 0), 0);
+
+    return {
+      periode:  { de: from, a: to },
+      par_boutique: rows.map(r => ({
+        boutique:      r.boutique,
+        unites:        Number(r.unites),
+        ventes_brutes: fmtMoney(r.ventes_brutes),
+        cout_ventes:   fmtMoney(r.cout_ventes),
+      })),
+      total: {
+        unites:        totUnites,
+        ventes_brutes: fmtMoney(totVentes),
+        cout_ventes:   fmtMoney(totCout),
+      },
+    };
+  }
+
   const { rows } = await pool.query(`
     SELECT
       p.manufacturer,
@@ -118,16 +156,24 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
     LIMIT 50
   `, params);
 
+  const totVentes = rows.reduce((s, r) => s + parseFloat(r.ventes_brutes ?? 0), 0);
+  const totCout   = rows.reduce((s, r) => s + parseFloat(r.cout_ventes   ?? 0), 0);
+  const totUnites = rows.reduce((s, r) => s + parseInt(r.unites          ?? 0), 0);
+
   return {
     periode: { de: from, a: to },
-    note: 'ventes_brutes = prix de vente HT après escompte. cout_ventes = coût d\'achat des articles vendus.',
     resultats: rows.map(r => ({
       marque:        r.manufacturer,
       boutique:      r.boutique,
-      unites:        r.unites,
+      unites:        Number(r.unites),
       ventes_brutes: fmtMoney(r.ventes_brutes),
       cout_ventes:   fmtMoney(r.cout_ventes),
     })),
+    total: {
+      unites:        totUnites,
+      ventes_brutes: fmtMoney(totVentes),
+      cout_ventes:   fmtMoney(totCout),
+    },
   };
 }
 
