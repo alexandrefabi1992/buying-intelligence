@@ -199,6 +199,42 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
   };
 }
 
+async function toolGetStockByVariant({ manufacturer, size, description_search, shop_id }, { pool }) {
+  const conditions = ['p.archived = false'];
+  const params     = [];
+
+  if (manufacturer)       { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
+  if (description_search) { conditions.push(`p.description ILIKE $${params.length + 1}`);  params.push(`%${description_search}%`); }
+  if (size)               { conditions.push(`p.description ILIKE $${params.length + 1}`);  params.push(`%${size}%`); }
+  if (shop_id)            { conditions.push(`i.shop_id = $${params.length + 1}`);           params.push(shop_id); }
+
+  const { rows } = await pool.query(`
+    SELECT
+      p.description,
+      p.manufacturer,
+      sh.name            AS boutique,
+      i.qty_on_hand      AS stock,
+      p.default_cost     AS cout_unitaire
+    FROM products p
+    JOIN inventory i ON i.item_id = p.item_id
+    JOIN shops    sh ON sh.shop_id = i.shop_id
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY p.description, sh.name
+    LIMIT 100
+  `, params);
+
+  const total = rows.reduce((s, r) => s + Number(r.stock), 0);
+  return {
+    filtre: { marque: manufacturer, taille: size, recherche: description_search },
+    total_unites: total,
+    articles: rows.map(r => ({
+      description: r.description,
+      boutique:    r.boutique,
+      stock:       Number(r.stock),
+    })),
+  };
+}
+
 async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = false }, { pool }) {
   const conditions = ['p.archived = false', 'i.qty_on_hand > 0'];
   const params     = [];
@@ -371,6 +407,7 @@ async function executeTool(name, args, ctx) {
       case 'get_budget_recommendations': return await toolGetBudgetRecommendations(args, ctx);
       case 'get_sales_analysis':         return await toolGetSalesAnalysis(args, ctx);
       case 'get_stock_levels':           return await toolGetStockLevels(args, ctx);
+      case 'get_stock_by_variant':       return await toolGetStockByVariant(args, ctx);
       case 'get_plan_vs_recommended':    return await toolGetPlanVsRecommended(args, ctx);
       case 'get_top_performers':         return await toolGetTopPerformers(args, ctx);
       case 'get_shops_list':             return await toolGetShopsList(args, ctx);

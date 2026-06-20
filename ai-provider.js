@@ -124,6 +124,20 @@ const TOOL_DEFS = [
     description: 'Obtenir la liste des saisons configurées avec leurs dates.',
     parameters: { type: 'object', properties: {}, required: [] },
   },
+  {
+    name: 'get_stock_by_variant',
+    description: 'Obtenir le stock détaillé par variante (taille, couleur, description) pour une marque. Utiliser quand la question concerne une taille spécifique (ex: "taille 15.5", "taille M", "40", "XL") ou une description de produit précise.',
+    parameters: {
+      type: 'object',
+      properties: {
+        manufacturer:       { type: 'string',  description: 'Nom de la marque (optionnel)' },
+        size:               { type: 'string',  description: 'Taille à rechercher dans la description, ex: "15.5", "M", "40" (optionnel)' },
+        description_search: { type: 'string',  description: 'Terme de recherche dans la description du produit, ex: "chemise", "pantalon" (optionnel)' },
+        shop_id:            { type: 'string',  description: 'ID de la boutique (optionnel)' },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
