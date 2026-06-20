@@ -13,6 +13,7 @@ const axios   = require('axios');
 const { Pool } = require('pg');
 const fs      = require('fs');
 const path    = require('path');
+const { runAgentLoop } = require('./ai-agent');
 
 const app  = express();
 
@@ -3852,6 +3853,34 @@ app.post('/api/admin/refresh-view', async (req, res, next) => {
 
     const { rows } = await pool.query('SELECT COUNT(*) FROM mv_sales_velocity');
     res.json({ ok: true, mv_sales_velocity_count: rows[0].count });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ai/chat — AI agent endpoint
+// Body: { messages: [...] }   (OpenAI-format conversation history)
+// Returns: { content, messages }
+//
+// Provider is configured via env vars — see ai-provider.js header for details:
+//   AI_PROVIDER=mistral   MISTRAL_API_KEY=...   AI_MODEL=mistral-small-latest
+//   AI_PROVIDER=openai    OPENAI_API_KEY=...    AI_MODEL=gpt-4o-mini
+//   AI_PROVIDER=anthropic ANTHROPIC_API_KEY=... AI_MODEL=claude-haiku-4-5-20251001
+//   (self-hosted) MISTRAL_BASE_URL=http://your-server:8000/v1
+// ---------------------------------------------------------------------------
+app.post('/api/ai/chat', async (req, res, next) => {
+  try {
+    if (!process.env.MISTRAL_API_KEY && !process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+      return res.status(503).json({
+        error: 'Agent IA non configuré. Ajouter MISTRAL_API_KEY (ou OPENAI_API_KEY / ANTHROPIC_API_KEY) dans les variables d\'environnement.',
+      });
+    }
+    const { messages } = req.body;
+    if (!Array.isArray(messages) || !messages.length) {
+      return res.status(400).json({ error: 'messages array required' });
+    }
+    const ctx = { pool, budgetCache, getSeasonsConfig };
+    const result = await runAgentLoop(messages, ctx);
+    res.json(result);
   } catch (err) { next(err); }
 });
 
