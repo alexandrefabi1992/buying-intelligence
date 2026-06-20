@@ -324,8 +324,11 @@ async function executeTool(name, args, ctx) {
 async function runAgentLoop(messages, ctx) {
   const provider = createProvider();
 
+  const today = new Date().toISOString().slice(0, 10);
+  const systemContent = `${SYSTEM_PROMPT}\n\nDATE ACTUELLE: ${today}. Quand l'utilisateur dit "les 12 derniers mois", "le mois dernier", "cette année", etc., calcule les dates à partir de cette date.`;
+
   const fullMessages = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: systemContent },
     ...messages,
   ];
 
