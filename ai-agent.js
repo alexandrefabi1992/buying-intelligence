@@ -371,18 +371,25 @@ async function runAgentLoop(messages, ctx) {
 
   const now   = new Date();
   const today = now.toISOString().slice(0, 10);
-  const minus12m = new Date(now); minus12m.setFullYear(minus12m.getFullYear() - 1);
-  const minus6m  = new Date(now); minus6m.setMonth(minus6m.getMonth() - 6);
-  const minus3m  = new Date(now); minus3m.setMonth(minus3m.getMonth() - 3);
-  const startOfYear = `${now.getFullYear()}-01-01`;
+  const d = (yearsBack = 0, monthsBack = 0) => {
+    const dt = new Date(now);
+    dt.setFullYear(dt.getFullYear() - yearsBack);
+    dt.setMonth(dt.getMonth() - monthsBack);
+    return dt.toISOString().slice(0, 10);
+  };
 
   const dateContext = `\n\nDATE ACTUELLE: ${today}
-PÉRIODES PRÉ-CALCULÉES (utilise ces valeurs exactes):
-- "12 derniers mois" → date_from: ${minus12m.toISOString().slice(0,10)}, date_to: ${today}
-- "6 derniers mois"  → date_from: ${minus6m.toISOString().slice(0,10)}, date_to: ${today}
-- "3 derniers mois"  → date_from: ${minus3m.toISOString().slice(0,10)}, date_to: ${today}
-- "cette année"      → date_from: ${startOfYear}, date_to: ${today}
-NE JAMAIS inventer des dates — utilise toujours les valeurs ci-dessus pour les périodes relatives.`;
+PÉRIODES PRÉ-CALCULÉES — utilise TOUJOURS ces valeurs exactes, ne calcule jamais toi-même:
+- "1 an" / "12 mois" / "dernière année"  → date_from: ${d(1)}, date_to: ${today}
+- "2 ans" / "24 mois"                    → date_from: ${d(2)}, date_to: ${today}
+- "3 ans" / "36 mois"                    → date_from: ${d(3)}, date_to: ${today}
+- "4 ans" / "48 mois"                    → date_from: ${d(4)}, date_to: ${today}
+- "5 ans" / "60 mois"                    → date_from: ${d(5)}, date_to: ${today}
+- "6 mois"                               → date_from: ${d(0,6)}, date_to: ${today}
+- "3 mois"                               → date_from: ${d(0,3)}, date_to: ${today}
+- "cette année"                          → date_from: ${now.getFullYear()}-01-01, date_to: ${today}
+- "année passée" / "l'an dernier"        → date_from: ${now.getFullYear()-1}-01-01, date_to: ${now.getFullYear()-1}-12-31
+RÈGLE ABSOLUE: si l'utilisateur demande une période en mois ou années, utilise les dates ci-dessus. Ne jamais deviner.`;
 
   const systemContent = SYSTEM_PROMPT + dateContext;
 
