@@ -1551,14 +1551,16 @@ app.get('/api/admin/revenue-check', async (req, res, next) => {
     const to   = req.query.date_to   || new Date().toISOString().slice(0,10);
     const { rows } = await pool.query(`
       SELECT
-        COUNT(*)::int                                                            AS total_lines,
-        COUNT(*) FILTER (WHERE sl.qty > 0)::int                                 AS lignes_ventes,
-        COUNT(*) FILTER (WHERE sl.qty < 0)::int                                 AS lignes_retours,
-        COUNT(*) FILTER (WHERE sl.qty = 0)::int                                 AS lignes_zero,
-        ROUND(SUM((sl.raw->>'calcSubtotal')::numeric),2)::float8               AS subtotal_all,
-        ROUND(SUM((sl.raw->>'calcSubtotal')::numeric) FILTER (WHERE sl.qty > 0),2)::float8 AS subtotal_ventes_only,
-        ROUND(SUM((sl.raw->>'calcSubtotal')::numeric) FILTER (WHERE sl.qty < 0),2)::float8 AS subtotal_retours_only,
-        COUNT(*) FILTER (WHERE sl.raw->>'calcTotal' IS NOT NULL)::int           AS lines_with_calc_total,
+        COUNT(*)::int                                                                        AS total_lines,
+        COUNT(*) FILTER (WHERE sl.qty > 0)::int                                             AS lignes_ventes,
+        COUNT(*) FILTER (WHERE sl.qty < 0)::int                                             AS lignes_retours,
+        COUNT(*) FILTER (WHERE sl.raw->>'calcSubtotal' IS NULL)::int                        AS lignes_sans_calcsubtotal,
+        COUNT(*) FILTER (WHERE sl.raw->>'calcSubtotal' IS NOT NULL)::int                    AS lignes_avec_calcsubtotal,
+        ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price)),2)::float8  AS subtotal_all,
+        ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price)) FILTER (WHERE sl.qty > 0),2)::float8 AS subtotal_ventes_only,
+        ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price)) FILTER (WHERE sl.qty < 0),2)::float8 AS subtotal_retours_only,
+        ROUND(SUM(sl.qty * sl.unit_price),2)::float8                                        AS sum_unit_price,
+        ROUND(SUM(COALESCE((sl.raw->>'calcLineDiscount')::numeric,0)),2)::float8            AS sum_discounts,
         ROUND(SUM((sl.raw->>'calcTotal')::numeric - COALESCE((sl.raw->>'calcTax1')::numeric,0) - COALESCE((sl.raw->>'calcTax2')::numeric,0)),2)::float8 AS calctotal_pretax
       FROM sale_lines sl
       WHERE sl.completed_time BETWEEN $1 AND $2
