@@ -126,13 +126,13 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_sales_by_variant',
-    description: 'Analyser les ventes par variante (taille, description de produit). Utiliser quand on veut les ventes d\'un produit précis ou d\'une taille spécifique (ex: "chemise Eton 15.5", "pantalon taille 32"). Retourne les unités vendues et ventes brutes par description.',
+    description: 'Analyser les ventes par variante (taille, description de produit). Utiliser quand on veut les ventes d\'un produit précis ou d\'une taille spécifique (ex: "chemise Eton 15.5", "pantalon taille 32"). IMPORTANT: Ne PAS utiliser description_search pour des catégories génériques comme "chemise", "pantalon", "polo" — les descriptions sont des codes produits, pas des catégories. Utiliser seulement manufacturer + size pour les requêtes par taille.',
     parameters: {
       type: 'object',
       properties: {
         manufacturer:       { type: 'string', description: 'Nom de la marque (optionnel)' },
-        size:               { type: 'string', description: 'Taille à rechercher dans la description, ex: "15.5", "M", "40"' },
-        description_search: { type: 'string', description: 'Terme de recherche dans la description du produit, ex: "chemise", "polo"' },
+        size:               { type: 'string', description: 'Taille à rechercher, ex: "15.5", "M", "40". Supporte automatiquement "15 1/2" = "15.5"' },
+        description_search: { type: 'string', description: 'UNIQUEMENT pour chercher une référence de produit précise (ex: "TUXEDO", "TWILL"). NE PAS utiliser pour des catégories génériques (chemise, pantalon, etc.)' },
         shop_id:            { type: 'string', description: 'ID de la boutique (optionnel)' },
         period:             { type: 'string', description: 'Période relative, ex: "1y", "2y", "ytd", "last_year", "6m"' },
         season:             { type: 'string', description: 'Code de saison (ex: p26, a25) — si la question porte sur une saison' },
@@ -148,7 +148,7 @@ const TOOL_DEFS = [
       properties: {
         manufacturer:       { type: 'string',  description: 'Nom de la marque (optionnel)' },
         size:               { type: 'string',  description: 'Taille à rechercher dans la description, ex: "15.5", "M", "40" (optionnel)' },
-        description_search: { type: 'string',  description: 'Terme de recherche dans la description du produit, ex: "chemise", "pantalon" (optionnel)' },
+        description_search: { type: 'string',  description: 'UNIQUEMENT pour chercher une référence précise (ex: "TUXEDO", "TWILL"). NE PAS utiliser pour des catégories génériques (chemise, pantalon, etc.)' },
         shop_id:            { type: 'string',  description: 'ID de la boutique (optionnel)' },
       },
       required: [],
