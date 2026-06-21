@@ -1572,6 +1572,29 @@ app.get('/api/admin/revenue-check', async (req, res, next) => {
 
 // ---------------------------------------------------------------------------
 // GET /api/admin/season-gap-diag
+// GET /api/admin/product-descriptions?manufacturer=Eton&limit=50
+// Show raw product descriptions to inspect size/variant format in DB
+// ---------------------------------------------------------------------------
+app.get('/api/admin/product-descriptions', async (req, res, next) => {
+  try {
+    const mfr   = req.query.manufacturer || 'Eton';
+    const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
+    const { rows } = await pool.query(
+      `SELECT p.description, p.manufacturer, p.item_id,
+              COALESCE(SUM(i.qty_on_hand), 0) AS total_stock
+       FROM products p
+       LEFT JOIN inventory i ON i.item_id = p.item_id
+       WHERE p.manufacturer ILIKE $1 AND p.archived = false
+       GROUP BY p.description, p.manufacturer, p.item_id
+       ORDER BY p.description
+       LIMIT $2`,
+      [`%${mfr}%`, limit]
+    );
+    res.json({ manufacturer: mfr, count: rows.length, products: rows });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // Diagnose the gap between Tag mode and Tag+Période mode for a given
 // manufacturer / tag / shop.
 // Example: /api/admin/season-gap-diag?manufacturer=Brax&tag=p26&shop_id=5
