@@ -235,6 +235,58 @@ async function toolGetStockByVariant({ manufacturer, size, description_search, s
   };
 }
 
+async function toolGetSalesByVariant({ manufacturer, size, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
+  let from, to;
+  if (period) {
+    const resolved = resolvePeriod(period);
+    if (resolved) [from, to] = resolved;
+  }
+  if (season && !from) {
+    const seasons = await getSeasonsConfig();
+    const s = seasons.find(x => x.code === season.toLowerCase());
+    if (s) { from = s.sale_from; to = s.sale_to; }
+  }
+
+  const conditions = ['sl.qty > 0'];
+  const params     = [];
+
+  if (from) { conditions.push(`sl.completed_time >= $${params.length + 1}`); params.push(from); }
+  if (to)   { conditions.push(`sl.completed_time <= $${params.length + 1}`); params.push(to); }
+  if (manufacturer)       { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
+  if (description_search) { conditions.push(`p.description ILIKE $${params.length + 1}`);  params.push(`%${description_search}%`); }
+  if (size)               { conditions.push(`p.description ILIKE $${params.length + 1}`);  params.push(`% ${size}%`); }
+  if (shop_id)            { conditions.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
+
+  const { rows } = await pool.query(`
+    SELECT
+      p.description,
+      p.manufacturer,
+      SUM(sl.qty)                          AS qty_vendue,
+      ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price)), 2) AS ventes_brutes,
+      ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2) AS cout_ventes
+    FROM sale_lines sl
+    JOIN products p ON p.item_id = sl.item_id
+    WHERE ${conditions.join(' AND ')}
+    GROUP BY p.description, p.manufacturer
+    ORDER BY qty_vendue DESC
+    LIMIT 100
+  `, params);
+
+  const total_qty    = rows.reduce((s, r) => s + Number(r.qty_vendue),    0);
+  const total_ventes = rows.reduce((s, r) => s + parseFloat(r.ventes_brutes ?? 0), 0);
+
+  return {
+    filtre: { marque: manufacturer, taille: size, recherche: description_search, de: from, a: to },
+    total_unites_vendues:  total_qty,
+    total_ventes_brutes:   fmtMoney(total_ventes),
+    articles: rows.map(r => ({
+      description:   r.description,
+      qty_vendue:    Number(r.qty_vendue),
+      ventes_brutes: fmtMoney(r.ventes_brutes),
+    })),
+  };
+}
+
 async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = false }, { pool }) {
   const conditions = ['p.archived = false', 'i.qty_on_hand > 0'];
   const params     = [];
@@ -408,6 +460,7 @@ async function executeTool(name, args, ctx) {
       case 'get_sales_analysis':         return await toolGetSalesAnalysis(args, ctx);
       case 'get_stock_levels':           return await toolGetStockLevels(args, ctx);
       case 'get_stock_by_variant':       return await toolGetStockByVariant(args, ctx);
+      case 'get_sales_by_variant':       return await toolGetSalesByVariant(args, ctx);
       case 'get_plan_vs_recommended':    return await toolGetPlanVsRecommended(args, ctx);
       case 'get_top_performers':         return await toolGetTopPerformers(args, ctx);
       case 'get_shops_list':             return await toolGetShopsList(args, ctx);

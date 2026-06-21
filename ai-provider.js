@@ -125,8 +125,24 @@ const TOOL_DEFS = [
     parameters: { type: 'object', properties: {}, required: [] },
   },
   {
+    name: 'get_sales_by_variant',
+    description: 'Analyser les ventes par variante (taille, description de produit). Utiliser quand on veut les ventes d\'un produit précis ou d\'une taille spécifique (ex: "chemise Eton 15.5", "pantalon taille 32"). Retourne les unités vendues et ventes brutes par description.',
+    parameters: {
+      type: 'object',
+      properties: {
+        manufacturer:       { type: 'string', description: 'Nom de la marque (optionnel)' },
+        size:               { type: 'string', description: 'Taille à rechercher dans la description, ex: "15.5", "M", "40"' },
+        description_search: { type: 'string', description: 'Terme de recherche dans la description du produit, ex: "chemise", "polo"' },
+        shop_id:            { type: 'string', description: 'ID de la boutique (optionnel)' },
+        period:             { type: 'string', description: 'Période relative, ex: "1y", "2y", "ytd", "last_year", "6m"' },
+        season:             { type: 'string', description: 'Code de saison (ex: p26, a25) — si la question porte sur une saison' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'get_stock_by_variant',
-    description: 'Obtenir le stock détaillé par variante (taille, couleur, description) pour une marque. Utiliser quand la question concerne une taille spécifique (ex: "taille 15.5", "taille M", "40", "XL") ou une description de produit précise.',
+    description: 'Obtenir le stock actuel détaillé par variante (taille, couleur, description) pour une marque. Utiliser quand la question concerne le stock d\'une taille spécifique (ex: "taille 15.5", "taille M", "40", "XL") ou une description de produit précise.',
     parameters: {
       type: 'object',
       properties: {
