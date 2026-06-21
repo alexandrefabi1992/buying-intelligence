@@ -203,10 +203,19 @@ async function toolGetStockByVariant({ manufacturer, size, description_search, s
   const conditions = ['p.archived = false'];
   const params     = [];
 
-  if (manufacturer)       { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
-  if (description_search) { conditions.push(`p.description ILIKE $${params.length + 1}`);  params.push(`%${description_search}%`); }
-  if (size)               { conditions.push(`p.description ILIKE $${params.length + 1}`);  params.push(`%${size}%`); }
-  if (shop_id)            { conditions.push(`i.shop_id = $${params.length + 1}`);           params.push(shop_id); }
+  if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
+  if (description_search && !size) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
+  if (size) {
+    const fraction = decimalToFraction(size.trim());
+    if (fraction) {
+      conditions.push(`(p.description ILIKE $${params.length + 1} OR p.description ILIKE $${params.length + 2})`);
+      params.push(`% ${size.trim()}%`, `% ${fraction}%`);
+    } else {
+      conditions.push(`p.description ILIKE $${params.length + 1}`);
+      params.push(`% ${size.trim()}%`);
+    }
+  }
+  if (shop_id) { conditions.push(`i.shop_id = $${params.length + 1}`); params.push(shop_id); }
 
   const { rows } = await pool.query(`
     SELECT
@@ -235,6 +244,14 @@ async function toolGetStockByVariant({ manufacturer, size, description_search, s
   };
 }
 
+// Convert decimal collar size to fraction string used by some products, e.g. 15.5 → "15 1/2"
+function decimalToFraction(sizeStr) {
+  const fractions = { '.25': '1/4', '.5': '1/2', '.75': '3/4' };
+  const m = sizeStr.match(/^(\d+)(\.(?:25|5|75))$/);
+  if (!m) return null;
+  return `${m[1]} ${fractions[m[2]]}`;
+}
+
 async function toolGetSalesByVariant({ manufacturer, size, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
   let from, to;
   if (period) {
@@ -252,10 +269,21 @@ async function toolGetSalesByVariant({ manufacturer, size, description_search, s
 
   if (from) { conditions.push(`sl.completed_time >= $${params.length + 1}`); params.push(from); }
   if (to)   { conditions.push(`sl.completed_time <= $${params.length + 1}`); params.push(to); }
-  if (manufacturer)       { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
-  if (description_search) { conditions.push(`p.description ILIKE $${params.length + 1}`);  params.push(`%${description_search}%`); }
-  if (size)               { conditions.push(`p.description ILIKE $${params.length + 1}`);  params.push(`% ${size}%`); }
-  if (shop_id)            { conditions.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
+  if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
+  // description_search only when no size is provided (category search), never for size lookups
+  if (description_search && !size) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
+  if (size) {
+    const fraction = decimalToFraction(size.trim());
+    if (fraction) {
+      // Match both "15.5" and "15 1/2" formats
+      conditions.push(`(p.description ILIKE $${params.length + 1} OR p.description ILIKE $${params.length + 2})`);
+      params.push(`% ${size.trim()}%`, `% ${fraction}%`);
+    } else {
+      conditions.push(`p.description ILIKE $${params.length + 1}`);
+      params.push(`% ${size.trim()}%`);
+    }
+  }
+  if (shop_id) { conditions.push(`sl.shop_id = $${params.length + 1}`); params.push(shop_id); }
 
   const { rows } = await pool.query(`
     SELECT
