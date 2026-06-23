@@ -161,6 +161,24 @@ const TOOL_DEFS = [
     },
   },
   {
+    name: 'get_sellthrough_by_size',
+    description: 'Calculer le sell-through (ST) et les ventes par variante (taille, couleur, coupe) pour une marque et une saison. Retourne vendu + stock restant + ST% par article. Utiliser pour: (1) top/flop tailles ("quelles tailles se vendent le mieux"), (2) comparer deux saisons (appeler deux fois avec des saisons différentes), (3) décisions de réachat par taille.',
+    parameters: {
+      type: 'object',
+      properties: {
+        manufacturer: { type: 'string',  description: 'Nom de la marque' },
+        category:     { type: 'string',  description: 'Type de produit, ex: "Pantalon", "Chemise"' },
+        genre:        { type: 'string',  description: '"Homme" ou "Femme"' },
+        tag:          { type: 'string',  description: 'Balise saison, ex: "p26". Filtre les produits par collection.' },
+        season:       { type: 'string',  description: 'Code saison pour la période de vente, ex: "p26", "a25"' },
+        shop_id:      { type: 'string',  description: 'ID boutique (optionnel)' },
+        sort:         { type: 'string',  enum: ['st_desc', 'st_asc', 'sold_desc'], description: 'Tri: st_desc = meilleures performances, st_asc = pires performances (flop), sold_desc = plus vendu' },
+        limit:        { type: 'integer', description: 'Nombre max de variantes (défaut: 50)' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'get_categories',
     description: 'Obtenir la liste des catégories de produits disponibles dans la base de données. UTILISER AVANT de filtrer par category dans get_sales_by_variant ou get_stock_by_variant quand on ne connaît pas la structure exacte des catégories. Retourne l\'arbre complet des catégories avec le nombre de produits par catégorie.',
     parameters: {

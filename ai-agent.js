@@ -480,6 +480,99 @@ async function toolSearchBrands({ query }, { pool }) {
   return { resultats: rows.map(r => ({ marque: r.manufacturer, nb_articles: Number(r.nb_articles) })) };
 }
 
+async function toolGetSellthroughBySize({ manufacturer, category, genre, tag, season, shop_id, sort = 'st_desc', limit = 50 }, { pool, getSeasonsConfig }) {
+  const today = new Date().toISOString().slice(0, 10);
+  let from, to;
+
+  if (season) {
+    const seasons = await getSeasonsConfig();
+    const s = seasons.find(x => x.code === season.toLowerCase());
+    if (s) { from = s.sale_from; to = s.sale_to < today ? s.sale_to : today; }
+  }
+  if (!from) {
+    const d = new Date(); d.setFullYear(d.getFullYear() - 1);
+    from = d.toISOString().slice(0, 10); to = today;
+  }
+
+  const prodWhere = ['p.archived = false'];
+  const params    = [from, to]; // $1, $2
+
+  if (manufacturer) { prodWhere.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
+  if (category)     { prodWhere.push(`p.category ILIKE $${params.length + 1}`);      params.push(`%${category}%`); }
+  if (genre)        {
+    prodWhere.push(`(p.category ILIKE $${params.length + 1} OR p.tags ILIKE $${params.length + 2} OR p.description ILIKE $${params.length + 3})`);
+    params.push(`%${genre}%`, `%${genre}%`, `%${genre}%`);
+  }
+  if (tag) { prodWhere.push(`p.tags ILIKE $${params.length + 1}`); params.push(`%${tag}%`); }
+
+  const shopIdx        = shop_id ? params.length + 1 : null;
+  if (shop_id) params.push(shop_id);
+  const shopSaleCond   = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
+  const shopStockWhere = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
+
+  const limitIdx = params.length + 1;
+  params.push(Math.min(limit, 100));
+
+  const orderBy = sort === 'st_asc'    ? 'st_pct ASC  NULLS LAST, sold DESC'
+               : sort === 'sold_desc' ? 'sold DESC, st_pct DESC'
+               : /* st_desc default */ 'st_pct DESC NULLS LAST, sold DESC';
+
+  const { rows } = await pool.query(`
+    WITH sales_by_item AS (
+      SELECT sl2.item_id, SUM(sl2.qty) AS sold
+      FROM sale_lines sl2
+      WHERE sl2.completed_time BETWEEN $1 AND $2
+        AND sl2.qty > 0
+        ${shopSaleCond}
+      GROUP BY sl2.item_id
+    ),
+    stock_by_item AS (
+      SELECT inv.item_id, SUM(inv.qty_on_hand) AS stock
+      FROM inventory inv
+      ${shopStockWhere}
+      GROUP BY inv.item_id
+    )
+    SELECT
+      p.description,
+      p.manufacturer,
+      p.category,
+      COALESCE(s.sold,   0)::int                                           AS sold,
+      COALESCE(st.stock, 0)::int                                           AS stock,
+      (COALESCE(s.sold, 0) + COALESCE(st.stock, 0))::int                  AS received_proxy,
+      CASE WHEN (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)) > 0
+        THEN ROUND(COALESCE(s.sold, 0)::numeric
+             / (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)) * 100, 1)
+        ELSE 0 END                                                          AS st_pct
+    FROM products p
+    LEFT JOIN sales_by_item  s  ON s.item_id  = p.item_id
+    LEFT JOIN stock_by_item  st ON st.item_id = p.item_id
+    WHERE ${prodWhere.join(' AND ')}
+      AND (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)) > 0
+    ORDER BY ${orderBy}
+    LIMIT $${limitIdx}
+  `, params);
+
+  const total_sold  = rows.reduce((s, r) => s + Number(r.sold),  0);
+  const total_stock = rows.reduce((s, r) => s + Number(r.stock), 0);
+  const total_proxy = total_sold + total_stock;
+  const total_st    = total_proxy > 0 ? Math.round(total_sold / total_proxy * 1000) / 10 : 0;
+
+  return {
+    periode:      { de: from, a: to },
+    filtre:       { marque: manufacturer, categorie: category, genre, tag, saison: season },
+    tri:          sort,
+    total_vendu:  total_sold,
+    total_stock:  total_stock,
+    st_global:    `${total_st}%`,
+    variantes:    rows.map(r => ({
+      description:  r.description,
+      vendu:        Number(r.sold),
+      stock:        Number(r.stock),
+      st_pct:       `${Number(r.st_pct)}%`,
+    })),
+  };
+}
+
 async function toolGetCategories({ manufacturer }, { pool }) {
   const conditions = ['p.category IS NOT NULL', "p.category != ''", 'p.archived = false'];
   const params     = [];
@@ -551,7 +644,8 @@ async function executeTool(name, args, ctx) {
       case 'get_shops_list':             return await toolGetShopsList(args, ctx);
       case 'search_brands':              return await toolSearchBrands(args, ctx);
       case 'get_seasons_list':           return await toolGetSeasonsList(args, ctx);
-      case 'get_categories':             return await toolGetCategories(args, ctx);
+      case 'get_categories':              return await toolGetCategories(args, ctx);
+      case 'get_sellthrough_by_size':    return await toolGetSellthroughBySize(args, ctx);
       default:                           return { erreur: `Outil inconnu: ${name}` };
     }
   } catch (err) {
