@@ -160,6 +160,17 @@ const TOOL_DEFS = [
       required: [],
     },
   },
+  {
+    name: 'get_categories',
+    description: 'Obtenir la liste des catégories de produits disponibles dans la base de données. UTILISER AVANT de filtrer par category dans get_sales_by_variant ou get_stock_by_variant quand on ne connaît pas la structure exacte des catégories. Retourne l\'arbre complet des catégories avec le nombre de produits par catégorie.',
+    parameters: {
+      type: 'object',
+      properties: {
+        manufacturer: { type: 'string', description: 'Filtrer par marque pour voir ses catégories spécifiques (optionnel). Ex: "Brax", "Eton".' },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -193,6 +204,7 @@ RÈGLES ABSOLUES
 - Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL à la fin
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
 - JAMAIS mettre un type de produit (pantalon, chemise, veste, jeans, chandail...) dans description_search — utiliser UNIQUEMENT category pour ça. description_search = couleur ou coupe SEULEMENT.
+- Si tu n'es pas certain du nom exact d'une catégorie : appelle get_categories(manufacturer=X) d'abord pour voir la structure réelle, puis utilise la valeur exacte retournée dans le champ "category".
 - Si l'utilisateur demande un type de produit pouvant être homme OU femme (pantalon, jeans, chandail, haut, manteau, veste, etc.) SANS préciser le genre : demande "Pour homme, femme, ou les deux ?" AVANT d'appeler l'outil.
 - Le genre peut être exprimé de plusieurs façons — toutes équivalentes. Convertir en "Homme" ou "Femme" pour le paramètre genre :
   * Homme : "homme", "pour lui", "masculin", "men", "male"
