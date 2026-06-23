@@ -132,8 +132,8 @@ const TOOL_DEFS = [
       properties: {
         manufacturer:       { type: 'string', description: 'Nom de la marque (optionnel)' },
         size:               { type: 'string', description: 'Taille à rechercher, ex: "15.5", "M", "40". Supporte automatiquement "15 1/2" = "15.5"' },
-        category:           { type: 'string', description: 'Catégorie de produit Lightspeed, ex: "Chemise", "Pantalon", "T-shirt", "Cravate". Utiliser quand l\'utilisateur mentionne un type de produit sans taille précise.' },
-        description_search: { type: 'string', description: 'Mot-clé dans la description du produit : couleur (ex: "BLEU", "BLANC", "MARINE"), coupe (ex: "SLIM", "CONTEMPORAIN"), ou style (ex: "TUXEDO", "TWILL"). NE PAS utiliser pour des catégories génériques (chemise, pantalon) — utiliser "category" à la place.' },
+        category:           { type: 'string', description: 'Catégorie Lightspeed. Format: "Homme/Pantalon" pour pantalons homme, "Femme/Bas/Pantalon" pour pantalons femme, "Homme/Chemise" pour chemises homme, "Homme/Hauts" pour hauts homme. Le genre (homme/femme) est TOUJOURS dans la catégorie, jamais dans description_search.' },
+        description_search: { type: 'string', description: 'Mot-clé dans la description du produit : couleur (ex: "BLEU", "BLANC", "MARINE"), coupe (ex: "SLIM", "CONTEMPORAIN"), style (ex: "TUXEDO", "TWILL"). JAMAIS utiliser pour le genre (homme/femme) ni les catégories — utiliser "category" à la place.' },
         shop_id:            { type: 'string', description: 'ID de la boutique (optionnel)' },
         period:             { type: 'string', description: 'Période relative, ex: "1y", "2y", "ytd", "last_year", "6m"' },
         season:             { type: 'string', description: 'Code de saison (ex: p26, a25) — si la question porte sur une saison' },
@@ -149,8 +149,8 @@ const TOOL_DEFS = [
       properties: {
         manufacturer:       { type: 'string',  description: 'Nom de la marque (optionnel)' },
         size:               { type: 'string',  description: 'Taille à rechercher dans la description, ex: "15.5", "M", "40" (optionnel)' },
-        category:           { type: 'string',  description: 'Catégorie Lightspeed, ex: "Chemise", "Pantalon", "T-shirt". Utiliser quand l\'utilisateur mentionne un type de produit.' },
-        description_search: { type: 'string',  description: 'Mot-clé dans la description : couleur (ex: "BLEU", "BLANC", "MARINE"), coupe (ex: "SLIM", "CONTEMPORAIN"), ou style (ex: "TUXEDO", "TWILL"). NE PAS utiliser pour des catégories génériques — utiliser "category" à la place.' },
+        category:           { type: 'string',  description: 'Catégorie Lightspeed. Format: "Homme/Pantalon" pour pantalons homme, "Femme/Bas/Pantalon" pour pantalons femme, "Homme/Chemise" pour chemises homme. Le genre est TOUJOURS dans la catégorie, jamais dans description_search.' },
+        description_search: { type: 'string',  description: 'Mot-clé dans la description : couleur (ex: "BLEU", "BLANC", "MARINE"), coupe (ex: "SLIM", "CONTEMPORAIN"), style (ex: "TUXEDO"). JAMAIS pour le genre (homme/femme) — utiliser "category" à la place.' },
         shop_id:            { type: 'string',  description: 'ID de la boutique (optionnel)' },
       },
       required: [],
