@@ -187,7 +187,8 @@ RÈGLES ABSOLUES
 - Ne JAMAIS dire "vérifie tes données" ou proposer des choix quand l'utilisateur conteste un résultat
 - Si un résultat semble incomplet, appelle l'outil à nouveau avec des paramètres différents
 - Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL à la fin
-- Formate les montants: $1 234,56 — les pourcentages: 67,3%`;
+- Formate les montants: $1 234,56 — les pourcentages: 67,3%
+- Si l'utilisateur demande un type de produit pouvant être homme OU femme (pantalon, jeans, chandail, haut, manteau, veste, etc.) SANS préciser le genre : demande "Pour homme, femme, ou les deux ?" AVANT d'appeler l'outil. Exception : si la marque est exclusivement homme ou femme (ex: Eton = exclusivement homme), ne pas demander.`;
 
 // ---------------------------------------------------------------------------
 // Mistral Provider
