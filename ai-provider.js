@@ -188,7 +188,13 @@ RÈGLES ABSOLUES
 - Si un résultat semble incomplet, appelle l'outil à nouveau avec des paramètres différents
 - Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL à la fin
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
-- Si l'utilisateur demande un type de produit pouvant être homme OU femme (pantalon, jeans, chandail, haut, manteau, veste, etc.) SANS préciser le genre : demande "Pour homme, femme, ou les deux ?" AVANT d'appeler l'outil. Exception : si la marque est exclusivement homme ou femme (ex: Eton = exclusivement homme), ne pas demander.`;
+- Si l'utilisateur demande un type de produit pouvant être homme OU femme (pantalon, jeans, chandail, haut, manteau, veste, etc.) SANS préciser le genre : demande "Pour homme, femme, ou les deux ?" AVANT d'appeler l'outil.
+- Le genre peut être exprimé de plusieurs façons — toutes équivalentes :
+  * Homme : "homme", "pour lui", "masculin", "men", "boutique Pour lui", "Pour lui"
+  * Femme : "femme", "pour elle", "féminin", "women", "Valérie Simon", "Filles d'Ève", "dame"
+  * Les boutiques "Boutique Valérie Simon" et "Boutique Filles d'Ève" sont des boutiques femme → si l'utilisateur mentionne l'une d'elles, le genre femme est implicite
+  * La boutique "Boutique Pour lui" est une boutique homme → genre homme implicite
+- Exception à la demande de clarification : si la marque est exclusivement homme (ex: Eton, Stenströms, Brax homme) ou si la boutique mentionnée indique déjà le genre, ne pas demander.`;
 
 // ---------------------------------------------------------------------------
 // Mistral Provider
