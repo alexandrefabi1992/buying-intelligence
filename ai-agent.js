@@ -479,6 +479,48 @@ async function toolSearchBrands({ query }, { pool }) {
   return { resultats: rows.map(r => ({ marque: r.manufacturer, nb_articles: Number(r.nb_articles) })) };
 }
 
+async function toolGetCategories({ manufacturer }, { pool }) {
+  const conditions = ['p.category IS NOT NULL', "p.category != ''", 'p.archived = false'];
+  const params     = [];
+
+  if (manufacturer) {
+    conditions.push(`p.manufacturer ILIKE $${params.length + 1}`);
+    params.push(`%${manufacturer}%`);
+  }
+
+  const { rows } = await pool.query(`
+    SELECT
+      p.category,
+      COUNT(DISTINCT p.item_id)   AS nb_produits,
+      COUNT(DISTINCT p.manufacturer) AS nb_marques
+    FROM products p
+    WHERE ${conditions.join(' AND ')}
+    GROUP BY p.category
+    ORDER BY nb_produits DESC
+    LIMIT 100
+  `, params);
+
+  // Build a tree summary: top-level segments and their children
+  const tree = {};
+  for (const r of rows) {
+    const parts = r.category.split('/');
+    const top   = parts[0];
+    if (!tree[top]) tree[top] = [];
+    tree[top].push({ categorie: r.category, nb_produits: Number(r.nb_produits) });
+  }
+
+  return {
+    filtre_marque: manufacturer ?? 'toutes',
+    nb_categories: rows.length,
+    categories: rows.map(r => ({
+      categorie:   r.category,
+      nb_produits: Number(r.nb_produits),
+      nb_marques:  Number(r.nb_marques),
+    })),
+    arbre: tree,
+  };
+}
+
 async function toolGetSeasonsList(_, { getSeasonsConfig }) {
   const seasons = await getSeasonsConfig();
   return {
@@ -508,6 +550,7 @@ async function executeTool(name, args, ctx) {
       case 'get_shops_list':             return await toolGetShopsList(args, ctx);
       case 'search_brands':              return await toolSearchBrands(args, ctx);
       case 'get_seasons_list':           return await toolGetSeasonsList(args, ctx);
+      case 'get_categories':             return await toolGetCategories(args, ctx);
       default:                           return { erreur: `Outil inconnu: ${name}` };
     }
   } catch (err) {
