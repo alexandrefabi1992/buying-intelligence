@@ -132,8 +132,9 @@ const TOOL_DEFS = [
       properties: {
         manufacturer:       { type: 'string', description: 'Nom de la marque (optionnel)' },
         size:               { type: 'string', description: 'Taille à rechercher, ex: "15.5", "M", "40". Supporte automatiquement "15 1/2" = "15.5"' },
-        category:           { type: 'string', description: 'Catégorie Lightspeed. Format: "Homme/Pantalon" pour pantalons homme, "Femme/Bas/Pantalon" pour pantalons femme, "Homme/Chemise" pour chemises homme, "Homme/Hauts" pour hauts homme. Le genre (homme/femme) est TOUJOURS dans la catégorie, jamais dans description_search.' },
-        description_search: { type: 'string', description: 'Mot-clé dans la description du produit : couleur (ex: "BLEU", "BLANC", "MARINE"), coupe (ex: "SLIM", "CONTEMPORAIN"), style (ex: "TUXEDO", "TWILL"). JAMAIS utiliser pour le genre (homme/femme) ni les catégories — utiliser "category" à la place.' },
+        category:           { type: 'string', description: 'Type de produit dans la catégorie Lightspeed, ex: "Pantalon", "Chemise", "Jean", "Hauts", "Chandail". Ne pas inclure le genre ici — utiliser le paramètre "genre" séparément.' },
+        genre:              { type: 'string', description: 'Genre du produit : "Homme" ou "Femme". Cherche dans la catégorie, les balises ET la description du produit. Utiliser quand l\'utilisateur précise homme/femme/pour lui/pour elle.' },
+        description_search: { type: 'string', description: 'Mot-clé dans la description : couleur (ex: "BLEU", "BLANC", "MARINE"), coupe (ex: "SLIM", "CONTEMPORAIN"), style (ex: "TUXEDO", "TWILL"). Jamais pour le genre ni le type de produit.' },
         shop_id:            { type: 'string', description: 'ID de la boutique (optionnel)' },
         period:             { type: 'string', description: 'Période relative, ex: "1y", "2y", "ytd", "last_year", "6m"' },
         season:             { type: 'string', description: 'Code de saison (ex: p26, a25) — si la question porte sur une saison' },
@@ -149,8 +150,9 @@ const TOOL_DEFS = [
       properties: {
         manufacturer:       { type: 'string',  description: 'Nom de la marque (optionnel)' },
         size:               { type: 'string',  description: 'Taille à rechercher dans la description, ex: "15.5", "M", "40" (optionnel)' },
-        category:           { type: 'string',  description: 'Catégorie Lightspeed. Format: "Homme/Pantalon" pour pantalons homme, "Femme/Bas/Pantalon" pour pantalons femme, "Homme/Chemise" pour chemises homme. Le genre est TOUJOURS dans la catégorie, jamais dans description_search.' },
-        description_search: { type: 'string',  description: 'Mot-clé dans la description : couleur (ex: "BLEU", "BLANC", "MARINE"), coupe (ex: "SLIM", "CONTEMPORAIN"), style (ex: "TUXEDO"). JAMAIS pour le genre (homme/femme) — utiliser "category" à la place.' },
+        category:           { type: 'string',  description: 'Type de produit dans la catégorie, ex: "Pantalon", "Chemise", "Jean", "Hauts". Ne pas inclure le genre ici — utiliser "genre" séparément.' },
+        genre:              { type: 'string',  description: 'Genre du produit : "Homme" ou "Femme". Cherche dans la catégorie, les balises ET la description. Utiliser quand l\'utilisateur précise homme/femme/pour lui/pour elle.' },
+        description_search: { type: 'string',  description: 'Mot-clé dans la description : couleur (ex: "BLEU", "BLANC"), coupe (ex: "SLIM", "CONTEMPORAIN"), style (ex: "TUXEDO"). Jamais pour le genre ni le type de produit.' },
         shop_id:            { type: 'string',  description: 'ID de la boutique (optionnel)' },
       },
       required: [],
@@ -189,9 +191,10 @@ RÈGLES ABSOLUES
 - Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL à la fin
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
 - Si l'utilisateur demande un type de produit pouvant être homme OU femme (pantalon, jeans, chandail, haut, manteau, veste, etc.) SANS préciser le genre : demande "Pour homme, femme, ou les deux ?" AVANT d'appeler l'outil.
-- Le genre peut être exprimé de plusieurs façons — toutes équivalentes :
+- Le genre peut être exprimé de plusieurs façons — toutes équivalentes. Convertir en "Homme" ou "Femme" pour le paramètre genre :
   * Homme : "homme", "pour lui", "masculin", "men", "male"
   * Femme : "femme", "pour elle", "féminin", "women", "dame", "female"
+- Le genre est recherché dans la catégorie, les balises ET la description du produit — pas besoin de deviner où il est stocké.
 - Exception à la demande de clarification : si la marque est exclusivement homme (ex: Eton, Stenströms) ou exclusivement femme, ne pas demander.`;
 
 // ---------------------------------------------------------------------------
