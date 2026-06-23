@@ -7,7 +7,7 @@
 // and handles tool_calls until the model returns a final text response.
 // ---------------------------------------------------------------------------
 
-const { createProvider, SYSTEM_PROMPT } = require('./ai-provider');
+const { createProvider, SYSTEM_PROMPT, buildSystemPrompt } = require('./ai-provider');
 
 const MAX_TOOL_ROUNDS = 6; // safety limit against infinite loops
 
@@ -52,8 +52,8 @@ async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { poo
 
   const shopFilter = shopIds?.length ? 'AND sl.shop_id = ANY($3)' : '';
   const params = shopIds?.length
-    ? [target.sale_from, target.sale_to, shopIds]
-    : [target.sale_from, target.sale_to];
+    ? [target.sell_from, target.sell_to, shopIds]
+    : [target.sell_from, target.sell_to];
 
   const { rows } = await pool.query(`
     SELECT
@@ -114,8 +114,8 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
     if (!s) return { erreur: `Saison "${season}" non trouvée.` };
-    from = s.sale_from;
-    to   = s.sale_to;
+    from = s.sell_from;
+    to   = s.sell_to;
   }
   if (!from) return { erreur: 'Fournir "period" (ex: "4y", "10w", "6m", "ytd") ou "season" ou "date_from".' };
 
@@ -280,7 +280,7 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tag,
   if (season && !from) {
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
-    if (s) { from = s.sale_from; to = s.sale_to; }
+    if (s) { from = s.sell_from; to = s.sell_to; }
   }
 
   const conditions = ['sl.qty > 0'];
@@ -440,7 +440,7 @@ async function toolGetTopPerformers({ season, metric, order = 'desc', limit = 10
   const s = seasons.find(x => x.code === season);
   if (!s) return { erreur: `Saison "${season}" non trouvée.` };
   const shopFilter = shopIds?.length ? 'AND sl.shop_id = ANY($3)' : '';
-  const params = shopIds?.length ? [s.sale_from, s.sale_to, shopIds] : [s.sale_from, s.sale_to];
+  const params = shopIds?.length ? [s.sell_from, s.sell_to, shopIds] : [s.sell_from, s.sell_to];
 
   const dir = order === 'asc' ? 'ASC' : 'DESC';
   const { rows } = await pool.query(`
@@ -480,14 +480,14 @@ async function toolSearchBrands({ query }, { pool }) {
   return { resultats: rows.map(r => ({ marque: r.manufacturer, nb_articles: Number(r.nb_articles) })) };
 }
 
-async function toolGetSellthroughBySize({ manufacturer, category, genre, tag, season, shop_id, sort = 'st_desc', limit = 50 }, { pool, getSeasonsConfig }) {
+async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tag, season, shop_id, sort = 'st_desc', limit = 50 }, { pool, getSeasonsConfig }) {
   const today = new Date().toISOString().slice(0, 10);
   let from, to;
 
   if (season) {
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
-    if (s) { from = s.sale_from; to = s.sale_to < today ? s.sale_to : today; }
+    if (s) { from = s.sell_from; to = s.sell_to < today ? s.sell_to : today; }
   }
   if (!from) {
     const d = new Date(); d.setFullYear(d.getFullYear() - 1);
@@ -503,7 +503,8 @@ async function toolGetSellthroughBySize({ manufacturer, category, genre, tag, se
     prodWhere.push(`(p.category ILIKE $${params.length + 1} OR p.tags ILIKE $${params.length + 2} OR p.description ILIKE $${params.length + 3})`);
     params.push(`%${genre}%`, `%${genre}%`, `%${genre}%`);
   }
-  if (tag) { prodWhere.push(`p.tags ILIKE $${params.length + 1}`); params.push(`%${tag}%`); }
+  if (tag)  { prodWhere.push(`p.tags ILIKE $${params.length + 1}`); params.push(`%${tag}%`); }
+  if (size) { prodWhere.push(buildSizeCondition(size, params)); }
 
   const shopIdx        = shop_id ? params.length + 1 : null;
   if (shop_id) params.push(shop_id);
@@ -559,7 +560,7 @@ async function toolGetSellthroughBySize({ manufacturer, category, genre, tag, se
 
   return {
     periode:      { de: from, a: to },
-    filtre:       { marque: manufacturer, categorie: category, genre, tag, saison: season },
+    filtre:       { marque: manufacturer, categorie: category, genre, tag, taille: size, saison: season },
     tri:          sort,
     total_vendu:  total_sold,
     total_stock:  total_stock,
@@ -622,8 +623,8 @@ async function toolGetSeasonsList(_, { getSeasonsConfig }) {
       code:          s.code,
       reception_de:  s.reception_from,
       reception_a:   s.reception_to,
-      ventes_de:     s.sale_from,
-      ventes_a:      s.sale_to,
+      ventes_de:     s.sell_from,
+      ventes_a:      s.sell_to,
     })),
   };
 }
@@ -631,23 +632,64 @@ async function toolGetSeasonsList(_, { getSeasonsConfig }) {
 // ---------------------------------------------------------------------------
 // Tool dispatcher
 // ---------------------------------------------------------------------------
+async function dispatchTool(name, args, ctx) {
+  switch (name) {
+    case 'get_budget_recommendations': return await toolGetBudgetRecommendations(args, ctx);
+    case 'get_sales_analysis':         return await toolGetSalesAnalysis(args, ctx);
+    case 'get_stock_levels':           return await toolGetStockLevels(args, ctx);
+    case 'get_stock_by_variant':       return await toolGetStockByVariant(args, ctx);
+    case 'get_sales_by_variant':       return await toolGetSalesByVariant(args, ctx);
+    case 'get_plan_vs_recommended':    return await toolGetPlanVsRecommended(args, ctx);
+    case 'get_top_performers':         return await toolGetTopPerformers(args, ctx);
+    case 'get_shops_list':             return await toolGetShopsList(args, ctx);
+    case 'search_brands':              return await toolSearchBrands(args, ctx);
+    case 'get_seasons_list':           return await toolGetSeasonsList(args, ctx);
+    case 'get_categories':             return await toolGetCategories(args, ctx);
+    case 'get_sellthrough_by_size':    return await toolGetSellthroughBySize(args, ctx);
+    default:                           return { erreur: `Outil inconnu: ${name}` };
+  }
+}
+
+// Returns true when a tool result has no useful data (0 items, 0 sales, empty arrays)
+function isEmptyResult(name, result) {
+  if (result.erreur) return false; // errors are not "empty" — don't retry
+  if (name === 'get_sellthrough_by_size') return !result.variantes?.length;
+  if (name === 'get_sales_by_variant')    return !result.lignes?.length && (result.total_qty ?? 0) === 0;
+  if (name === 'get_stock_by_variant')    return !result.articles?.length;
+  return false;
+}
+
+// Relax args one step: remove the most restrictive filter to broaden the search
+function relaxArgs(name, args) {
+  const r = { ...args };
+  // Priority order: size > tag > category > description_search > genre
+  if (name === 'get_sellthrough_by_size' || name === 'get_sales_by_variant' || name === 'get_stock_by_variant') {
+    if (r.size)               { delete r.size;               return { relaxed: r, dropped: 'size' }; }
+    if (r.tag)                { delete r.tag;                return { relaxed: r, dropped: 'tag' }; }
+    if (r.description_search) { delete r.description_search; return { relaxed: r, dropped: 'description_search' }; }
+    if (r.category)           { delete r.category;           return { relaxed: r, dropped: 'category' }; }
+  }
+  return null;
+}
+
 async function executeTool(name, args, ctx) {
   try {
-    switch (name) {
-      case 'get_budget_recommendations': return await toolGetBudgetRecommendations(args, ctx);
-      case 'get_sales_analysis':         return await toolGetSalesAnalysis(args, ctx);
-      case 'get_stock_levels':           return await toolGetStockLevels(args, ctx);
-      case 'get_stock_by_variant':       return await toolGetStockByVariant(args, ctx);
-      case 'get_sales_by_variant':       return await toolGetSalesByVariant(args, ctx);
-      case 'get_plan_vs_recommended':    return await toolGetPlanVsRecommended(args, ctx);
-      case 'get_top_performers':         return await toolGetTopPerformers(args, ctx);
-      case 'get_shops_list':             return await toolGetShopsList(args, ctx);
-      case 'search_brands':              return await toolSearchBrands(args, ctx);
-      case 'get_seasons_list':           return await toolGetSeasonsList(args, ctx);
-      case 'get_categories':              return await toolGetCategories(args, ctx);
-      case 'get_sellthrough_by_size':    return await toolGetSellthroughBySize(args, ctx);
-      default:                           return { erreur: `Outil inconnu: ${name}` };
+    const result = await dispatchTool(name, args, ctx);
+
+    // Auto-retry with relaxed filters if result is empty
+    if (isEmptyResult(name, result)) {
+      const relaxation = relaxArgs(name, args);
+      if (relaxation) {
+        console.log(`[ai-agent] Empty result for "${name}", retrying without "${relaxation.dropped}"`);
+        const retried = await dispatchTool(name, relaxation.relaxed, ctx);
+        if (!isEmptyResult(name, retried)) {
+          retried._retry_note = `Filtre "${relaxation.dropped}" retiré automatiquement — aucun résultat avec le filtre original.`;
+          return retried;
+        }
+      }
     }
+
+    return result;
   } catch (err) {
     console.error(`[ai-agent] Tool "${name}" error:`, err.message);
     return { erreur: `Erreur lors de l'exécution de l'outil "${name}": ${err.message}` };
@@ -675,7 +717,8 @@ async function runAgentLoop(messages, ctx) {
 RÈGLE ABSOLUE SUR LES DATES: utilise TOUJOURS le paramètre "period" pour les périodes relatives — jamais date_from/date_to calculées de ta tête.
 Correspondances period: "4y"=4 ans, "3y"=3 ans, "2y"=2 ans, "1y"=1 an, "6m"=6 mois, "3m"=3 mois, "10w"=10 semaines, "ytd"=cette année, "last_year"=l'an dernier.`;
 
-  const systemContent = SYSTEM_PROMPT + dateContext;
+  const basePrompt    = ctx.tenantConfig ? buildSystemPrompt(ctx.tenantConfig) : SYSTEM_PROMPT;
+  const systemContent = basePrompt + dateContext;
 
   const fullMessages = [
     { role: 'system', content: systemContent },

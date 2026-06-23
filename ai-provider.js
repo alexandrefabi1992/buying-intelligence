@@ -145,7 +145,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_stock_by_variant',
-    description: 'Obtenir le stock actuel détaillé par variante (taille, couleur, description) pour une marque. Utiliser quand la question concerne le stock d\'une taille spécifique (ex: "taille 15.5", "taille M", "40", "XL") ou une description de produit précise.',
+    description: 'Obtenir le stock actuel détaillé par variante (taille, couleur, description) pour une marque. Retourne UNIQUEMENT le stock actuel — NE PAS utiliser pour calculer les unités reçues ou le sell-through. Pour les reçus ou le ST, utiliser get_sellthrough_by_size à la place.',
     parameters: {
       type: 'object',
       properties: {
@@ -162,11 +162,12 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_sellthrough_by_size',
-    description: 'Calculer le sell-through (ST) et les ventes par variante (taille, couleur, coupe) pour une marque et une saison. Retourne vendu + stock restant + ST% par article. Utiliser pour: (1) top/flop tailles ("quelles tailles se vendent le mieux"), (2) comparer deux saisons (appeler deux fois avec des saisons différentes), (3) décisions de réachat par taille.',
+    description: 'Calculer le sell-through (ST), les ventes et les unités reçues par variante pour une marque et une saison. Retourne vendu + stock restant + ST% par article. Utiliser pour: (1) top/flop tailles ("quelles tailles se vendent le mieux"), (2) comparer deux saisons, (3) décisions de réachat, (4) toute question sur les unités REÇUES ("avons-nous reçu plus?", "combien de reçus?") — reçus = vendu + stock restant.',
     parameters: {
       type: 'object',
       properties: {
         manufacturer: { type: 'string',  description: 'Nom de la marque' },
+        size:         { type: 'string',  description: 'Taille à filtrer, ex: "15.5", "36", "L". Optionnel — omettre pour voir toutes les tailles.' },
         category:     { type: 'string',  description: 'Type de produit, ex: "Pantalon", "Chemise"' },
         genre:        { type: 'string',  description: '"Homme" ou "Femme"' },
         tag:          { type: 'string',  description: 'Balise saison, ex: "p26". Filtre les produits par collection.' },
@@ -192,41 +193,65 @@ const TOOL_DEFS = [
 ];
 
 // ---------------------------------------------------------------------------
-// System prompt
+// System prompt — built dynamically from tenant config
 // ---------------------------------------------------------------------------
-const SYSTEM_PROMPT = `Tu es un assistant expert en achat pour une boutique de mode haut de gamme.
+function buildSystemPrompt(tenantConfig = {}) {
+  const boutique    = tenantConfig.boutique_name ?? 'la boutique';
+  const ptField     = tenantConfig.product_type_field ?? 'category';
+  const genreOn     = tenantConfig.genre_enabled === 'yes';
+  const genreFields = tenantConfig.genre_fields ?? ['category', 'tag', 'description'];
+  const genreH      = tenantConfig.genre_values?.homme ?? 'Homme';
+  const genreF      = tenantConfig.genre_values?.femme ?? 'Femme';
+  const nosTag      = tenantConfig.nos_tag ?? null;
+  const nosEnabled  = tenantConfig.nos_enabled === 'yes' && nosTag;
+
+  const ptInstruction = ptField === 'description'
+    ? `Le TYPE DE PRODUIT (pantalon, chemise, polo...) est dans le champ "description" — utiliser description_search pour filtrer par type de produit.`
+    : ptField === 'tag'
+    ? `Le TYPE DE PRODUIT (pantalon, chemise, polo...) est dans les balises (tags) — utiliser le paramètre "tag" pour filtrer par type.`
+    : `Le TYPE DE PRODUIT (pantalon, chemise, polo...) est dans le champ "category" — utiliser le paramètre "category". JAMAIS mettre un type de produit dans description_search.`;
+
+  const genreInstruction = genreOn
+    ? `Le genre distingue "${genreH}" et "${genreF}" (champs: ${genreFields.join(', ')}). Quand l'utilisateur précise le genre, passe-le dans "genre". homme/pour lui/men → "${genreH}" ; femme/pour elle/women → "${genreF}". Si genre non précisé ET la marque a les deux genres : pose UNE seule question "Pour ${genreH.toLowerCase()} ou ${genreF.toLowerCase()} ?"`
+    : `Ce catalogue ne distingue pas homme/femme — ne pas filtrer par genre ni poser de question à ce sujet.`;
+
+  const nosInstruction = nosEnabled
+    ? `Les produits NOS (permanents) sont identifiés par la balise "${nosTag}".`
+    : `Aucune balise NOS configurée.`;
+
+  return `Tu es un assistant expert en achat pour ${boutique}.
 Tu as accès à des outils qui interrogent la base de données de l'application Buying Intelligence.
 
-CONTEXTE DE L'APPLICATION
+CONTEXTE
 - L'app gère des budgets d'achat saisonniers par marque et par boutique
 - Les saisons : P = Printemps, A = Automne + année (ex: p26 = Printemps 2026)
-- Sell-through (ST) = unités vendues / unités reçues × 100% — indicateur clé de performance
+- Sell-through (ST) = unités vendues / unités reçues × 100%
 - Un bon ST est généralement ≥ 65%. En dessous de 35%, la marque est sous-performante
-- Budget recommandé = moyenne pondérée des saisons précédentes × multiplicateur ST
-- Budget planifié = ce que l'acheteur a saisi manuellement dans le plan d'achat
-- Ventes brutes = prix de vente HT × quantités − escomptes (chiffre d'affaires réel)
-- Coût des ventes = prix d'achat × quantités vendues (≠ ventes brutes — ne pas confondre)
+- Ventes brutes = prix de vente HT − escomptes. Coût des ventes = prix d'achat × quantités vendues
 
-BOUTIQUES DISPONIBLES
-Utilise get_shops_list() si tu as besoin des IDs exacts.
+STRUCTURE DES DONNÉES
+- ${ptInstruction}
+- ${genreInstruction}
+- ${nosInstruction}
 
-INSTRUCTIONS
-- Réponds toujours en français
+BOUTIQUES : utilise get_shops_list() si tu as besoin des IDs exacts.
+
 RÈGLES ABSOLUES
 - Réponds TOUJOURS en français
 - Sois BREF : 1 tableau ou 3-4 lignes max — jamais de blocs d'explication non demandés
 - JAMAIS inventer un chiffre — toujours appeler un outil pour obtenir les données
-- Si l'utilisateur dit que ton chiffre est faux ou différent du sien : appelle IMMÉDIATEMENT l'outil à nouveau sans poser de questions — ne propose jamais d'options, re-requête et compare
+- JAMAIS répondre à une question de suivi en puisant dans ta mémoire — toujours rappeler l'outil avec les bons filtres
+- Si l'utilisateur dit que ton chiffre est faux : appelle IMMÉDIATEMENT l'outil à nouveau sans poser de questions
 - Ne JAMAIS dire "vérifie tes données" ou proposer des choix quand l'utilisateur conteste un résultat
-- Si un résultat semble incomplet, appelle l'outil à nouveau avec des paramètres différents
-- Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL à la fin
+- TAILLES : si 0 résultat pour la taille demandée, réponds "0 unité" — JAMAIS substituer une autre taille
+- REÇUS : utiliser get_sellthrough_by_size (reçus = vendu + stock restant) — jamais estimer depuis le stock seul
+- Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
-- JAMAIS mettre un type de produit (pantalon, chemise, veste, jeans, chandail...) dans description_search — utiliser UNIQUEMENT category pour ça. description_search = couleur ou coupe SEULEMENT.
-- Si tu n'es pas certain du nom exact d'une catégorie : appelle get_categories(manufacturer=X) d'abord pour voir la structure réelle, puis utilise la valeur exacte retournée dans le champ "category".
-- QUESTIONS DE CLARIFICATION : tu n'as le droit de poser QU'UNE SEULE question, UNIQUEMENT si l'information manquante est BLOQUANTE (le résultat serait complètement faux sans elle). Exemples autorisés : genre manquant pour une marque qui a homme ET femme. JAMAIS demander la couleur, la boutique, la période ou d'autres précisions non demandées — requête sans ces filtres et présente le résultat global.
-- GENRE : si l'utilisateur précise le genre (même indirectement), utilise-le. Si le genre n'est pas précisé ET que la marque a des produits homme ET femme, pose UNE seule question : "Pour homme ou femme ?" — rien d'autre.
-- Expressions de genre — convertir en "Homme" ou "Femme" : homme/pour lui/masculin/men/male → "Homme" ; femme/pour elle/féminin/women/dame/female → "Femme"
-- Le genre est recherché dans catégorie + balises + description — pas besoin de deviner.`;
+- Si tu n'es pas certain du nom exact d'une catégorie : appelle get_categories(manufacturer=X) d'abord
+- QUESTIONS DE CLARIFICATION : UNE SEULE question, UNIQUEMENT si l'info manquante est BLOQUANTE. JAMAIS demander la couleur, la boutique ou la période.`;
+}
+
+const SYSTEM_PROMPT = buildSystemPrompt();
 
 // ---------------------------------------------------------------------------
 // Mistral Provider
@@ -394,4 +419,4 @@ function createProvider() {
   }
 }
 
-module.exports = { createProvider, TOOL_DEFS, SYSTEM_PROMPT };
+module.exports = { createProvider, TOOL_DEFS, SYSTEM_PROMPT, buildSystemPrompt };

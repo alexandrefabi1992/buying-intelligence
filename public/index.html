@@ -75,7 +75,8 @@
   <button class="tab py-3 tab-inactive" data-tab="transfers" data-i18n="tab_transfers">Transferts / Actions</button>
   <button class="tab py-3 tab-inactive" data-tab="plan"      data-i18n="tab_plan">Création de budget</button>
   <button class="tab py-3 tab-inactive" data-tab="params"    data-i18n="tab_params">Paramètres</button>
-  <a href="/velocity" class="ml-auto py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors" data-i18n="tab_velocity">Vélocité →</a>
+  <a href="/velocity" class="py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors" data-i18n="tab_velocity">Vélocité →</a>
+  <a href="/onboarding.html" class="ml-2 py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">⚙ Configuration</a>
 </nav>
 
 <main class="p-6 max-w-7xl mx-auto">
@@ -2558,6 +2559,17 @@ Promise.all([loadTiers(), loadBudgetParams()]).then(() => {
     padding: 0 14px; cursor: pointer; font-size: 12px; font-weight: 600; transition: background 0.1s; }
   #ai-send:hover { background: #4338ca; }
   #ai-send:disabled { background: #c7d2fe; cursor: default; }
+  #ai-shortcuts { padding: 8px 12px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .ai-shortcut { font-size: 11px; padding: 4px 10px; border-radius: 99px; border: 1.5px solid #e0e7ff;
+    background: #f5f3ff; color: #4f46e5; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+  .ai-shortcut:hover { background: #ede9fe; border-color: #a5b4fc; }
+  #ai-history-btn { font-size: 10px; color: #94a3b8; cursor: pointer; padding: 2px 6px; border-radius: 6px; border: 1px solid #e2e8f0; background: white; }
+  #ai-history-btn:hover { background: #f8fafc; color: #475569; }
+  #ai-history-panel { display: none; flex-direction: column; gap: 2px; padding: 8px 12px; max-height: 180px; overflow-y: auto; border-bottom: 1px solid #f1f5f9; }
+  #ai-history-panel.open { display: flex; }
+  .history-item { font-size: 11px; padding: 6px 8px; border-radius: 8px; cursor: pointer; color: #374151; display: flex; justify-content: space-between; align-items: center; }
+  .history-item:hover { background: #f8fafc; }
+  .history-item .hist-date { font-size: 10px; color: #94a3b8; flex-shrink: 0; margin-left: 8px; }
 </style>
 
 <!-- Floating button -->
@@ -2575,9 +2587,22 @@ Promise.all([loadTiers(), loadBudgetParams()]).then(() => {
       <span class="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full" id="ai-provider-badge">Mistral</span>
     </div>
     <div class="flex items-center gap-2">
-      <button id="ai-clear" class="text-[10px] text-gray-400 hover:text-gray-600" title="Nouvelle conversation">↺ Réinitialiser</button>
+      <button id="ai-history-btn">⏱ Historique</button>
+      <button id="ai-clear" class="text-[10px] text-gray-400 hover:text-gray-600" title="Nouvelle conversation">↺ Nouveau</button>
       <button id="ai-close" class="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
     </div>
+  </div>
+
+  <!-- History panel (hidden by default) -->
+  <div id="ai-history-panel"></div>
+
+  <!-- Quick shortcuts -->
+  <div id="ai-shortcuts">
+    <button class="ai-shortcut" data-q="Quelles marques ont le meilleur sell-through en p26 ?">🏆 Top ST P26</button>
+    <button class="ai-shortcut" data-q="Quelles marques ont le plus faible sell-through en p26 ?">⚠ Flop ST P26</button>
+    <button class="ai-shortcut" data-q="Donne-moi le budget recommandé par marque pour p27">💰 Budget P27</button>
+    <button class="ai-shortcut" data-q="Quelles tailles se vendent le mieux toutes marques en p26 ?">📐 Top tailles</button>
+    <button class="ai-shortcut" data-q="Quel est le stock actuel par marque ?">📦 Stock global</button>
   </div>
 
   <!-- Messages -->
@@ -2594,17 +2619,57 @@ Promise.all([loadTiers(), loadBudgetParams()]).then(() => {
 
 <script>
 (function () {
-  const panel    = document.getElementById('ai-chat-panel');
-  const btn      = document.getElementById('ai-chat-btn');
-  const closeBtn = document.getElementById('ai-close');
-  const clearBtn = document.getElementById('ai-clear');
-  const input    = document.getElementById('ai-input');
-  const sendBtn  = document.getElementById('ai-send');
-  const msgs     = document.getElementById('ai-messages');
-  const badge    = document.getElementById('ai-provider-badge');
+  const panel      = document.getElementById('ai-chat-panel');
+  const btn        = document.getElementById('ai-chat-btn');
+  const closeBtn   = document.getElementById('ai-close');
+  const clearBtn   = document.getElementById('ai-clear');
+  const histBtn    = document.getElementById('ai-history-btn');
+  const histPanel  = document.getElementById('ai-history-panel');
+  const input      = document.getElementById('ai-input');
+  const sendBtn    = document.getElementById('ai-send');
+  const msgs       = document.getElementById('ai-messages');
+  const badge      = document.getElementById('ai-provider-badge');
 
-  let history = []; // OpenAI-format conversation history
+  let history = [];
   let open    = false;
+
+  // Shortcuts
+  document.querySelectorAll('.ai-shortcut').forEach(btn => {
+    btn.addEventListener('click', () => {
+      input.value = btn.dataset.q;
+      sendMessage();
+    });
+  });
+
+  // History panel
+  histBtn.addEventListener('click', async () => {
+    const isOpen = histPanel.classList.toggle('open');
+    if (!isOpen) return;
+    histPanel.innerHTML = '<span style="font-size:11px;color:#94a3b8;padding:4px 8px">Chargement…</span>';
+    try {
+      const convs = await fetch(`${BASE}/api/conversations?limit=20`).then(r => r.json());
+      if (!convs.length) { histPanel.innerHTML = '<span style="font-size:11px;color:#94a3b8;padding:4px 8px">Aucune conversation sauvegardée.</span>'; return; }
+      histPanel.innerHTML = '';
+      convs.forEach(c => {
+        const d = new Date(c.created_at);
+        const dateStr = d.toLocaleDateString('fr-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `<span class="truncate">${c.preview || '(sans titre)'}</span><span class="hist-date">${dateStr}</span>`;
+        item.addEventListener('click', async () => {
+          const full = await fetch(`${BASE}/api/conversations/${c.id}`).then(r => r.json());
+          history = full.messages ?? [];
+          msgs.innerHTML = '';
+          appendMsg('assistant', 'Bonjour ! Je suis votre assistant achat. Posez-moi des questions sur vos budgets, ventes, stocks ou sell-through.');
+          history.filter(m => m.role === 'user' || m.role === 'assistant').forEach(m => {
+            if (m.role === 'user' || (m.role === 'assistant' && m.content)) appendMsg(m.role, m.content);
+          });
+          histPanel.classList.remove('open');
+        });
+        histPanel.appendChild(item);
+      });
+    } catch { histPanel.innerHTML = '<span style="font-size:11px;color:#ef4444;padding:4px 8px">Erreur de chargement.</span>'; }
+  });
 
   // Detect provider from a lightweight ping (optional enhancement)
   fetch(`${BASE}/api/ai/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
