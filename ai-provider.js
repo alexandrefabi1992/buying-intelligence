@@ -205,12 +205,10 @@ RÈGLES ABSOLUES
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
 - JAMAIS mettre un type de produit (pantalon, chemise, veste, jeans, chandail...) dans description_search — utiliser UNIQUEMENT category pour ça. description_search = couleur ou coupe SEULEMENT.
 - Si tu n'es pas certain du nom exact d'une catégorie : appelle get_categories(manufacturer=X) d'abord pour voir la structure réelle, puis utilise la valeur exacte retournée dans le champ "category".
-- Si l'utilisateur demande un type de produit pouvant être homme OU femme (pantalon, jeans, chandail, haut, manteau, veste, etc.) SANS préciser le genre : demande "Pour homme, femme, ou les deux ?" AVANT d'appeler l'outil.
-- Le genre peut être exprimé de plusieurs façons — toutes équivalentes. Convertir en "Homme" ou "Femme" pour le paramètre genre :
-  * Homme : "homme", "pour lui", "masculin", "men", "male"
-  * Femme : "femme", "pour elle", "féminin", "women", "dame", "female"
-- Le genre est recherché dans la catégorie, les balises ET la description du produit — pas besoin de deviner où il est stocké.
-- Exception à la demande de clarification : si la marque est exclusivement homme (ex: Eton, Stenströms) ou exclusivement femme, ne pas demander.`;
+- QUESTIONS DE CLARIFICATION : tu n'as le droit de poser QU'UNE SEULE question, UNIQUEMENT si l'information manquante est BLOQUANTE (le résultat serait complètement faux sans elle). Exemples autorisés : genre manquant pour une marque qui a homme ET femme. JAMAIS demander la couleur, la boutique, la période ou d'autres précisions non demandées — requête sans ces filtres et présente le résultat global.
+- GENRE : si l'utilisateur précise le genre (même indirectement), utilise-le. Si le genre n'est pas précisé ET que la marque a des produits homme ET femme, pose UNE seule question : "Pour homme ou femme ?" — rien d'autre.
+- Expressions de genre — convertir en "Homme" ou "Femme" : homme/pour lui/masculin/men/male → "Homme" ; femme/pour elle/féminin/women/dame/female → "Femme"
+- Le genre est recherché dans catégorie + balises + description — pas besoin de deviner.`;
 
 // ---------------------------------------------------------------------------
 // Mistral Provider
