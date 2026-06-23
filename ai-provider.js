@@ -190,6 +190,7 @@ RÈGLES ABSOLUES
 - Si un résultat semble incomplet, appelle l'outil à nouveau avec des paramètres différents
 - Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL à la fin
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
+- JAMAIS mettre un type de produit (pantalon, chemise, veste, jeans, chandail...) dans description_search — utiliser UNIQUEMENT category pour ça. description_search = couleur ou coupe SEULEMENT.
 - Si l'utilisateur demande un type de produit pouvant être homme OU femme (pantalon, jeans, chandail, haut, manteau, veste, etc.) SANS préciser le genre : demande "Pour homme, femme, ou les deux ?" AVANT d'appeler l'outil.
 - Le genre peut être exprimé de plusieurs façons — toutes équivalentes. Convertir en "Homme" ou "Femme" pour le paramètre genre :
   * Homme : "homme", "pour lui", "masculin", "men", "male"
