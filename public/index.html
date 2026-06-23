@@ -2559,11 +2559,7 @@ Promise.all([loadTiers(), loadBudgetParams()]).then(() => {
     padding: 0 14px; cursor: pointer; font-size: 12px; font-weight: 600; transition: background 0.1s; }
   #ai-send:hover { background: #4338ca; }
   #ai-send:disabled { background: #c7d2fe; cursor: default; }
-  #ai-shortcuts { padding: 8px 12px 0; display: flex; flex-wrap: wrap; gap: 6px; }
-  .ai-shortcut { font-size: 11px; padding: 4px 10px; border-radius: 99px; border: 1.5px solid #e0e7ff;
-    background: #f5f3ff; color: #4f46e5; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
-  .ai-shortcut:hover { background: #ede9fe; border-color: #a5b4fc; }
-  #ai-history-btn { font-size: 10px; color: #94a3b8; cursor: pointer; padding: 2px 6px; border-radius: 6px; border: 1px solid #e2e8f0; background: white; }
+#ai-history-btn { font-size: 10px; color: #94a3b8; cursor: pointer; padding: 2px 6px; border-radius: 6px; border: 1px solid #e2e8f0; background: white; }
   #ai-history-btn:hover { background: #f8fafc; color: #475569; }
   #ai-history-panel { display: none; flex-direction: column; gap: 2px; padding: 8px 12px; max-height: 180px; overflow-y: auto; border-bottom: 1px solid #f1f5f9; }
   #ai-history-panel.open { display: flex; }
@@ -2596,15 +2592,6 @@ Promise.all([loadTiers(), loadBudgetParams()]).then(() => {
   <!-- History panel (hidden by default) -->
   <div id="ai-history-panel"></div>
 
-  <!-- Quick shortcuts -->
-  <div id="ai-shortcuts">
-    <button class="ai-shortcut" data-q="Quelles marques ont le meilleur sell-through en p26 ?">🏆 Top ST P26</button>
-    <button class="ai-shortcut" data-q="Quelles marques ont le plus faible sell-through en p26 ?">⚠ Flop ST P26</button>
-    <button class="ai-shortcut" data-q="Donne-moi le budget recommandé par marque pour p27">💰 Budget P27</button>
-    <button class="ai-shortcut" data-q="Quelles tailles se vendent le mieux toutes marques en p26 ?">📐 Top tailles</button>
-    <button class="ai-shortcut" data-q="Quel est le stock actuel par marque ?">📦 Stock global</button>
-  </div>
-
   <!-- Messages -->
   <div id="ai-messages">
     <div class="ai-msg assistant">Bonjour ! Je suis votre assistant achat. Posez-moi des questions sur vos budgets, ventes, stocks ou sell-through.</div>
@@ -2632,14 +2619,6 @@ Promise.all([loadTiers(), loadBudgetParams()]).then(() => {
 
   let history = [];
   let open    = false;
-
-  // Shortcuts
-  document.querySelectorAll('.ai-shortcut').forEach(btn => {
-    btn.addEventListener('click', () => {
-      input.value = btn.dataset.q;
-      sendMessage();
-    });
-  });
 
   // History panel
   histBtn.addEventListener('click', async () => {
