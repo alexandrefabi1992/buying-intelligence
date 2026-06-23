@@ -204,8 +204,8 @@ async function toolGetStockByVariant({ manufacturer, size, category, description
   const params     = [];
 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
-  if (category)     { conditions.push(`p.category ILIKE $${params.length + 1}`);      params.push(`%${category}%`); }
-  if (description_search && !size) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
+  if (category)           { conditions.push(`p.category ILIKE $${params.length + 1}`);     params.push(`%${category}%`); }
+  if (description_search) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
   if (size) {
     const fraction = decimalToFraction(size.trim());
     if (fraction) {
@@ -271,9 +271,8 @@ async function toolGetSalesByVariant({ manufacturer, size, category, description
   if (from) { conditions.push(`sl.completed_time >= $${params.length + 1}`); params.push(from); }
   if (to)   { conditions.push(`sl.completed_time <= $${params.length + 1}`); params.push(to); }
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
-  if (category)     { conditions.push(`p.category ILIKE $${params.length + 1}`);      params.push(`%${category}%`); }
-  // description_search only when no size is provided, never for size lookups
-  if (description_search && !size) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
+  if (category)           { conditions.push(`p.category ILIKE $${params.length + 1}`);     params.push(`%${category}%`); }
+  if (description_search) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
   if (size) {
     const fraction = decimalToFraction(size.trim());
     if (fraction) {
