@@ -199,11 +199,12 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
   };
 }
 
-async function toolGetStockByVariant({ manufacturer, size, description_search, shop_id }, { pool }) {
+async function toolGetStockByVariant({ manufacturer, size, category, description_search, shop_id }, { pool }) {
   const conditions = ['p.archived = false'];
   const params     = [];
 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
+  if (category)     { conditions.push(`p.category ILIKE $${params.length + 1}`);      params.push(`%${category}%`); }
   if (description_search && !size) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
   if (size) {
     const fraction = decimalToFraction(size.trim());
@@ -252,7 +253,7 @@ function decimalToFraction(sizeStr) {
   return `${m[1]} ${fractions[m[2]]}`;
 }
 
-async function toolGetSalesByVariant({ manufacturer, size, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
+async function toolGetSalesByVariant({ manufacturer, size, category, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
   let from, to;
   if (period) {
     const resolved = resolvePeriod(period);
@@ -270,7 +271,8 @@ async function toolGetSalesByVariant({ manufacturer, size, description_search, s
   if (from) { conditions.push(`sl.completed_time >= $${params.length + 1}`); params.push(from); }
   if (to)   { conditions.push(`sl.completed_time <= $${params.length + 1}`); params.push(to); }
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
-  // description_search only when no size is provided (category search), never for size lookups
+  if (category)     { conditions.push(`p.category ILIKE $${params.length + 1}`);      params.push(`%${category}%`); }
+  // description_search only when no size is provided, never for size lookups
   if (description_search && !size) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
   if (size) {
     const fraction = decimalToFraction(size.trim());

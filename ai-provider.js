@@ -132,7 +132,8 @@ const TOOL_DEFS = [
       properties: {
         manufacturer:       { type: 'string', description: 'Nom de la marque (optionnel)' },
         size:               { type: 'string', description: 'Taille à rechercher, ex: "15.5", "M", "40". Supporte automatiquement "15 1/2" = "15.5"' },
-        description_search: { type: 'string', description: 'UNIQUEMENT pour chercher une référence de produit précise (ex: "TUXEDO", "TWILL"). NE PAS utiliser pour des catégories génériques (chemise, pantalon, etc.)' },
+        category:           { type: 'string', description: 'Catégorie de produit Lightspeed, ex: "Chemise", "Pantalon", "T-shirt", "Cravate". Utiliser quand l\'utilisateur mentionne un type de produit sans taille précise.' },
+        description_search: { type: 'string', description: 'UNIQUEMENT pour chercher une référence de produit précise (ex: "TUXEDO", "TWILL"). NE PAS utiliser pour des catégories génériques.' },
         shop_id:            { type: 'string', description: 'ID de la boutique (optionnel)' },
         period:             { type: 'string', description: 'Période relative, ex: "1y", "2y", "ytd", "last_year", "6m"' },
         season:             { type: 'string', description: 'Code de saison (ex: p26, a25) — si la question porte sur une saison' },
@@ -148,7 +149,8 @@ const TOOL_DEFS = [
       properties: {
         manufacturer:       { type: 'string',  description: 'Nom de la marque (optionnel)' },
         size:               { type: 'string',  description: 'Taille à rechercher dans la description, ex: "15.5", "M", "40" (optionnel)' },
-        description_search: { type: 'string',  description: 'UNIQUEMENT pour chercher une référence précise (ex: "TUXEDO", "TWILL"). NE PAS utiliser pour des catégories génériques (chemise, pantalon, etc.)' },
+        category:           { type: 'string',  description: 'Catégorie Lightspeed, ex: "Chemise", "Pantalon", "T-shirt". Utiliser quand l\'utilisateur mentionne un type de produit.' },
+        description_search: { type: 'string',  description: 'UNIQUEMENT pour chercher une référence précise (ex: "TUXEDO", "TWILL"). NE PAS utiliser pour des catégories génériques.' },
         shop_id:            { type: 'string',  description: 'ID de la boutique (optionnel)' },
       },
       required: [],
