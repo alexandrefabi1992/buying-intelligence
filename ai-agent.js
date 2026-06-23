@@ -210,7 +210,7 @@ async function toolGetStockByVariant({ manufacturer, size, category, genre, tag,
     params.push(`%${genre}%`, `%${genre}%`, `%${genre}%`);
   }
   if (tag)               { conditions.push(`p.tags ILIKE $${params.length + 1}`);          params.push(`%${tag}%`); }
-  if (description_search){ conditions.push(`p.description ILIKE $${params.length + 1}`);   params.push(`%${description_search}%`); }
+  if (description_search && !category) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
   if (size)              { conditions.push(buildSizeCondition(size, params)); }
   if (shop_id)           { conditions.push(`i.shop_id = $${params.length + 1}`);            params.push(shop_id); }
 
@@ -295,7 +295,8 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tag,
     params.push(`%${genre}%`, `%${genre}%`, `%${genre}%`);
   }
   if (tag)               { conditions.push(`p.tags ILIKE $${params.length + 1}`);          params.push(`%${tag}%`); }
-  if (description_search){ conditions.push(`p.description ILIKE $${params.length + 1}`);   params.push(`%${description_search}%`); }
+  // Ignore description_search if category is already set — model tends to duplicate the type word
+  if (description_search && !category) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
   if (size)              { conditions.push(buildSizeCondition(size, params)); }
   if (shop_id)           { conditions.push(`sl.shop_id = $${params.length + 1}`);           params.push(shop_id); }
 
