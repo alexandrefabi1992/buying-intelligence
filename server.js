@@ -1580,12 +1580,12 @@ app.get('/api/admin/product-descriptions', async (req, res, next) => {
     const mfr   = req.query.manufacturer || 'Eton';
     const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
     const { rows } = await pool.query(
-      `SELECT p.description, p.manufacturer, p.item_id,
+      `SELECT p.description, p.manufacturer, p.item_id, p.category,
               COALESCE(SUM(i.qty_on_hand), 0) AS total_stock
        FROM products p
        LEFT JOIN inventory i ON i.item_id = p.item_id
        WHERE p.manufacturer ILIKE $1 AND p.archived = false
-       GROUP BY p.description, p.manufacturer, p.item_id
+       GROUP BY p.description, p.manufacturer, p.item_id, p.category
        ORDER BY p.description
        LIMIT $2`,
       [`%${mfr}%`, limit]
