@@ -199,7 +199,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
   };
 }
 
-async function toolGetStockByVariant({ manufacturer, size, category, genre, description_search, shop_id }, { pool }) {
+async function toolGetStockByVariant({ manufacturer, size, category, genre, tag, description_search, shop_id }, { pool }) {
   const conditions = ['p.archived = false'];
   const params     = [];
 
@@ -209,18 +209,10 @@ async function toolGetStockByVariant({ manufacturer, size, category, genre, desc
     conditions.push(`(p.category ILIKE $${params.length + 1} OR p.tags ILIKE $${params.length + 2} OR p.description ILIKE $${params.length + 3})`);
     params.push(`%${genre}%`, `%${genre}%`, `%${genre}%`);
   }
-  if (description_search) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
-  if (size) {
-    const fraction = decimalToFraction(size.trim());
-    if (fraction) {
-      conditions.push(`(p.description ILIKE $${params.length + 1} OR p.description ILIKE $${params.length + 2})`);
-      params.push(`% ${size.trim()}%`, `% ${fraction}%`);
-    } else {
-      conditions.push(`p.description ILIKE $${params.length + 1}`);
-      params.push(`% ${size.trim()}%`);
-    }
-  }
-  if (shop_id) { conditions.push(`i.shop_id = $${params.length + 1}`); params.push(shop_id); }
+  if (tag)               { conditions.push(`p.tags ILIKE $${params.length + 1}`);          params.push(`%${tag}%`); }
+  if (description_search){ conditions.push(`p.description ILIKE $${params.length + 1}`);   params.push(`%${description_search}%`); }
+  if (size)              { conditions.push(buildSizeCondition(size, params)); }
+  if (shop_id)           { conditions.push(`i.shop_id = $${params.length + 1}`);            params.push(shop_id); }
 
   const { rows } = await pool.query(`
     SELECT
@@ -257,7 +249,29 @@ function decimalToFraction(sizeStr) {
   return `${m[1]} ${fractions[m[2]]}`;
 }
 
-async function toolGetSalesByVariant({ manufacturer, size, category, genre, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
+// Build a size condition that avoids false positives.
+// Letter sizes (S, M, L, XL, XXL…) require a word boundary after the size
+// to avoid matching MARINE, MAUVE, LILAS, SLIM, etc.
+// Numeric sizes also check the fraction equivalent (15.5 ↔ 15 1/2).
+function buildSizeCondition(size, params) {
+  const s = size.trim();
+  if (/^(XS|S|M|L|XL|XXL|XXXL)$/i.test(s)) {
+    const i1 = params.length + 1, i2 = params.length + 2;
+    params.push(`% ${s} %`, `% ${s}`);
+    return `(p.description ILIKE $${i1} OR p.description ILIKE $${i2})`;
+  }
+  const fraction = decimalToFraction(s);
+  if (fraction) {
+    const i1 = params.length + 1, i2 = params.length + 2;
+    params.push(`% ${s}%`, `% ${fraction}%`);
+    return `(p.description ILIKE $${i1} OR p.description ILIKE $${i2})`;
+  }
+  const i = params.length + 1;
+  params.push(`% ${s}%`);
+  return `p.description ILIKE $${i}`;
+}
+
+async function toolGetSalesByVariant({ manufacturer, size, category, genre, tag, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
   let from, to;
   if (period) {
     const resolved = resolvePeriod(period);
@@ -280,18 +294,10 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, desc
     conditions.push(`(p.category ILIKE $${params.length + 1} OR p.tags ILIKE $${params.length + 2} OR p.description ILIKE $${params.length + 3})`);
     params.push(`%${genre}%`, `%${genre}%`, `%${genre}%`);
   }
-  if (description_search) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
-  if (size) {
-    const fraction = decimalToFraction(size.trim());
-    if (fraction) {
-      conditions.push(`(p.description ILIKE $${params.length + 1} OR p.description ILIKE $${params.length + 2})`);
-      params.push(`% ${size.trim()}%`, `% ${fraction}%`);
-    } else {
-      conditions.push(`p.description ILIKE $${params.length + 1}`);
-      params.push(`% ${size.trim()}%`);
-    }
-  }
-  if (shop_id) { conditions.push(`sl.shop_id = $${params.length + 1}`); params.push(shop_id); }
+  if (tag)               { conditions.push(`p.tags ILIKE $${params.length + 1}`);          params.push(`%${tag}%`); }
+  if (description_search){ conditions.push(`p.description ILIKE $${params.length + 1}`);   params.push(`%${description_search}%`); }
+  if (size)              { conditions.push(buildSizeCondition(size, params)); }
+  if (shop_id)           { conditions.push(`sl.shop_id = $${params.length + 1}`);           params.push(shop_id); }
 
   const { rows } = await pool.query(`
     SELECT
