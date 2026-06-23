@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configuration — Buying Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .step { display: none; }
+    .step.active { display: block; }
+    .choice-btn {
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px 20px;
+      text-align: left;
+      width: 100%;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: white;
+    }
+    .choice-btn:hover { border-color: #93c5fd; background: #eff6ff; }
+    .choice-btn.selected { border-color: #1d4ed8; background: #eff6ff; }
+    .tag-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; border-radius: 99px;
+      font-size: 12px; font-weight: 500;
+      cursor: pointer; border: 1.5px solid;
+      transition: all 0.15s;
+    }
+    .tag-chip.selected { background: #1d4ed8; color: white; border-color: #1d4ed8; }
+    .tag-chip:not(.selected) { background: white; color: #374151; border-color: #d1d5db; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-6">
+
+<div class="w-full max-w-2xl">
+
+  <!-- Header -->
+  <div class="text-center mb-8">
+    <h1 class="text-2xl font-bold text-gray-900">Configuration de votre boutique</h1>
+    <p class="text-gray-500 mt-1">Quelques questions pour personnaliser votre expérience</p>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="mb-8">
+    <div class="flex justify-between text-xs text-gray-400 mb-2">
+      <span id="step-label">Étape 1 sur 7</span>
+      <span id="step-pct">14%</span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-2">
+      <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width:14%"></div>
+    </div>
+  </div>
+
+  <!-- Card -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+
+    <!-- STEP 1 — Boutique name -->
+    <div class="step active" id="step-1">
+      <div class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">Informations de base</div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Quel est le nom de votre boutique ?</h2>
+      <p class="text-gray-500 text-sm mb-6">Ce nom sera utilisé dans les rapports et l'assistant.</p>
+      <input id="boutique-name" type="text" placeholder="Ex: Boutique Mode Paris"
+        class="w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    </div>
+
+    <!-- STEP 2 — Product type field -->
+    <div class="step" id="step-2">
+      <div class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">Structure des produits</div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Où se trouve le TYPE DE PRODUIT dans Lightspeed ?</h2>
+      <p class="text-gray-500 text-sm mb-6">Ex : "Pantalon", "Chemise", "Polo" — dans quel champ Lightspeed ?</p>
+      <div class="space-y-3" id="product-type-choices">
+        <button class="choice-btn" data-val="category" onclick="selectChoice(this, 'product_type_field')">
+          <div class="font-semibold text-gray-800">Catégorie</div>
+          <div class="text-sm text-gray-500 mt-1">Le champ "Catégorie" de Lightspeed contient le type de produit</div>
+        </button>
+        <button class="choice-btn" data-val="description" onclick="selectChoice(this, 'product_type_field')">
+          <div class="font-semibold text-gray-800">Description</div>
+          <div class="text-sm text-gray-500 mt-1">Le type de produit est intégré dans le nom/description de l'article</div>
+        </button>
+        <button class="choice-btn" data-val="tag" onclick="selectChoice(this, 'product_type_field')">
+          <div class="font-semibold text-gray-800">Balise (tag)</div>
+          <div class="text-sm text-gray-500 mt-1">Une balise Lightspeed identifie le type de produit</div>
+        </button>
+      </div>
+      <div id="categories-preview" class="mt-4 hidden">
+        <p class="text-xs text-gray-400 mb-2">Catégories détectées dans votre catalogue :</p>
+        <div id="categories-list" class="flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+
+    <!-- STEP 3 — Genre -->
+    <div class="step" id="step-3">
+      <div class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">Genre</div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Votre catalogue distingue-t-il Homme et Femme ?</h2>
+      <p class="text-gray-500 text-sm mb-6">Si oui, dans quel(s) champ(s) cette information apparaît-elle ?</p>
+      <div class="space-y-3">
+        <button class="choice-btn" data-val="no" onclick="selectChoice(this, 'genre_enabled'); document.getElementById('genre-fields-block').classList.add('hidden')">
+          <div class="font-semibold text-gray-800">Non — pas de distinction H/F</div>
+          <div class="text-sm text-gray-500 mt-1">Tous les produits s'adressent au même genre</div>
+        </button>
+        <button class="choice-btn" data-val="yes" onclick="selectChoice(this, 'genre_enabled'); document.getElementById('genre-fields-block').classList.remove('hidden')">
+          <div class="font-semibold text-gray-800">Oui</div>
+          <div class="text-sm text-gray-500 mt-1">Le genre apparaît dans un ou plusieurs champs</div>
+        </button>
+      </div>
+      <div id="genre-fields-block" class="hidden mt-6">
+        <p class="text-sm font-medium text-gray-700 mb-3">Dans quels champs ? (plusieurs choix possibles)</p>
+        <div class="flex flex-wrap gap-2" id="genre-field-chips">
+          <span class="tag-chip" data-val="category" onclick="toggleChip(this, 'genre_fields')">Catégorie</span>
+          <span class="tag-chip" data-val="tag" onclick="toggleChip(this, 'genre_fields')">Balise</span>
+          <span class="tag-chip" data-val="description" onclick="toggleChip(this, 'genre_fields')">Description</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4 — Genre values -->
+    <div class="step" id="step-4">
+      <div class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">Genre — valeurs</div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Quelles valeurs utilisez-vous pour le genre ?</h2>
+      <p class="text-gray-500 text-sm mb-6">Indiquez exactement ce qui apparaît dans Lightspeed.</p>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Valeur Homme</label>
+          <input id="genre-homme" type="text" placeholder="Ex: Homme, Men, H, Male"
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <div id="genre-homme-suggestions" class="mt-2 flex flex-wrap gap-1"></div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Valeur Femme</label>
+          <input id="genre-femme" type="text" placeholder="Ex: Femme, Women, F, Female"
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <div id="genre-femme-suggestions" class="mt-2 flex flex-wrap gap-1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 5 — Season tags -->
+    <div class="step" id="step-5">
+      <div class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">Saisons</div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Comment identifiez-vous vos saisons avec des balises ?</h2>
+      <p class="text-gray-500 text-sm mb-6">Cliquez sur les balises détectées ou entrez votre propre format.</p>
+      <div id="season-tags-detected" class="mb-4 flex flex-wrap gap-2"></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Balise Printemps/Été (exemple)</label>
+          <input id="season-tag-spring" type="text" placeholder="Ex: p26, ss26, spring2026"
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Balise Automne/Hiver (exemple)</label>
+          <input id="season-tag-fall" type="text" placeholder="Ex: a26, fw26, fall2026"
+            class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 mt-3">Ces exemples servent à comprendre votre format. Les saisons se configurent dans "Paramètres".</p>
+    </div>
+
+    <!-- STEP 6 — NOS tag -->
+    <div class="step" id="step-6">
+      <div class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">Produits permanents (NOS)</div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">Comment identifiez-vous vos produits NOS (jamais en rupture) ?</h2>
+      <p class="text-gray-500 text-sm mb-6">Les produits NOS sont des permanences qui ne suivent pas les saisons.</p>
+      <div class="space-y-3 mb-4">
+        <button class="choice-btn" data-val="no" onclick="selectChoice(this, 'nos_enabled'); document.getElementById('nos-tag-block').classList.add('hidden')">
+          <div class="font-semibold text-gray-800">Pas de NOS — tous mes produits sont saisonniers</div>
+        </button>
+        <button class="choice-btn" data-val="yes" onclick="selectChoice(this, 'nos_enabled'); document.getElementById('nos-tag-block').classList.remove('hidden')">
+          <div class="font-semibold text-gray-800">Oui, j'ai des produits NOS</div>
+          <div class="text-sm text-gray-500 mt-1">Une balise les identifie dans Lightspeed</div>
+        </button>
+      </div>
+      <div id="nos-tag-block" class="hidden">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Balise NOS utilisée</label>
+        <input id="nos-tag" type="text" placeholder="Ex: nos, NOS, permanent, core"
+          class="w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <div id="nos-tag-suggestions" class="mt-2 flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+
+    <!-- STEP 7 — Summary -->
+    <div class="step" id="step-7">
+      <div class="text-xs font-semibold text-green-600 uppercase tracking-wider mb-2">Résumé</div>
+      <h2 class="text-xl font-semibold text-gray-900 mb-6">Tout est prêt !</h2>
+      <div id="summary" class="space-y-3 text-sm"></div>
+      <div class="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
+        Ces paramètres peuvent être modifiés à tout moment depuis la page de configuration.
+      </div>
+    </div>
+
+  </div><!-- end card -->
+
+  <!-- Navigation -->
+  <div class="flex justify-between mt-6">
+    <button id="btn-prev" onclick="prevStep()"
+      class="px-6 py-3 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors hidden">
+      ← Précédent
+    </button>
+    <div></div>
+    <button id="btn-next" onclick="nextStep()"
+      class="px-8 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors">
+      Suivant →
+    </button>
+  </div>
+
+</div><!-- end max-w -->
+
+<script>
+const TOTAL_STEPS = 7;
+let currentStep = 1;
+let discoverData = {};
+const config = {};
+
+// ── Auto-discover on load ────────────────────────────────────────────────────
+fetch('/api/admin/discover')
+  .then(r => r.json())
+  .then(data => {
+    discoverData = data;
+
+    // Categories preview (step 2)
+    const catList = document.getElementById('categories-list');
+    data.categories.slice(0, 15).forEach(c => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.textContent = `${c.name} (${c.count})`;
+      catList.appendChild(chip);
+    });
+
+    // Season tags (step 5)
+    const seasonDiv = document.getElementById('season-tags-detected');
+    const seasonKeywords = /^[pa]\d{2}$|spring|fall|summer|winter|ss|fw|automne|printemps/i;
+    const seasonTags = data.tags.filter(t => seasonKeywords.test(t.tag)).slice(0, 20);
+    seasonTags.forEach(t => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.textContent = t.tag;
+      chip.onclick = () => {
+        // guess spring/fall
+        if (/^p\d|spring|ss|printemps/i.test(t.tag))
+          document.getElementById('season-tag-spring').value = t.tag;
+        else
+          document.getElementById('season-tag-fall').value = t.tag;
+        chip.classList.toggle('selected');
+      };
+      seasonDiv.appendChild(chip);
+    });
+
+    // NOS suggestions (step 6)
+    const nosDiv = document.getElementById('nos-tag-suggestions');
+    const nosKeywords = /nos|permanent|core|basic|base/i;
+    const nosTags = data.tags.filter(t => nosKeywords.test(t.tag)).slice(0, 10);
+    nosTags.forEach(t => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.textContent = t.tag;
+      chip.onclick = () => {
+        document.getElementById('nos-tag').value = t.tag;
+        document.querySelectorAll('#nos-tag-suggestions .tag-chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+      };
+      nosDiv.appendChild(chip);
+    });
+
+    // Genre suggestions (step 4)
+    const genreKeywords = /homme|femme|men|women|male|female|^h$|^f$|^m$|^w$/i;
+    const genreTags = data.tags.filter(t => genreKeywords.test(t.tag));
+    const hDiv = document.getElementById('genre-homme-suggestions');
+    const fDiv = document.getElementById('genre-femme-suggestions');
+    genreTags.forEach(t => {
+      if (/homme|men|male|^h$|^m$/i.test(t.tag)) {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip text-xs px-2 py-1';
+        chip.textContent = t.tag;
+        chip.onclick = () => { document.getElementById('genre-homme').value = t.tag; };
+        hDiv.appendChild(chip);
+      } else {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip text-xs px-2 py-1';
+        chip.textContent = t.tag;
+        chip.onclick = () => { document.getElementById('genre-femme').value = t.tag; };
+        fDiv.appendChild(chip);
+      }
+    });
+
+    // Also suggest from categories
+    data.categories.forEach(c => {
+      if (/homme|men|male/i.test(c.name) && !document.getElementById('genre-homme').value)
+        document.getElementById('genre-homme').placeholder = `Ex: ${c.name}`;
+      if (/femme|women|female/i.test(c.name) && !document.getElementById('genre-femme').value)
+        document.getElementById('genre-femme').placeholder = `Ex: ${c.name}`;
+    });
+  })
+  .catch(() => {});
+
+// ── Fetch existing config ────────────────────────────────────────────────────
+fetch('/api/settings/tenant')
+  .then(r => r.json())
+  .then(saved => {
+    if (saved.boutique_name) document.getElementById('boutique-name').value = saved.boutique_name;
+    Object.assign(config, saved);
+  });
+
+// ── Step navigation ──────────────────────────────────────────────────────────
+function showStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(`step-${n}`).classList.add('active');
+
+  const pct = Math.round((n / TOTAL_STEPS) * 100);
+  document.getElementById('step-label').textContent = `Étape ${n} sur ${TOTAL_STEPS}`;
+  document.getElementById('step-pct').textContent = `${pct}%`;
+  document.getElementById('progress-bar').style.width = `${pct}%`;
+
+  document.getElementById('btn-prev').classList.toggle('hidden', n === 1);
+  document.getElementById('btn-next').textContent = n === TOTAL_STEPS ? '✓ Terminer' : 'Suivant →';
+
+  if (n === 7) buildSummary();
+  if (n === 2 && config.product_type_field === 'category')
+    document.getElementById('categories-preview').classList.remove('hidden');
+}
+
+function nextStep() {
+  if (!validateStep(currentStep)) return;
+  collectStep(currentStep);
+  if (currentStep === TOTAL_STEPS) { saveConfig(); return; }
+
+  // Skip step 4 if genre disabled
+  let next = currentStep + 1;
+  if (next === 4 && config.genre_enabled !== 'yes') next = 5;
+  currentStep = next;
+  showStep(currentStep);
+}
+
+function prevStep() {
+  let prev = currentStep - 1;
+  if (prev === 4 && config.genre_enabled !== 'yes') prev = 3;
+  currentStep = Math.max(1, prev);
+  showStep(currentStep);
+}
+
+// ── Validation ───────────────────────────────────────────────────────────────
+function validateStep(n) {
+  if (n === 1) {
+    const v = document.getElementById('boutique-name').value.trim();
+    if (!v) { alert('Veuillez entrer le nom de votre boutique.'); return false; }
+  }
+  if (n === 2 && !config.product_type_field) {
+    alert('Veuillez choisir où se trouve le type de produit.'); return false;
+  }
+  if (n === 3 && !config.genre_enabled) {
+    alert('Veuillez indiquer si votre catalogue distingue Homme et Femme.'); return false;
+  }
+  return true;
+}
+
+// ── Collect data from current step ──────────────────────────────────────────
+function collectStep(n) {
+  if (n === 1) config.boutique_name = document.getElementById('boutique-name').value.trim();
+  if (n === 4) {
+    config.genre_values = {
+      homme: document.getElementById('genre-homme').value.trim() || 'Homme',
+      femme: document.getElementById('genre-femme').value.trim() || 'Femme',
+    };
+  }
+  if (n === 5) {
+    config.season_tag_spring = document.getElementById('season-tag-spring').value.trim();
+    config.season_tag_fall   = document.getElementById('season-tag-fall').value.trim();
+  }
+  if (n === 6) {
+    config.nos_tag = config.nos_enabled === 'yes' ? (document.getElementById('nos-tag').value.trim() || 'nos') : null;
+  }
+}
+
+// ── Choice buttons ───────────────────────────────────────────────────────────
+function selectChoice(btn, key) {
+  btn.closest('div, .step').querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  config[key] = btn.dataset.val;
+  if (key === 'product_type_field') {
+    document.getElementById('categories-preview').classList.toggle('hidden', btn.dataset.val !== 'category');
+  }
+}
+
+function toggleChip(chip, key) {
+  chip.classList.toggle('selected');
+  const container = chip.closest('[id]');
+  config[key] = [...container.querySelectorAll('.tag-chip.selected')].map(c => c.dataset.val);
+}
+
+// ── Summary ──────────────────────────────────────────────────────────────────
+function buildSummary() {
+  collectStep(currentStep - 1);
+  const rows = [
+    ['Boutique',           config.boutique_name ?? '—'],
+    ['Type de produit',    { category:'Catégorie', description:'Description', tag:'Balise' }[config.product_type_field] ?? '—'],
+    ['Genre',              config.genre_enabled === 'yes' ? `Oui (champs: ${(config.genre_fields||[]).join(', ')})` : 'Non'],
+    ['Valeurs genre',      config.genre_enabled === 'yes' ? `Homme="${config.genre_values?.homme}", Femme="${config.genre_values?.femme}"` : '—'],
+    ['Tag saison P/É',    config.season_tag_spring || '—'],
+    ['Tag saison A/H',    config.season_tag_fall   || '—'],
+    ['Produits NOS',       config.nos_enabled === 'yes' ? `Tag: "${config.nos_tag}"` : 'Aucun'],
+  ];
+  document.getElementById('summary').innerHTML = rows.map(([k, v]) => `
+    <div class="flex gap-3 py-2 border-b border-gray-100 last:border-0">
+      <span class="w-40 text-gray-500 shrink-0">${k}</span>
+      <span class="font-medium text-gray-800">${v}</span>
+    </div>`).join('');
+}
+
+// ── Save ─────────────────────────────────────────────────────────────────────
+async function saveConfig() {
+  collectStep(TOTAL_STEPS);
+  config.setup_completed = true;
+  try {
+    await fetch('/api/settings/tenant', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+    document.getElementById('btn-next').textContent = '✓ Sauvegardé !';
+    document.getElementById('btn-next').className = 'px-8 py-3 rounded-xl bg-green-600 text-white font-semibold cursor-default';
+    setTimeout(() => { window.location.href = '/'; }, 1500);
+  } catch {
+    alert('Erreur lors de la sauvegarde. Veuillez réessayer.');
+  }
+}
+
+// Init
+showStep(1);
+</script>
+</body>
+</html>

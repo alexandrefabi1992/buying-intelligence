@@ -103,6 +103,14 @@ const DEFAULT_BUDGET_PARAMS = {
   absent_brand_mode:          'show', // 'show' = afficher avec badge | 'hide' = masquer
 };
 
+async function getTenantConfig() {
+  try {
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'tenant_config'");
+    if (rows.length && rows[0].value) return rows[0].value;
+  } catch {}
+  return {};
+}
+
 async function getSeasonsConfig() {
   try {
     const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'seasons_config'");
@@ -270,6 +278,16 @@ async function runMigrations() {
       updated_at TIMESTAMPTZ DEFAULT now()
     )
   `);
+  // Conversation history table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS conversations (
+      id          SERIAL PRIMARY KEY,
+      created_at  TIMESTAMPTZ DEFAULT now(),
+      preview     TEXT,
+      messages    JSONB NOT NULL
+    )
+  `);
+
   const { rows: tiersRow } = await pool.query(
     "SELECT 1 FROM app_settings WHERE key = 'multiplier_tiers'"
   );
@@ -2425,6 +2443,46 @@ app.put('/api/settings/budget-params', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/settings/tenant  — read tenant onboarding config
+// PUT /api/settings/tenant  — save tenant onboarding config
+// GET /api/admin/discover   — auto-discover DB structure for onboarding wizard
+// ---------------------------------------------------------------------------
+app.get('/api/settings/tenant', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'tenant_config'");
+    res.json(rows.length ? rows[0].value : {});
+  } catch (err) { next(err); }
+});
+
+app.put('/api/settings/tenant', async (req, res, next) => {
+  try {
+    const config = req.body;
+    await pool.query(
+      `INSERT INTO app_settings(key, value, updated_at)
+       VALUES ('tenant_config', $1::jsonb, now())
+       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
+      [JSON.stringify(config)]
+    );
+    res.json({ ok: true, config });
+  } catch (err) { next(err); }
+});
+
+app.get('/api/admin/discover', async (req, res, next) => {
+  try {
+    const [cats, tags, descSamples] = await Promise.all([
+      pool.query(`SELECT DISTINCT category, COUNT(*) as cnt FROM products WHERE category IS NOT NULL AND category != '' AND archived = false GROUP BY category ORDER BY cnt DESC LIMIT 30`),
+      pool.query(`SELECT DISTINCT UNNEST(string_to_array(tags, ',')) AS tag, COUNT(*) as cnt FROM products WHERE tags IS NOT NULL AND tags != '' AND archived = false GROUP BY tag ORDER BY cnt DESC LIMIT 50`),
+      pool.query(`SELECT description FROM products WHERE archived = false AND description IS NOT NULL ORDER BY RANDOM() LIMIT 5`),
+    ]);
+    res.json({
+      categories:       cats.rows.map(r => ({ name: r.category, count: Number(r.cnt) })),
+      tags:             tags.rows.map(r => ({ tag: r.tag.trim(), count: Number(r.cnt) })),
+      description_samples: descSamples.rows.map(r => r.description),
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/budget/marque — Pre-season buying budget per brand (config-driven)
 //
 // Config loaded from app_settings: seasons_config, budget_params, multiplier_tiers.
@@ -3930,9 +3988,55 @@ app.post('/api/ai/chat', async (req, res, next) => {
     if (!Array.isArray(messages) || !messages.length) {
       return res.status(400).json({ error: 'messages array required' });
     }
-    const ctx = { pool, budgetCache, getSeasonsConfig };
+    const tenantConfig = await getTenantConfig();
+    const ctx = { pool, budgetCache, getSeasonsConfig, tenantConfig };
     const result = await runAgentLoop(messages, ctx);
+
+    // Save conversation asynchronously (don't block response)
+    const userMsgs = (result.messages ?? []).filter(m => m.role === 'user');
+    if (userMsgs.length) {
+      const preview = userMsgs[userMsgs.length - 1].content?.slice(0, 120) ?? '';
+      pool.query(
+        `INSERT INTO conversations(preview, messages) VALUES($1, $2::jsonb)`,
+        [preview, JSON.stringify(result.messages ?? [])]
+      ).catch(() => {});
+    }
+
     res.json(result);
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/conversations        — list recent conversations
+// GET /api/conversations/:id    — get full conversation
+// DELETE /api/conversations/:id — delete a conversation
+// ---------------------------------------------------------------------------
+app.get('/api/conversations', async (req, res, next) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit ?? 50), 200);
+    const { rows } = await pool.query(
+      `SELECT id, created_at, preview FROM conversations ORDER BY created_at DESC LIMIT $1`,
+      [limit]
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+app.get('/api/conversations/:id', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, created_at, preview, messages FROM conversations WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Conversation introuvable' });
+    res.json(rows[0]);
+  } catch (err) { next(err); }
+});
+
+app.delete('/api/conversations/:id', async (req, res, next) => {
+  try {
+    await pool.query(`DELETE FROM conversations WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 
