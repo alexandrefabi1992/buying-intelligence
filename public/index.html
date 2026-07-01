@@ -2472,15 +2472,11 @@ document.getElementById('budgetParamsApply').addEventListener('click', async () 
 // ── NOS Accordéon par marque ─────────────────────────────────────────────
 let nosUrgentData = [];
 const nosExpandedBrands = new Set();
-let nosShopsInited = false;
-
 async function initNosUrgentShops() {
-  if (nosShopsInited) return;
-  nosShopsInited = true;
+  const sel = document.getElementById('nosUrgentShop');
+  if (!sel || sel.options.length > 1) return; // already populated
   try {
     const shops = await fetch(`${BASE}/api/shops`).then(r => r.json());
-    const sel = document.getElementById('nosUrgentShop');
-    if (!sel) return;
     shops.forEach(s => {
       const opt = document.createElement('option');
       opt.value = s.shop_id; opt.textContent = s.name;
@@ -2506,7 +2502,7 @@ async function loadNosUrgent() {
     console.error('[NOS] Erreur de chargement:', err);
     loader?.classList.add('hidden');
     document.getElementById('nosAccordionBody').innerHTML =
-      `<tr><td colspan="7" class="text-center py-6 text-xs text-red-400">Erreur de chargement — <button onclick="loadNosUrgent()" class="underline hover:text-red-600">Réessayer</button></td></tr>`;
+      `<tr><td colspan="7" class="text-center py-6 text-xs text-red-400">Erreur: ${err?.message ?? err} — <button onclick="loadNosUrgent()" class="underline hover:text-red-600">Réessayer</button></td></tr>`;
   }
 }
 
