@@ -234,11 +234,12 @@
       <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
         NOS — À commander
       </span>
-      <!-- Brand search with autocomplete -->
+      <!-- Brand search with native datalist autocomplete -->
       <div class="relative">
-        <input id="nosSearchBrand" type="text" placeholder="Rechercher une marque…" autocomplete="off"
+        <input id="nosSearchBrand" type="text" placeholder="Rechercher une marque…"
+          list="nosSearchBrandList" autocomplete="off"
           class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs w-52 focus:outline-none focus:ring-2 focus:ring-blue-300">
-        <div id="nosSearchSuggestions" class="hidden absolute z-30 top-full left-0 mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto"></div>
+        <datalist id="nosSearchBrandList"></datalist>
       </div>
       <select id="nosUrgentShop" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
         <option value="">Toutes les boutiques</option>
@@ -2513,6 +2514,7 @@ async function loadNosUrgent() {
     const d = await fetch(url).then(r => r.json());
     nosUrgentData = d.items ?? [];
     loader?.classList.add('hidden');
+    nosPopulateBrandList();
     renderNosAccordion();
   } catch (err) {
     console.error('[NOS] Erreur de chargement:', err);
@@ -2632,38 +2634,21 @@ function renderNosAccordion() {
 // Shop change reloads data from server
 document.getElementById('nosUrgentShop')?.addEventListener('change', loadNosUrgent);
 
-// Brand search autocomplete
-document.getElementById('nosSearchBrand')?.addEventListener('input', function() {
-  var val = this.value.toLowerCase().trim();
-  var sugg = document.getElementById('nosSearchSuggestions');
-  if (!val || !nosUrgentData.length) { sugg.classList.add('hidden'); return; }
-  var brands = Array.from(new Set(nosUrgentData.map(function(it) { return it.manufacturer; })))
-    .filter(function(b) { return b.toLowerCase().includes(val); })
-    .sort().slice(0, 12);
-  if (!brands.length) { sugg.classList.add('hidden'); return; }
-  sugg.innerHTML = brands.map(function(b) {
-    return '<div class="nos-sugg-item px-3 py-2 text-xs text-gray-700 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0">' + b + '</div>';
-  }).join('');
-  sugg.classList.remove('hidden');
-  sugg.querySelectorAll('.nos-sugg-item').forEach(function(item) {
-    item.addEventListener('mousedown', function(e) {
-      e.preventDefault();
-      document.getElementById('nosSearchBrand').value = item.textContent;
-      sugg.classList.add('hidden');
-      renderNosAccordion();
-    });
-  });
-});
-document.getElementById('nosSearchBrand')?.addEventListener('blur', function() {
-  setTimeout(function() { document.getElementById('nosSearchSuggestions')?.classList.add('hidden'); }, 150);
-});
+// Clear search on Escape
 document.getElementById('nosSearchBrand')?.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') { document.getElementById('nosSearchSuggestions')?.classList.add('hidden'); this.value = ''; renderNosAccordion(); }
-  if (e.key === 'Enter')  { document.getElementById('nosSearchSuggestions')?.classList.add('hidden'); renderNosAccordion(); }
+  if (e.key === 'Escape') { this.value = ''; renderNosAccordion(); }
+  if (e.key === 'Enter')  { renderNosAccordion(); }
 });
 
-// Apply button applies urgency checkboxes + brand search filter
+// Apply button
 document.getElementById('nosApplyBtn')?.addEventListener('click', renderNosAccordion);
+
+function nosPopulateBrandList() {
+  var dl = document.getElementById('nosSearchBrandList');
+  if (!dl) return;
+  var brands = Array.from(new Set(nosUrgentData.map(function(it) { return it.manufacturer; }))).sort();
+  dl.innerHTML = brands.map(function(b) { return '<option value="' + b + '">'; }).join('');
+}
 
 
 // ── Lead Times (Paramètres) ───────────────────────────────────────────────
