@@ -229,119 +229,50 @@
   <!-- ── NOS ────────────────────────────────────────────────────── -->
   <section id="tab-nos" class="hidden">
 
-    <!-- À commander maintenant -->
-    <div class="mb-8">
-      <div class="flex flex-wrap items-center gap-3 mb-3">
-        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-          À commander maintenant
-        </span>
-        <select id="nosUrgentShop" class="border border-gray-300 rounded px-2 py-1 text-xs">
-          <option value="">Toutes les boutiques</option>
-        </select>
-        <span id="nosUrgentTotal" class="text-xs font-semibold text-red-700 ml-auto"></span>
+    <!-- Filtres -->
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+        NOS — À commander
+      </span>
+      <input id="nosSearchBrand" type="text" placeholder="Rechercher une marque…"
+        class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs w-48 focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <select id="nosUrgentShop" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">Toutes les boutiques</option>
+      </select>
+      <div class="flex items-center gap-3 ml-1">
+        <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+          <input type="checkbox" id="nosFilterCritique" checked class="accent-red-600"> <span class="text-red-600 font-semibold">⛔ Critique</span>
+        </label>
+        <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+          <input type="checkbox" id="nosFilterUrgent" checked class="accent-orange-500"> <span class="text-orange-600 font-semibold">⚠ Urgent</span>
+        </label>
+        <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+          <input type="checkbox" id="nosFilterAttention" checked class="accent-yellow-500"> <span class="text-yellow-600 font-semibold">◉ Attention</span>
+        </label>
       </div>
-      <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-xs">
-            <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
-              <tr>
-                <th class="px-3 py-2 text-left">Urgence</th>
-                <th class="px-3 py-2 text-left">Description</th>
-                <th class="px-3 py-2 text-left">Marque</th>
-                <th class="px-3 py-2 text-left">Boutique</th>
-                <th class="px-3 py-2 text-right">Stock</th>
-                <th class="px-3 py-2 text-right">En commande</th>
-                <th class="px-3 py-2 text-right">Couverture</th>
-                <th class="px-3 py-2 text-right">Délai fourn.</th>
-                <th class="px-3 py-2 text-right">Qté à commander</th>
-              </tr>
-            </thead>
-            <tbody id="nosUrgentBody" class="divide-y divide-gray-100"></tbody>
-          </table>
-        </div>
-        <div id="nosUrgentLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
-        <div id="nosUrgentEmpty" class="hidden text-center py-8 text-xs text-gray-400">Aucun article urgent — tout est bien approvisionné ✓</div>
-      </div>
+      <span id="nosUrgentTotal" class="text-xs font-semibold text-gray-600 ml-auto"></span>
     </div>
 
-    <!-- NOS budget par marque -->
-    <div class="mb-8">
-      <div class="flex flex-wrap items-end gap-4 mb-3">
-        <div>
-          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 mb-2"
-                data-i18n="nos_badge">
-            NOS — Budget par marque
-          </span>
-          <div class="flex items-center gap-2">
-            <label class="text-xs text-gray-500" data-i18n="nos_coverage">Couverture cible :</label>
-            <input type="range" id="nosWeeks" min="1" max="26" value="4" class="w-28">
-            <span id="nosWeeksLabel" class="font-semibold text-blue-700 w-5">4</span>
-            <span class="text-xs text-gray-400" data-i18n="nos_weeks">semaines</span>
-          </div>
-        </div>
-        <div id="budgetNosTotal" class="text-base font-bold text-blue-700 self-end"></div>
-      </div>
-      <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-xs">
-            <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
-              <tr>
-                <th class="px-3 py-2 w-6"></th>
-                <th class="px-3 py-2 text-left"     data-i18n="nos_col_brand">Marque</th>
-                <th class="px-3 py-2 text-right"    data-i18n="nos_col_items">Articles</th>
-                <th class="px-3 py-2 text-right"    data-i18n="nos_col_stock">Stock en main</th>
-                <th class="px-3 py-2 text-right"    data-i18n="nos_col_sold">Unités vendues (12 sem.)</th>
-                <th class="px-3 py-2 text-right"    data-i18n="nos_col_budget">Budget suggéré $</th>
-                <th class="px-3 py-2 text-right"    data-i18n="nos_col_adj">Ajustement %</th>
-              </tr>
-            </thead>
-            <tbody id="budgetNosBody" class="divide-y divide-gray-100"></tbody>
-          </table>
-        </div>
-        <div id="budgetNosLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
-      </div>
-    </div>
-
-    <!-- Détail NOS par article -->
-    <div class="flex flex-wrap items-end gap-4 mb-4">
-      <div>
-        <label class="block text-xs text-gray-500 mb-1" data-i18n="nos_shop_lbl">Boutique</label>
-        <select id="nosShop" class="border border-gray-300 rounded px-2 py-1 text-sm">
-          <option value="" data-i18n="opt_all">Toutes</option>
-        </select>
-      </div>
-      <div class="flex-1">
-        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_search">Recherche</label>
-        <input id="nosSearch" type="text" placeholder="Description, catégorie…"
-          data-i18n-ph="nos_search_ph"
-          class="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-xs">
-      </div>
-      <div id="nosCount" class="text-xs text-gray-500 ml-auto self-end"></div>
-    </div>
+    <!-- Tableau accordéon par marque -->
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-xs">
-          <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
-            <tr>
-              <th class="px-3 py-2 text-left"  data-i18n="col_description">Description</th>
-              <th class="px-3 py-2 text-left"  data-i18n="col_boutique">Boutique</th>
-              <th class="px-3 py-2 text-left"  data-i18n="col_category">Catégorie</th>
-              <th class="px-3 py-2 text-right" data-i18n="col_stock_short">Stock</th>
-              <th class="px-3 py-2 text-right" data-i18n="nos_col_avg_wk">Moy. / sem.</th>
-              <th class="px-3 py-2 text-right" data-i18n="nos_col_cover">Couverture</th>
-              <th class="px-3 py-2 text-right" data-i18n="col_qty_suggested">Qté suggérée</th>
-            </tr>
-          </thead>
-          <tbody id="nosBody" class="divide-y divide-gray-100"></tbody>
-        </table>
-      </div>
-      <div id="nosLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
-      <div id="nosPager" class="flex items-center justify-between px-4 py-2 border-t border-gray-100 hidden">
-        <button id="nosPrev" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_prev">← Précédent</button>
-        <span id="nosPage" class="text-xs text-gray-500"></span>
-        <button id="nosNext" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_next">Suivant →</button>
-      </div>
+      <table class="w-full text-xs">
+        <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+          <tr>
+            <th class="px-3 py-2 w-6"></th>
+            <th class="px-3 py-2 text-left">Marque</th>
+            <th class="px-3 py-2 text-center">Critique</th>
+            <th class="px-3 py-2 text-center">Urgent</th>
+            <th class="px-3 py-2 text-center">Attention</th>
+            <th class="px-3 py-2 text-right">Qté totale</th>
+            <th class="px-3 py-2 text-right">Budget estimé</th>
+          </tr>
+        </thead>
+        <tbody id="nosAccordionBody" class="divide-y divide-gray-100"></tbody>
+      </table>
+      <div id="nosUrgentLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
+      <div id="nosUrgentEmpty" class="hidden text-center py-8 text-xs text-gray-400">Aucun article urgent — tout est bien approvisionné ✓</div>
     </div>
+
   </section>
 
   <!-- ── SEASONAL ────────────────────────────────────────────────── -->
@@ -1083,7 +1014,7 @@ document.querySelectorAll('.tab').forEach(btn => {
 });
 function loadTab(id) {
   if (id === 'budget')    loadBudget();
-  if (id === 'nos')       { loadNos(); initNosUrgentShops().then(loadNosUrgent); }
+  if (id === 'nos')       { initNosUrgentShops().then(loadNosUrgent); }
   if (id === 'seasonal')  loadSeasonal();
   if (id === 'sizes')     loadSizes();
   if (id === 'transfers') loadTransfers();
@@ -2537,8 +2468,9 @@ document.getElementById('budgetParamsApply').addEventListener('click', async () 
   }
 });
 
-// ── NOS Urgent ───────────────────────────────────────────────────────────
-const urgencyLabel = { critique: { text: '⛔ Critique', cls: 'bg-red-100 text-red-700' }, urgent: { text: '⚠ Urgent', cls: 'bg-orange-100 text-orange-700' }, attention: { text: '◉ Attention', cls: 'bg-yellow-100 text-yellow-700' } };
+// ── NOS Accordéon par marque ─────────────────────────────────────────────
+let nosUrgentData = [];
+const nosExpandedBrands = new Set();
 
 async function initNosUrgentShops() {
   try {
@@ -2556,36 +2488,124 @@ async function initNosUrgentShops() {
 async function loadNosUrgent() {
   const shopId = document.getElementById('nosUrgentShop')?.value ?? '';
   const loader = document.getElementById('nosUrgentLoader');
-  const body   = document.getElementById('nosUrgentBody');
   const empty  = document.getElementById('nosUrgentEmpty');
-  const total  = document.getElementById('nosUrgentTotal');
-  if (!body) return;
-  loader.classList.remove('hidden'); body.innerHTML = ''; empty.classList.add('hidden');
+  loader?.classList.remove('hidden');
+  document.getElementById('nosAccordionBody').innerHTML = '';
+  empty?.classList.add('hidden');
   try {
     const url = shopId ? `${BASE}/api/nos/urgent?shop_id=${shopId}` : `${BASE}/api/nos/urgent`;
     const d = await fetch(url).then(r => r.json());
-    loader.classList.add('hidden');
-    if (!d.items?.length) { empty.classList.remove('hidden'); total.textContent = ''; return; }
-    total.textContent = `${d.count} article${d.count > 1 ? 's' : ''} — Budget estimé : ${fmt(d.total_cost)}`;
-    body.innerHTML = d.items.map(it => {
-      const u = urgencyLabel[it.urgency];
-      const coverCls = it.urgency === 'critique' ? 'text-red-600 font-bold' : it.urgency === 'urgent' ? 'text-orange-600 font-semibold' : 'text-yellow-600';
-      return `<tr class="hover:bg-gray-50">
-        <td class="px-3 py-2"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold ${u.cls}">${u.text}</span></td>
-        <td class="px-3 py-2 text-gray-700 max-w-[160px] truncate" title="${it.description}">${it.description}</td>
-        <td class="px-3 py-2 text-gray-500">${it.manufacturer}</td>
-        <td class="px-3 py-2 text-gray-500">${it.shop_name}</td>
-        <td class="px-3 py-2 text-right">${it.qty_on_hand}</td>
-        <td class="px-3 py-2 text-right text-blue-600">${it.qty_on_order}</td>
-        <td class="px-3 py-2 text-right ${coverCls}">${it.weeks_of_cover !== null ? it.weeks_of_cover + ' sem.' : '—'}</td>
-        <td class="px-3 py-2 text-right text-gray-400">${it.lead_time_weeks} sem.</td>
-        <td class="px-3 py-2 text-right font-semibold text-indigo-700">${it.suggested_qty}</td>
-      </tr>`;
-    }).join('');
-  } catch { loader.classList.add('hidden'); body.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-xs text-red-400">Erreur de chargement</td></tr>'; }
+    nosUrgentData = d.items ?? [];
+    loader?.classList.add('hidden');
+    renderNosAccordion();
+  } catch {
+    loader?.classList.add('hidden');
+    document.getElementById('nosAccordionBody').innerHTML = '<tr><td colspan="7" class="text-center py-6 text-xs text-red-400">Erreur de chargement</td></tr>';
+  }
 }
 
-document.getElementById('nosUrgentShop')?.addEventListener('change', loadNosUrgent);
+function renderNosAccordion() {
+  const search   = (document.getElementById('nosSearchBrand')?.value ?? '').toLowerCase();
+  const showCrit = document.getElementById('nosFilterCritique')?.checked ?? true;
+  const showUrg  = document.getElementById('nosFilterUrgent')?.checked ?? true;
+  const showAttn = document.getElementById('nosFilterAttention')?.checked ?? true;
+  const activeSet = new Set(['critique','urgent','attention'].filter((u,i) => [showCrit,showUrg,showAttn][i]));
+
+  const filtered = nosUrgentData.filter(it =>
+    activeSet.has(it.urgency) &&
+    (!search || it.manufacturer.toLowerCase().includes(search))
+  );
+
+  const body  = document.getElementById('nosAccordionBody');
+  const total = document.getElementById('nosUrgentTotal');
+  const empty = document.getElementById('nosUrgentEmpty');
+
+  if (!filtered.length) {
+    body.innerHTML = '';
+    empty?.classList.remove('hidden');
+    total.textContent = '';
+    return;
+  }
+  empty?.classList.add('hidden');
+
+  const byBrand = {};
+  filtered.forEach(it => {
+    if (!byBrand[it.manufacturer]) byBrand[it.manufacturer] = { critique:[], urgent:[], attention:[] };
+    byBrand[it.manufacturer][it.urgency].push(it);
+  });
+
+  const totalCost = filtered.reduce((s,i) => s + i.suggested_qty * i.unit_cost, 0);
+  total.textContent = `${filtered.length} article${filtered.length>1?'s':''} — Budget estimé : ${fmt(totalCost)}`;
+
+  const rows = [];
+  Object.entries(byBrand).sort(([a],[b]) => a.localeCompare(b)).forEach(([brand, groups]) => {
+    const allItems  = [...groups.critique, ...groups.urgent, ...groups.attention];
+    const brandQty  = allItems.reduce((s,i) => s + i.suggested_qty, 0);
+    const brandCost = allItems.reduce((s,i) => s + i.suggested_qty * i.unit_cost, 0);
+    const isOpen    = nosExpandedBrands.has(brand);
+    const arrow     = isOpen ? '&#9662;' : '&#9656;';
+
+    rows.push(`<tr class="nos-brand-row hover:bg-blue-50 cursor-pointer select-none border-b border-gray-100" data-brand="${encodeURIComponent(brand)}">
+      <td class="px-3 py-2.5 text-gray-400 text-center text-sm">${arrow}</td>
+      <td class="px-3 py-2.5 font-semibold text-gray-800">${brand}</td>
+      <td class="px-3 py-2.5 text-center">${groups.critique.length ? `<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">${groups.critique.length}</span>` : '<span class="text-gray-300">—</span>'}</td>
+      <td class="px-3 py-2.5 text-center">${groups.urgent.length ? `<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-100 text-orange-700">${groups.urgent.length}</span>` : '<span class="text-gray-300">—</span>'}</td>
+      <td class="px-3 py-2.5 text-center">${groups.attention.length ? `<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-700">${groups.attention.length}</span>` : '<span class="text-gray-300">—</span>'}</td>
+      <td class="px-3 py-2.5 text-right text-gray-700">${brandQty}</td>
+      <td class="px-3 py-2.5 text-right font-semibold text-indigo-700">${fmt(brandCost)}</td>
+    </tr>`);
+
+    if (isOpen) {
+      rows.push(`<tr class="nos-detail-row" data-brand="${encodeURIComponent(brand)}"><td colspan="7" class="p-0 bg-gray-50">
+        <table class="w-full text-xs">
+          <thead><tr class="text-gray-400 uppercase text-[9px] tracking-wide border-b border-gray-200">
+            <th class="px-5 py-1.5 w-6"></th>
+            <th class="px-4 py-1.5 text-left">Description</th>
+            <th class="px-4 py-1.5 text-left">Boutique</th>
+            <th class="px-4 py-1.5 text-right">Stock</th>
+            <th class="px-4 py-1.5 text-right">En cmd</th>
+            <th class="px-4 py-1.5 text-right">Couverture</th>
+            <th class="px-4 py-1.5 text-right">Délai fourn.</th>
+            <th class="px-4 py-1.5 text-right">Qté à cmd</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+            ${allItems.map(it => {
+              const icon = it.urgency==='critique' ? '⛔' : it.urgency==='urgent' ? '⚠' : '◉';
+              const coverCls = it.urgency==='critique' ? 'text-red-600 font-bold' : it.urgency==='urgent' ? 'text-orange-600' : 'text-yellow-600';
+              return `<tr class="hover:bg-white">
+                <td class="px-5 py-1.5 text-center">${icon}</td>
+                <td class="px-4 py-1.5 text-gray-700 max-w-xs truncate" title="${it.description}">${it.description}</td>
+                <td class="px-4 py-1.5 text-gray-500">${it.shop_name}</td>
+                <td class="px-4 py-1.5 text-right">${it.qty_on_hand}</td>
+                <td class="px-4 py-1.5 text-right text-blue-500">${it.qty_on_order}</td>
+                <td class="px-4 py-1.5 text-right ${coverCls}">${it.weeks_of_cover !== null ? it.weeks_of_cover+' sem.' : '—'}</td>
+                <td class="px-4 py-1.5 text-right text-gray-400">${it.lead_time_weeks} sem.</td>
+                <td class="px-4 py-1.5 text-right font-semibold text-indigo-700">${it.suggested_qty}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </td></tr>`);
+    }
+  });
+
+  body.innerHTML = rows.join('');
+  body.querySelectorAll('.nos-brand-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const brand = decodeURIComponent(row.dataset.brand);
+      if (nosExpandedBrands.has(brand)) nosExpandedBrands.delete(brand);
+      else nosExpandedBrands.add(brand);
+      renderNosAccordion();
+    });
+  });
+}
+
+['nosUrgentShop'].forEach(id => document.getElementById(id)?.addEventListener('change', loadNosUrgent));
+['nosFilterCritique','nosFilterUrgent','nosFilterAttention'].forEach(id =>
+  document.getElementById(id)?.addEventListener('change', renderNosAccordion)
+);
+document.getElementById('nosSearchBrand')?.addEventListener('input', renderNosAccordion);
+
 
 // ── Lead Times (Paramètres) ───────────────────────────────────────────────
 let leadTimesData = {};
