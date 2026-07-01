@@ -269,7 +269,7 @@
         </thead>
         <tbody id="nosAccordionBody" class="divide-y divide-gray-100"></tbody>
       </table>
-      <div id="nosUrgentLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
+      <div id="nosUrgentLoader" class="hidden flex justify-center py-8"><div class="spinner"></div></div>
       <div id="nosUrgentEmpty" class="hidden text-center py-8 text-xs text-gray-400">Aucun article urgent — tout est bien approvisionné ✓</div>
     </div>
 
@@ -1009,7 +1009,8 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.querySelectorAll('section[id^="tab-"]').forEach(s => s.classList.add('hidden'));
     const id = btn.dataset.tab;
     document.getElementById(`tab-${id}`).classList.remove('hidden');
-    if (!tabLoaded[id]) { tabLoaded[id] = true; loadTab(id); }
+    if (id === 'nos') { loadTab(id); }
+    else if (!tabLoaded[id]) { tabLoaded[id] = true; loadTab(id); }
   });
 });
 function loadTab(id) {
@@ -2471,8 +2472,11 @@ document.getElementById('budgetParamsApply').addEventListener('click', async () 
 // ── NOS Accordéon par marque ─────────────────────────────────────────────
 let nosUrgentData = [];
 const nosExpandedBrands = new Set();
+let nosShopsInited = false;
 
 async function initNosUrgentShops() {
+  if (nosShopsInited) return;
+  nosShopsInited = true;
   try {
     const shops = await fetch(`${BASE}/api/shops`).then(r => r.json());
     const sel = document.getElementById('nosUrgentShop');
@@ -2498,9 +2502,11 @@ async function loadNosUrgent() {
     nosUrgentData = d.items ?? [];
     loader?.classList.add('hidden');
     renderNosAccordion();
-  } catch {
+  } catch (err) {
+    console.error('[NOS] Erreur de chargement:', err);
     loader?.classList.add('hidden');
-    document.getElementById('nosAccordionBody').innerHTML = '<tr><td colspan="7" class="text-center py-6 text-xs text-red-400">Erreur de chargement</td></tr>';
+    document.getElementById('nosAccordionBody').innerHTML =
+      `<tr><td colspan="7" class="text-center py-6 text-xs text-red-400">Erreur de chargement — <button onclick="loadNosUrgent()" class="underline hover:text-red-600">Réessayer</button></td></tr>`;
   }
 }
 
