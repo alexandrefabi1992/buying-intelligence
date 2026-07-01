@@ -627,6 +627,11 @@
 </main>
 
 <script>
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED GLOBALS — i18n, utilities, state, pager, shop filter, tab switcher
+// Each tab's own functions/state live in the namespace objects further below.
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── i18n ──────────────────────────────────────────────────────────────────
 const TRANSLATIONS = {
   fr: {
@@ -849,12 +854,12 @@ function setLanguage(lang) {
     }
   }
   // Re-render dynamic tables
-  if (state.budgetSeas.data.length) renderBudgetTable('budgetSeas');
-  if (state.budgetNos.data.length)  renderBudgetTable('budgetNos');
-  if (state.nos.filtered?.length)   renderNosPage();
-  if (state.seasonal.filtered?.length) renderSeasonalPage();
-  if (state.sizes.filtered?.length) renderSizesPage();
-  if (document.getElementById('tiersTableBody')?.children.length) renderTiersTable();
+  if (state.budgetSeas.data.length) BudgetTab.renderMarqueBudgetTable();
+  if (state.budgetNos.data.length)  BudgetTab.renderBudgetTable('budgetNos');
+  if (state.nos.filtered?.length)   SeasonalTab.renderNosPage();
+  if (state.seasonal.filtered?.length) SeasonalTab.renderPage();
+  if (state.sizes.filtered?.length) SizesTab.renderPage();
+  if (document.getElementById('tiersTableBody')?.children.length) ParamsTab.renderTiersTable();
 }
 
 const BASE      = '';
@@ -880,10 +885,6 @@ const state = {
   filters:    { shops: new Set(), collections: new Set(), sizes: new Set() },
   tiers:      DEFAULT_TIERS.map(t => ({ ...t })),
 };
-
-// ── NOS state (declared early to avoid TDZ in async callbacks) ───────────
-let nosUrgentData = [];
-const nosExpandedBrands = new Set();
 
 // ── Utilities ─────────────────────────────────────────────────────────────
 const fmt   = n => n == null ? '—' : Number(n).toLocaleString('fr-CA', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -1032,13 +1033,13 @@ document.querySelectorAll('.tab').forEach(btn => {
   });
 });
 function loadTab(id) {
-  if (id === 'budget')    loadBudget();
-  if (id === 'nos')       { initNosUrgentShops().then(loadNosUrgent); }
-  if (id === 'seasonal')  loadSeasonal();
-  if (id === 'sizes')     loadSizes();
-  if (id === 'transfers') loadTransfers();
-  if (id === 'plan')      loadBudgetPlan();
-  if (id === 'params')    { loadTiers().then(renderTiersTable); loadLeadTimes(); }
+  if (id === 'budget')    BudgetTab.load();
+  if (id === 'nos')       NosTab.init();
+  if (id === 'seasonal')  SeasonalTab.load();
+  if (id === 'sizes')     SizesTab.load();
+  if (id === 'transfers') TransfersTab.load();
+  if (id === 'plan')      PlanTab.load();
+  if (id === 'params')    ParamsTab.init();
 }
 
 // ── Sync status ───────────────────────────────────────────────────────────
@@ -1169,1185 +1170,1153 @@ function updateFilterBadge() {
   }
 }
 
-// ── BUDGET — config ────────────────────────────────────────────────────────
-const BUDGET_CFG = {
-  budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetMfrSearch', totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS',        cols:7, hasHyp:false },
-  budgetSeas: { refField:'avg_received_cost',    color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'seasBudgetSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:9,  hasHyp:false },
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// BudgetTab — Budget saisonnier (tab-budget)
+// ─────────────────────────────────────────────────────────────────────────────
+const BudgetTab = (() => {
+  const CFG = {
+    budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetMfrSearch', totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS',        cols:7, hasHyp:false },
+    budgetSeas: { refField:'avg_received_cost',    color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'seasBudgetSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:9,  hasHyp:false },
+  };
 
-const HYP_STYLE = {
-  'Augmenter':     { bg:'bg-green-100',  text:'text-green-700'  },
-  'Légère hausse': { bg:'bg-blue-100',   text:'text-blue-700'   },
-  'Reconduire':    { bg:'bg-gray-100',   text:'text-gray-600'   },
-  'Réduire':       { bg:'bg-amber-100',  text:'text-amber-700'  },
-  'Couper':        { bg:'bg-red-100',    text:'text-red-700'    },
-};
+  const HYP_STYLE = {
+    'Augmenter':     { bg:'bg-green-100',  text:'text-green-700'  },
+    'Légère hausse': { bg:'bg-blue-100',   text:'text-blue-700'   },
+    'Reconduire':    { bg:'bg-gray-100',   text:'text-gray-600'   },
+    'Réduire':       { bg:'bg-amber-100',  text:'text-amber-700'  },
+    'Couper':        { bg:'bg-red-100',    text:'text-red-700'    },
+  };
 
-function stPctCell(val, threshold) {
-  if (val === null || val === undefined) return '<td class="px-3 py-2.5 text-right text-gray-300">—</td>';
-  if (val > 1.5) return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-400" title="${escHtml(t('st_na_title'))}">${t('st_nd')}</span></td>`;
-  const pct = Math.round(val * 100);
-  const ok  = val >= threshold;
-  const mid = val >= threshold * 0.75;
-  const bg  = ok ? 'bg-green-50 text-green-700' : mid ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
-  return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${bg}">${pct}%</span></td>`;
-}
-
-function stPctCellDual(avgSt, recentProj, recentYtd, seasonCode, threshold) {
-  if (avgSt === null || avgSt === undefined) return '<td class="px-3 py-2.5 text-right text-gray-300">—</td>';
-  if (avgSt > 1.5) return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-400" title="${escHtml(t('st_na_title'))}">${t('st_nd')}</span></td>`;
-  const pct = Math.round(avgSt * 100);
-  const ok  = avgSt >= threshold;
-  const mid = avgSt >= threshold * 0.75;
-  const bg  = ok ? 'bg-green-50 text-green-700' : mid ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
-  let html  = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${bg}" title="${escHtml(t('st_avg_tip'))}">${pct}%</span>`;
-  if (recentProj !== null && recentProj !== undefined && seasonCode) {
-    const projPct = Math.round(recentProj * 100);
-    const ytdPct  = recentYtd !== null && recentYtd !== undefined ? Math.round(recentYtd * 100) : null;
-    const season  = seasonCode.toUpperCase();
-    const ytdPart = ytdPct !== null && ytdPct !== projPct
-      ? ` <span class="text-gray-400">(${ytdPct}% ${t('st_ytd_lbl')})</span>`
-      : '';
-    html += `<span class="block text-[10px] text-indigo-500 mt-0.5" title="${escHtml(t('st_projected_tip'))}">${season}: ${projPct}% proj${ytdPart}</span>`;
-  }
-  return `<td class="px-3 py-2.5 text-right">${html}</td>`;
-}
-
-function trendBadge(trend) {
-  if (!trend) return '<span class="text-gray-300">—</span>';
-  const s = { hausse: 'bg-green-100 text-green-700', stable: 'bg-gray-100 text-gray-600', baisse: 'bg-red-100 text-red-700' };
-  const i = { hausse: '▲', stable: '→', baisse: '▼' };
-  const cls = s[trend] ?? s.stable;
-  const label = t(`trend_${trend}`) || trend;
-  return `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}">${i[trend] ?? ''} ${label}</span>`;
-}
-
-// ── Budget: render saisonnier table (marque format) ───────────────────────
-function renderMarqueBudgetTable() {
-  const key = 'budgetSeas';
-  const { color, bodyId, searchId, cols } = BUDGET_CFG[key];
-  const search  = (document.getElementById(searchId)?.value ?? '').toLowerCase().trim();
-  const { data, sort } = state[key];
-
-  // Filter by search
-  let visible = search ? data.filter(m => m.manufacturer.toLowerCase().includes(search)) : [...data];
-
-  // Sort
-  if (sort.col) {
-    visible.sort((a, b) => {
-      let va = a[sort.col], vb = b[sort.col];
-      if (sort.col === 'manufacturer') {
-        va = (va ?? '').toLowerCase(); vb = (vb ?? '').toLowerCase();
-        return sort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
-      }
-      va = va ?? -Infinity; vb = vb ?? -Infinity;
-      return sort.dir === 'asc' ? va - vb : vb - va;
-    });
+  function stPctCell(val, threshold) {
+    if (val === null || val === undefined) return '<td class="px-3 py-2.5 text-right text-gray-300">—</td>';
+    if (val > 1.5) return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-400" title="${escHtml(t('st_na_title'))}">${t('st_nd')}</span></td>`;
+    const pct = Math.round(val * 100);
+    const ok  = val >= threshold;
+    const mid = val >= threshold * 0.75;
+    const bg  = ok ? 'bg-green-50 text-green-700' : mid ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
+    return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${bg}">${pct}%</span></td>`;
   }
 
-  // Update sort arrows in thead
-  document.querySelectorAll('#budgetSeasBody').forEach(() => {});
-  document.querySelectorAll('th.sort-col[data-sort]').forEach(th => {
-    const arrow = th.querySelector('.sort-arrow');
-    if (!arrow) return;
-    if (th.dataset.sort === sort.col) {
-      arrow.textContent = sort.dir === 'asc' ? '↑' : '↓';
-      arrow.className = 'sort-arrow text-amber-600 ml-0.5';
-    } else {
-      arrow.textContent = '↕';
-      arrow.className = 'sort-arrow text-gray-300 ml-0.5';
+  function stPctCellDual(avgSt, recentProj, recentYtd, seasonCode, threshold) {
+    if (avgSt === null || avgSt === undefined) return '<td class="px-3 py-2.5 text-right text-gray-300">—</td>';
+    if (avgSt > 1.5) return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-400" title="${escHtml(t('st_na_title'))}">${t('st_nd')}</span></td>`;
+    const pct = Math.round(avgSt * 100);
+    const ok  = avgSt >= threshold;
+    const mid = avgSt >= threshold * 0.75;
+    const bg  = ok ? 'bg-green-50 text-green-700' : mid ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
+    let html  = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${bg}" title="${escHtml(t('st_avg_tip'))}">${pct}%</span>`;
+    if (recentProj !== null && recentProj !== undefined && seasonCode) {
+      const projPct = Math.round(recentProj * 100);
+      const ytdPct  = recentYtd !== null && recentYtd !== undefined ? Math.round(recentYtd * 100) : null;
+      const season  = seasonCode.toUpperCase();
+      const ytdPart = ytdPct !== null && ytdPct !== projPct
+        ? ` <span class="text-gray-400">(${ytdPct}% ${t('st_ytd_lbl')})</span>`
+        : '';
+      html += `<span class="block text-[10px] text-indigo-500 mt-0.5" title="${escHtml(t('st_projected_tip'))}">${season}: ${projPct}% proj${ytdPart}</span>`;
     }
-  });
+    return `<td class="px-3 py-2.5 text-right">${html}</td>`;
+  }
 
-  const rows = [];
-  for (const m of visible) {
-    // Recent received cost — raw implied received for the most recent reference season
-    const recentSeasonData = m.seasons?.[m.most_recent_ref];
-    const recentRecvCost   = recentSeasonData?.received_cost_raw ?? null;
-    const recentRecvHtml   = recentRecvCost != null
-      ? `<span class="font-semibold">${fmtC(recentRecvCost)}</span>${recentSeasonData?.partial ? `<span class="text-[10px] text-gray-400 block">${(m.most_recent_ref ?? '').toUpperCase()} YTD</span>` : `<span class="text-[10px] text-gray-400 block">${(m.most_recent_ref ?? '').toUpperCase()}</span>`}`
-      : `<span class="text-gray-300">—</span>`;
+  function trendBadge(trend) {
+    if (!trend) return '<span class="text-gray-300">—</span>';
+    const s = { hausse: 'bg-green-100 text-green-700', stable: 'bg-gray-100 text-gray-600', baisse: 'bg-red-100 text-red-700' };
+    const i = { hausse: '▲', stable: '→', baisse: '▼' };
+    const cls = s[trend] ?? s.stable;
+    const label = t(`trend_${trend}`) || trend;
+    return `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}">${i[trend] ?? ''} ${label}</span>`;
+  }
 
-    // Fourchette
-    const rangeHtml = (m.min_received_cost != null && m.max_received_cost != null
-      && m.min_received_cost !== m.max_received_cost)
-      ? `<span class="text-gray-400">${fmtC(m.min_received_cost)}</span><span class="text-gray-300 mx-0.5">–</span><span class="text-gray-400">${fmtC(m.max_received_cost)}</span>`
-      : `<span class="text-gray-400">${fmtC(m.min_received_cost ?? m.avg_received_cost)}</span>`;
+  function renderMarqueBudgetTable() {
+    const key = 'budgetSeas';
+    const { color, bodyId, searchId, cols } = CFG[key];
+    const search  = (document.getElementById(searchId)?.value ?? '').toLowerCase().trim();
+    const { data, sort } = state[key];
 
-    // Multiplicateur cell
-    const multLabel = m.multiplier_label ?? 'Reconduire';
-    const multStyle = HYP_STYLE[multLabel] ?? HYP_STYLE['Reconduire'];
-    const multPct   = m.multiplier != null ? `×${m.multiplier.toFixed(2)}` : '×1.00';
-    const multHtml  = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${multStyle.bg} ${multStyle.text}">${multPct} ${tTierLabel(multLabel)}</span>`;
+    let visible = search ? data.filter(m => m.manufacturer.toLowerCase().includes(search)) : [...data];
 
-    // Avg receivings — show partial note if most-recent reference is in progress
-    const avgRecvHtml = `<span class="font-semibold">${fmtC(m.avg_received_cost ?? m.avg_hist)}</span>`;
-
-    // Budget ajusté
-    const adjBudget = m.adjusted_budget ?? 0;
-    const adjHtml   = `<span class="font-semibold">${fmtC(adjBudget)}</span>`;
-
-    // Budget net with carryover sub-line
-    const netBudget      = m.net_budget ?? 0;
-    const carryoverDed   = m.carryover_deduction ?? 0;
-    let netHtml;
-    if (netBudget === 0 && adjBudget === 0) {
-      netHtml = `<span class="text-gray-300">—</span>`;
-    } else if (netBudget === 0) {
-      netHtml = `<span class="text-gray-400">—</span>`;
-      if (carryoverDed > 0) {
-        netHtml += `<span class="text-[10px] text-gray-400 block">−${fmtC(carryoverDed)} ${t('carryover_lbl')}</span>`;
-      }
-    } else {
-      netHtml = `<span class="font-bold ${color}">${fmtC(netBudget)}</span>`;
-      if (carryoverDed > 0) {
-        netHtml += `<span class="text-[10px] text-gray-400 block">−${fmtC(carryoverDed)} ${t('carryover_lbl')}</span>`;
-      }
-      if (m.redistributed_amount > 0) {
-        netHtml += `<span class="text-[10px] text-indigo-400 block" title="${escHtml(t('redistributed_tip'))}">+${fmtC(m.redistributed_amount)} ${t('redistributed_lbl')}</span>`;
-      }
+    if (sort.col) {
+      visible.sort((a, b) => {
+        let va = a[sort.col], vb = b[sort.col];
+        if (sort.col === 'manufacturer') {
+          va = (va ?? '').toLowerCase(); vb = (vb ?? '').toLowerCase();
+          return sort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+        }
+        va = va ?? -Infinity; vb = vb ?? -Infinity;
+        return sort.dir === 'asc' ? va - vb : vb - va;
+      });
     }
 
-    // Brand name with optional alert badges
-    const alertBadge = m.low_st_alert
-      ? ` <span class="ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700">${t('review_brand')}</span>`
-      : '';
-    const absentBadge = m.absent_recent_season
-      ? ` <span class="ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-700" title="${escHtml(t('absent_recent_badge'))} ${(m.most_recent_ref ?? '').toUpperCase()}">${t('absent_recent_badge')} ${(m.most_recent_ref ?? '').toUpperCase()}</span>`
-      : '';
-
-    rows.push(`
-      <tr class="mfr-row hover:bg-amber-50/40" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
-        <td class="px-3 py-2.5 font-medium text-gray-900">
-          <span class="mfr-link hover:text-blue-600 hover:underline cursor-pointer"
-                data-mfr="${escHtml(m.manufacturer)}">${escHtml(m.manufacturer)}</span>${alertBadge}${absentBadge}
-        </td>
-        <td class="px-3 py-2.5 text-right">${recentRecvHtml}</td>
-        <td class="px-3 py-2.5 text-right">${avgRecvHtml}</td>
-        <td class="px-3 py-2.5 text-right text-[11px]">${rangeHtml}</td>
-        ${stPctCellDual(m.avg_st, m.recent_st_projected, m.recent_st_ytd, m.recent_season_code, 0.60)}
-        <td class="px-3 py-2.5 text-center">${trendBadge(m.trend)}</td>
-        <td class="px-3 py-2.5 text-center">${multHtml}</td>
-        <td class="px-3 py-2.5 text-right">${adjHtml}</td>
-        <td class="px-3 py-2.5 text-right">${netHtml}</td>
-      </tr>`);
-  }
-
-  const tbody = document.getElementById(bodyId);
-  tbody.innerHTML = rows.join('') || `<tr><td colspan="${cols}" class="text-center py-8 text-gray-400">${t('no_data')}</td></tr>`;
-}
-
-// ── Budget: render NOS table ───────────────────────────────────────────────
-function renderBudgetTable(key) {
-  if (key === 'budgetSeas') { renderMarqueBudgetTable(); return; }
-
-  const { refField, color, catBg, bodyId, searchId, cols } = BUDGET_CFG[key];
-  const search = document.getElementById(searchId).value.toLowerCase().trim();
-  const { data, expanded, multipliers } = state[key];
-  const visible = search ? data.filter(m => m.manufacturer.toLowerCase().includes(search)) : data;
-
-  const rows = [];
-  for (const m of visible) {
-    const isOpen  = expanded.has(m.manufacturer);
-    const hasCats = m.by_category?.length > 0;
-    const chevron = hasCats ? `<span style="font-size:10px;color:#9ca3af">${isOpen ? '▼' : '▶'}</span>` : '';
-    const mult    = multipliers[m.manufacturer] ?? 1;
-    const pct     = Math.round((mult - 1) * 100);
-    const adjusted = m.proposed_budget * mult;
-    const hasAdj  = Math.abs(mult - 1) > 0.001;
-    const adjColor = mult >= 1 ? 'color:#059669' : 'color:#dc2626';
-    const adjHtml = hasAdj ? `<span style="font-size:11px;${adjColor};font-weight:600"> → ${fmtC(adjusted)}</span>` : '';
-
-    rows.push(`
-      <tr class="mfr-row" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
-        <td class="px-3 py-2.5 text-center">${chevron}</td>
-        <td class="px-3 py-2.5 font-medium text-gray-900">
-          <span class="mfr-link hover:text-blue-600 hover:underline cursor-pointer"
-                data-mfr="${escHtml(m.manufacturer)}">${escHtml(m.manufacturer)}</span>
-        </td>
-        <td class="px-3 py-2.5 text-right text-gray-500">${m.items_count}</td>
-        <td class="px-3 py-2.5 text-right text-gray-500">${fmt(m.remaining_stock_units)}</td>
-        <td class="px-3 py-2.5 text-right">${fmt(m[refField])}</td>
-        <td class="px-3 py-2.5 text-right font-semibold ${color}">${fmtC(m.proposed_budget)}</td>
-        <td class="px-3 py-2.5 text-right" style="white-space:nowrap">
-          <input class="pct-input" type="number" min="-99" max="500" step="1"
-            value="${pct || ''}" placeholder="0"
-            data-mfr="${escHtml(m.manufacturer)}" data-key="${key}" data-base="${m.proposed_budget}"
-          ><span class="text-gray-400 text-[10px] ml-0.5">%</span>${adjHtml}
-        </td>
-      </tr>`);
-
-    if (isOpen && hasCats) {
-      for (const cat of m.by_category) {
-        rows.push(`
-          <tr class="cat-row" style="background:${catBg}">
-            <td class="px-3 py-1.5"></td>
-            <td class="px-3 py-1.5 pl-7 text-gray-500 italic">${escHtml(cat.category)}</td>
-            <td class="px-3 py-1.5 text-right text-gray-400">${cat.items_count}</td>
-            <td class="px-3 py-1.5 text-right text-gray-400">${fmt(cat.remaining_stock_units)}</td>
-            <td class="px-3 py-1.5 text-right text-gray-400">${fmt(cat[refField])}</td>
-            <td class="px-3 py-1.5 text-right text-gray-500">${fmtC(cat.proposed_budget)}</td>
-            <td class="px-3 py-1.5"></td>
-          </tr>`);
+    document.querySelectorAll('th.sort-col[data-sort]').forEach(th => {
+      const arrow = th.querySelector('.sort-arrow');
+      if (!arrow) return;
+      if (th.dataset.sort === sort.col) {
+        arrow.textContent = sort.dir === 'asc' ? '↑' : '↓';
+        arrow.className = 'sort-arrow text-amber-600 ml-0.5';
+      } else {
+        arrow.textContent = '↕';
+        arrow.className = 'sort-arrow text-gray-300 ml-0.5';
       }
-    }
-  }
-
-  const tbody = document.getElementById(bodyId);
-  tbody.innerHTML = rows.join('') || `<tr><td colspan="${cols}" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
-}
-
-// ── Budget: attach table event listeners once at startup ───────────────────
-// Using event delegation on each static tbody — stays valid across innerHTML
-// replacements. NOT called inside renderBudgetTable to avoid stacking.
-function bindBudgetTableListeners() {
-  for (const key of ['budgetNos', 'budgetSeas']) {
-    if (!document.getElementById(BUDGET_CFG[key].bodyId)) continue;
-    const tbody = document.getElementById(BUDGET_CFG[key].bodyId);
-
-    tbody.addEventListener('click', e => {
-      if (e.target.tagName === 'INPUT') return;
-      // Click on manufacturer name → open brand detail page in new tab
-      if (e.target.classList.contains('mfr-link')) {
-        window.open(`/brand/${encodeURIComponent(e.target.dataset.mfr)}`, '_blank');
-        return;
-      }
-      const tr = e.target.closest('tr.mfr-row');
-      if (!tr) return;
-      const mfr = tr.dataset.mfr, k = tr.dataset.key;
-      if (state[k].expanded.has(mfr)) state[k].expanded.delete(mfr);
-      else state[k].expanded.add(mfr);
-      renderBudgetTable(k);
     });
 
-    tbody.addEventListener('input', e => {
-      const inp = e.target;
-      if (!inp.classList.contains('pct-input')) return;
-      const mfr = inp.dataset.mfr, k = inp.dataset.key;
-      const base = parseFloat(inp.dataset.base);
-      const pct  = parseFloat(inp.value) || 0;
-      state[k].multipliers[mfr] = 1 + pct / 100;
-      let adjSpan = inp.closest('td').querySelector('.adj-live');
-      if (!adjSpan) { adjSpan = document.createElement('span'); adjSpan.className = 'adj-live'; inp.closest('td').appendChild(adjSpan); }
-      if (Math.abs(pct) < 0.01) { adjSpan.textContent = ''; adjSpan.style = ''; }
-      else {
-        adjSpan.textContent = ` → ${fmtC(base * (1 + pct / 100))}`;
-        adjSpan.style.cssText = `font-size:11px;font-weight:600;${pct > 0 ? 'color:#059669' : 'color:#dc2626'}`;
+    const rows = [];
+    for (const m of visible) {
+      const recentSeasonData = m.seasons?.[m.most_recent_ref];
+      const recentRecvCost   = recentSeasonData?.received_cost_raw ?? null;
+      const recentRecvHtml   = recentRecvCost != null
+        ? `<span class="font-semibold">${fmtC(recentRecvCost)}</span>${recentSeasonData?.partial ? `<span class="text-[10px] text-gray-400 block">${(m.most_recent_ref ?? '').toUpperCase()} YTD</span>` : `<span class="text-[10px] text-gray-400 block">${(m.most_recent_ref ?? '').toUpperCase()}</span>`}`
+        : `<span class="text-gray-300">—</span>`;
+
+      const rangeHtml = (m.min_received_cost != null && m.max_received_cost != null
+        && m.min_received_cost !== m.max_received_cost)
+        ? `<span class="text-gray-400">${fmtC(m.min_received_cost)}</span><span class="text-gray-300 mx-0.5">–</span><span class="text-gray-400">${fmtC(m.max_received_cost)}</span>`
+        : `<span class="text-gray-400">${fmtC(m.min_received_cost ?? m.avg_received_cost)}</span>`;
+
+      const multLabel = m.multiplier_label ?? 'Reconduire';
+      const multStyle = HYP_STYLE[multLabel] ?? HYP_STYLE['Reconduire'];
+      const multPct   = m.multiplier != null ? `×${m.multiplier.toFixed(2)}` : '×1.00';
+      const multHtml  = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${multStyle.bg} ${multStyle.text}">${multPct} ${tTierLabel(multLabel)}</span>`;
+
+      const avgRecvHtml = `<span class="font-semibold">${fmtC(m.avg_received_cost ?? m.avg_hist)}</span>`;
+      const adjBudget   = m.adjusted_budget ?? 0;
+      const adjHtml     = `<span class="font-semibold">${fmtC(adjBudget)}</span>`;
+
+      const netBudget    = m.net_budget ?? 0;
+      const carryoverDed = m.carryover_deduction ?? 0;
+      let netHtml;
+      if (netBudget === 0 && adjBudget === 0) {
+        netHtml = `<span class="text-gray-300">—</span>`;
+      } else if (netBudget === 0) {
+        netHtml = `<span class="text-gray-400">—</span>`;
+        if (carryoverDed > 0) netHtml += `<span class="text-[10px] text-gray-400 block">−${fmtC(carryoverDed)} ${t('carryover_lbl')}</span>`;
+      } else {
+        netHtml = `<span class="font-bold ${color}">${fmtC(netBudget)}</span>`;
+        if (carryoverDed > 0) netHtml += `<span class="text-[10px] text-gray-400 block">−${fmtC(carryoverDed)} ${t('carryover_lbl')}</span>`;
+        if (m.redistributed_amount > 0) netHtml += `<span class="text-[10px] text-indigo-400 block" title="${escHtml(t('redistributed_tip'))}">+${fmtC(m.redistributed_amount)} ${t('redistributed_lbl')}</span>`;
       }
-      updateAllBudgetTotals();
+
+      const alertBadge = m.low_st_alert
+        ? ` <span class="ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700">${t('review_brand')}</span>`
+        : '';
+      const absentBadge = m.absent_recent_season
+        ? ` <span class="ml-1 px-1 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-700" title="${escHtml(t('absent_recent_badge'))} ${(m.most_recent_ref ?? '').toUpperCase()}">${t('absent_recent_badge')} ${(m.most_recent_ref ?? '').toUpperCase()}</span>`
+        : '';
+
+      rows.push(`
+        <tr class="mfr-row hover:bg-amber-50/40" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
+          <td class="px-3 py-2.5 font-medium text-gray-900">
+            <span class="mfr-link hover:text-blue-600 hover:underline cursor-pointer"
+                  data-mfr="${escHtml(m.manufacturer)}">${escHtml(m.manufacturer)}</span>${alertBadge}${absentBadge}
+          </td>
+          <td class="px-3 py-2.5 text-right">${recentRecvHtml}</td>
+          <td class="px-3 py-2.5 text-right">${avgRecvHtml}</td>
+          <td class="px-3 py-2.5 text-right text-[11px]">${rangeHtml}</td>
+          ${stPctCellDual(m.avg_st, m.recent_st_projected, m.recent_st_ytd, m.recent_season_code, 0.60)}
+          <td class="px-3 py-2.5 text-center">${trendBadge(m.trend)}</td>
+          <td class="px-3 py-2.5 text-center">${multHtml}</td>
+          <td class="px-3 py-2.5 text-right">${adjHtml}</td>
+          <td class="px-3 py-2.5 text-right">${netHtml}</td>
+        </tr>`);
+    }
+
+    const tbody = document.getElementById(bodyId);
+    tbody.innerHTML = rows.join('') || `<tr><td colspan="${cols}" class="text-center py-8 text-gray-400">${t('no_data')}</td></tr>`;
+  }
+
+  function renderBudgetTable(key) {
+    if (key === 'budgetSeas') { renderMarqueBudgetTable(); return; }
+
+    const { refField, color, catBg, bodyId, searchId, cols } = CFG[key];
+    const search = document.getElementById(searchId).value.toLowerCase().trim();
+    const { data, expanded, multipliers } = state[key];
+    const visible = search ? data.filter(m => m.manufacturer.toLowerCase().includes(search)) : data;
+
+    const rows = [];
+    for (const m of visible) {
+      const isOpen  = expanded.has(m.manufacturer);
+      const hasCats = m.by_category?.length > 0;
+      const chevron = hasCats ? `<span style="font-size:10px;color:#9ca3af">${isOpen ? '▼' : '▶'}</span>` : '';
+      const mult    = multipliers[m.manufacturer] ?? 1;
+      const pct     = Math.round((mult - 1) * 100);
+      const adjusted = m.proposed_budget * mult;
+      const hasAdj  = Math.abs(mult - 1) > 0.001;
+      const adjColor = mult >= 1 ? 'color:#059669' : 'color:#dc2626';
+      const adjHtml = hasAdj ? `<span style="font-size:11px;${adjColor};font-weight:600"> → ${fmtC(adjusted)}</span>` : '';
+
+      rows.push(`
+        <tr class="mfr-row" data-mfr="${escHtml(m.manufacturer)}" data-key="${key}">
+          <td class="px-3 py-2.5 text-center">${chevron}</td>
+          <td class="px-3 py-2.5 font-medium text-gray-900">
+            <span class="mfr-link hover:text-blue-600 hover:underline cursor-pointer"
+                  data-mfr="${escHtml(m.manufacturer)}">${escHtml(m.manufacturer)}</span>
+          </td>
+          <td class="px-3 py-2.5 text-right text-gray-500">${m.items_count}</td>
+          <td class="px-3 py-2.5 text-right text-gray-500">${fmt(m.remaining_stock_units)}</td>
+          <td class="px-3 py-2.5 text-right">${fmt(m[refField])}</td>
+          <td class="px-3 py-2.5 text-right font-semibold ${color}">${fmtC(m.proposed_budget)}</td>
+          <td class="px-3 py-2.5 text-right" style="white-space:nowrap">
+            <input class="pct-input" type="number" min="-99" max="500" step="1"
+              value="${pct || ''}" placeholder="0"
+              data-mfr="${escHtml(m.manufacturer)}" data-key="${key}" data-base="${m.proposed_budget}"
+            ><span class="text-gray-400 text-[10px] ml-0.5">%</span>${adjHtml}
+          </td>
+        </tr>`);
+
+      if (isOpen && hasCats) {
+        for (const cat of m.by_category) {
+          rows.push(`
+            <tr class="cat-row" style="background:${catBg}">
+              <td class="px-3 py-1.5"></td>
+              <td class="px-3 py-1.5 pl-7 text-gray-500 italic">${escHtml(cat.category)}</td>
+              <td class="px-3 py-1.5 text-right text-gray-400">${cat.items_count}</td>
+              <td class="px-3 py-1.5 text-right text-gray-400">${fmt(cat.remaining_stock_units)}</td>
+              <td class="px-3 py-1.5 text-right text-gray-400">${fmt(cat[refField])}</td>
+              <td class="px-3 py-1.5 text-right text-gray-500">${fmtC(cat.proposed_budget)}</td>
+              <td class="px-3 py-1.5"></td>
+            </tr>`);
+        }
+      }
+    }
+
+    const tbody = document.getElementById(bodyId);
+    tbody.innerHTML = rows.join('') || `<tr><td colspan="${cols}" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
+  }
+
+  function bindTableListeners() {
+    for (const key of ['budgetNos', 'budgetSeas']) {
+      if (!document.getElementById(CFG[key].bodyId)) continue;
+      const tbody = document.getElementById(CFG[key].bodyId);
+
+      tbody.addEventListener('click', e => {
+        if (e.target.tagName === 'INPUT') return;
+        if (e.target.classList.contains('mfr-link')) {
+          window.open(`/brand/${encodeURIComponent(e.target.dataset.mfr)}`, '_blank');
+          return;
+        }
+        const tr = e.target.closest('tr.mfr-row');
+        if (!tr) return;
+        const mfr = tr.dataset.mfr, k = tr.dataset.key;
+        if (state[k].expanded.has(mfr)) state[k].expanded.delete(mfr);
+        else state[k].expanded.add(mfr);
+        renderBudgetTable(k);
+      });
+
+      tbody.addEventListener('input', e => {
+        const inp = e.target;
+        if (!inp.classList.contains('pct-input')) return;
+        const mfr = inp.dataset.mfr, k = inp.dataset.key;
+        const base = parseFloat(inp.dataset.base);
+        const pct  = parseFloat(inp.value) || 0;
+        state[k].multipliers[mfr] = 1 + pct / 100;
+        let adjSpan = inp.closest('td').querySelector('.adj-live');
+        if (!adjSpan) { adjSpan = document.createElement('span'); adjSpan.className = 'adj-live'; inp.closest('td').appendChild(adjSpan); }
+        if (Math.abs(pct) < 0.01) { adjSpan.textContent = ''; adjSpan.style = ''; }
+        else {
+          adjSpan.textContent = ` → ${fmtC(base * (1 + pct / 100))}`;
+          adjSpan.style.cssText = `font-size:11px;font-weight:600;${pct > 0 ? 'color:#059669' : 'color:#dc2626'}`;
+        }
+        updateTotals();
+        saveMultipliers();
+      });
+    }
+  }
+
+  function updateTotals() {
+    let grandNet = 0;
+    for (const key of ['budgetSeas']) {
+      const { data } = state[key];
+      if (!data.length) continue;
+      const hist     = data.reduce((s, m) => s + (m.avg_hist ?? m.avg_received_cost ?? 0), 0);
+      const adj      = data.reduce((s, m) => s + (m.adjusted_budget ?? 0), 0);
+      const coDeduct = data.reduce((s, m) => s + (m.carryover_deduction ?? 0), 0);
+      const net      = data.reduce((s, m) => s + (m.net_budget ?? 0), 0);
+      grandNet += net;
+      let html = `${t('total_seasonal')} : <strong>${fmtC(net)}</strong> net · ${data.length} ${t('total_brands')}`;
+      html += ` <span style="color:#6b7280;font-size:11px">(${t('total_hist')} ${fmtC(hist)} → ${t('total_adjusted')} ${fmtC(adj)}`;
+      if (coDeduct > 0.01) html += ` → ${t('total_carryover_ded')} ${fmtC(coDeduct)}`;
+      html += `)</span>`;
+      document.getElementById(CFG[key].totalId).innerHTML = html;
+    }
+    if (grandNet > 0) {
+      document.getElementById('budgetBaseTotal').textContent = fmtC(grandNet);
+      document.getElementById('budgetBanner').classList.remove('hidden');
+      document.getElementById('budgetAdjTotal').classList.add('hidden');
+    }
+  }
+
+  async function fetchPanel(key, endpoint, extraParams = {}) {
+    showLoader(key, true);
+    try {
+      const qs = buildQuerySuffix(extraParams);
+      const d  = await fetch(`${BASE}${endpoint}${qs}`).then(r => r.json());
+      state[key].data     = d.by_manufacturer ?? [];
+      state[key].expanded = new Set();
+      if (key === 'budgetSeas') {
+        state.budgetSeas.season   = d.target_season ?? extraParams?.season ?? 'p26';
+        state.budgetSeas.isFuture = d.is_future_season ?? false;
+        const remDays    = d.remaining_days ?? 0;
+        const remInfo    = remDays > 0 ? ` • ${remDays}${t('days_left_season')}` : '';
+        const futureInfo = d.is_future_season ? ` • ${t('future_season_lbl')}` : '';
+        const coRate     = d.carryover_deduction_rate != null ? ` • ${Math.round(d.carryover_deduction_rate * 100)}% carryover` : '';
+        document.getElementById('budgetSeasPeriod').textContent =
+          d.reference_seasons_label ? `${t('hist_ref')} : ${d.reference_seasons_label}${remInfo}${coRate}${futureInfo}` : '';
+      } else if (CFG[key].hasHyp) {
+        applyClientTiers(state[key].data);
+        for (const m of state[key].data) {
+          state[key].multipliers[m.manufacturer] = m.hypothesis?.multiplier ?? 1.0;
+        }
+      }
       saveMultipliers();
-    });
-  }
-}
-
-// ── Budget: totals ─────────────────────────────────────────────────────────
-function updateAllBudgetTotals() {
-  let grandNet = 0;
-  for (const key of ['budgetSeas']) {
-    const { data } = state[key];
-    if (!data.length) continue;
-    const hist     = data.reduce((s, m) => s + (m.avg_hist ?? m.avg_received_cost ?? 0), 0);
-    const adj      = data.reduce((s, m) => s + (m.adjusted_budget ?? 0), 0);
-    const coDeduct = data.reduce((s, m) => s + (m.carryover_deduction ?? 0), 0);
-    const net      = data.reduce((s, m) => s + (m.net_budget ?? 0), 0);
-    grandNet += net;
-    let html = `${t('total_seasonal')} : <strong>${fmtC(net)}</strong> net · ${data.length} ${t('total_brands')}`;
-    html += ` <span style="color:#6b7280;font-size:11px">(${t('total_hist')} ${fmtC(hist)} → ${t('total_adjusted')} ${fmtC(adj)}`;
-    if (coDeduct > 0.01) html += ` → ${t('total_carryover_ded')} ${fmtC(coDeduct)}`;
-    html += `)</span>`;
-    document.getElementById(BUDGET_CFG[key].totalId).innerHTML = html;
-  }
-  if (grandNet > 0) {
-    document.getElementById('budgetBaseTotal').textContent = fmtC(grandNet);
-    document.getElementById('budgetBanner').classList.remove('hidden');
-    document.getElementById('budgetAdjTotal').classList.add('hidden');
-  }
-}
-
-// ── Budget: fetch both panels ──────────────────────────────────────────────
-async function fetchBudgetPanel(key, endpoint, extraParams = {}) {
-  showLoader(key, true);
-  try {
-    const qs = buildQuerySuffix(extraParams);
-    const d  = await fetch(`${BASE}${endpoint}${qs}`).then(r => r.json());
-    state[key].data     = d.by_manufacturer ?? [];
-    state[key].expanded = new Set();
-    if (key === 'budgetSeas') {
-      state.budgetSeas.season   = d.target_season ?? extraParams?.season ?? 'p26';
-      state.budgetSeas.isFuture = d.is_future_season ?? false;
-      const remDays = d.remaining_days ?? 0;
-      const remInfo = remDays > 0 ? ` • ${remDays}${t('days_left_season')}` : '';
-      const futureInfo = d.is_future_season ? ` • ${t('future_season_lbl')}` : '';
-      const coRate = d.carryover_deduction_rate != null ? ` • ${Math.round(d.carryover_deduction_rate * 100)}% carryover` : '';
-      document.getElementById('budgetSeasPeriod').textContent =
-        d.reference_seasons_label ? `${t('hist_ref')} : ${d.reference_seasons_label}${remInfo}${coRate}${futureInfo}` : '';
-    } else if (BUDGET_CFG[key].hasHyp) {
-      applyClientTiers(state[key].data);
-      for (const m of state[key].data) {
-        state[key].multipliers[m.manufacturer] = m.hypothesis?.multiplier ?? 1.0;
-      }
+      renderBudgetTable(key);
+    } catch (e) {
+      document.getElementById(CFG[key].bodyId).innerHTML =
+        `<tr><td colspan="${CFG[key].cols}" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
     }
-    saveMultipliers();
-    renderBudgetTable(key);
-  } catch (e) {
-    document.getElementById(BUDGET_CFG[key].bodyId).innerHTML =
-      `<tr><td colspan="${BUDGET_CFG[key].cols}" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
+    showLoader(key, false);
   }
-  showLoader(key, false);
-}
 
-async function loadBudget() {
-  const season = document.getElementById('budgetSeasSeason').value;
-  await fetchBudgetPanel('budgetSeas', '/api/budget/marque', { season });
-  updateAllBudgetTotals();
-}
-
-// ── Filter bar events ─────────────────────────────────────────────────────
-document.getElementById('budgetApply').addEventListener('click', () => {
-  updateFilterBadge();
-  loadBudget();
-});
-
-document.getElementById('budgetReset').addEventListener('click', () => {
-  document.querySelectorAll('.shop-cb').forEach(cb => cb.checked = false);
-  document.querySelectorAll('.tog-btn').forEach(btn => btn.classList.remove('active'));
-  document.getElementById('budgetMfrSearch').value = '';
-  document.getElementById('filterBadge').classList.add('hidden');
-  loadBudget();
-});
-
-// ── Budget controls ───────────────────────────────────────────────────────
-(function () {
-  // Saisonnier season dropdown
-  document.getElementById('budgetSeasSeason').addEventListener('change', async () => {
+  async function load() {
     const season = document.getElementById('budgetSeasSeason').value;
-    await fetchBudgetPanel('budgetSeas', '/api/budget/marque', { season });
-    updateAllBudgetTotals();
-  });
-
-  // Dedicated saisonnier search — live filter
-  document.getElementById('seasBudgetSearch').addEventListener('input', () => {
-    renderBudgetTable('budgetSeas');
-  });
-
-  // Column sort — delegate click on any th.sort-col in the saisonnier table
-  document.addEventListener('click', e => {
-    const th = e.target.closest('th.sort-col');
-    if (!th) return;
-    // Only handle if it's inside the saisonnier table
-    if (!th.closest('table')?.querySelector('#budgetSeasBody')) return;
-    const col = th.dataset.sort;
-    const s   = state.budgetSeas.sort;
-    if (s.col === col) {
-      s.dir = s.dir === 'desc' ? 'asc' : 'desc';
-    } else {
-      s.col = col;
-      s.dir = col === 'manufacturer' ? 'asc' : 'desc';
-    }
-    renderBudgetTable('budgetSeas');
-  });
-})();
-
-// ── NOS weeks slider (shared for brand budget + product table) ────────────
-(function () {
-  const nosSlider = document.getElementById('nosWeeks');
-  nosSlider.addEventListener('input', () => {
-    document.getElementById('nosWeeksLabel').textContent = nosSlider.value;
-  });
-  let nt;
-  nosSlider.addEventListener('change', () => {
-    clearTimeout(nt);
-    nt = setTimeout(() => loadNos(), 300);
-  });
-})();
-
-// ── NOS tab ────────────────────────────────────────────────────────────────
-async function loadNos() {
-  const weeks = document.getElementById('nosWeeks').value;
-  await Promise.all([
-    fetchBudgetPanel('budgetNos', '/api/budget/nos', { weeks }),
-    (async () => {
-      showLoader('nos', true);
-      try {
-        const r = await fetch(`${BASE}/api/nos?weeks=${weeks}`);
-        const d = await r.json();
-        state.nos.data = d.items;
-        populateShopFilter(d.items, 'nosShop');
-        filterAndRenderNos();
-      } catch (e) { document.getElementById('nosBody').innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`; }
-      showLoader('nos', false);
-    })(),
-  ]);
-}
-function filterAndRenderNos() {
-  const shop = document.getElementById('nosShop').value, search = document.getElementById('nosSearch').value.toLowerCase();
-  state.nos.filtered = state.nos.data.filter(r => (!shop || r.shop_id === shop) && (!search || r.description?.toLowerCase().includes(search) || String(r.category).includes(search)));
-  state.nos.page = 0; renderNosPage();
-}
-function renderNosPage() {
-  const { filtered, page } = state.nos;
-  const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  document.getElementById('nosCount').textContent = t('nos_count')(filtered.length);
-  document.getElementById('nosBody').innerHTML = slice.map(r => `
-    <tr class="transition-colors">
-      <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
-      <td class="px-3 py-2 text-gray-500">${r.shop_name}</td>
-      <td class="px-3 py-2 text-gray-500">${r.category ?? '—'}</td>
-      <td class="px-3 py-2 text-right">${fmt(r.qty_on_hand)}</td>
-      <td class="px-3 py-2 text-right font-medium">${fmt(r.avg_weekly_units)}</td>
-      <td class="px-3 py-2 text-right">${coverBadge(r.weeks_of_cover)}</td>
-      <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(r.suggested_order_qty)}</td>
-    </tr>`).join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
-  renderPager('nos', filtered.length);
-}
-
-// ── Seasonal tab ──────────────────────────────────────────────────────────
-async function loadSeasonal() {
-  showLoader('seasonal', true);
-  try {
-    const r = await fetch(`${BASE}/api/seasonal?weeks_ahead=${document.getElementById('seasWeeks').value}`);
-    const d = await r.json();
-    state.seasonal.data = d.recommendations;
-    populateShopFilter(d.recommendations, 'seasShop');
-    filterAndRenderSeasonal();
-  } catch (e) { document.getElementById('seasBody').innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`; }
-  showLoader('seasonal', false);
-}
-function filterAndRenderSeasonal() {
-  const shop = document.getElementById('seasShop').value, search = document.getElementById('seasSearch').value.toLowerCase();
-  state.seasonal.filtered = state.seasonal.data.filter(r => (!shop || r.shop_id === shop) && (!search || r.description?.toLowerCase().includes(search)));
-  state.seasonal.page = 0; renderSeasonalPage();
-}
-function renderSeasonalPage() {
-  const { filtered, page } = state.seasonal;
-  const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  document.getElementById('seasCount').textContent = t('seas_count')(filtered.length);
-  document.getElementById('seasBody').innerHTML = slice.map(r => `
-    <tr class="transition-colors">
-      <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
-      <td class="px-3 py-2 text-gray-500">${r.shop_name}</td>
-      <td class="px-3 py-2 text-gray-500">${r.category ?? '—'}</td>
-      <td class="px-3 py-2 text-right">${fmt(r.qty_on_hand)}</td>
-      <td class="px-3 py-2 text-right font-medium">${fmt(r.forecasted_units)}</td>
-      <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(r.suggested_order_qty)}</td>
-      <td class="px-3 py-2 text-right">${r.estimated_cost > 0 ? fmtC(r.estimated_cost) : '—'}</td>
-    </tr>`).join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
-  renderPager('seasonal', filtered.length);
-}
-
-// ── Sizes tab ─────────────────────────────────────────────────────────────
-async function loadSizes() {
-  showLoader('sizes', true);
-  try {
-    const r = await fetch(`${BASE}/api/sizes`);
-    const d = await r.json();
-    state.sizes.data = d.size_curves;
-    populateShopFilter(d.size_curves, 'sizesShop');
-    filterAndRenderSizes();
-  } catch (e) { document.getElementById('sizesBody').innerHTML = `<tr><td colspan="6" class="text-center py-8 text-red-500">${e.message}</td></tr>`; }
-  showLoader('sizes', false);
-}
-function filterAndRenderSizes() {
-  const shop = document.getElementById('sizesShop').value, search = document.getElementById('sizesSearch').value.toLowerCase();
-  state.sizes.filtered = state.sizes.data.filter(r => (!shop || r.shop_id === shop) && (!search || r.description?.toLowerCase().includes(search)));
-  state.sizes.page = 0; renderSizesPage();
-}
-function renderSizesPage() {
-  const { filtered, page } = state.sizes;
-  const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  document.getElementById('sizesCount').textContent = t('sizes_count')(filtered.length);
-  document.getElementById('sizesBody').innerHTML = slice.map(r => `
-    <tr class="transition-colors">
-      <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
-      <td class="px-3 py-2 text-gray-500">${r.shop_name}</td>
-      <td class="px-3 py-2 text-right">${fmt(r.units_sold)}</td>
-      <td class="px-3 py-2 text-right text-gray-500">${fmt(r.total_units)}</td>
-      <td class="px-3 py-2 text-right font-semibold text-blue-700">${r.pct_of_matrix}%</td>
-      <td class="px-3 py-2 text-right">${fmt(r.qty_on_hand)}</td>
-    </tr>`).join('') || `<tr><td colspan="6" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
-  renderPager('sizes', filtered.length);
-}
-
-// ── Transfers tab ─────────────────────────────────────────────────────────
-// ── Création de budget ────────────────────────────────────────────────────
-const planState = {
-  budget: [], plan: {}, drops: {}, season: 'p26',
-  selectedShops: new Set(SHOPS.map(s => s.id)),
-  excluded:  new Set(),  // brand names removed from the plan view
-  overrides: {},         // { [mfr]: customSuggestedAmount }
-  allMfrs: [],           // all manufacturers from /api/manufacturers
-};
-
-function planLoadExcluded() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(`plan_excluded_${planState.season}`) || '[]');
-    planState.excluded = new Set(stored);
-  } catch { planState.excluded = new Set(); }
-}
-function planSaveExcluded() {
-  localStorage.setItem(`plan_excluded_${planState.season}`, JSON.stringify([...planState.excluded]));
-}
-function planLoadOverrides() {
-  try {
-    planState.overrides = JSON.parse(localStorage.getItem(`plan_overrides_${planState.season}`) || '{}');
-  } catch { planState.overrides = {}; }
-}
-function planSaveOverrides() {
-  localStorage.setItem(`plan_overrides_${planState.season}`, JSON.stringify(planState.overrides));
-}
-
-function buildPlanShopFilter() {
-  const container = document.getElementById('planShopFilter');
-  if (!container || container.dataset.built) return;
-  container.dataset.built = '1';
-  SHOPS.forEach(({ id, name }) => {
-    const lbl = document.createElement('label');
-    lbl.className = 'flex items-center gap-1.5 text-xs cursor-pointer select-none';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.value = id; cb.checked = true;
-    cb.className = 'plan-shop-cb accent-indigo-600';
-    cb.addEventListener('change', () => {
-      if (cb.checked) planState.selectedShops.add(id);
-      else planState.selectedShops.delete(id);
-      // Re-fetch with new shop scope so brand list reflects history for those shops
-      fetchAndRenderPlan();
-    });
-    lbl.append(cb, document.createTextNode(' ' + name));
-    container.appendChild(lbl);
-  });
-}
-
-function planSeasonFromBudget() {
-  return document.getElementById('budgetSeasSeason')?.value ?? 'p26';
-}
-
-async function loadBudgetPlan() {
-  buildPlanShopFilter();
-  const budgetSeasEl = document.getElementById('budgetSeasSeason');
-  const planSeasEl   = document.getElementById('planSeason');
-  if (budgetSeasEl && planSeasEl && !planSeasEl.options.length) {
-    planSeasEl.innerHTML = budgetSeasEl.innerHTML;
-    planSeasEl.value     = budgetSeasEl.value;
-    planSeasEl.addEventListener('change', () => {
-      planState.season = planSeasEl.value;
-      planLoadExcluded();
-      planLoadOverrides();
-      fetchAndRenderPlan();
-    });
+    await fetchPanel('budgetSeas', '/api/budget/marque', { season });
+    updateTotals();
   }
-  planState.season = planSeasEl?.value ?? planSeasonFromBudget();
-  planLoadExcluded();
-  planLoadOverrides();
-  // Load all manufacturers for the "add brand" dropdown (once)
-  if (!planState.allMfrs.length) {
-    fetch(`${BASE}/api/manufacturers`).then(r => r.json()).then(list => {
-      planState.allMfrs = list;
-      const sel = document.getElementById('planAddExistingBrand');
-      if (sel) {
-        sel.innerHTML = '<option value="">— Choisir —</option>' +
-          list.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
+
+  function init() {
+    // Filter bar
+    document.getElementById('budgetApply').addEventListener('click', () => {
+      updateFilterBadge();
+      load();
+    });
+    document.getElementById('budgetReset').addEventListener('click', () => {
+      document.querySelectorAll('.shop-cb').forEach(cb => cb.checked = false);
+      document.querySelectorAll('.tog-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('budgetMfrSearch').value = '';
+      document.getElementById('filterBadge').classList.add('hidden');
+      load();
+    });
+    // Season dropdown
+    document.getElementById('budgetSeasSeason').addEventListener('change', async () => {
+      const season = document.getElementById('budgetSeasSeason').value;
+      await fetchPanel('budgetSeas', '/api/budget/marque', { season });
+      updateTotals();
+    });
+    // Search
+    document.getElementById('seasBudgetSearch').addEventListener('input', () => renderBudgetTable('budgetSeas'));
+    // Column sort
+    document.addEventListener('click', e => {
+      const th = e.target.closest('th.sort-col');
+      if (!th) return;
+      if (!th.closest('table')?.querySelector('#budgetSeasBody')) return;
+      const col = th.dataset.sort;
+      const s   = state.budgetSeas.sort;
+      if (s.col === col) {
+        s.dir = s.dir === 'desc' ? 'asc' : 'desc';
+      } else {
+        s.col = col;
+        s.dir = col === 'manufacturer' ? 'asc' : 'desc';
       }
-    }).catch(() => {});
+      renderBudgetTable('budgetSeas');
+    });
+    // Table row click/input delegation
+    bindTableListeners();
   }
-  await fetchAndRenderPlan();
-}
 
-async function fetchAndRenderPlan() {
-  const season    = planState.season;
-  const shopParam = planState.selectedShops.size
-    ? `&shops=${[...planState.selectedShops].join(',')}`
-    : '';
-  try {
-    const [budgetRes, planRes] = await Promise.all([
-      fetch(`${BASE}/api/budget/marque?season=${season}${shopParam}`).then(r => r.json()),
-      fetch(`${BASE}/api/budget-plan?season=${season}`).then(r => r.json()),
-    ]);
-    planState.budget = budgetRes.by_manufacturer ?? [];
-    planState.plan   = planRes.by_manufacturer   ?? {};
-    planState.drops  = planRes.drops             ?? {};
-    // Auto-restore if all budget brands are excluded (nothing would show)
-    if (planState.budget.length > 0 && planState.budget.every(m => planState.excluded.has(m.manufacturer))) {
-      planState.excluded.clear();
-      planSaveExcluded();
+  return { init, load, updateTotals, renderMarqueBudgetTable, renderBudgetTable, fetchPanel };
+})();
+
+// Alias used by ParamsTab to re-fetch budget after tiers change
+function fetchBudgetPanel(key, endpoint, extraParams) { return BudgetTab.fetchPanel(key, endpoint, extraParams); }
+function updateAllBudgetTotals() { BudgetTab.updateTotals(); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SeasonalTab — Saisonnier produit (tab-seasonal) + legacy NOS product table
+// ─────────────────────────────────────────────────────────────────────────────
+const SeasonalTab = (() => {
+  // ── Legacy NOS product table (state.nos) — kept for completeness ──────────
+  function filterAndRenderNos() {
+    const shop   = document.getElementById('nosShop')?.value ?? '';
+    const search = (document.getElementById('nosSearch')?.value ?? '').toLowerCase();
+    state.nos.filtered = state.nos.data.filter(r =>
+      (!shop || r.shop_id === shop) &&
+      (!search || r.description?.toLowerCase().includes(search) || String(r.category).includes(search))
+    );
+    state.nos.page = 0;
+    renderNosPage();
+  }
+
+  function renderNosPage() {
+    const { filtered, page } = state.nos;
+    const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    const nosCount = document.getElementById('nosCount');
+    const nosBody  = document.getElementById('nosBody');
+    if (nosCount) nosCount.textContent = t('nos_count')(filtered.length);
+    if (nosBody) nosBody.innerHTML = slice.map(r => `
+      <tr class="transition-colors">
+        <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
+        <td class="px-3 py-2 text-gray-500">${r.shop_name}</td>
+        <td class="px-3 py-2 text-gray-500">${r.category ?? '—'}</td>
+        <td class="px-3 py-2 text-right">${fmt(r.qty_on_hand)}</td>
+        <td class="px-3 py-2 text-right font-medium">${fmt(r.avg_weekly_units)}</td>
+        <td class="px-3 py-2 text-right">${coverBadge(r.weeks_of_cover)}</td>
+        <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(r.suggested_order_qty)}</td>
+      </tr>`).join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
+    renderPager('nos', filtered.length);
+  }
+
+  // ── Seasonal product table ────────────────────────────────────────────────
+  async function load() {
+    showLoader('seasonal', true);
+    try {
+      const r = await fetch(`${BASE}/api/seasonal?weeks_ahead=${document.getElementById('seasWeeks').value}`);
+      const d = await r.json();
+      state.seasonal.data = d.recommendations;
+      populateShopFilter(d.recommendations, 'seasShop');
+      filterAndRender();
+    } catch (e) {
+      document.getElementById('seasBody').innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
     }
-    renderPlanTable();
-  } catch (e) {
-    document.getElementById('planBody').innerHTML =
-      `<tr><td colspan="5" class="text-center py-8 text-red-400">${escHtml(e.message)}</td></tr>`;
+    showLoader('seasonal', false);
   }
-}
 
-function planTotalForMfr(mfr) {
-  const dropMap = planState.plan[mfr] ?? {};
-  let total = 0;
-  for (const shopMap of Object.values(dropMap))
-    for (const amt of Object.values(shopMap)) total += amt;
-  return total;
-}
+  function filterAndRender() {
+    const shop   = document.getElementById('seasShop').value;
+    const search = document.getElementById('seasSearch').value.toLowerCase();
+    state.seasonal.filtered = state.seasonal.data.filter(r =>
+      (!shop || r.shop_id === shop) && (!search || r.description?.toLowerCase().includes(search))
+    );
+    state.seasonal.page = 0;
+    renderPage();
+  }
 
-function renderPlanTable() {
-  const tbody = document.getElementById('planBody');
-  if (!tbody) return;
+  function renderPage() {
+    const { filtered, page } = state.seasonal;
+    const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    document.getElementById('seasCount').textContent = t('seas_count')(filtered.length);
+    document.getElementById('seasBody').innerHTML = slice.map(r => `
+      <tr class="transition-colors">
+        <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
+        <td class="px-3 py-2 text-gray-500">${r.shop_name}</td>
+        <td class="px-3 py-2 text-gray-500">${r.category ?? '—'}</td>
+        <td class="px-3 py-2 text-right">${fmt(r.qty_on_hand)}</td>
+        <td class="px-3 py-2 text-right font-medium">${fmt(r.forecasted_units)}</td>
+        <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(r.suggested_order_qty)}</td>
+        <td class="px-3 py-2 text-right">${r.estimated_cost > 0 ? fmtC(r.estimated_cost) : '—'}</td>
+      </tr>`).join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
+    renderPager('seasonal', filtered.length);
+  }
 
-  // Visible brands = budget list (filtered by history via API) + manually added brands
-  // minus excluded ones
-  const visibleBrands = [
-    ...planState.budget.filter(m => !planState.excluded.has(m.manufacturer)),
-    // manually added brands (in plan but not in budget list)
-    ...Object.keys(planState.plan)
-      .filter(mfr => !planState.budget.find(m => m.manufacturer === mfr) && !planState.excluded.has(mfr))
-      .map(mfr => ({ manufacturer: mfr, net_budget: 0, _manual: true })),
-  ];
+  function init() {
+    let seasD;
+    const seasWeeks = document.getElementById('seasWeeks');
+    seasWeeks.addEventListener('input', () => document.getElementById('seasWeeksLabel').textContent = seasWeeks.value);
+    seasWeeks.addEventListener('change', () => { clearTimeout(seasD); seasD = setTimeout(() => { state.seasonal.data = []; load(); }, 200); });
+    document.getElementById('seasShop').addEventListener('change', filterAndRender);
+    document.getElementById('seasSearch').addEventListener('input', () => { clearTimeout(seasD); seasD = setTimeout(filterAndRender, 250); });
+    bindPager('seasonal', renderPage);
+  }
 
-  // Budget from excluded brands redistributed proportionally among visible brands
-  const excludedBudget = planState.budget
-    .filter(m => planState.excluded.has(m.manufacturer))
-    .reduce((s, m) => s + (m.net_budget ?? 0), 0);
-  const visibleTotal = visibleBrands.reduce((s, m) => s + (m.net_budget ?? 0), 0);
+  return { init, load, renderPage, renderNosPage, filterAndRender, filterAndRenderNos };
+})();
 
-  const rows = [];
-  let totalCalcSuggested = 0, totalSuggested = 0, totalPlanned = 0;
+// ─────────────────────────────────────────────────────────────────────────────
+// SizesTab — Courbes tailles (tab-sizes)
+// ─────────────────────────────────────────────────────────────────────────────
+const SizesTab = (() => {
+  async function load() {
+    showLoader('sizes', true);
+    try {
+      const r = await fetch(`${BASE}/api/sizes`);
+      const d = await r.json();
+      state.sizes.data = d.size_curves;
+      populateShopFilter(d.size_curves, 'sizesShop');
+      filterAndRender();
+    } catch (e) {
+      document.getElementById('sizesBody').innerHTML = `<tr><td colspan="6" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
+    }
+    showLoader('sizes', false);
+  }
 
-  for (const m of visibleBrands) {
-    const mfr     = m.manufacturer;
-    const base    = m.net_budget ?? 0;
-    // Redistribute excluded budget proportionally; if visibleTotal is 0, spread equally
-    const share   = visibleTotal > 0 ? base / visibleTotal : (visibleBrands.length ? 1 / visibleBrands.length : 0);
-    const calcSuggested      = Math.round((base + excludedBudget * share) * 100) / 100;
-    const isOverridden       = planState.overrides[mfr] !== undefined;
-    const effectiveSuggested = isOverridden ? planState.overrides[mfr] : calcSuggested;
-    totalCalcSuggested      += calcSuggested;
-    totalSuggested          += effectiveSuggested;
-    const totalPlan          = planTotalForMfr(mfr);
-    totalPlanned            += totalPlan;
+  function filterAndRender() {
+    const shop   = document.getElementById('sizesShop').value;
+    const search = document.getElementById('sizesSearch').value.toLowerCase();
+    state.sizes.filtered = state.sizes.data.filter(r =>
+      (!shop || r.shop_id === shop) && (!search || r.description?.toLowerCase().includes(search))
+    );
+    state.sizes.page = 0;
+    renderPage();
+  }
 
-    const diff    = totalPlan - effectiveSuggested;
+  function renderPage() {
+    const { filtered, page } = state.sizes;
+    const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    document.getElementById('sizesCount').textContent = t('sizes_count')(filtered.length);
+    document.getElementById('sizesBody').innerHTML = slice.map(r => `
+      <tr class="transition-colors">
+        <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
+        <td class="px-3 py-2 text-gray-500">${r.shop_name}</td>
+        <td class="px-3 py-2 text-right">${fmt(r.units_sold)}</td>
+        <td class="px-3 py-2 text-right text-gray-500">${fmt(r.total_units)}</td>
+        <td class="px-3 py-2 text-right font-semibold text-blue-700">${r.pct_of_matrix}%</td>
+        <td class="px-3 py-2 text-right">${fmt(r.qty_on_hand)}</td>
+      </tr>`).join('') || `<tr><td colspan="6" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
+    renderPager('sizes', filtered.length);
+  }
+
+  function init() {
+    let sizD;
+    document.getElementById('sizesShop').addEventListener('change', filterAndRender);
+    document.getElementById('sizesSearch').addEventListener('input', () => { clearTimeout(sizD); sizD = setTimeout(filterAndRender, 250); });
+    bindPager('sizes', renderPage);
+  }
+
+  return { init, load, renderPage, filterAndRender };
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TransfersTab — Transferts / Actions (tab-transfers)
+// ─────────────────────────────────────────────────────────────────────────────
+const TransfersTab = (() => {
+  async function load() {
+    showLoader('transfers', true);
+    try {
+      const r = await fetch(`${BASE}/api/transfers`);
+      const d = await r.json();
+      document.getElementById('transfersCount').textContent = d.count > 0 ? t('transfers_count')(d.count) : '';
+      if (d.count === 0) {
+        document.getElementById('transfersEmpty').classList.remove('hidden');
+        document.getElementById('transfersBody').innerHTML = '';
+      } else {
+        document.getElementById('transfersEmpty').classList.add('hidden');
+        document.getElementById('transfersBody').innerHTML = d.transfers.map(tr => `
+          <tr class="transition-colors">
+            <td class="px-3 py-2 max-w-xs truncate">${escHtml(tr.description)}</td>
+            <td class="px-3 py-2 text-gray-500">${tr.from_shop}</td>
+            <td class="px-3 py-2 text-gray-500">${tr.to_shop}</td>
+            <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(tr.qty)}</td>
+          </tr>`).join('');
+      }
+    } catch (e) {
+      document.getElementById('transfersBody').innerHTML = `<tr><td colspan="4" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
+    }
+    showLoader('transfers', false);
+  }
+
+  return { load };
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PlanTab — Création de budget (tab-plan)
+// ─────────────────────────────────────────────────────────────────────────────
+const PlanTab = (() => {
+  const planState = {
+    budget: [], plan: {}, drops: {}, season: 'p26',
+    selectedShops: new Set(SHOPS.map(s => s.id)),
+    excluded:  new Set(),
+    overrides: {},
+    allMfrs: [],
+  };
+
+  function loadExcluded() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(`plan_excluded_${planState.season}`) || '[]');
+      planState.excluded = new Set(stored);
+    } catch { planState.excluded = new Set(); }
+  }
+  function saveExcluded() {
+    localStorage.setItem(`plan_excluded_${planState.season}`, JSON.stringify([...planState.excluded]));
+  }
+  function loadOverrides() {
+    try {
+      planState.overrides = JSON.parse(localStorage.getItem(`plan_overrides_${planState.season}`) || '{}');
+    } catch { planState.overrides = {}; }
+  }
+  function saveOverrides() {
+    localStorage.setItem(`plan_overrides_${planState.season}`, JSON.stringify(planState.overrides));
+  }
+
+  function buildShopFilter() {
+    const container = document.getElementById('planShopFilter');
+    if (!container || container.dataset.built) return;
+    container.dataset.built = '1';
+    SHOPS.forEach(({ id, name }) => {
+      const lbl = document.createElement('label');
+      lbl.className = 'flex items-center gap-1.5 text-xs cursor-pointer select-none';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = id; cb.checked = true;
+      cb.className = 'plan-shop-cb accent-indigo-600';
+      cb.addEventListener('change', () => {
+        if (cb.checked) planState.selectedShops.add(id);
+        else planState.selectedShops.delete(id);
+        fetchAndRender();
+      });
+      lbl.append(cb, document.createTextNode(' ' + name));
+      container.appendChild(lbl);
+    });
+  }
+
+  function seasonFromBudget() {
+    return document.getElementById('budgetSeasSeason')?.value ?? 'p26';
+  }
+
+  async function load() {
+    buildShopFilter();
+    const budgetSeasEl = document.getElementById('budgetSeasSeason');
+    const planSeasEl   = document.getElementById('planSeason');
+    if (budgetSeasEl && planSeasEl && !planSeasEl.options.length) {
+      planSeasEl.innerHTML = budgetSeasEl.innerHTML;
+      planSeasEl.value     = budgetSeasEl.value;
+      planSeasEl.addEventListener('change', () => {
+        planState.season = planSeasEl.value;
+        loadExcluded();
+        loadOverrides();
+        fetchAndRender();
+      });
+    }
+    planState.season = planSeasEl?.value ?? seasonFromBudget();
+    loadExcluded();
+    loadOverrides();
+    if (!planState.allMfrs.length) {
+      fetch(`${BASE}/api/manufacturers`).then(r => r.json()).then(list => {
+        planState.allMfrs = list;
+        const sel = document.getElementById('planAddExistingBrand');
+        if (sel) {
+          sel.innerHTML = '<option value="">— Choisir —</option>' +
+            list.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
+        }
+      }).catch(() => {});
+    }
+    await fetchAndRender();
+  }
+
+  async function fetchAndRender() {
+    const season    = planState.season;
+    const shopParam = planState.selectedShops.size
+      ? `&shops=${[...planState.selectedShops].join(',')}`
+      : '';
+    try {
+      const [budgetRes, planRes] = await Promise.all([
+        fetch(`${BASE}/api/budget/marque?season=${season}${shopParam}`).then(r => r.json()),
+        fetch(`${BASE}/api/budget-plan?season=${season}`).then(r => r.json()),
+      ]);
+      planState.budget = budgetRes.by_manufacturer ?? [];
+      planState.plan   = planRes.by_manufacturer   ?? {};
+      planState.drops  = planRes.drops             ?? {};
+      if (planState.budget.length > 0 && planState.budget.every(m => planState.excluded.has(m.manufacturer))) {
+        planState.excluded.clear();
+        saveExcluded();
+      }
+      renderTable();
+    } catch (e) {
+      document.getElementById('planBody').innerHTML =
+        `<tr><td colspan="5" class="text-center py-8 text-red-400">${escHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  function totalForMfr(mfr) {
+    const dropMap = planState.plan[mfr] ?? {};
+    let total = 0;
+    for (const shopMap of Object.values(dropMap))
+      for (const amt of Object.values(shopMap)) total += amt;
+    return total;
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('planBody');
+    if (!tbody) return;
+
+    const visibleBrands = [
+      ...planState.budget.filter(m => !planState.excluded.has(m.manufacturer)),
+      ...Object.keys(planState.plan)
+        .filter(mfr => !planState.budget.find(m => m.manufacturer === mfr) && !planState.excluded.has(mfr))
+        .map(mfr => ({ manufacturer: mfr, net_budget: 0, _manual: true })),
+    ];
+
+    const excludedBudget = planState.budget
+      .filter(m => planState.excluded.has(m.manufacturer))
+      .reduce((s, m) => s + (m.net_budget ?? 0), 0);
+    const visibleTotal = visibleBrands.reduce((s, m) => s + (m.net_budget ?? 0), 0);
+
+    const rows = [];
+    let totalCalcSuggested = 0, totalSuggested = 0, totalPlanned = 0;
+
+    for (const m of visibleBrands) {
+      const mfr    = m.manufacturer;
+      const base   = m.net_budget ?? 0;
+      const share  = visibleTotal > 0 ? base / visibleTotal : (visibleBrands.length ? 1 / visibleBrands.length : 0);
+      const calcSuggested      = Math.round((base + excludedBudget * share) * 100) / 100;
+      const isOverridden       = planState.overrides[mfr] !== undefined;
+      const effectiveSuggested = isOverridden ? planState.overrides[mfr] : calcSuggested;
+      totalCalcSuggested      += calcSuggested;
+      totalSuggested          += effectiveSuggested;
+      const totalPlan          = totalForMfr(mfr);
+      totalPlanned            += totalPlan;
+
+      const diff    = totalPlan - effectiveSuggested;
+      const diffCls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
+      const diffHtml = totalPlan > 0
+        ? `<span class="${diffCls}">${diff >= 0 ? '+' : ''}${fmtC(diff)}</span>`
+        : `<span class="text-gray-300">—</span>`;
+
+      const resetBtn = isOverridden
+        ? `<button class="plan-suggested-reset shrink-0 text-indigo-300 hover:text-indigo-600 text-sm leading-none"
+             title="Réinitialiser au montant recommandé (${fmtC(calcSuggested)})"
+             data-mfr="${escHtml(mfr)}" data-calc="${calcSuggested}">↺</button>`
+        : '';
+      const calcRef = isOverridden
+        ? `<div class="text-[9px] text-gray-400 text-right mt-0.5">rec. ${fmtC(calcSuggested)}</div>`
+        : '';
+      const suggestedCell = m._manual
+        ? `<span class="text-gray-300 italic text-[10px]">nouvelle</span>`
+        : `<div class="text-right">
+             <div class="flex items-center justify-end gap-1">
+               ${resetBtn}
+               <input type="number" min="0" step="100"
+                 class="plan-suggested-input text-right text-xs w-24 bg-transparent border-b
+                   ${isOverridden ? 'border-indigo-400 text-indigo-700 font-semibold' : 'border-transparent text-gray-500 hover:border-gray-300'}
+                   focus:border-indigo-400 focus:outline-none"
+                 data-mfr="${escHtml(mfr)}" data-calc="${calcSuggested}"
+                 value="${effectiveSuggested}">
+             </div>
+             ${calcRef}
+           </div>`;
+
+      rows.push(`
+        <tr class="border-t border-gray-100 hover:bg-indigo-50/30 cursor-pointer plan-row" data-mfr="${escHtml(mfr)}">
+          <td class="px-4 py-2.5 font-medium text-gray-800">
+            <span class="flex items-center gap-1">
+              <span class="plan-toggle text-gray-300 text-[10px]">▶</span>
+              ${escHtml(mfr)}
+            </span>
+          </td>
+          <td class="px-4 py-2.5 text-right text-gray-500">${suggestedCell}</td>
+          <td class="px-4 py-2.5 text-right font-semibold text-indigo-700">${totalPlan > 0 ? fmtC(totalPlan) : '<span class="text-gray-300">—</span>'}</td>
+          <td class="px-4 py-2.5 text-right">${diffHtml}</td>
+          <td class="px-4 py-2.5 text-right">
+            <button class="plan-exclude-btn text-gray-300 hover:text-red-400 text-xs px-1" title="Retirer du plan" data-mfr="${escHtml(mfr)}">✕</button>
+          </td>
+        </tr>
+        <tr class="plan-detail hidden" data-mfr="${escHtml(mfr)}">
+          <td colspan="5" class="px-6 py-4 bg-gray-50 border-t border-gray-100">
+            ${renderDropsBlock(mfr, effectiveSuggested)}
+          </td>
+        </tr>`);
+    }
+
+    if (rows.length) {
+      tbody.innerHTML = rows.join('');
+    } else if (planState.excluded.size > 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-gray-400 text-xs">Toutes les marques ont été retirées — <button onclick="document.getElementById('planRestoreAllBtn').click()" class="underline text-amber-600 hover:text-amber-800">Tout réintégrer</button></td></tr>`;
+    } else {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-gray-400">${t('no_data')}</td></tr>`;
+    }
+
+    const excPanel = document.getElementById('planExcludedPanel');
+    const excList  = document.getElementById('planExcludedList');
+    if (excPanel && excList) {
+      const excBrands = [...planState.excluded].sort();
+      if (excBrands.length) {
+        excList.innerHTML = excBrands.map(b =>
+          `<span class="inline-flex items-center gap-1 bg-white border border-amber-200 rounded-full px-2.5 py-1 text-xs text-amber-700">
+            ${escHtml(b)}
+            <button class="plan-restore-btn text-amber-400 hover:text-amber-700 ml-1" data-mfr="${escHtml(b)}" title="Réintégrer">↩</button>
+          </span>`
+        ).join('');
+        excPanel.classList.remove('hidden');
+      } else {
+        excPanel.classList.add('hidden');
+      }
+    }
+
+    const balance      = Math.round((totalCalcSuggested - totalSuggested) * 100) / 100;
+    const hasOverrides = Object.keys(planState.overrides).length > 0;
+    document.getElementById('planTotalRecommended').textContent = fmtC(totalCalcSuggested);
+    document.getElementById('planTotalSuggested').textContent   = fmtC(totalSuggested);
+
+    const balanceWrap = document.getElementById('planBalanceWrap');
+    const balanceEl   = document.getElementById('planTotalBalance');
+    if (hasOverrides) {
+      balanceWrap.classList.remove('hidden');
+      balanceEl.textContent = `${balance >= 0 ? '+' : ''}${fmtC(balance)}`;
+      balanceEl.className   = 'font-semibold ' + (balance > 0 ? 'text-emerald-600' : balance < 0 ? 'text-red-500' : 'text-gray-400');
+    } else {
+      balanceWrap.classList.add('hidden');
+    }
+
+    const diff    = totalPlanned - totalSuggested;
     const diffCls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
-    const diffHtml = totalPlan > 0
-      ? `<span class="${diffCls}">${diff >= 0 ? '+' : ''}${fmtC(diff)}</span>`
-      : `<span class="text-gray-300">—</span>`;
+    document.getElementById('planTotalPlanned').textContent = totalPlanned > 0 ? fmtC(totalPlanned) : '—';
+    const diffEl = document.getElementById('planTotalDiff');
+    diffEl.textContent = totalPlanned > 0 ? `${diff >= 0 ? '+' : ''}${fmtC(diff)}` : '—';
+    diffEl.className   = 'font-semibold ' + diffCls;
 
-    const resetBtn = isOverridden
-      ? `<button class="plan-suggested-reset shrink-0 text-indigo-300 hover:text-indigo-600 text-sm leading-none"
-           title="Réinitialiser au montant recommandé (${fmtC(calcSuggested)})"
-           data-mfr="${escHtml(mfr)}" data-calc="${calcSuggested}">↺</button>`
-      : '';
-    const calcRef = isOverridden
-      ? `<div class="text-[9px] text-gray-400 text-right mt-0.5">rec. ${fmtC(calcSuggested)}</div>`
-      : '';
-    const suggestedCell = m._manual
-      ? `<span class="text-gray-300 italic text-[10px]">nouvelle</span>`
-      : `<div class="text-right">
-           <div class="flex items-center justify-end gap-1">
-             ${resetBtn}
-             <input type="number" min="0" step="100"
-               class="plan-suggested-input text-right text-xs w-24 bg-transparent border-b
-                 ${isOverridden ? 'border-indigo-400 text-indigo-700 font-semibold' : 'border-transparent text-gray-500 hover:border-gray-300'}
-                 focus:border-indigo-400 focus:outline-none"
-               data-mfr="${escHtml(mfr)}" data-calc="${calcSuggested}"
-               value="${effectiveSuggested}">
-           </div>
-           ${calcRef}
-         </div>`;
-
-    rows.push(`
-      <tr class="border-t border-gray-100 hover:bg-indigo-50/30 cursor-pointer plan-row" data-mfr="${escHtml(mfr)}">
-        <td class="px-4 py-2.5 font-medium text-gray-800">
-          <span class="flex items-center gap-1">
-            <span class="plan-toggle text-gray-300 text-[10px]">▶</span>
-            ${escHtml(mfr)}
-          </span>
-        </td>
-        <td class="px-4 py-2.5 text-right text-gray-500">${suggestedCell}</td>
-        <td class="px-4 py-2.5 text-right font-semibold text-indigo-700">${totalPlan > 0 ? fmtC(totalPlan) : '<span class="text-gray-300">—</span>'}</td>
-        <td class="px-4 py-2.5 text-right">${diffHtml}</td>
-        <td class="px-4 py-2.5 text-right">
-          <button class="plan-exclude-btn text-gray-300 hover:text-red-400 text-xs px-1" title="Retirer du plan" data-mfr="${escHtml(mfr)}">✕</button>
-        </td>
-      </tr>
-      <tr class="plan-detail hidden" data-mfr="${escHtml(mfr)}">
-        <td colspan="5" class="px-6 py-4 bg-gray-50 border-t border-gray-100">
-          ${renderDropsBlock(mfr, effectiveSuggested)}
-        </td>
-      </tr>`);
-  }
-
-  if (rows.length) {
-    tbody.innerHTML = rows.join('');
-  } else if (planState.excluded.size > 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-gray-400 text-xs">Toutes les marques ont été retirées — <button onclick="document.getElementById('planRestoreAllBtn').click()" class="underline text-amber-600 hover:text-amber-800">Tout réintégrer</button></td></tr>`;
-  } else {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-gray-400">${t('no_data')}</td></tr>`;
-  }
-
-  // Excluded brands panel
-  const excPanel = document.getElementById('planExcludedPanel');
-  const excList  = document.getElementById('planExcludedList');
-  if (excPanel && excList) {
-    const excBrands = [...planState.excluded].sort();
-    if (excBrands.length) {
-      excList.innerHTML = excBrands.map(b =>
-        `<span class="inline-flex items-center gap-1 bg-white border border-amber-200 rounded-full px-2.5 py-1 text-xs text-amber-700">
-          ${escHtml(b)}
-          <button class="plan-restore-btn text-amber-400 hover:text-amber-700 ml-1" data-mfr="${escHtml(b)}" title="Réintégrer">↩</button>
-        </span>`
-      ).join('');
-      excPanel.classList.remove('hidden');
-    } else {
-      excPanel.classList.add('hidden');
-    }
-  }
-
-  // Totals bar
-  const balance      = Math.round((totalCalcSuggested - totalSuggested) * 100) / 100;
-  const hasOverrides = Object.keys(planState.overrides).length > 0;
-  document.getElementById('planTotalRecommended').textContent = fmtC(totalCalcSuggested);
-  document.getElementById('planTotalSuggested').textContent   = fmtC(totalSuggested);
-
-  const balanceWrap = document.getElementById('planBalanceWrap');
-  const balanceEl   = document.getElementById('planTotalBalance');
-  if (hasOverrides) {
-    balanceWrap.classList.remove('hidden');
-    balanceEl.textContent = `${balance >= 0 ? '+' : ''}${fmtC(balance)}`;
-    balanceEl.className   = 'font-semibold ' + (balance > 0 ? 'text-emerald-600' : balance < 0 ? 'text-red-500' : 'text-gray-400');
-  } else {
-    balanceWrap.classList.add('hidden');
-  }
-
-  const diff    = totalPlanned - totalSuggested;
-  const diffCls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
-  document.getElementById('planTotalPlanned').textContent = totalPlanned > 0 ? fmtC(totalPlanned) : '—';
-  const diffEl = document.getElementById('planTotalDiff');
-  diffEl.textContent = totalPlanned > 0 ? `${diff >= 0 ? '+' : ''}${fmtC(diff)}` : '—';
-  diffEl.className   = 'font-semibold ' + diffCls;
-
-  // Row click → expand (but not when clicking action buttons or the editable input)
-  document.querySelectorAll('.plan-row').forEach(row => {
-    row.addEventListener('click', e => {
-      if (e.target.closest('.plan-exclude-btn'))    return;
-      if (e.target.closest('.plan-suggested-input')) return;
-      if (e.target.closest('.plan-suggested-reset')) return;
-      const mfr    = row.dataset.mfr;
-      const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
-      const toggle = row.querySelector('.plan-toggle');
-      if (detail) {
-        const open = !detail.classList.contains('hidden');
-        detail.classList.toggle('hidden', open);
-        if (toggle) toggle.textContent = open ? '▶' : '▼';
-        if (!open) planLoadAllDocs(mfr);
-      }
+    document.querySelectorAll('.plan-row').forEach(row => {
+      row.addEventListener('click', e => {
+        if (e.target.closest('.plan-exclude-btn'))    return;
+        if (e.target.closest('.plan-suggested-input')) return;
+        if (e.target.closest('.plan-suggested-reset')) return;
+        const mfr    = row.dataset.mfr;
+        const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
+        const toggle = row.querySelector('.plan-toggle');
+        if (detail) {
+          const open = !detail.classList.contains('hidden');
+          detail.classList.toggle('hidden', open);
+          if (toggle) toggle.textContent = open ? '▶' : '▼';
+          if (!open) loadAllDocs(mfr);
+        }
+      });
     });
-  });
-}
+  }
 
-function renderDropsBlock(mfr, suggested) {
-  // Ensure at least drop_1 exists in planState.drops
-  let drops = planState.drops[mfr];
-  if (!drops || !drops.length) drops = [{ drop_id: 'drop_1', drop_name: 'Drop 1', drop_order: 1 }];
+  function renderDropsBlock(mfr, suggested) {
+    let drops = planState.drops[mfr];
+    if (!drops || !drops.length) drops = [{ drop_id: 'drop_1', drop_name: 'Drop 1', drop_order: 1 }];
 
-  const visibleShops = SHOPS.filter(s => planState.selectedShops.has(s.id));
+    const visibleShops = SHOPS.filter(s => planState.selectedShops.has(s.id));
 
-  const dropBlocks = drops.map(drop => {
-    const { drop_id, drop_name } = drop;
-    const shopMap  = (planState.plan[mfr] ?? {})[drop_id] ?? {};
-    const dropTotal = visibleShops.reduce((s, sh) => s + (shopMap[sh.id] ?? 0), 0);
-    const isDrop1  = drop_id === 'drop_1';
+    const dropBlocks = drops.map(drop => {
+      const { drop_id, drop_name } = drop;
+      const shopMap  = (planState.plan[mfr] ?? {})[drop_id] ?? {};
+      const dropTotal = visibleShops.reduce((s, sh) => s + (shopMap[sh.id] ?? 0), 0);
+      const isDrop1  = drop_id === 'drop_1';
 
-    const shopRows = visibleShops.map(({ id, name }) => {
-      const val = shopMap[id] ?? 0;
-      return `
-        <div class="flex items-center gap-3 mb-1.5">
-          <span class="text-xs text-gray-500 w-40 truncate">${escHtml(name)}</span>
-          <div class="flex items-center gap-1">
-            <span class="text-xs text-gray-400">$</span>
-            <input type="number" min="0" step="100"
-              class="plan-shop-input border border-gray-200 rounded px-2 py-1 text-xs w-28 text-right focus:border-indigo-400 focus:outline-none"
-              data-mfr="${escHtml(mfr)}" data-drop="${drop_id}" data-shop="${id}"
-              value="${val > 0 ? val : ''}" placeholder="0">
-          </div>
+      const shopRows = visibleShops.map(({ id, name }) => {
+        const val = shopMap[id] ?? 0;
+        return `
+          <div class="flex items-center gap-3 mb-1.5">
+            <span class="text-xs text-gray-500 w-40 truncate">${escHtml(name)}</span>
+            <div class="flex items-center gap-1">
+              <span class="text-xs text-gray-400">$</span>
+              <input type="number" min="0" step="100"
+                class="plan-shop-input border border-gray-200 rounded px-2 py-1 text-xs w-28 text-right focus:border-indigo-400 focus:outline-none"
+                data-mfr="${escHtml(mfr)}" data-drop="${drop_id}" data-shop="${id}"
+                value="${val > 0 ? val : ''}" placeholder="0">
+            </div>
+          </div>`;
+      }).join('');
+
+      const deleteBtn = isDrop1 ? '' :
+        `<button class="plan-drop-delete ml-2 text-gray-300 hover:text-red-400 text-xs" title="Supprimer la livraison"
+           data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">✕</button>`;
+
+      const docsSection = `
+        <div class="mt-2 pt-2 border-t border-gray-100">
+          <div class="plan-docs-list text-[10px] text-gray-400 mb-1.5" data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">…</div>
+          <label class="flex items-center gap-1.5 text-[10px] text-indigo-400 hover:text-indigo-600 cursor-pointer font-medium">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+            </svg>
+            Ajouter un document
+            <input type="file" class="plan-doc-upload sr-only"
+              data-mfr="${escHtml(mfr)}" data-drop="${drop_id}"
+              accept=".pdf,.xlsx,.xls,.docx,.doc,.csv,.txt,.jpg,.jpeg,.png">
+          </label>
         </div>`;
-    }).join('');
 
-    const deleteBtn = isDrop1 ? '' :
-      `<button class="plan-drop-delete ml-2 text-gray-300 hover:text-red-400 text-xs" title="Supprimer la livraison"
-         data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">✕</button>`;
-
-    const docsSection = `
-      <div class="mt-2 pt-2 border-t border-gray-100">
-        <div class="plan-docs-list text-[10px] text-gray-400 mb-1.5" data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">…</div>
-        <label class="flex items-center gap-1.5 text-[10px] text-indigo-400 hover:text-indigo-600 cursor-pointer font-medium">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
-          </svg>
-          Ajouter un document
-          <input type="file" class="plan-doc-upload sr-only"
-            data-mfr="${escHtml(mfr)}" data-drop="${drop_id}"
-            accept=".pdf,.xlsx,.xls,.docx,.doc,.csv,.txt,.jpg,.jpeg,.png">
-        </label>
-      </div>`;
+      return `
+        <div class="plan-drop-block mb-4 last:mb-0" data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">
+          <div class="flex items-center gap-2 mb-2">
+            <input type="text"
+              class="plan-drop-name border-b border-gray-200 bg-transparent text-xs font-semibold text-gray-600 px-1 py-0.5 focus:outline-none focus:border-indigo-400 w-40"
+              data-mfr="${escHtml(mfr)}" data-drop="${drop_id}"
+              value="${escHtml(drop_name)}">
+            ${deleteBtn}
+            ${dropTotal > 0 ? `<span class="text-xs text-indigo-600 font-semibold ml-2">${fmtC(dropTotal)}</span>` : ''}
+          </div>
+          ${visibleShops.length ? shopRows : '<span class="text-xs text-gray-300">Aucune boutique sélectionnée</span>'}
+          ${docsSection}
+        </div>`;
+    }).join('<div class="border-t border-gray-200 my-3"></div>');
 
     return `
-      <div class="plan-drop-block mb-4 last:mb-0" data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">
-        <div class="flex items-center gap-2 mb-2">
-          <input type="text"
-            class="plan-drop-name border-b border-gray-200 bg-transparent text-xs font-semibold text-gray-600 px-1 py-0.5 focus:outline-none focus:border-indigo-400 w-40"
-            data-mfr="${escHtml(mfr)}" data-drop="${drop_id}"
-            value="${escHtml(drop_name)}">
-          ${deleteBtn}
-          ${dropTotal > 0 ? `<span class="text-xs text-indigo-600 font-semibold ml-2">${fmtC(dropTotal)}</span>` : ''}
+      <div class="flex gap-8 flex-wrap">
+        <div class="min-w-72">
+          <div class="text-xs text-gray-400 mb-3">Suggéré total : <span class="font-semibold text-gray-600">${fmtC(suggested)}</span></div>
+          ${dropBlocks}
+          <button class="plan-add-drop mt-3 flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-medium"
+            data-mfr="${escHtml(mfr)}">
+            <span class="text-base leading-none">+</span> Ajouter une livraison
+          </button>
         </div>
-        ${visibleShops.length ? shopRows : '<span class="text-xs text-gray-300">Aucune boutique sélectionnée</span>'}
-        ${docsSection}
       </div>`;
-  }).join('<div class="border-t border-gray-200 my-3"></div>');
-
-  return `
-    <div class="flex gap-8 flex-wrap">
-      <div class="min-w-72">
-        <div class="text-xs text-gray-400 mb-3">Suggéré total : <span class="font-semibold text-gray-600">${fmtC(suggested)}</span></div>
-        ${dropBlocks}
-        <button class="plan-add-drop mt-3 flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-medium"
-          data-mfr="${escHtml(mfr)}">
-          <span class="text-base leading-none">+</span> Ajouter une livraison
-        </button>
-      </div>
-    </div>`;
-}
-
-function flashPlanSaved() {
-  const msg = document.getElementById('planSavedMsg');
-  if (!msg) return;
-  msg.classList.remove('hidden');
-  clearTimeout(msg._timer);
-  msg._timer = setTimeout(() => msg.classList.add('hidden'), 2000);
-}
-
-// Auto-save amount inputs on change
-document.addEventListener('change', async e => {
-  const input = e.target.closest('.plan-shop-input');
-  if (!input) return;
-  const mfr    = input.dataset.mfr;
-  const dropId = input.dataset.drop ?? 'drop_1';
-  const shopId = input.dataset.shop;
-  const amount = parseFloat(input.value) || 0;
-  const season = planState.season;
-
-  if (!planState.plan[mfr]) planState.plan[mfr] = {};
-  if (!planState.plan[mfr][dropId]) planState.plan[mfr][dropId] = {};
-  planState.plan[mfr][dropId][shopId] = amount;
-
-  // Ensure this drop exists in planState.drops
-  if (!planState.drops[mfr]) planState.drops[mfr] = [];
-  if (!planState.drops[mfr].find(d => d.drop_id === dropId)) {
-    planState.drops[mfr].push({ drop_id: dropId, drop_name: 'Drop 1', drop_order: 1 });
   }
 
-  try {
-    await fetch(`${BASE}/api/budget-plan`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ season_code: season, manufacturer: mfr, drop_id: dropId, shop_id: shopId, planned_amount: amount }),
-    });
-    flashPlanSaved();
-    // Refresh only the totals cells without full re-render
-    const totalPlan = planTotalForMfr(mfr);
-    const suggested = planState.budget.find(b => b.manufacturer === mfr)?.net_budget ?? 0;
-    const row       = document.querySelector(`.plan-row[data-mfr="${CSS.escape(mfr)}"]`);
-    if (row) {
-      const cells = row.querySelectorAll('td');
-      const diff  = totalPlan - suggested;
-      cells[2].innerHTML = totalPlan > 0 ? `<span class="font-semibold text-indigo-700">${fmtC(totalPlan)}</span>` : '<span class="text-gray-300">—</span>';
-      const cls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
-      cells[3].innerHTML = totalPlan > 0 ? `<span class="${cls}">${diff >= 0 ? '+' : ''}${fmtC(diff)}</span>` : '<span class="text-gray-300">—</span>';
-    }
-    // Refresh totals bar
-    let ts = 0, tp = 0;
-    for (const m of planState.budget) { ts += m.net_budget ?? 0; tp += planTotalForMfr(m.manufacturer); }
-    document.getElementById('planTotalSuggested').textContent = fmtC(ts);
-    document.getElementById('planTotalPlanned').textContent   = tp > 0 ? fmtC(tp) : '—';
-    const d = tp - ts;
-    const diffEl = document.getElementById('planTotalDiff');
-    diffEl.textContent = tp > 0 ? `${d >= 0 ? '+' : ''}${fmtC(d)}` : '—';
-    diffEl.className   = 'font-semibold ' + (d > 0 ? 'text-red-500' : d < 0 ? 'text-amber-600' : 'text-gray-400');
-  } catch {}
-});
-
-// Save drop name on blur or Enter
-document.addEventListener('change', async e => {
-  const input = e.target.closest('.plan-drop-name');
-  if (!input) return;
-  const mfr    = input.dataset.mfr;
-  const dropId = input.dataset.drop;
-  const name   = input.value.trim() || dropId;
-  // Update local state
-  const drop = planState.drops[mfr]?.find(d => d.drop_id === dropId);
-  if (drop) drop.drop_name = name;
-  try {
-    await fetch(`${BASE}/api/budget-plan/drop`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_id: dropId, drop_name: name }),
-    });
-    flashPlanSaved();
-  } catch {}
-});
-
-// Add drop button
-document.addEventListener('click', async e => {
-  const btn = e.target.closest('.plan-add-drop');
-  if (!btn) return;
-  const mfr = btn.dataset.mfr;
-  try {
-    const res = await fetch(`${BASE}/api/budget-plan/drop`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_name: '' }),
-    });
-    const data = await res.json();
-    if (!data.ok) return;
-    if (!planState.drops[mfr]) planState.drops[mfr] = [];
-    planState.drops[mfr].push({ drop_id: data.drop_id, drop_name: data.drop_name, drop_order: data.drop_order });
-    if (!planState.plan[mfr]) planState.plan[mfr] = {};
-    planState.plan[mfr][data.drop_id] = {};
-    // Re-render the detail row only
-    const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
-    if (detail) {
-      const suggested = planState.budget.find(b => b.manufacturer === mfr)?.net_budget ?? 0;
-      detail.querySelector('td').innerHTML = renderDropsBlock(mfr, suggested);
-      planLoadAllDocs(mfr);
-    }
-  } catch {}
-});
-
-// Delete drop button
-document.addEventListener('click', async e => {
-  const btn = e.target.closest('.plan-drop-delete');
-  if (!btn) return;
-  const mfr    = btn.dataset.mfr;
-  const dropId = btn.dataset.drop;
-  if (!confirm(`Supprimer cette livraison et ses montants ?`)) return;
-  try {
-    await fetch(`${BASE}/api/budget-plan/drop`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_id: dropId }),
-    });
-    // Update local state
-    if (planState.drops[mfr]) planState.drops[mfr] = planState.drops[mfr].filter(d => d.drop_id !== dropId);
-    if (planState.plan[mfr]) delete planState.plan[mfr][dropId];
-    // Re-render detail + totals
-    const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
-    if (detail) {
-      const suggested = planState.budget.find(b => b.manufacturer === mfr)?.net_budget ?? 0;
-      detail.querySelector('td').innerHTML = renderDropsBlock(mfr, suggested);
-    }
-    renderPlanTable();
-  } catch {}
-});
-
-// Exclude a brand from the plan view (X button in summary row)
-document.addEventListener('click', e => {
-  const btn = e.target.closest('.plan-exclude-btn');
-  if (!btn) return;
-  e.stopPropagation();
-  const mfr = btn.dataset.mfr;
-  planState.excluded.add(mfr);
-  planSaveExcluded();
-  // Close its detail row if open
-  const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
-  if (detail) detail.classList.add('hidden');
-  renderPlanTable();
-});
-
-// Restore a single excluded brand (↩ button in excluded panel)
-document.addEventListener('click', e => {
-  const btn = e.target.closest('.plan-restore-btn');
-  if (!btn) return;
-  e.stopPropagation();
-  planState.excluded.delete(btn.dataset.mfr);
-  planSaveExcluded();
-  renderPlanTable();
-});
-
-// Restore all excluded brands
-document.getElementById('planRestoreAllBtn')?.addEventListener('click', () => {
-  planState.excluded.clear();
-  planSaveExcluded();
-  renderPlanTable();
-});
-
-// Edit suggested budget inline
-document.addEventListener('change', e => {
-  const input = e.target.closest('.plan-suggested-input');
-  if (!input) return;
-  const mfr  = input.dataset.mfr;
-  const calc  = parseFloat(input.dataset.calc ?? 0);
-  const value = parseFloat(input.value) || 0;
-  if (Math.abs(value - calc) < 0.01) {
-    delete planState.overrides[mfr];
-  } else {
-    planState.overrides[mfr] = value;
-  }
-  planSaveOverrides();
-  renderPlanTable();
-});
-
-// Reset suggested budget to calculated value
-document.addEventListener('click', e => {
-  const btn = e.target.closest('.plan-suggested-reset');
-  if (!btn) return;
-  e.stopPropagation();
-  const mfr = btn.dataset.mfr;
-  delete planState.overrides[mfr];
-  planSaveOverrides();
-  renderPlanTable();
-});
-
-// Show/hide add-brand panel
-document.getElementById('planShowAddBrand')?.addEventListener('click', () => {
-  document.getElementById('planAddBrandPanel')?.classList.toggle('hidden');
-  document.getElementById('planAddBrandMsg')?.classList.add('hidden');
-});
-document.getElementById('planCancelAddBrand')?.addEventListener('click', () => {
-  document.getElementById('planAddBrandPanel')?.classList.add('hidden');
-});
-
-// Confirm add brand
-document.getElementById('planConfirmAddBrand')?.addEventListener('click', () => {
-  const selEl = document.getElementById('planAddExistingBrand');
-  const txtEl = document.getElementById('planAddNewBrand');
-  const msgEl = document.getElementById('planAddBrandMsg');
-  const mfr   = (txtEl.value.trim() || selEl.value || '').trim();
-  if (!mfr) { msgEl.textContent = 'Veuillez choisir ou saisir un nom de collection.'; msgEl.classList.remove('hidden'); return; }
-
-  // Remove from excluded if it was excluded
-  if (planState.excluded.has(mfr)) {
-    planState.excluded.delete(mfr);
-    planSaveExcluded();
+  function flashSaved() {
+    const msg = document.getElementById('planSavedMsg');
+    if (!msg) return;
+    msg.classList.remove('hidden');
+    clearTimeout(msg._timer);
+    msg._timer = setTimeout(() => msg.classList.add('hidden'), 2000);
   }
 
-  // If not already in budget list, add a manual entry
-  if (!planState.budget.find(b => b.manufacturer === mfr)) {
-    planState.budget.push({ manufacturer: mfr, net_budget: 0, _manual: true });
+  function fmtFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' Ko';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' Mo';
   }
-  // Ensure at least drop_1 exists
-  if (!planState.drops[mfr]) planState.drops[mfr] = [{ drop_id: 'drop_1', drop_name: 'Drop 1', drop_order: 1 }];
-  if (!planState.plan[mfr])  planState.plan[mfr]  = {};
 
-  // Reset form
-  selEl.value = ''; txtEl.value = '';
-  document.getElementById('planAddBrandPanel')?.classList.add('hidden');
-  renderPlanTable();
-});
-
-// ── Budget documents ──────────────────────────────────────────────────────
-
-function fmtFileSize(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' Ko';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' Mo';
-}
-
-async function loadPlanDocs(mfr, dropId) {
-  const containers = document.querySelectorAll(`.plan-docs-list[data-mfr="${CSS.escape(mfr)}"][data-drop="${CSS.escape(dropId)}"]`);
-  if (!containers.length) return;
-  try {
-    const r    = await fetch(`${BASE}/api/budget-plan/documents?season=${planState.season}&manufacturer=${encodeURIComponent(mfr)}&drop_id=${dropId}`);
-    const data = await r.json();
-    const html = data.docs && data.docs.length
-      ? data.docs.map(doc => `
-          <div class="flex items-center gap-2 py-0.5">
-            <a href="${BASE}/api/budget-plan/document/${doc.id}" target="_blank"
-               class="text-[10px] text-indigo-500 hover:underline max-w-xs truncate"
-               title="${escHtml(doc.filename)}">📄 ${escHtml(doc.filename)}</a>
-            <span class="text-[10px] text-gray-300">${fmtFileSize(doc.file_size)}</span>
-            <button class="plan-doc-delete text-gray-300 hover:text-red-400 text-[10px]"
-              data-doc-id="${doc.id}" data-mfr="${escHtml(mfr)}" data-drop="${escHtml(dropId)}" title="Supprimer">✕</button>
-          </div>`).join('')
-      : '<span class="text-[10px] text-gray-300 italic">Aucun document</span>';
-    containers.forEach(c => c.innerHTML = html);
-  } catch {
-    containers.forEach(c => c.innerHTML = '<span class="text-[10px] text-red-400">Erreur</span>');
-  }
-}
-
-function planLoadAllDocs(mfr) {
-  const drops = planState.drops[mfr] ?? [{ drop_id: 'drop_1' }];
-  drops.forEach(d => loadPlanDocs(mfr, d.drop_id));
-}
-
-// Upload file
-document.addEventListener('change', async e => {
-  const input = e.target.closest('.plan-doc-upload');
-  if (!input) return;
-  const file  = input.files[0];
-  if (!file) return;
-  const mfr   = input.dataset.mfr;
-  const drop  = input.dataset.drop;
-  // Show uploading state
-  const containers = document.querySelectorAll(`.plan-docs-list[data-mfr="${CSS.escape(mfr)}"][data-drop="${CSS.escape(drop)}"]`);
-  containers.forEach(c => c.innerHTML = '<span class="text-[10px] text-gray-400 animate-pulse">Envoi en cours…</span>');
-  const reader = new FileReader();
-  reader.onload = async evt => {
-    const base64 = evt.target.result.split(',')[1];
+  async function loadDocs(mfr, dropId) {
+    const containers = document.querySelectorAll(`.plan-docs-list[data-mfr="${CSS.escape(mfr)}"][data-drop="${CSS.escape(dropId)}"]`);
+    if (!containers.length) return;
     try {
-      const res = await fetch(`${BASE}/api/budget-plan/document`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          season_code: planState.season,
-          manufacturer: mfr,
-          drop_id: drop,
-          filename: file.name,
-          content_type: file.type || 'application/octet-stream',
-          data_base64: base64,
-        }),
-      });
-      if (res.ok) { flashPlanSaved(); }
-    } catch {}
-    input.value = '';
-    loadPlanDocs(mfr, drop);
-  };
-  reader.readAsDataURL(file);
-});
-
-// Delete document
-document.addEventListener('click', async e => {
-  const btn = e.target.closest('.plan-doc-delete');
-  if (!btn) return;
-  const docId = btn.dataset.docId;
-  const mfr   = btn.dataset.mfr;
-  const drop  = btn.dataset.drop;
-  if (!confirm('Supprimer ce document ?')) return;
-  try {
-    await fetch(`${BASE}/api/budget-plan/document/${docId}`, { method: 'DELETE' });
-    loadPlanDocs(mfr, drop);
-  } catch {}
-});
-
-async function loadTransfers() {
-  showLoader('transfers', true);
-  try {
-    const r = await fetch(`${BASE}/api/transfers`);
-    const d = await r.json();
-    document.getElementById('transfersCount').textContent = d.count > 0 ? t('transfers_count')(d.count) : '';
-    if (d.count === 0) {
-      document.getElementById('transfersEmpty').classList.remove('hidden');
-      document.getElementById('transfersBody').innerHTML = '';
-    } else {
-      document.getElementById('transfersEmpty').classList.add('hidden');
-      document.getElementById('transfersBody').innerHTML = d.transfers.map(t => `
-        <tr class="transition-colors">
-          <td class="px-3 py-2 max-w-xs truncate">${escHtml(t.description)}</td>
-          <td class="px-3 py-2 text-gray-500">${t.from_shop}</td>
-          <td class="px-3 py-2 text-gray-500">${t.to_shop}</td>
-          <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(t.qty)}</td>
-        </tr>`).join('');
+      const r    = await fetch(`${BASE}/api/budget-plan/documents?season=${planState.season}&manufacturer=${encodeURIComponent(mfr)}&drop_id=${dropId}`);
+      const data = await r.json();
+      const html = data.docs && data.docs.length
+        ? data.docs.map(doc => `
+            <div class="flex items-center gap-2 py-0.5">
+              <a href="${BASE}/api/budget-plan/document/${doc.id}" target="_blank"
+                 class="text-[10px] text-indigo-500 hover:underline max-w-xs truncate"
+                 title="${escHtml(doc.filename)}">📄 ${escHtml(doc.filename)}</a>
+              <span class="text-[10px] text-gray-300">${fmtFileSize(doc.file_size)}</span>
+              <button class="plan-doc-delete text-gray-300 hover:text-red-400 text-[10px]"
+                data-doc-id="${doc.id}" data-mfr="${escHtml(mfr)}" data-drop="${escHtml(dropId)}" title="Supprimer">✕</button>
+            </div>`).join('')
+        : '<span class="text-[10px] text-gray-300 italic">Aucun document</span>';
+      containers.forEach(c => c.innerHTML = html);
+    } catch {
+      containers.forEach(c => c.innerHTML = '<span class="text-[10px] text-red-400">Erreur</span>');
     }
-  } catch (e) { document.getElementById('transfersBody').innerHTML = `<tr><td colspan="4" class="text-center py-8 text-red-500">${e.message}</td></tr>`; }
-  showLoader('transfers', false);
-}
+  }
+
+  function loadAllDocs(mfr) {
+    const drops = planState.drops[mfr] ?? [{ drop_id: 'drop_1' }];
+    drops.forEach(d => loadDocs(mfr, d.drop_id));
+  }
+
+  function init() {
+    // Auto-save shop amount inputs
+    document.addEventListener('change', async e => {
+      const input = e.target.closest('.plan-shop-input');
+      if (!input) return;
+      const mfr    = input.dataset.mfr;
+      const dropId = input.dataset.drop ?? 'drop_1';
+      const shopId = input.dataset.shop;
+      const amount = parseFloat(input.value) || 0;
+      const season = planState.season;
+
+      if (!planState.plan[mfr]) planState.plan[mfr] = {};
+      if (!planState.plan[mfr][dropId]) planState.plan[mfr][dropId] = {};
+      planState.plan[mfr][dropId][shopId] = amount;
+
+      if (!planState.drops[mfr]) planState.drops[mfr] = [];
+      if (!planState.drops[mfr].find(d => d.drop_id === dropId)) {
+        planState.drops[mfr].push({ drop_id: dropId, drop_name: 'Drop 1', drop_order: 1 });
+      }
+
+      try {
+        await fetch(`${BASE}/api/budget-plan`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ season_code: season, manufacturer: mfr, drop_id: dropId, shop_id: shopId, planned_amount: amount }),
+        });
+        flashSaved();
+        const tp  = totalForMfr(mfr);
+        const sug = planState.budget.find(b => b.manufacturer === mfr)?.net_budget ?? 0;
+        const row = document.querySelector(`.plan-row[data-mfr="${CSS.escape(mfr)}"]`);
+        if (row) {
+          const cells = row.querySelectorAll('td');
+          const diff  = tp - sug;
+          cells[2].innerHTML = tp > 0 ? `<span class="font-semibold text-indigo-700">${fmtC(tp)}</span>` : '<span class="text-gray-300">—</span>';
+          const cls = diff > 0 ? 'text-red-500' : diff < 0 ? 'text-amber-600' : 'text-gray-400';
+          cells[3].innerHTML = tp > 0 ? `<span class="${cls}">${diff >= 0 ? '+' : ''}${fmtC(diff)}</span>` : '<span class="text-gray-300">—</span>';
+        }
+        let ts = 0, tpl = 0;
+        for (const m of planState.budget) { ts += m.net_budget ?? 0; tpl += totalForMfr(m.manufacturer); }
+        document.getElementById('planTotalSuggested').textContent = fmtC(ts);
+        document.getElementById('planTotalPlanned').textContent   = tpl > 0 ? fmtC(tpl) : '—';
+        const d = tpl - ts;
+        const diffEl = document.getElementById('planTotalDiff');
+        diffEl.textContent = tpl > 0 ? `${d >= 0 ? '+' : ''}${fmtC(d)}` : '—';
+        diffEl.className   = 'font-semibold ' + (d > 0 ? 'text-red-500' : d < 0 ? 'text-amber-600' : 'text-gray-400');
+      } catch {}
+    });
+
+    // Save drop name
+    document.addEventListener('change', async e => {
+      const input = e.target.closest('.plan-drop-name');
+      if (!input) return;
+      const mfr    = input.dataset.mfr;
+      const dropId = input.dataset.drop;
+      const name   = input.value.trim() || dropId;
+      const drop   = planState.drops[mfr]?.find(d => d.drop_id === dropId);
+      if (drop) drop.drop_name = name;
+      try {
+        await fetch(`${BASE}/api/budget-plan/drop`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_id: dropId, drop_name: name }),
+        });
+        flashSaved();
+      } catch {}
+    });
+
+    // Add drop
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('.plan-add-drop');
+      if (!btn) return;
+      const mfr = btn.dataset.mfr;
+      try {
+        const res  = await fetch(`${BASE}/api/budget-plan/drop`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_name: '' }),
+        });
+        const data = await res.json();
+        if (!data.ok) return;
+        if (!planState.drops[mfr]) planState.drops[mfr] = [];
+        planState.drops[mfr].push({ drop_id: data.drop_id, drop_name: data.drop_name, drop_order: data.drop_order });
+        if (!planState.plan[mfr]) planState.plan[mfr] = {};
+        planState.plan[mfr][data.drop_id] = {};
+        const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
+        if (detail) {
+          const suggested = planState.budget.find(b => b.manufacturer === mfr)?.net_budget ?? 0;
+          detail.querySelector('td').innerHTML = renderDropsBlock(mfr, suggested);
+          loadAllDocs(mfr);
+        }
+      } catch {}
+    });
+
+    // Delete drop
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('.plan-drop-delete');
+      if (!btn) return;
+      const mfr    = btn.dataset.mfr;
+      const dropId = btn.dataset.drop;
+      if (!confirm('Supprimer cette livraison et ses montants ?')) return;
+      try {
+        await fetch(`${BASE}/api/budget-plan/drop`, {
+          method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_id: dropId }),
+        });
+        if (planState.drops[mfr]) planState.drops[mfr] = planState.drops[mfr].filter(d => d.drop_id !== dropId);
+        if (planState.plan[mfr]) delete planState.plan[mfr][dropId];
+        const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
+        if (detail) {
+          const suggested = planState.budget.find(b => b.manufacturer === mfr)?.net_budget ?? 0;
+          detail.querySelector('td').innerHTML = renderDropsBlock(mfr, suggested);
+        }
+        renderTable();
+      } catch {}
+    });
+
+    // Exclude brand
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('.plan-exclude-btn');
+      if (!btn) return;
+      e.stopPropagation();
+      const mfr = btn.dataset.mfr;
+      planState.excluded.add(mfr);
+      saveExcluded();
+      const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
+      if (detail) detail.classList.add('hidden');
+      renderTable();
+    });
+
+    // Restore single excluded brand
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('.plan-restore-btn');
+      if (!btn) return;
+      e.stopPropagation();
+      planState.excluded.delete(btn.dataset.mfr);
+      saveExcluded();
+      renderTable();
+    });
+
+    // Restore all
+    document.getElementById('planRestoreAllBtn')?.addEventListener('click', () => {
+      planState.excluded.clear();
+      saveExcluded();
+      renderTable();
+    });
+
+    // Edit suggested budget inline
+    document.addEventListener('change', e => {
+      const input = e.target.closest('.plan-suggested-input');
+      if (!input) return;
+      const mfr   = input.dataset.mfr;
+      const calc  = parseFloat(input.dataset.calc ?? 0);
+      const value = parseFloat(input.value) || 0;
+      if (Math.abs(value - calc) < 0.01) delete planState.overrides[mfr];
+      else planState.overrides[mfr] = value;
+      saveOverrides();
+      renderTable();
+    });
+
+    // Reset suggested to calc
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('.plan-suggested-reset');
+      if (!btn) return;
+      e.stopPropagation();
+      delete planState.overrides[btn.dataset.mfr];
+      saveOverrides();
+      renderTable();
+    });
+
+    // Add brand panel
+    document.getElementById('planShowAddBrand')?.addEventListener('click', () => {
+      document.getElementById('planAddBrandPanel')?.classList.toggle('hidden');
+      document.getElementById('planAddBrandMsg')?.classList.add('hidden');
+    });
+    document.getElementById('planCancelAddBrand')?.addEventListener('click', () => {
+      document.getElementById('planAddBrandPanel')?.classList.add('hidden');
+    });
+    document.getElementById('planConfirmAddBrand')?.addEventListener('click', () => {
+      const selEl = document.getElementById('planAddExistingBrand');
+      const txtEl = document.getElementById('planAddNewBrand');
+      const msgEl = document.getElementById('planAddBrandMsg');
+      const mfr   = (txtEl.value.trim() || selEl.value || '').trim();
+      if (!mfr) { msgEl.textContent = 'Veuillez choisir ou saisir un nom de collection.'; msgEl.classList.remove('hidden'); return; }
+      if (planState.excluded.has(mfr)) { planState.excluded.delete(mfr); saveExcluded(); }
+      if (!planState.budget.find(b => b.manufacturer === mfr)) planState.budget.push({ manufacturer: mfr, net_budget: 0, _manual: true });
+      if (!planState.drops[mfr]) planState.drops[mfr] = [{ drop_id: 'drop_1', drop_name: 'Drop 1', drop_order: 1 }];
+      if (!planState.plan[mfr]) planState.plan[mfr] = {};
+      selEl.value = ''; txtEl.value = '';
+      document.getElementById('planAddBrandPanel')?.classList.add('hidden');
+      renderTable();
+    });
+
+    // Upload file
+    document.addEventListener('change', async e => {
+      const input = e.target.closest('.plan-doc-upload');
+      if (!input) return;
+      const file = input.files[0];
+      if (!file) return;
+      const mfr  = input.dataset.mfr;
+      const drop = input.dataset.drop;
+      const containers = document.querySelectorAll(`.plan-docs-list[data-mfr="${CSS.escape(mfr)}"][data-drop="${CSS.escape(drop)}"]`);
+      containers.forEach(c => c.innerHTML = '<span class="text-[10px] text-gray-400 animate-pulse">Envoi en cours…</span>');
+      const reader = new FileReader();
+      reader.onload = async evt => {
+        const base64 = evt.target.result.split(',')[1];
+        try {
+          const res = await fetch(`${BASE}/api/budget-plan/document`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              season_code: planState.season, manufacturer: mfr, drop_id: drop,
+              filename: file.name, content_type: file.type || 'application/octet-stream', data_base64: base64,
+            }),
+          });
+          if (res.ok) flashSaved();
+        } catch {}
+        input.value = '';
+        loadDocs(mfr, drop);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Delete document
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('.plan-doc-delete');
+      if (!btn) return;
+      const docId = btn.dataset.docId, mfr = btn.dataset.mfr, drop = btn.dataset.drop;
+      if (!confirm('Supprimer ce document ?')) return;
+      try {
+        await fetch(`${BASE}/api/budget-plan/document/${docId}`, { method: 'DELETE' });
+        loadDocs(mfr, drop);
+      } catch {}
+    });
+  }
+
+  return { load, init };
+})();
 
 // ── Pager ─────────────────────────────────────────────────────────────────
 function renderPager(key, total) {
@@ -2375,337 +2344,332 @@ function populateShopFilter(items, selectId) {
 // ── Loader ────────────────────────────────────────────────────────────────
 function showLoader(key, show) { const el = document.getElementById(`${key}Loader`); if (el) el.classList.toggle('hidden', !show); }
 
-// ── Event bindings ────────────────────────────────────────────────────────
-let nosD, seasD, sizD;
-document.getElementById('nosShop').addEventListener('change', filterAndRenderNos);
-document.getElementById('nosSearch').addEventListener('input', () => { clearTimeout(nosD); nosD = setTimeout(filterAndRenderNos, 250); });
-bindPager('nos', renderNosPage);
-
-const seasWeeks = document.getElementById('seasWeeks');
-seasWeeks.addEventListener('input', () => document.getElementById('seasWeeksLabel').textContent = seasWeeks.value);
-seasWeeks.addEventListener('change', () => { clearTimeout(seasD); seasD = setTimeout(() => { state.seasonal.data=[]; loadSeasonal(); }, 200); });
-document.getElementById('seasShop').addEventListener('change', filterAndRenderSeasonal);
-document.getElementById('seasSearch').addEventListener('input', () => { clearTimeout(seasD); seasD = setTimeout(filterAndRenderSeasonal, 250); });
-bindPager('seasonal', renderSeasonalPage);
-
-document.getElementById('sizesShop').addEventListener('change', filterAndRenderSizes);
-document.getElementById('sizesSearch').addEventListener('input', () => { clearTimeout(sizD); sizD = setTimeout(filterAndRenderSizes, 250); });
-bindPager('sizes', renderSizesPage);
-
-// ── Paramètres — budget params load/save ─────────────────────────────────
-function buildShopRateInputs(ratesByShop) {
-  const container = document.getElementById('budgetShopRates');
-  if (!container) return;
-  container.innerHTML = '';
-  SHOPS.forEach(({ id, name }) => {
-    const pct = ratesByShop?.[id] != null ? Math.round(ratesByShop[id] * 100) : 50;
-    const row = document.createElement('div');
-    row.className = 'flex items-center gap-2';
-    row.innerHTML = `
-      <span class="text-xs text-gray-600 w-44 truncate">${name}</span>
-      <input id="budgetShopRate_${id}" type="number" min="0" max="100" step="5" value="${pct}"
-             class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
-      <span class="text-xs text-gray-500">%</span>`;
-    container.appendChild(row);
-  });
-}
-
-function applyBudgetSameRateToggle() {
-  const checked = document.getElementById('budgetSameRate')?.checked ?? true;
-  const container = document.getElementById('budgetShopRates');
-  const globalInput = document.getElementById('budgetCarryoverRate');
-  if (!container) return;
-  if (checked) {
-    container.classList.add('hidden');
-    container.classList.remove('flex');
-  } else {
-    container.classList.remove('hidden');
-    container.classList.add('flex');
-    // Sync global rate to any shop that still has the default
-    const globalPct = parseFloat(globalInput?.value ?? 50);
-    SHOPS.forEach(({ id }) => {
-      const el = document.getElementById(`budgetShopRate_${id}`);
-      if (el && el.value === '50') el.value = globalPct;
+// ─────────────────────────────────────────────────────────────────────────────
+// ParamsTab — Paramètres (tab-params)
+// ─────────────────────────────────────────────────────────────────────────────
+const ParamsTab = (() => {
+  function buildShopRateInputs(ratesByShop) {
+    const container = document.getElementById('budgetShopRates');
+    if (!container) return;
+    container.innerHTML = '';
+    SHOPS.forEach(({ id, name }) => {
+      const pct = ratesByShop?.[id] != null ? Math.round(ratesByShop[id] * 100) : 50;
+      const row = document.createElement('div');
+      row.className = 'flex items-center gap-2';
+      row.innerHTML = `
+        <span class="text-xs text-gray-600 w-44 truncate">${name}</span>
+        <input id="budgetShopRate_${id}" type="number" min="0" max="100" step="5" value="${pct}"
+               class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+        <span class="text-xs text-gray-500">%</span>`;
+      container.appendChild(row);
     });
   }
-}
 
-async function loadBudgetParams() {
-  try {
-    const d = await fetch(`${BASE}/api/settings/budget-params`).then(r => r.json());
-    const nbEl = document.getElementById('budgetNbSaisons');
-    const coEl = document.getElementById('budgetCarryoverRate');
-    const cbEl = document.getElementById('budgetSameRate');
-    if (nbEl && d.nb_saisons_reference != null) nbEl.value = d.nb_saisons_reference;
-    if (coEl && d.carryover_deduction_rate != null) coEl.value = Math.round(d.carryover_deduction_rate * 100);
-    if (cbEl) cbEl.checked = d.use_global_carryover_rate !== false;
-    buildShopRateInputs(d.carryover_rates_by_shop ?? {});
-    applyBudgetSameRateToggle();
-    const rfEl = document.getElementById('budgetRecencyFactor');
-    if (rfEl && d.recency_factor != null) { rfEl.value = d.recency_factor; updateRecencyPreview(); }
-    const absentMode = d.absent_brand_mode ?? 'show';
-    document.querySelectorAll('input[name="absentBrandMode"]').forEach(r => { r.checked = r.value === absentMode; });
-  } catch (e) {
-    console.warn('[budget-params] Failed to load:', e.message);
-  }
-}
-
-async function saveBudgetParamsToServer() {
-  const nb   = parseInt(document.getElementById('budgetNbSaisons')?.value ?? 3, 10);
-  const co   = parseFloat(document.getElementById('budgetCarryoverRate')?.value ?? 50) / 100;
-  const same = document.getElementById('budgetSameRate')?.checked ?? true;
-  const ratesByShop = {};
-  if (!same) {
-    SHOPS.forEach(({ id }) => {
-      const el = document.getElementById(`budgetShopRate_${id}`);
-      if (el) ratesByShop[id] = parseFloat(el.value) / 100;
-    });
-  }
-  const rf          = parseFloat(document.getElementById('budgetRecencyFactor')?.value ?? 2.0);
-  const absentMode  = document.querySelector('input[name="absentBrandMode"]:checked')?.value ?? 'show';
-  await fetch(`${BASE}/api/settings/budget-params`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      nb_saisons_reference:      nb,
-      carryover_deduction_rate:  co,
-      use_global_carryover_rate: same,
-      carryover_rates_by_shop:   ratesByShop,
-      recency_factor:            rf,
-      absent_brand_mode:         absentMode,
-    }),
-  });
-}
-
-function updateRecencyPreview() {
-  const rfEl      = document.getElementById('budgetRecencyFactor');
-  const previewEl = document.getElementById('budgetRecencyPreview');
-  const nbEl      = document.getElementById('budgetNbSaisons');
-  if (!rfEl || !previewEl) return;
-  const rf = parseFloat(rfEl.value) || 1;
-  const n  = parseInt(nbEl?.value ?? 3, 10);
-  const weights = Array.from({ length: n }, (_, i) => Math.pow(rf, n - 1 - i));
-  const total   = weights.reduce((s, w) => s + w, 0);
-  const pcts    = weights.map(w => Math.round(w / total * 100) + '%');
-  previewEl.textContent = `→ ${pcts.join(' / ')} (récent→ancien)`;
-}
-
-// ── Paramètres — events ───────────────────────────────────────────────────
-document.getElementById('tiersApply').addEventListener('click', async () => {
-  document.querySelectorAll('.tiers-input').forEach(inp => {
-    const idx   = parseInt(inp.dataset.idx, 10);
-    const field = inp.dataset.field;
-    const val   = parseFloat(inp.value);
-    if (!isNaN(val)) state.tiers[idx][field] = val;
-  });
-  saveTiers();
-  await saveTiersToServer();
-  // Re-fetch saisonnier budget so server applies new tiers
-  if (state.budgetSeas.data.length) {
-    const season = document.getElementById('budgetSeasSeason').value;
-    await fetchBudgetPanel('budgetSeas', '/api/budget/marque', { season });
-    updateAllBudgetTotals();
-  }
-  const note = document.getElementById('tiersNote');
-  note.classList.remove('hidden');
-  setTimeout(() => note.classList.add('hidden'), 3000);
-});
-
-document.getElementById('tiersReset').addEventListener('click', async () => {
-  state.tiers = DEFAULT_TIERS.map(t => ({ ...t }));
-  saveTiers();
-  await saveTiersToServer();
-  renderTiersTable();
-  if (state.budgetSeas.data.length) {
-    const season = document.getElementById('budgetSeasSeason').value;
-    await fetchBudgetPanel('budgetSeas', '/api/budget/marque', { season });
-    updateAllBudgetTotals();
-  }
-});
-
-document.getElementById('budgetSameRate').addEventListener('change', applyBudgetSameRateToggle);
-document.getElementById('budgetRecencyFactor').addEventListener('input', updateRecencyPreview);
-
-document.getElementById('budgetParamsApply').addEventListener('click', async () => {
-  try {
-    await saveBudgetParamsToServer();
-    if (state.budgetSeas.data.length) {
-      const season = document.getElementById('budgetSeasSeason').value;
-      await fetchBudgetPanel('budgetSeas', '/api/budget/marque', { season });
-      updateAllBudgetTotals();
+  function applySameRateToggle() {
+    const checked     = document.getElementById('budgetSameRate')?.checked ?? true;
+    const container   = document.getElementById('budgetShopRates');
+    const globalInput = document.getElementById('budgetCarryoverRate');
+    if (!container) return;
+    if (checked) {
+      container.classList.add('hidden'); container.classList.remove('flex');
+    } else {
+      container.classList.remove('hidden'); container.classList.add('flex');
+      const globalPct = parseFloat(globalInput?.value ?? 50);
+      SHOPS.forEach(({ id }) => {
+        const el = document.getElementById(`budgetShopRate_${id}`);
+        if (el && el.value === '50') el.value = globalPct;
+      });
     }
-    const note = document.getElementById('budgetParamsNote');
-    note.classList.remove('hidden');
-    setTimeout(() => note.classList.add('hidden'), 3000);
-  } catch (e) {
-    console.warn('[budget-params] Failed to apply:', e.message);
   }
-});
 
-// ── NOS Accordéon par marque ─────────────────────────────────────────────
-async function initNosUrgentShops() {
-  const sel = document.getElementById('nosUrgentShop');
-  if (!sel || sel.options.length > 1) return; // already populated
-  try {
-    const shops = await fetch(`${BASE}/api/shops`).then(r => r.json());
-    shops.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.shop_id; opt.textContent = s.name;
-      sel.appendChild(opt);
-    });
-  } catch {}
-}
-
-async function loadNosUrgent() {
-  const shopId = document.getElementById('nosUrgentShop')?.value ?? '';
-  const loader = document.getElementById('nosUrgentLoader');
-  const empty  = document.getElementById('nosUrgentEmpty');
-  loader?.classList.remove('hidden');
-  document.getElementById('nosAccordionBody').innerHTML = '';
-  empty?.classList.add('hidden');
-  try {
-    const url = shopId ? `${BASE}/api/nos/urgent?shop_id=${shopId}` : `${BASE}/api/nos/urgent`;
-    const d = await fetch(url).then(r => r.json());
-    nosUrgentData = d.items ?? [];
-    loader?.classList.add('hidden');
-    nosPopulateBrandList();
-    renderNosAccordion();
-  } catch (err) {
-    console.error('[NOS] Erreur de chargement:', err);
-    loader?.classList.add('hidden');
-    document.getElementById('nosAccordionBody').innerHTML =
-      `<tr><td colspan="7" class="text-center py-6 text-xs text-red-400">Erreur: ${err?.message ?? err} — <button onclick="loadNosUrgent()" class="underline hover:text-red-600">Réessayer</button></td></tr>`;
+  async function loadBudgetParams() {
+    try {
+      const d = await fetch(`${BASE}/api/settings/budget-params`).then(r => r.json());
+      const nbEl = document.getElementById('budgetNbSaisons');
+      const coEl = document.getElementById('budgetCarryoverRate');
+      const cbEl = document.getElementById('budgetSameRate');
+      if (nbEl && d.nb_saisons_reference != null) nbEl.value = d.nb_saisons_reference;
+      if (coEl && d.carryover_deduction_rate != null) coEl.value = Math.round(d.carryover_deduction_rate * 100);
+      if (cbEl) cbEl.checked = d.use_global_carryover_rate !== false;
+      buildShopRateInputs(d.carryover_rates_by_shop ?? {});
+      applySameRateToggle();
+      const rfEl = document.getElementById('budgetRecencyFactor');
+      if (rfEl && d.recency_factor != null) { rfEl.value = d.recency_factor; updateRecencyPreview(); }
+      const absentMode = d.absent_brand_mode ?? 'show';
+      document.querySelectorAll('input[name="absentBrandMode"]').forEach(r => { r.checked = r.value === absentMode; });
+    } catch (e) { console.warn('[budget-params] Failed to load:', e.message); }
   }
-}
 
-function nosDetailRowHtml(it) {
-  var urgIcon = it.urgency === 'critique' ? '⛔' : it.urgency === 'urgent' ? '⚠' : '◉';
-  var coverCls = it.urgency === 'critique' ? 'text-red-600 font-bold' : it.urgency === 'urgent' ? 'text-orange-600' : 'text-yellow-600';
-  return '<tr class="hover:bg-white">'
-    + '<td class="px-5 py-1.5 text-center">' + urgIcon + '</td>'
-    + '<td class="px-4 py-1.5 text-gray-700 max-w-xs truncate" title="' + it.description + '">' + it.description + '</td>'
-    + '<td class="px-4 py-1.5 text-gray-500">' + it.shop_name + '</td>'
-    + '<td class="px-4 py-1.5 text-right">' + it.qty_on_hand + '</td>'
-    + '<td class="px-4 py-1.5 text-right text-blue-500">' + it.qty_on_order + '</td>'
-    + '<td class="px-4 py-1.5 text-right ' + coverCls + '">' + (it.weeks_of_cover !== null ? it.weeks_of_cover + ' sem.' : '—') + '</td>'
-    + '<td class="px-4 py-1.5 text-right text-gray-400">' + it.lead_time_weeks + ' sem.</td>'
-    + '<td class="px-4 py-1.5 text-right font-semibold text-indigo-700">' + it.suggested_qty + '</td>'
-    + '</tr>';
-}
-
-function renderNosAccordion() {
-  var search   = (document.getElementById('nosSearchBrand')?.value ?? '').toLowerCase();
-  var showCrit = document.getElementById('nosFilterCritique')?.checked ?? true;
-  var showUrg  = document.getElementById('nosFilterUrgent')?.checked ?? true;
-  var showAttn = document.getElementById('nosFilterAttention')?.checked ?? true;
-
-  var filtered = nosUrgentData.filter(function(it) {
-    if (!showCrit && it.urgency === 'critique') return false;
-    if (!showUrg  && it.urgency === 'urgent')   return false;
-    if (!showAttn && it.urgency === 'attention') return false;
-    return !search || it.manufacturer.toLowerCase().includes(search);
-  });
-
-  var body  = document.getElementById('nosAccordionBody');
-  var total = document.getElementById('nosUrgentTotal');
-  var empty = document.getElementById('nosUrgentEmpty');
-
-  if (!filtered.length) {
-    body.innerHTML = '';
-    empty?.classList.remove('hidden');
-    total.textContent = '';
-    return;
-  }
-  empty?.classList.add('hidden');
-
-  var byBrand = {};
-  filtered.forEach(function(it) {
-    if (!byBrand[it.manufacturer]) byBrand[it.manufacturer] = { critique:[], urgent:[], attention:[] };
-    byBrand[it.manufacturer][it.urgency].push(it);
-  });
-
-  var totalCost = filtered.reduce(function(acc, it) { return acc + it.suggested_qty * it.unit_cost; }, 0);
-  total.textContent = filtered.length + ' article' + (filtered.length > 1 ? 's' : '') + ' — Budget estimé : ' + fmt(totalCost);
-
-  var rows = [];
-  Object.entries(byBrand).sort(function(a, b) { return a[0].localeCompare(b[0]); }).forEach(function(entry) {
-    var brand  = entry[0];
-    var groups = entry[1];
-    var allItems  = groups.critique.concat(groups.urgent, groups.attention);
-    var brandQty  = allItems.reduce(function(acc, it) { return acc + it.suggested_qty; }, 0);
-    var brandCost = allItems.reduce(function(acc, it) { return acc + it.suggested_qty * it.unit_cost; }, 0);
-    var isOpen = nosExpandedBrands.has(brand);
-    var arrow  = isOpen ? '&#9662;' : '&#9656;';
-
-    var critBadge = groups.critique.length
-      ? '<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">' + groups.critique.length + '</span>'
-      : '<span class="text-gray-300">—</span>';
-    var urgBadge = groups.urgent.length
-      ? '<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-100 text-orange-700">' + groups.urgent.length + '</span>'
-      : '<span class="text-gray-300">—</span>';
-    var attnBadge = groups.attention.length
-      ? '<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-700">' + groups.attention.length + '</span>'
-      : '<span class="text-gray-300">—</span>';
-
-    rows.push('<tr class="nos-brand-row hover:bg-blue-50 cursor-pointer select-none border-b border-gray-100" data-brand="' + encodeURIComponent(brand) + '">'
-      + '<td class="px-3 py-2.5 text-gray-400 text-center text-sm">' + arrow + '</td>'
-      + '<td class="px-3 py-2.5 font-semibold text-gray-800">' + brand + '</td>'
-      + '<td class="px-3 py-2.5 text-center">' + critBadge + '</td>'
-      + '<td class="px-3 py-2.5 text-center">' + urgBadge + '</td>'
-      + '<td class="px-3 py-2.5 text-center">' + attnBadge + '</td>'
-      + '<td class="px-3 py-2.5 text-right text-gray-700">' + brandQty + '</td>'
-      + '<td class="px-3 py-2.5 text-right font-semibold text-indigo-700">' + fmt(brandCost) + '</td>'
-      + '</tr>');
-
-    if (isOpen) {
-      rows.push('<tr class="nos-detail-row" data-brand="' + encodeURIComponent(brand) + '"><td colspan="7" class="p-0 bg-gray-50">'
-        + '<table class="w-full text-xs"><thead><tr class="text-gray-400 uppercase text-[9px] tracking-wide border-b border-gray-200">'
-        + '<th class="px-5 py-1.5 w-6"></th>'
-        + '<th class="px-4 py-1.5 text-left">Description</th>'
-        + '<th class="px-4 py-1.5 text-left">Boutique</th>'
-        + '<th class="px-4 py-1.5 text-right">Stock</th>'
-        + '<th class="px-4 py-1.5 text-right">En cmd</th>'
-        + '<th class="px-4 py-1.5 text-right">Couverture</th>'
-        + '<th class="px-4 py-1.5 text-right">Délai fourn.</th>'
-        + '<th class="px-4 py-1.5 text-right">Qté à cmd</th>'
-        + '</tr></thead><tbody class="divide-y divide-gray-100">'
-        + allItems.map(nosDetailRowHtml).join('')
-        + '</tbody></table></td></tr>');
+  async function saveBudgetParams() {
+    const nb   = parseInt(document.getElementById('budgetNbSaisons')?.value ?? 3, 10);
+    const co   = parseFloat(document.getElementById('budgetCarryoverRate')?.value ?? 50) / 100;
+    const same = document.getElementById('budgetSameRate')?.checked ?? true;
+    const ratesByShop = {};
+    if (!same) {
+      SHOPS.forEach(({ id }) => {
+        const el = document.getElementById(`budgetShopRate_${id}`);
+        if (el) ratesByShop[id] = parseFloat(el.value) / 100;
+      });
     }
-  });
-
-  body.innerHTML = rows.join('');
-  body.querySelectorAll('.nos-brand-row').forEach(function(row) {
-    row.addEventListener('click', function() {
-      var brand = decodeURIComponent(row.dataset.brand);
-      if (nosExpandedBrands.has(brand)) nosExpandedBrands.delete(brand);
-      else nosExpandedBrands.add(brand);
-      renderNosAccordion();
+    const rf         = parseFloat(document.getElementById('budgetRecencyFactor')?.value ?? 2.0);
+    const absentMode = document.querySelector('input[name="absentBrandMode"]:checked')?.value ?? 'show';
+    await fetch(`${BASE}/api/settings/budget-params`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nb_saisons_reference: nb, carryover_deduction_rate: co,
+        use_global_carryover_rate: same, carryover_rates_by_shop: ratesByShop,
+        recency_factor: rf, absent_brand_mode: absentMode,
+      }),
     });
-  });
-}
+  }
 
-// Shop change reloads data from server
-document.getElementById('nosUrgentShop')?.addEventListener('change', loadNosUrgent);
+  function updateRecencyPreview() {
+    const rfEl      = document.getElementById('budgetRecencyFactor');
+    const previewEl = document.getElementById('budgetRecencyPreview');
+    const nbEl      = document.getElementById('budgetNbSaisons');
+    if (!rfEl || !previewEl) return;
+    const rf = parseFloat(rfEl.value) || 1;
+    const n  = parseInt(nbEl?.value ?? 3, 10);
+    const weights = Array.from({ length: n }, (_, i) => Math.pow(rf, n - 1 - i));
+    const total   = weights.reduce((s, w) => s + w, 0);
+    const pcts    = weights.map(w => Math.round(w / total * 100) + '%');
+    previewEl.textContent = `→ ${pcts.join(' / ')} (récent→ancien)`;
+  }
 
-// Clear search on Escape
-document.getElementById('nosSearchBrand')?.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') { this.value = ''; renderNosAccordion(); }
-  if (e.key === 'Enter')  { renderNosAccordion(); }
-});
+  async function init() {
+    await Promise.all([loadTiers().then(renderTiersTable), loadBudgetParams()]);
+    loadLeadTimes();
 
-// Apply button
-document.getElementById('nosApplyBtn')?.addEventListener('click', renderNosAccordion);
+    document.getElementById('tiersApply').addEventListener('click', async () => {
+      document.querySelectorAll('.tiers-input').forEach(inp => {
+        const idx = parseInt(inp.dataset.idx, 10), field = inp.dataset.field, val = parseFloat(inp.value);
+        if (!isNaN(val)) state.tiers[idx][field] = val;
+      });
+      saveTiers();
+      await saveTiersToServer();
+      if (state.budgetSeas.data.length) {
+        const season = document.getElementById('budgetSeasSeason').value;
+        await BudgetTab.fetchPanel('budgetSeas', '/api/budget/marque', { season });
+        BudgetTab.updateTotals();
+      }
+      const note = document.getElementById('tiersNote');
+      note.classList.remove('hidden');
+      setTimeout(() => note.classList.add('hidden'), 3000);
+    });
 
-function nosPopulateBrandList() {
-  var dl = document.getElementById('nosSearchBrandList');
-  if (!dl) return;
-  var brands = Array.from(new Set(nosUrgentData.map(function(it) { return it.manufacturer; }))).sort();
-  dl.innerHTML = brands.map(function(b) { return '<option value="' + b + '">'; }).join('');
-}
+    document.getElementById('tiersReset').addEventListener('click', async () => {
+      state.tiers = DEFAULT_TIERS.map(t => ({ ...t }));
+      saveTiers();
+      await saveTiersToServer();
+      renderTiersTable();
+      if (state.budgetSeas.data.length) {
+        const season = document.getElementById('budgetSeasSeason').value;
+        await BudgetTab.fetchPanel('budgetSeas', '/api/budget/marque', { season });
+        BudgetTab.updateTotals();
+      }
+    });
 
+    document.getElementById('budgetSameRate').addEventListener('change', applySameRateToggle);
+    document.getElementById('budgetRecencyFactor').addEventListener('input', updateRecencyPreview);
 
-// ── Lead Times (Paramètres) ───────────────────────────────────────────────
+    document.getElementById('budgetParamsApply').addEventListener('click', async () => {
+      try {
+        await saveBudgetParams();
+        if (state.budgetSeas.data.length) {
+          const season = document.getElementById('budgetSeasSeason').value;
+          await BudgetTab.fetchPanel('budgetSeas', '/api/budget/marque', { season });
+          BudgetTab.updateTotals();
+        }
+        const note = document.getElementById('budgetParamsNote');
+        note.classList.remove('hidden');
+        setTimeout(() => note.classList.add('hidden'), 3000);
+      } catch (e) { console.warn('[budget-params] Failed to apply:', e.message); }
+    });
+  }
+
+  return { init, renderTiersTable, loadBudgetParams };
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NosTab — NOS Accordéon par marque (tab-nos)
+// NOTE: uses var/function() style throughout to avoid Safari TDZ bug.
+// nosUrgentData and nosExpandedBrands are module-level for callback safety.
+// ─────────────────────────────────────────────────────────────────────────────
+const NosTab = (() => {
+  // Declared at module level to avoid TDZ in async callbacks (Safari bug).
+  var urgentData     = [];
+  var expandedBrands = new Set();
+
+  async function initShops() {
+    var sel = document.getElementById('nosUrgentShop');
+    if (!sel || sel.options.length > 1) return;
+    try {
+      var shops = await fetch(`${BASE}/api/shops`).then(function(r) { return r.json(); });
+      shops.forEach(function(s) {
+        var opt = document.createElement('option');
+        opt.value = s.shop_id; opt.textContent = s.name;
+        sel.appendChild(opt);
+      });
+    } catch (e) {}
+  }
+
+  async function load() {
+    var shopId = document.getElementById('nosUrgentShop')?.value ?? '';
+    var loader = document.getElementById('nosUrgentLoader');
+    var empty  = document.getElementById('nosUrgentEmpty');
+    loader?.classList.remove('hidden');
+    document.getElementById('nosAccordionBody').innerHTML = '';
+    empty?.classList.add('hidden');
+    try {
+      var url = shopId ? `${BASE}/api/nos/urgent?shop_id=${shopId}` : `${BASE}/api/nos/urgent`;
+      var d = await fetch(url).then(function(r) { return r.json(); });
+      urgentData = d.items ?? [];
+      loader?.classList.add('hidden');
+      populateBrandList();
+      renderAccordion();
+    } catch (err) {
+      console.error('[NOS] Erreur de chargement:', err);
+      loader?.classList.add('hidden');
+      document.getElementById('nosAccordionBody').innerHTML =
+        '<tr><td colspan="7" class="text-center py-6 text-xs text-red-400">Erreur: ' + (err?.message ?? err) + ' — <button onclick="NosTab.load()" class="underline hover:text-red-600">Réessayer</button></td></tr>';
+    }
+  }
+
+  function detailRowHtml(it) {
+    var urgIcon  = it.urgency === 'critique' ? '⛔' : it.urgency === 'urgent' ? '⚠' : '◉';
+    var coverCls = it.urgency === 'critique' ? 'text-red-600 font-bold' : it.urgency === 'urgent' ? 'text-orange-600' : 'text-yellow-600';
+    return '<tr class="hover:bg-white">'
+      + '<td class="px-5 py-1.5 text-center">' + urgIcon + '</td>'
+      + '<td class="px-4 py-1.5 text-gray-700 max-w-xs truncate" title="' + it.description + '">' + it.description + '</td>'
+      + '<td class="px-4 py-1.5 text-gray-500">' + it.shop_name + '</td>'
+      + '<td class="px-4 py-1.5 text-right">' + it.qty_on_hand + '</td>'
+      + '<td class="px-4 py-1.5 text-right text-blue-500">' + it.qty_on_order + '</td>'
+      + '<td class="px-4 py-1.5 text-right ' + coverCls + '">' + (it.weeks_of_cover !== null ? it.weeks_of_cover + ' sem.' : '—') + '</td>'
+      + '<td class="px-4 py-1.5 text-right text-gray-400">' + it.lead_time_weeks + ' sem.</td>'
+      + '<td class="px-4 py-1.5 text-right font-semibold text-indigo-700">' + it.suggested_qty + '</td>'
+      + '</tr>';
+  }
+
+  function renderAccordion() {
+    var search   = (document.getElementById('nosSearchBrand')?.value ?? '').toLowerCase();
+    var showCrit = document.getElementById('nosFilterCritique')?.checked ?? true;
+    var showUrg  = document.getElementById('nosFilterUrgent')?.checked ?? true;
+    var showAttn = document.getElementById('nosFilterAttention')?.checked ?? true;
+
+    var filtered = urgentData.filter(function(it) {
+      if (!showCrit && it.urgency === 'critique') return false;
+      if (!showUrg  && it.urgency === 'urgent')   return false;
+      if (!showAttn && it.urgency === 'attention') return false;
+      return !search || it.manufacturer.toLowerCase().includes(search);
+    });
+
+    var body  = document.getElementById('nosAccordionBody');
+    var total = document.getElementById('nosUrgentTotal');
+    var empty = document.getElementById('nosUrgentEmpty');
+
+    if (!filtered.length) {
+      body.innerHTML = '';
+      empty?.classList.remove('hidden');
+      total.textContent = '';
+      return;
+    }
+    empty?.classList.add('hidden');
+
+    var byBrand = {};
+    filtered.forEach(function(it) {
+      if (!byBrand[it.manufacturer]) byBrand[it.manufacturer] = { critique:[], urgent:[], attention:[] };
+      byBrand[it.manufacturer][it.urgency].push(it);
+    });
+
+    var totalCost = filtered.reduce(function(acc, it) { return acc + it.suggested_qty * it.unit_cost; }, 0);
+    total.textContent = filtered.length + ' article' + (filtered.length > 1 ? 's' : '') + ' — Budget estimé : ' + fmt(totalCost);
+
+    var rows = [];
+    Object.entries(byBrand).sort(function(a, b) { return a[0].localeCompare(b[0]); }).forEach(function(entry) {
+      var brand    = entry[0];
+      var groups   = entry[1];
+      var allItems  = groups.critique.concat(groups.urgent, groups.attention);
+      var brandQty  = allItems.reduce(function(acc, it) { return acc + it.suggested_qty; }, 0);
+      var brandCost = allItems.reduce(function(acc, it) { return acc + it.suggested_qty * it.unit_cost; }, 0);
+      var isOpen    = expandedBrands.has(brand);
+      var arrow     = isOpen ? '&#9662;' : '&#9656;';
+
+      var critBadge = groups.critique.length
+        ? '<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">' + groups.critique.length + '</span>'
+        : '<span class="text-gray-300">—</span>';
+      var urgBadge = groups.urgent.length
+        ? '<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-100 text-orange-700">' + groups.urgent.length + '</span>'
+        : '<span class="text-gray-300">—</span>';
+      var attnBadge = groups.attention.length
+        ? '<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-700">' + groups.attention.length + '</span>'
+        : '<span class="text-gray-300">—</span>';
+
+      rows.push('<tr class="nos-brand-row hover:bg-blue-50 cursor-pointer select-none border-b border-gray-100" data-brand="' + encodeURIComponent(brand) + '">'
+        + '<td class="px-3 py-2.5 text-gray-400 text-center text-sm">' + arrow + '</td>'
+        + '<td class="px-3 py-2.5 font-semibold text-gray-800">' + brand + '</td>'
+        + '<td class="px-3 py-2.5 text-center">' + critBadge + '</td>'
+        + '<td class="px-3 py-2.5 text-center">' + urgBadge + '</td>'
+        + '<td class="px-3 py-2.5 text-center">' + attnBadge + '</td>'
+        + '<td class="px-3 py-2.5 text-right text-gray-700">' + brandQty + '</td>'
+        + '<td class="px-3 py-2.5 text-right font-semibold text-indigo-700">' + fmt(brandCost) + '</td>'
+        + '</tr>');
+
+      if (isOpen) {
+        rows.push('<tr class="nos-detail-row" data-brand="' + encodeURIComponent(brand) + '"><td colspan="7" class="p-0 bg-gray-50">'
+          + '<table class="w-full text-xs"><thead><tr class="text-gray-400 uppercase text-[9px] tracking-wide border-b border-gray-200">'
+          + '<th class="px-5 py-1.5 w-6"></th>'
+          + '<th class="px-4 py-1.5 text-left">Description</th>'
+          + '<th class="px-4 py-1.5 text-left">Boutique</th>'
+          + '<th class="px-4 py-1.5 text-right">Stock</th>'
+          + '<th class="px-4 py-1.5 text-right">En cmd</th>'
+          + '<th class="px-4 py-1.5 text-right">Couverture</th>'
+          + '<th class="px-4 py-1.5 text-right">Délai fourn.</th>'
+          + '<th class="px-4 py-1.5 text-right">Qté à cmd</th>'
+          + '</tr></thead><tbody class="divide-y divide-gray-100">'
+          + allItems.map(detailRowHtml).join('')
+          + '</tbody></table></td></tr>');
+      }
+    });
+
+    body.innerHTML = rows.join('');
+    body.querySelectorAll('.nos-brand-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        var brand = decodeURIComponent(row.dataset.brand);
+        if (expandedBrands.has(brand)) expandedBrands.delete(brand);
+        else expandedBrands.add(brand);
+        renderAccordion();
+      });
+    });
+  }
+
+  function populateBrandList() {
+    var dl = document.getElementById('nosSearchBrandList');
+    if (!dl) return;
+    var brands = Array.from(new Set(urgentData.map(function(it) { return it.manufacturer; }))).sort();
+    dl.innerHTML = brands.map(function(b) { return '<option value="' + b + '">'; }).join('');
+  }
+
+  // init() is called every time the NOS tab is clicked (tab always reloads)
+  async function init() {
+    await initShops();
+    // Attach event listeners only once (guard with dataset flag)
+    var panel = document.getElementById('tab-nos');
+    if (!panel.dataset.nosListeners) {
+      panel.dataset.nosListeners = '1';
+      document.getElementById('nosUrgentShop')?.addEventListener('change', load);
+      document.getElementById('nosSearchBrand')?.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') { this.value = ''; renderAccordion(); }
+        if (e.key === 'Enter')  { renderAccordion(); }
+      });
+      document.getElementById('nosApplyBtn')?.addEventListener('click', renderAccordion);
+    }
+    await load();
+  }
+
+  return { init, load, renderAccordion };
+})();
+
+// ── Lead Times — kept global so ParamsTab.init() can call loadLeadTimes() ──
 let leadTimesData = {};
 
 async function loadLeadTimes() {
@@ -2743,20 +2707,23 @@ document.getElementById('leadTimesApply')?.addEventListener('click', async () =>
     const note = document.getElementById('leadTimesNote');
     note.classList.remove('hidden');
     setTimeout(() => note.classList.add('hidden'), 3000);
-    loadNosUrgent(); // refresh urgent list with new lead times
+    NosTab.load();
   } catch (e) { alert('Erreur de sauvegarde : ' + e.message); }
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────
-Promise.all([loadTiers(), loadBudgetParams()]).then(() => {
+Promise.all([loadTiers(), ParamsTab.loadBudgetParams()]).then(() => {
   loadMultipliers();
   buildFilterBar();
-  bindBudgetTableListeners();
+  BudgetTab.init();
+  SeasonalTab.init();
+  SizesTab.init();
+  PlanTab.init();
   loadSyncStatus();
   tabLoaded['budget'] = true;
   // Apply saved language (updates static elements + button styling)
   setLanguage(_lang);
-  loadBudget();
+  BudgetTab.load();
 });
 
 // ── Column tooltips (JS-based to bypass overflow:hidden on containers) ────
