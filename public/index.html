@@ -2506,21 +2506,37 @@ async function loadNosUrgent() {
   }
 }
 
+function nosDetailRowHtml(it) {
+  var urgIcon = it.urgency === 'critique' ? '⛔' : it.urgency === 'urgent' ? '⚠' : '◉';
+  var coverCls = it.urgency === 'critique' ? 'text-red-600 font-bold' : it.urgency === 'urgent' ? 'text-orange-600' : 'text-yellow-600';
+  return '<tr class="hover:bg-white">'
+    + '<td class="px-5 py-1.5 text-center">' + urgIcon + '</td>'
+    + '<td class="px-4 py-1.5 text-gray-700 max-w-xs truncate" title="' + it.description + '">' + it.description + '</td>'
+    + '<td class="px-4 py-1.5 text-gray-500">' + it.shop_name + '</td>'
+    + '<td class="px-4 py-1.5 text-right">' + it.qty_on_hand + '</td>'
+    + '<td class="px-4 py-1.5 text-right text-blue-500">' + it.qty_on_order + '</td>'
+    + '<td class="px-4 py-1.5 text-right ' + coverCls + '">' + (it.weeks_of_cover !== null ? it.weeks_of_cover + ' sem.' : '—') + '</td>'
+    + '<td class="px-4 py-1.5 text-right text-gray-400">' + it.lead_time_weeks + ' sem.</td>'
+    + '<td class="px-4 py-1.5 text-right font-semibold text-indigo-700">' + it.suggested_qty + '</td>'
+    + '</tr>';
+}
+
 function renderNosAccordion() {
-  const search   = (document.getElementById('nosSearchBrand')?.value ?? '').toLowerCase();
-  const showCrit = document.getElementById('nosFilterCritique')?.checked ?? true;
-  const showUrg  = document.getElementById('nosFilterUrgent')?.checked ?? true;
-  const showAttn = document.getElementById('nosFilterAttention')?.checked ?? true;
-  const activeSet = new Set(['critique','urgent','attention'].filter((u,i) => [showCrit,showUrg,showAttn][i]));
+  var search   = (document.getElementById('nosSearchBrand')?.value ?? '').toLowerCase();
+  var showCrit = document.getElementById('nosFilterCritique')?.checked ?? true;
+  var showUrg  = document.getElementById('nosFilterUrgent')?.checked ?? true;
+  var showAttn = document.getElementById('nosFilterAttention')?.checked ?? true;
 
-  const filtered = nosUrgentData.filter(it =>
-    activeSet.has(it.urgency) &&
-    (!search || it.manufacturer.toLowerCase().includes(search))
-  );
+  var filtered = nosUrgentData.filter(function(it) {
+    if (!showCrit && it.urgency === 'critique') return false;
+    if (!showUrg  && it.urgency === 'urgent')   return false;
+    if (!showAttn && it.urgency === 'attention') return false;
+    return !search || it.manufacturer.toLowerCase().includes(search);
+  });
 
-  const body  = document.getElementById('nosAccordionBody');
-  const total = document.getElementById('nosUrgentTotal');
-  const empty = document.getElementById('nosUrgentEmpty');
+  var body  = document.getElementById('nosAccordionBody');
+  var total = document.getElementById('nosUrgentTotal');
+  var empty = document.getElementById('nosUrgentEmpty');
 
   if (!filtered.length) {
     body.innerHTML = '';
@@ -2530,71 +2546,66 @@ function renderNosAccordion() {
   }
   empty?.classList.add('hidden');
 
-  const byBrand = {};
-  filtered.forEach(it => {
+  var byBrand = {};
+  filtered.forEach(function(it) {
     if (!byBrand[it.manufacturer]) byBrand[it.manufacturer] = { critique:[], urgent:[], attention:[] };
     byBrand[it.manufacturer][it.urgency].push(it);
   });
 
-  const totalCost = filtered.reduce((s,i) => s + i.suggested_qty * i.unit_cost, 0);
-  total.textContent = `${filtered.length} article${filtered.length>1?'s':''} — Budget estimé : ${fmt(totalCost)}`;
+  var totalCost = filtered.reduce(function(acc, it) { return acc + it.suggested_qty * it.unit_cost; }, 0);
+  total.textContent = filtered.length + ' article' + (filtered.length > 1 ? 's' : '') + ' — Budget estimé : ' + fmt(totalCost);
 
-  const rows = [];
-  Object.entries(byBrand).sort(([a],[b]) => a.localeCompare(b)).forEach(([brand, groups]) => {
-    const allItems  = [...groups.critique, ...groups.urgent, ...groups.attention];
-    const brandQty  = allItems.reduce((s,i) => s + i.suggested_qty, 0);
-    const brandCost = allItems.reduce((s,i) => s + i.suggested_qty * i.unit_cost, 0);
-    const isOpen    = nosExpandedBrands.has(brand);
-    const arrow     = isOpen ? '&#9662;' : '&#9656;';
+  var rows = [];
+  Object.entries(byBrand).sort(function(a, b) { return a[0].localeCompare(b[0]); }).forEach(function(entry) {
+    var brand  = entry[0];
+    var groups = entry[1];
+    var allItems  = groups.critique.concat(groups.urgent, groups.attention);
+    var brandQty  = allItems.reduce(function(acc, it) { return acc + it.suggested_qty; }, 0);
+    var brandCost = allItems.reduce(function(acc, it) { return acc + it.suggested_qty * it.unit_cost; }, 0);
+    var isOpen = nosExpandedBrands.has(brand);
+    var arrow  = isOpen ? '&#9662;' : '&#9656;';
 
-    rows.push(`<tr class="nos-brand-row hover:bg-blue-50 cursor-pointer select-none border-b border-gray-100" data-brand="${encodeURIComponent(brand)}">
-      <td class="px-3 py-2.5 text-gray-400 text-center text-sm">${arrow}</td>
-      <td class="px-3 py-2.5 font-semibold text-gray-800">${brand}</td>
-      <td class="px-3 py-2.5 text-center">${groups.critique.length ? `<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">${groups.critique.length}</span>` : '<span class="text-gray-300">—</span>'}</td>
-      <td class="px-3 py-2.5 text-center">${groups.urgent.length ? `<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-100 text-orange-700">${groups.urgent.length}</span>` : '<span class="text-gray-300">—</span>'}</td>
-      <td class="px-3 py-2.5 text-center">${groups.attention.length ? `<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-700">${groups.attention.length}</span>` : '<span class="text-gray-300">—</span>'}</td>
-      <td class="px-3 py-2.5 text-right text-gray-700">${brandQty}</td>
-      <td class="px-3 py-2.5 text-right font-semibold text-indigo-700">${fmt(brandCost)}</td>
-    </tr>`);
+    var critBadge = groups.critique.length
+      ? '<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700">' + groups.critique.length + '</span>'
+      : '<span class="text-gray-300">—</span>';
+    var urgBadge = groups.urgent.length
+      ? '<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-100 text-orange-700">' + groups.urgent.length + '</span>'
+      : '<span class="text-gray-300">—</span>';
+    var attnBadge = groups.attention.length
+      ? '<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-700">' + groups.attention.length + '</span>'
+      : '<span class="text-gray-300">—</span>';
+
+    rows.push('<tr class="nos-brand-row hover:bg-blue-50 cursor-pointer select-none border-b border-gray-100" data-brand="' + encodeURIComponent(brand) + '">'
+      + '<td class="px-3 py-2.5 text-gray-400 text-center text-sm">' + arrow + '</td>'
+      + '<td class="px-3 py-2.5 font-semibold text-gray-800">' + brand + '</td>'
+      + '<td class="px-3 py-2.5 text-center">' + critBadge + '</td>'
+      + '<td class="px-3 py-2.5 text-center">' + urgBadge + '</td>'
+      + '<td class="px-3 py-2.5 text-center">' + attnBadge + '</td>'
+      + '<td class="px-3 py-2.5 text-right text-gray-700">' + brandQty + '</td>'
+      + '<td class="px-3 py-2.5 text-right font-semibold text-indigo-700">' + fmt(brandCost) + '</td>'
+      + '</tr>');
 
     if (isOpen) {
-      rows.push(`<tr class="nos-detail-row" data-brand="${encodeURIComponent(brand)}"><td colspan="7" class="p-0 bg-gray-50">
-        <table class="w-full text-xs">
-          <thead><tr class="text-gray-400 uppercase text-[9px] tracking-wide border-b border-gray-200">
-            <th class="px-5 py-1.5 w-6"></th>
-            <th class="px-4 py-1.5 text-left">Description</th>
-            <th class="px-4 py-1.5 text-left">Boutique</th>
-            <th class="px-4 py-1.5 text-right">Stock</th>
-            <th class="px-4 py-1.5 text-right">En cmd</th>
-            <th class="px-4 py-1.5 text-right">Couverture</th>
-            <th class="px-4 py-1.5 text-right">Délai fourn.</th>
-            <th class="px-4 py-1.5 text-right">Qté à cmd</th>
-          </tr></thead>
-          <tbody class="divide-y divide-gray-100">
-            ${allItems.map(it => {
-              const icon = it.urgency==='critique' ? '⛔' : it.urgency==='urgent' ? '⚠' : '◉';
-              const coverCls = it.urgency==='critique' ? 'text-red-600 font-bold' : it.urgency==='urgent' ? 'text-orange-600' : 'text-yellow-600';
-              return `<tr class="hover:bg-white">
-                <td class="px-5 py-1.5 text-center">${icon}</td>
-                <td class="px-4 py-1.5 text-gray-700 max-w-xs truncate" title="${it.description}">${it.description}</td>
-                <td class="px-4 py-1.5 text-gray-500">${it.shop_name}</td>
-                <td class="px-4 py-1.5 text-right">${it.qty_on_hand}</td>
-                <td class="px-4 py-1.5 text-right text-blue-500">${it.qty_on_order}</td>
-                <td class="px-4 py-1.5 text-right ${coverCls}">${it.weeks_of_cover !== null ? it.weeks_of_cover+' sem.' : '—'}</td>
-                <td class="px-4 py-1.5 text-right text-gray-400">${it.lead_time_weeks} sem.</td>
-                <td class="px-4 py-1.5 text-right font-semibold text-indigo-700">${it.suggested_qty}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </td></tr>`);
+      rows.push('<tr class="nos-detail-row" data-brand="' + encodeURIComponent(brand) + '"><td colspan="7" class="p-0 bg-gray-50">'
+        + '<table class="w-full text-xs"><thead><tr class="text-gray-400 uppercase text-[9px] tracking-wide border-b border-gray-200">'
+        + '<th class="px-5 py-1.5 w-6"></th>'
+        + '<th class="px-4 py-1.5 text-left">Description</th>'
+        + '<th class="px-4 py-1.5 text-left">Boutique</th>'
+        + '<th class="px-4 py-1.5 text-right">Stock</th>'
+        + '<th class="px-4 py-1.5 text-right">En cmd</th>'
+        + '<th class="px-4 py-1.5 text-right">Couverture</th>'
+        + '<th class="px-4 py-1.5 text-right">Délai fourn.</th>'
+        + '<th class="px-4 py-1.5 text-right">Qté à cmd</th>'
+        + '</tr></thead><tbody class="divide-y divide-gray-100">'
+        + allItems.map(nosDetailRowHtml).join('')
+        + '</tbody></table></td></tr>');
     }
   });
 
   body.innerHTML = rows.join('');
-  body.querySelectorAll('.nos-brand-row').forEach(row => {
-    row.addEventListener('click', () => {
-      const brand = decodeURIComponent(row.dataset.brand);
+  body.querySelectorAll('.nos-brand-row').forEach(function(row) {
+    row.addEventListener('click', function() {
+      var brand = decodeURIComponent(row.dataset.brand);
       if (nosExpandedBrands.has(brand)) nosExpandedBrands.delete(brand);
       else nosExpandedBrands.add(brand);
       renderNosAccordion();
