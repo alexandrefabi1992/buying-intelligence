@@ -2443,6 +2443,137 @@ app.put('/api/settings/budget-params', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/settings/nos-lead-times  — délais fournisseur par marque (en semaines)
+// PUT /api/settings/nos-lead-times  — sauvegarder
+// ---------------------------------------------------------------------------
+app.get('/api/settings/nos-lead-times', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'nos_lead_times'");
+    res.json(rows.length ? rows[0].value : {});
+  } catch (err) { next(err); }
+});
+
+app.put('/api/settings/nos-lead-times', async (req, res, next) => {
+  try {
+    const raw = req.body;
+    const clean = {};
+    for (const [brand, weeks] of Object.entries(raw)) {
+      const w = parseInt(weeks, 10);
+      if (brand && !isNaN(w) && w > 0) clean[brand] = w;
+    }
+    await pool.query(
+      `INSERT INTO app_settings(key, value, updated_at)
+       VALUES ('nos_lead_times', $1::jsonb, now())
+       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
+      [JSON.stringify(clean)]
+    );
+    res.json({ ok: true, lead_times: clean });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/nos/urgent — articles NOS à commander maintenant
+// Un article est urgent si sa couverture actuelle < délai fournisseur de sa marque
+// Tri par urgence décroissante (plus le déficit est grand, plus c'est critique)
+// ---------------------------------------------------------------------------
+app.get('/api/nos/urgent', async (req, res, next) => {
+  try {
+    const shopFilter = req.query.shop_id ? `AND i.shop_id = $1` : '';
+    const params     = req.query.shop_id ? [req.query.shop_id] : [];
+
+    // Load lead times from settings
+    const { rows: ltRows } = await pool.query("SELECT value FROM app_settings WHERE key = 'nos_lead_times'");
+    const leadTimes = ltRows.length ? ltRows[0].value : {};
+    const defaultLeadTime = 8; // semaines par défaut si non configuré
+
+    const { rows } = await pool.query(`
+      WITH velocity AS (
+        SELECT item_id, shop_id, AVG(units_sold) AS avg_weekly_units
+        FROM mv_sales_velocity
+        WHERE week >= date_trunc('week', now()) - INTERVAL '12 weeks'
+        GROUP BY item_id, shop_id
+      )
+      SELECT
+        p.item_id,
+        p.description,
+        COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+        COALESCE(p.category, 'Sans catégorie')  AS category,
+        s.name                                   AS shop_name,
+        i.shop_id,
+        COALESCE(i.qty_on_hand, 0)               AS qty_on_hand,
+        COALESCE(i.qty_on_order, 0)              AS qty_on_order,
+        COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0) AS total_stock,
+        ROUND(v.avg_weekly_units, 2)             AS avg_weekly_units,
+        ROUND(
+          CASE WHEN v.avg_weekly_units > 0
+            THEN (COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)) / v.avg_weekly_units
+            ELSE NULL END, 1
+        )                                        AS weeks_of_cover,
+        COALESCE(p.default_cost, 0)              AS unit_cost
+      FROM velocity v
+      JOIN inventory i ON i.item_id = v.item_id AND i.shop_id = v.shop_id
+      JOIN products  p ON p.item_id = v.item_id
+      JOIN shops     s ON s.shop_id = i.shop_id
+      WHERE p.tags ILIKE '%nos%'
+        AND p.archived = false
+        AND v.avg_weekly_units > 0
+        AND p.category    NOT ILIKE 'Alt%ration%'
+        AND p.description NOT ILIKE '%shopify%'
+        AND NOT (p.default_cost = 0 AND p.default_price = 0)
+        ${shopFilter}
+      ORDER BY weeks_of_cover ASC NULLS LAST
+    `, params);
+
+    // Enrich with lead time and urgency level
+    const items = rows.map(r => {
+      const lead = leadTimes[r.manufacturer] ?? defaultLeadTime;
+      const cover = r.weeks_of_cover !== null ? Number(r.weeks_of_cover) : null;
+      const deficit = cover !== null ? lead - cover : null;
+      const suggestedQty = Math.max(0, Math.round(Number(r.avg_weekly_units) * lead - Number(r.total_stock)));
+
+      let urgency;
+      if (cover === null || cover <= 0)        urgency = 'critique';
+      else if (cover < lead * 0.5)             urgency = 'urgent';
+      else if (cover < lead)                   urgency = 'attention';
+      else                                     return null; // pas urgent
+
+      return {
+        item_id:        r.item_id,
+        description:    r.description,
+        manufacturer:   r.manufacturer,
+        category:       r.category,
+        shop_name:      r.shop_name,
+        shop_id:        r.shop_id,
+        qty_on_hand:    Number(r.qty_on_hand),
+        qty_on_order:   Number(r.qty_on_order),
+        avg_weekly:     Number(r.avg_weekly_units),
+        weeks_of_cover: cover,
+        lead_time_weeks: lead,
+        deficit_weeks:  deficit !== null ? Math.round(deficit * 10) / 10 : null,
+        suggested_qty:  suggestedQty,
+        unit_cost:      Number(r.unit_cost),
+        urgency,
+      };
+    }).filter(Boolean);
+
+    // Sort: critique first, then urgent, then attention; within each by deficit desc
+    const order = { critique: 0, urgent: 1, attention: 2 };
+    items.sort((a, b) => order[a.urgency] - order[b.urgency] || (b.deficit_weeks ?? 0) - (a.deficit_weeks ?? 0));
+
+    const totalCost = items.reduce((s, i) => s + i.suggested_qty * i.unit_cost, 0);
+
+    res.json({
+      generated_at:     new Date().toISOString(),
+      default_lead_time: defaultLeadTime,
+      lead_times:       leadTimes,
+      count:            items.length,
+      total_cost:       Math.round(totalCost * 100) / 100,
+      items,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/settings/tenant  — read tenant onboarding config
 // PUT /api/settings/tenant  — save tenant onboarding config
 // GET /api/admin/discover   — auto-discover DB structure for onboarding wizard
