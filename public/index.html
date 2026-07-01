@@ -229,6 +229,41 @@
   <!-- ── NOS ────────────────────────────────────────────────────── -->
   <section id="tab-nos" class="hidden">
 
+    <!-- À commander maintenant -->
+    <div class="mb-8">
+      <div class="flex flex-wrap items-center gap-3 mb-3">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+          À commander maintenant
+        </span>
+        <select id="nosUrgentShop" class="border border-gray-300 rounded px-2 py-1 text-xs">
+          <option value="">Toutes les boutiques</option>
+        </select>
+        <span id="nosUrgentTotal" class="text-xs font-semibold text-red-700 ml-auto"></span>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+              <tr>
+                <th class="px-3 py-2 text-left">Urgence</th>
+                <th class="px-3 py-2 text-left">Description</th>
+                <th class="px-3 py-2 text-left">Marque</th>
+                <th class="px-3 py-2 text-left">Boutique</th>
+                <th class="px-3 py-2 text-right">Stock</th>
+                <th class="px-3 py-2 text-right">En commande</th>
+                <th class="px-3 py-2 text-right">Couverture</th>
+                <th class="px-3 py-2 text-right">Délai fourn.</th>
+                <th class="px-3 py-2 text-right">Qté à commander</th>
+              </tr>
+            </thead>
+            <tbody id="nosUrgentBody" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+        <div id="nosUrgentLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
+        <div id="nosUrgentEmpty" class="hidden text-center py-8 text-xs text-gray-400">Aucun article urgent — tout est bien approvisionné ✓</div>
+      </div>
+    </div>
+
     <!-- NOS budget par marque -->
     <div class="mb-8">
       <div class="flex flex-wrap items-end gap-4 mb-3">
@@ -622,6 +657,24 @@
           <div id="budgetParamsNote" class="text-xs text-emerald-700 font-semibold hidden"
                data-i18n="params_applied">Paramètres appliqués — budgets recalculés.</div>
         </div>
+      </div>
+
+      <!-- Délais fournisseur NOS -->
+      <div class="mt-6 border-t border-gray-200 pt-5">
+        <h3 class="text-xs font-semibold text-gray-700 mb-1">Délais fournisseur NOS (semaines)</h3>
+        <p class="text-xs text-gray-400 mb-3">Délai entre la commande et la réception. Utilisé pour déterminer les articles urgents à commander.</p>
+        <div id="leadTimesContainer" class="flex flex-col gap-2 mb-3 max-h-64 overflow-y-auto pr-1"></div>
+        <div class="flex items-center gap-2 mt-2">
+          <span class="text-xs text-gray-500">Délai par défaut si non configuré :</span>
+          <input id="leadTimeDefault" type="number" min="1" max="52" value="8"
+            class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+          <span class="text-xs text-gray-400">sem.</span>
+        </div>
+        <button id="leadTimesApply"
+          class="mt-3 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+          Sauvegarder les délais
+        </button>
+        <div id="leadTimesNote" class="mt-2 text-xs text-emerald-700 font-semibold hidden">Délais sauvegardés.</div>
       </div>
     </div>
   </section>
@@ -1030,12 +1083,12 @@ document.querySelectorAll('.tab').forEach(btn => {
 });
 function loadTab(id) {
   if (id === 'budget')    loadBudget();
-  if (id === 'nos')       loadNos();
+  if (id === 'nos')       { loadNos(); initNosUrgentShops().then(loadNosUrgent); }
   if (id === 'seasonal')  loadSeasonal();
   if (id === 'sizes')     loadSizes();
   if (id === 'transfers') loadTransfers();
   if (id === 'plan')      loadBudgetPlan();
-  if (id === 'params')    { loadTiers().then(renderTiersTable); }
+  if (id === 'params')    { loadTiers().then(renderTiersTable); loadLeadTimes(); }
 }
 
 // ── Sync status ───────────────────────────────────────────────────────────
@@ -2482,6 +2535,98 @@ document.getElementById('budgetParamsApply').addEventListener('click', async () 
   } catch (e) {
     console.warn('[budget-params] Failed to apply:', e.message);
   }
+});
+
+// ── NOS Urgent ───────────────────────────────────────────────────────────
+const urgencyLabel = { critique: { text: '⛔ Critique', cls: 'bg-red-100 text-red-700' }, urgent: { text: '⚠ Urgent', cls: 'bg-orange-100 text-orange-700' }, attention: { text: '◉ Attention', cls: 'bg-yellow-100 text-yellow-700' } };
+
+async function initNosUrgentShops() {
+  try {
+    const shops = await fetch(`${BASE}/api/shops`).then(r => r.json());
+    const sel = document.getElementById('nosUrgentShop');
+    if (!sel) return;
+    shops.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.shop_id; opt.textContent = s.name;
+      sel.appendChild(opt);
+    });
+  } catch {}
+}
+
+async function loadNosUrgent() {
+  const shopId = document.getElementById('nosUrgentShop')?.value ?? '';
+  const loader = document.getElementById('nosUrgentLoader');
+  const body   = document.getElementById('nosUrgentBody');
+  const empty  = document.getElementById('nosUrgentEmpty');
+  const total  = document.getElementById('nosUrgentTotal');
+  if (!body) return;
+  loader.classList.remove('hidden'); body.innerHTML = ''; empty.classList.add('hidden');
+  try {
+    const url = shopId ? `${BASE}/api/nos/urgent?shop_id=${shopId}` : `${BASE}/api/nos/urgent`;
+    const d = await fetch(url).then(r => r.json());
+    loader.classList.add('hidden');
+    if (!d.items?.length) { empty.classList.remove('hidden'); total.textContent = ''; return; }
+    total.textContent = `${d.count} article${d.count > 1 ? 's' : ''} — Budget estimé : ${fmt(d.total_cost)}`;
+    body.innerHTML = d.items.map(it => {
+      const u = urgencyLabel[it.urgency];
+      const coverCls = it.urgency === 'critique' ? 'text-red-600 font-bold' : it.urgency === 'urgent' ? 'text-orange-600 font-semibold' : 'text-yellow-600';
+      return `<tr class="hover:bg-gray-50">
+        <td class="px-3 py-2"><span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold ${u.cls}">${u.text}</span></td>
+        <td class="px-3 py-2 text-gray-700 max-w-[160px] truncate" title="${it.description}">${it.description}</td>
+        <td class="px-3 py-2 text-gray-500">${it.manufacturer}</td>
+        <td class="px-3 py-2 text-gray-500">${it.shop_name}</td>
+        <td class="px-3 py-2 text-right">${it.qty_on_hand}</td>
+        <td class="px-3 py-2 text-right text-blue-600">${it.qty_on_order}</td>
+        <td class="px-3 py-2 text-right ${coverCls}">${it.weeks_of_cover !== null ? it.weeks_of_cover + ' sem.' : '—'}</td>
+        <td class="px-3 py-2 text-right text-gray-400">${it.lead_time_weeks} sem.</td>
+        <td class="px-3 py-2 text-right font-semibold text-indigo-700">${it.suggested_qty}</td>
+      </tr>`;
+    }).join('');
+  } catch { loader.classList.add('hidden'); body.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-xs text-red-400">Erreur de chargement</td></tr>'; }
+}
+
+document.getElementById('nosUrgentShop')?.addEventListener('change', loadNosUrgent);
+
+// ── Lead Times (Paramètres) ───────────────────────────────────────────────
+let leadTimesData = {};
+
+async function loadLeadTimes() {
+  try {
+    leadTimesData = await fetch(`${BASE}/api/settings/nos-lead-times`).then(r => r.json());
+    const brands = await fetch(`${BASE}/api/manufacturers`).then(r => r.json());
+    const container = document.getElementById('leadTimesContainer');
+    if (!container) return;
+    container.innerHTML = brands.map(b => {
+      const val = leadTimesData[b] ?? '';
+      return `<div class="flex items-center gap-3">
+        <span class="text-xs text-gray-700 w-44 truncate" title="${b}">${b}</span>
+        <input type="number" min="1" max="52" value="${val}" placeholder="8"
+          data-brand="${b}"
+          class="lead-time-input border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+        <span class="text-xs text-gray-400">sem.</span>
+      </div>`;
+    }).join('');
+  } catch (e) { console.warn('loadLeadTimes:', e.message); }
+}
+
+document.getElementById('leadTimesApply')?.addEventListener('click', async () => {
+  const inputs = document.querySelectorAll('.lead-time-input');
+  const payload = {};
+  inputs.forEach(inp => {
+    const v = parseInt(inp.value, 10);
+    if (!isNaN(v) && v > 0) payload[inp.dataset.brand] = v;
+  });
+  try {
+    await fetch(`${BASE}/api/settings/nos-lead-times`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    leadTimesData = payload;
+    const note = document.getElementById('leadTimesNote');
+    note.classList.remove('hidden');
+    setTimeout(() => note.classList.add('hidden'), 3000);
+    loadNosUrgent(); // refresh urgent list with new lead times
+  } catch (e) { alert('Erreur de sauvegarde : ' + e.message); }
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────
