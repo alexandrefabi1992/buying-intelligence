@@ -867,6 +867,10 @@ const state = {
   tiers:      DEFAULT_TIERS.map(t => ({ ...t })),
 };
 
+// ── NOS state (declared early to avoid TDZ in async callbacks) ───────────
+let nosUrgentData = [];
+const nosExpandedBrands = new Set();
+
 // ── Utilities ─────────────────────────────────────────────────────────────
 const fmt   = n => n == null ? '—' : Number(n).toLocaleString('fr-CA', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const fmtC  = n => n == null ? '—' : Number(n).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -2470,8 +2474,6 @@ document.getElementById('budgetParamsApply').addEventListener('click', async () 
 });
 
 // ── NOS Accordéon par marque ─────────────────────────────────────────────
-let nosUrgentData = [];
-const nosExpandedBrands = new Set();
 async function initNosUrgentShops() {
   const sel = document.getElementById('nosUrgentShop');
   if (!sel || sel.options.length > 1) return; // already populated
