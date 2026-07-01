@@ -1029,16 +1029,25 @@ function loadTab(id) {
 
 // ── Sync status ───────────────────────────────────────────────────────────
 async function loadSyncStatus() {
+  const el = document.getElementById('syncStatus');
   try {
-    const r = await fetch(`${BASE}/api/sync/checkpoints`);
-    const d = await r.json();
-    const latest = d.checkpoints?.filter(c => c.status === 'completed').sort((a,b) => new Date(b.updated_at)-new Date(a.updated_at))[0];
-    if (latest) {
+    const d = await fetch(`${BASE}/api/sync/checkpoints`).then(r => r.json());
+    const all = d.checkpoints ?? [];
+    const completed = all.filter(c => c.status === 'completed').sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at));
+    const inProgress = all.some(c => c.status === 'in_progress');
+    if (completed.length) {
       const locale = _lang === 'en' ? 'en-CA' : 'fr-CA';
-      const dt = new Date(latest.updated_at).toLocaleString(locale, { dateStyle:'short', timeStyle:'short' });
-      document.getElementById('syncStatus').textContent = `${t('lastSync')} : ${dt}`;
+      const dt = new Date(completed[0].updated_at).toLocaleString(locale, { dateStyle:'short', timeStyle:'short' });
+      el.textContent = `${t('lastSync')} : ${dt}`;
+    } else if (inProgress) {
+      el.textContent = 'Sync en cours…';
+    } else {
+      el.textContent = 'Aucun sync effectué';
     }
-  } catch {}
+  } catch (err) {
+    console.warn('[syncStatus]', err);
+    el.textContent = 'Sync : non disponible';
+  }
 }
 
 // ── Filter bar bootstrap ──────────────────────────────────────────────────
