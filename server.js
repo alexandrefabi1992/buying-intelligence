@@ -709,7 +709,7 @@ app.get('/api/sizes', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/sizes/brands', async (req, res, next) => {
   try {
-    const { season, category, shop_id, date_from, date_to } = req.query;
+    const { season, category, shop_id, date_from, date_to, exclude_nos } = req.query;
     const params = [];
 
     const sizeCase = `
@@ -746,9 +746,10 @@ app.get('/api/sizes/brands', async (req, res, next) => {
       shopFilterInv = `AND i.shop_id  = $${params.length}`;
     }
 
+    const nosFilter = exclude_nos === '1' ? `AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')` : '';
     const baseWhere = `p.matrix_id IS NOT NULL AND p.archived = false
       AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
-      AND NOT (p.default_cost = 0 AND p.default_price = 0)`;
+      AND NOT (p.default_cost = 0 AND p.default_price = 0) ${nosFilter}`;
 
     const [{ rows }, { rows: catRows }] = await Promise.all([
       pool.query(`
