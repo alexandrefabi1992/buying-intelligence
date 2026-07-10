@@ -1515,14 +1515,15 @@ function fetchBudgetPanel(key, endpoint, extraParams) { return BudgetTab.fetchPa
 function updateAllBudgetTotals() { BudgetTab.updateTotals(); }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SizesTab — Courbes tailles par marque (accordion, brand-level aggregation)
+// SizesTab — Courbes tailles : Marque → Catégories → Tailles (3 niveaux)
 // ─────────────────────────────────────────────────────────────────────────────
 var SizesTab = (function() {
   var sizesData      = [];
-  var expandedGroups = new Set();
+  var expandedBrands = new Set();   // manufacturer name
+  var expandedCats   = new Set();   // "manufacturer||category"
   var activeSeason   = '';
   var shopsLoaded    = false;
-  var sortCol        = null;   // 'manufacturer' | 'totalSold' | 'stGlobal' | 'imbalances'
+  var sortCol        = null;
   var sortDir        = 'desc';
   var hideUnnamed    = false;
 
@@ -1540,6 +1541,23 @@ var SizesTab = (function() {
     return !name || name === 'Sans marque' || /^\d+$/.test(name.trim());
   }
 
+  function computeCat(sizes) {
+    var totalSold = 0, totalStock = 0;
+    sizes.forEach(function(s) { totalSold += s.units_sold; totalStock += s.qty_on_hand; });
+    var stGlobal = totalSold + totalStock > 0 ? Math.round(totalSold / (totalSold + totalStock) * 100) : 0;
+    var noStock  = totalStock === 0;
+    var sizesSorted = sizes.slice().sort(function(a, b) { return sizeSort(a.size_label, b.size_label); });
+    var imbalances = 0;
+    if (!noStock) {
+      sizesSorted.forEach(function(s) {
+        var ps = totalSold  > 0 ? s.units_sold  / totalSold  * 100 : 0;
+        var pk = totalStock > 0 ? s.qty_on_hand / totalStock * 100 : 0;
+        if (Math.abs(pk - ps) > 8) imbalances++;
+      });
+    }
+    return { totalSold: totalSold, totalStock: totalStock, stGlobal: stGlobal, noStock: noStock, sizesSorted: sizesSorted, imbalances: imbalances };
+  }
+
   async function loadShops() {
     if (shopsLoaded) return;
     try {
@@ -1548,8 +1566,7 @@ var SizesTab = (function() {
       var sel = document.getElementById('sizesShop');
       (d.shops || d).forEach(function(sh) {
         var opt = document.createElement('option');
-        opt.value = sh.shop_id;
-        opt.textContent = sh.name;
+        opt.value = sh.shop_id; opt.textContent = sh.name;
         sel.appendChild(opt);
       });
       shopsLoaded = true;
@@ -1563,7 +1580,6 @@ var SizesTab = (function() {
     loader.classList.remove('hidden');
     body.innerHTML = '';
     empty.classList.add('hidden');
-
     await loadShops();
 
     var params = new URLSearchParams();
@@ -1586,17 +1602,14 @@ var SizesTab = (function() {
       var r = await fetch(BASE + '/api/sizes/brands?' + params.toString());
       var d = await r.json();
       sizesData = d.sizes || [];
-
       var catSel = document.getElementById('sizesCatFilter');
       if (catSel.options.length <= 1 && d.categories) {
         d.categories.forEach(function(c) {
           var opt = document.createElement('option');
-          opt.value = c;
-          opt.textContent = c;
+          opt.value = c; opt.textContent = c;
           catSel.appendChild(opt);
         });
       }
-
       render();
     } catch(e) {
       body.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-red-500">' + escHtml(e.message) + '</td></tr>';
@@ -1604,58 +1617,44 @@ var SizesTab = (function() {
     loader.classList.add('hidden');
   }
 
-  function computeGroup(g) {
-    var totalSold = 0, totalStock = 0;
-    g.sizes.forEach(function(s) { totalSold += s.units_sold; totalStock += s.qty_on_hand; });
-    var stGlobal = totalSold + totalStock > 0 ? Math.round(totalSold / (totalSold + totalStock) * 100) : 0;
-    var noStock = totalStock === 0;
-
-    var sizesSorted = g.sizes.slice().sort(function(a, b) { return sizeSort(a.size_label, b.size_label); });
-    var imbalances = 0;
-    if (!noStock) {
-      sizesSorted.forEach(function(s) {
-        var ps = totalSold  > 0 ? s.units_sold  / totalSold  * 100 : 0;
-        var pk = totalStock > 0 ? s.qty_on_hand / totalStock * 100 : 0;
-        if (Math.abs(pk - ps) > 8) imbalances++;
-      });
-    }
-    return { totalSold: totalSold, totalStock: totalStock, stGlobal: stGlobal, noStock: noStock, sizesSorted: sizesSorted, imbalances: imbalances };
-  }
-
-  function buildGroups() {
+  function buildBrands() {
     var search = (document.getElementById('sizesBrandSearch').value || '').toLowerCase().trim();
-    var map = {};
+    var brandMap = {};
     sizesData.forEach(function(row) {
       if (!row.size_label) return;
       if (hideUnnamed && isUnnamed(row.manufacturer)) return;
-      var key = row.manufacturer + '||' + row.category;
       if (search && row.manufacturer.toLowerCase().indexOf(search) === -1) return;
-      if (!map[key]) map[key] = { manufacturer: row.manufacturer, category: row.category, sizes: [] };
-      map[key].sizes.push(row);
+      var mfr = row.manufacturer;
+      if (!brandMap[mfr]) brandMap[mfr] = { manufacturer: mfr, catMap: {} };
+      if (!brandMap[mfr].catMap[row.category]) brandMap[mfr].catMap[row.category] = { category: row.category, sizes: [] };
+      brandMap[mfr].catMap[row.category].sizes.push(row);
     });
-    var groups = Object.values(map);
 
-    // Attach computed stats for sorting
-    groups.forEach(function(g) {
-      var c = computeGroup(g);
-      g._totalSold  = c.totalSold;
-      g._stGlobal   = c.stGlobal;
-      g._imbalances = c.imbalances;
+    var brands = Object.values(brandMap).map(function(b) {
+      var cats = Object.values(b.catMap).map(function(c) {
+        return { category: c.category, sizes: c.sizes, _c: computeCat(c.sizes) };
+      });
+      var totalSold = 0, totalStock = 0, imbalances = 0;
+      cats.forEach(function(c) { totalSold += c._c.totalSold; totalStock += c._c.totalStock; imbalances += c._c.imbalances; });
+      var stGlobal = totalSold + totalStock > 0 ? Math.round(totalSold / (totalSold + totalStock) * 100) : 0;
+      return { manufacturer: b.manufacturer, cats: cats,
+        _totalSold: totalSold, _totalStock: totalStock, _stGlobal: stGlobal,
+        _noStock: totalStock === 0, _imbalances: imbalances };
     });
 
     if (sortCol) {
-      groups.sort(function(a, b) {
+      brands.sort(function(a, b) {
         var va, vb;
-        if (sortCol === 'manufacturer') { va = a.manufacturer.toLowerCase(); vb = b.manufacturer.toLowerCase(); }
-        else if (sortCol === 'totalSold')  { va = a._totalSold;  vb = b._totalSold; }
-        else if (sortCol === 'stGlobal')   { va = a._stGlobal;   vb = b._stGlobal; }
-        else if (sortCol === 'imbalances') { va = a._imbalances; vb = b._imbalances; }
+        if      (sortCol === 'manufacturer') { va = a.manufacturer.toLowerCase(); vb = b.manufacturer.toLowerCase(); }
+        else if (sortCol === 'totalSold')    { va = a._totalSold;  vb = b._totalSold; }
+        else if (sortCol === 'stGlobal')     { va = a._stGlobal;   vb = b._stGlobal; }
+        else if (sortCol === 'imbalances')   { va = a._imbalances; vb = b._imbalances; }
         if (va < vb) return sortDir === 'asc' ? -1 : 1;
-        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        if (va > vb) return sortDir === 'asc' ?  1 : -1;
         return 0;
       });
     }
-    return groups;
+    return brands;
   }
 
   function stBadgeClass(st) {
@@ -1673,27 +1672,30 @@ var SizesTab = (function() {
     if (diff < -8) return '<span class="text-red-600 font-bold">↓</span>';
     return '<span class="text-green-600 font-bold">✓</span>';
   }
+  function imbalanceBadge(noStock, imbalances) {
+    if (noStock)        return '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500">Épuisé</span>';
+    if (imbalances > 0) return '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">' + imbalances + ' ⚠</span>';
+    return '<span class="text-green-600 text-xs">✓</span>';
+  }
 
   function updateSortIcons() {
     document.querySelectorAll('.sizes-sort-icon').forEach(function(el) {
-      var col = el.dataset.col;
-      el.textContent = col === sortCol ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
+      el.textContent = el.dataset.col === sortCol ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
     });
   }
 
-  function updateSummary(groups) {
+  function updateSummary(brands) {
     var bar = document.getElementById('sizesSummaryBar');
-    if (!groups.length) { bar.classList.add('hidden'); return; }
+    if (!brands.length) { bar.classList.add('hidden'); return; }
     var sumSold = 0, sumW = 0, sumST = 0, sumImb = 0;
-    groups.forEach(function(g) {
-      sumSold += g._totalSold;
-      sumW    += g._totalSold;
-      sumST   += g._stGlobal * g._totalSold;
-      sumImb  += g._imbalances;
+    brands.forEach(function(b) {
+      sumSold += b._totalSold; sumW += b._totalSold;
+      sumST   += b._stGlobal * b._totalSold;
+      sumImb  += b._imbalances;
     });
-    document.getElementById('sumBrands').textContent    = groups.length;
-    document.getElementById('sumTotalSold').textContent = fmt(sumSold);
-    document.getElementById('sumST').textContent        = sumW > 0 ? Math.round(sumST / sumW) + '%' : '—';
+    document.getElementById('sumBrands').textContent     = brands.length;
+    document.getElementById('sumTotalSold').textContent  = fmt(sumSold);
+    document.getElementById('sumST').textContent         = sumW > 0 ? Math.round(sumST / sumW) + '%' : '—';
     document.getElementById('sumImbalances').textContent = sumImb;
     bar.classList.remove('hidden');
   }
@@ -1701,78 +1703,88 @@ var SizesTab = (function() {
   function render() {
     var body   = document.getElementById('sizesAccordionBody');
     var empty  = document.getElementById('sizesEmpty');
-    var groups = buildGroups();
+    var brands = buildBrands();
 
-    document.getElementById('sizesCount').textContent = groups.length + ' marque' + (groups.length !== 1 ? 's' : '');
+    document.getElementById('sizesCount').textContent = brands.length + ' marque' + (brands.length !== 1 ? 's' : '');
     updateSortIcons();
-    updateSummary(groups);
+    updateSummary(brands);
 
-    if (!groups.length) {
-      body.innerHTML = '';
-      empty.classList.remove('hidden');
-      return;
-    }
+    if (!brands.length) { body.innerHTML = ''; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
 
     var html = '';
-    groups.forEach(function(g) {
-      var key    = g.manufacturer + '||' + g.category;
-      var isOpen = expandedGroups.has(key);
-      var c      = computeGroup(g);
+    brands.forEach(function(b) {
+      var brandOpen = expandedBrands.has(b.manufacturer);
 
-      var imbalanceBadge = c.noStock
-        ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500">Épuisé</span>'
-        : c.imbalances > 0
-          ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">' + c.imbalances + ' ⚠</span>'
-          : '<span class="text-green-600 text-xs">✓</span>';
-
-      html += '<tr class="cursor-pointer hover:bg-gray-50 transition-colors sizes-group-row" data-key="' + escHtml(key) + '">';
-      html += '<td class="px-3 py-2 text-gray-400 text-center">' + (isOpen ? '▾' : '▸') + '</td>';
-      html += '<td class="px-3 py-2 font-semibold text-gray-800">' + escHtml(g.manufacturer) + '</td>';
-      html += '<td class="px-3 py-2 text-gray-500">' + escHtml(g.category) + '</td>';
-      html += '<td class="px-3 py-2 text-right">' + fmt(c.totalSold) + '</td>';
-      html += '<td class="px-3 py-2 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ' + stBadgeClass(c.stGlobal) + '">' + c.stGlobal + '%</span></td>';
-      html += '<td class="px-3 py-2 text-center">' + imbalanceBadge + '</td>';
+      // ── Niveau 1 : Marque ──
+      html += '<tr class="cursor-pointer hover:bg-gray-50 transition-colors sizes-brand-row" data-brand="' + escHtml(b.manufacturer) + '">';
+      html += '<td class="px-3 py-2 text-gray-400 text-center">' + (brandOpen ? '▾' : '▸') + '</td>';
+      html += '<td class="px-3 py-2 font-semibold text-gray-800">' + escHtml(b.manufacturer) + '</td>';
+      html += '<td class="px-3 py-2 text-gray-400 text-[10px]">' + b.cats.length + ' catégorie' + (b.cats.length > 1 ? 's' : '') + '</td>';
+      html += '<td class="px-3 py-2 text-right">' + fmt(b._totalSold) + '</td>';
+      html += '<td class="px-3 py-2 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ' + stBadgeClass(b._stGlobal) + '">' + b._stGlobal + '%</span></td>';
+      html += '<td class="px-3 py-2 text-center">' + imbalanceBadge(b._noStock, b._imbalances) + '</td>';
       html += '</tr>';
 
-      if (isOpen) {
+      if (!brandOpen) return;
+
+      b.cats.forEach(function(cat) {
+        var catKey  = b.manufacturer + '||' + cat.category;
+        var catOpen = expandedCats.has(catKey);
+        var c       = cat._c;
+
+        // ── Niveau 2 : Catégorie ──
+        html += '<tr class="cursor-pointer hover:bg-blue-50/50 transition-colors bg-gray-50/40 sizes-cat-row" data-cat-key="' + escHtml(catKey) + '">';
+        html += '<td></td>';
+        html += '<td class="px-3 py-1.5 pl-8 text-gray-700">' + (catOpen ? '▾' : '▸') + ' <span class="font-medium">' + escHtml(cat.category) + '</span></td>';
+        html += '<td class="px-3 py-1.5 text-gray-400 text-[10px]">' + c.sizesSorted.length + ' taille' + (c.sizesSorted.length > 1 ? 's' : '') + '</td>';
+        html += '<td class="px-3 py-1.5 text-right text-gray-600">' + fmt(c.totalSold) + '</td>';
+        html += '<td class="px-3 py-1.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ' + stBadgeClass(c.stGlobal) + '">' + c.stGlobal + '%</span></td>';
+        html += '<td class="px-3 py-1.5 text-center">' + imbalanceBadge(c.noStock, c.imbalances) + '</td>';
+        html += '</tr>';
+
+        if (!catOpen) return;
+
+        // ── Niveau 3 : En-tête tailles ──
         html += '<tr class="bg-blue-50 text-[10px] text-gray-500 uppercase tracking-wide">';
-        html += '<td></td><td class="px-3 py-1">Taille</td>';
+        html += '<td></td><td colspan="2" class="px-3 py-1 pl-14">Taille</td>';
         html += '<td class="px-3 py-1 text-right">% Ventes</td>';
-        html += '<td class="px-3 py-1 text-right">% Stock</td>';
         html += '<td class="px-3 py-1 text-right">ST</td>';
         html += '<td class="px-3 py-1 text-center">Alignement</td>';
         html += '</tr>';
 
         c.sizesSorted.forEach(function(s) {
-          var ps  = c.totalSold  > 0 ? s.units_sold  / c.totalSold  * 100 : 0;
-          var pk  = c.totalStock > 0 ? s.qty_on_hand / c.totalStock * 100 : 0;
-          var stS = s.units_sold + s.qty_on_hand > 0 ? Math.round(s.units_sold / (s.units_sold + s.qty_on_hand) * 100) : 0;
+          var ps   = c.totalSold  > 0 ? s.units_sold  / c.totalSold  * 100 : 0;
+          var pk   = c.totalStock > 0 ? s.qty_on_hand / c.totalStock * 100 : 0;
+          var stS  = s.units_sold + s.qty_on_hand > 0 ? Math.round(s.units_sold / (s.units_sold + s.qty_on_hand) * 100) : 0;
           var diff = pk - ps;
-
-          var alignCell = c.noStock
-            ? '<span class="text-gray-400 text-[10px]">—</span>'
+          var alignCell = c.noStock ? '<span class="text-gray-400">—</span>'
             : alignIcon(diff) + ' <span class="text-gray-400 text-[10px]">' + (diff >= 0 ? '+' : '') + diff.toFixed(1) + 'pp</span>';
 
-          html += '<tr class="bg-blue-50/40 hover:bg-blue-100/30 transition-colors">';
+          html += '<tr class="bg-blue-50/30 hover:bg-blue-100/40">';
           html += '<td></td>';
-          html += '<td class="px-3 py-1.5 pl-8 font-medium text-gray-700">' + stDot(stS) + ' <span class="ml-1">' + escHtml(s.size_label) + '</span></td>';
+          html += '<td colspan="2" class="px-3 py-1.5 pl-16 font-medium text-gray-700">' + stDot(stS) + ' ' + escHtml(s.size_label) + '</td>';
           html += '<td class="px-3 py-1.5 text-right text-gray-600">' + ps.toFixed(1) + '%</td>';
-          html += '<td class="px-3 py-1.5 text-right text-gray-600">' + pk.toFixed(1) + '%</td>';
           html += '<td class="px-3 py-1.5 text-right"><span class="' + stBadgeClass(stS) + ' px-1 rounded">' + stS + '%</span></td>';
           html += '<td class="px-3 py-1.5 text-center">' + alignCell + '</td>';
           html += '</tr>';
         });
-      }
+      });
     });
 
     body.innerHTML = html;
 
-    body.querySelectorAll('.sizes-group-row').forEach(function(row) {
+    body.querySelectorAll('.sizes-brand-row').forEach(function(row) {
       row.addEventListener('click', function() {
-        var key = row.dataset.key;
-        if (expandedGroups.has(key)) expandedGroups.delete(key);
-        else expandedGroups.add(key);
+        var b = row.dataset.brand;
+        if (expandedBrands.has(b)) expandedBrands.delete(b); else expandedBrands.add(b);
+        render();
+      });
+    });
+    body.querySelectorAll('.sizes-cat-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        var k = row.dataset.catKey;
+        if (expandedCats.has(k)) expandedCats.delete(k); else expandedCats.add(k);
         render();
       });
     });
@@ -1793,9 +1805,9 @@ var SizesTab = (function() {
         (i > 0 ? ' border-l border-gray-300' : '') +
         (active ? ' bg-blue-600 text-white' : ' bg-white text-gray-600 hover:bg-gray-50');
     });
-    var dateRange = document.getElementById('sizesDateRange');
-    if (activeSeason === 'custom') dateRange.classList.remove('hidden'), dateRange.style.display = 'flex';
-    else dateRange.classList.add('hidden'), dateRange.style.display = '';
+    var dr = document.getElementById('sizesDateRange');
+    if (activeSeason === 'custom') { dr.classList.remove('hidden'); dr.style.display = 'flex'; }
+    else { dr.classList.add('hidden'); dr.style.display = ''; }
   }
 
   function init() {
@@ -1803,26 +1815,18 @@ var SizesTab = (function() {
     document.getElementById('tab-sizes').dataset.sizesListeners = '1';
 
     document.querySelectorAll('.sizes-season-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        activeSeason = btn.dataset.season;
-        updateSeasonBtns();
-      });
+      btn.addEventListener('click', function() { activeSeason = btn.dataset.season; updateSeasonBtns(); });
     });
-
     document.getElementById('sizesApplyBtn').addEventListener('click', function() {
-      expandedGroups.clear();
-      load();
+      expandedBrands.clear(); expandedCats.clear(); load();
     });
-
     document.getElementById('sizesBrandSearch').addEventListener('keydown', function(e) {
       if (e.key === 'Enter')  render();
       if (e.key === 'Escape') { this.value = ''; render(); }
     });
     document.getElementById('sizesBrandSearch').addEventListener('input', function() { render(); });
-
     document.getElementById('sizesHideUnnamedBtn').addEventListener('click', function() { setHideUnnamed(true); });
     document.getElementById('sizesShowUnnamedBtn').addEventListener('click', function() { setHideUnnamed(false); });
-
     document.querySelectorAll('.sizes-sort-th').forEach(function(th) {
       th.addEventListener('click', function() {
         var col = th.dataset.sortCol;
