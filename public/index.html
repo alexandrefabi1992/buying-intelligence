@@ -292,13 +292,20 @@
 
   <!-- ── SIZES ──────────────────────────────────────────────────── -->
   <section id="tab-sizes" class="hidden">
-    <!-- Filtres -->
-    <div class="flex flex-wrap items-center gap-3 mb-3">
+    <!-- Filtres ligne 1 -->
+    <div class="flex flex-wrap items-center gap-3 mb-2">
       <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Courbes tailles — par marque</span>
       <div class="flex rounded-lg border border-gray-300 overflow-hidden text-xs">
         <button class="sizes-season-btn px-3 py-1.5 bg-blue-600 text-white font-semibold" data-season="">Tout</button>
         <button class="sizes-season-btn px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 border-l border-gray-300" data-season="p">Printemps</button>
         <button class="sizes-season-btn px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 border-l border-gray-300" data-season="a">Automne</button>
+        <button class="sizes-season-btn px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 border-l border-gray-300" data-season="custom">Période</button>
+      </div>
+      <!-- Date range (visible only when Période active) -->
+      <div id="sizesDateRange" class="hidden items-center gap-2 text-xs">
+        <input type="date" id="sizesDateFrom" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300">
+        <span class="text-gray-400">→</span>
+        <input type="date" id="sizesDateTo" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300">
       </div>
       <select id="sizesCatFilter" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
         <option value="">Toutes les catégories</option>
@@ -307,9 +314,17 @@
         <option value="">Toutes les boutiques</option>
       </select>
       <input id="sizesBrandSearch" type="text" placeholder="Rechercher une marque…"
-        class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs w-48 focus:outline-none focus:ring-2 focus:ring-blue-300">
+        class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-blue-300">
       <button id="sizesApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Appliquer</button>
+      <button id="sizesHideUnnamedBtn" class="px-2 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">Masquer sans marque</button>
       <span id="sizesCount" class="text-xs text-gray-500 ml-auto"></span>
+    </div>
+    <!-- Chip filtre actif sans marque -->
+    <div id="sizesUnnamedChip" class="hidden mb-2">
+      <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">
+        Sans marque masqués
+        <button id="sizesShowUnnamedBtn" class="ml-1 text-blue-500 hover:text-blue-700 font-bold leading-none">✕</button>
+      </span>
     </div>
     <!-- Légende -->
     <div class="flex flex-wrap gap-4 mb-3 text-[10px] text-gray-500">
@@ -318,17 +333,24 @@
       <span><span class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1"></span>ST &lt; 40%</span>
       <span class="ml-2">Alignement stock : <span class="text-green-600 font-semibold">✓</span> ok · <span class="text-amber-600 font-semibold">↑</span> surplus · <span class="text-red-600 font-semibold">↓</span> déficit (&gt; ±8 pts)</span>
     </div>
+    <!-- Barre de résumé -->
+    <div id="sizesSummaryBar" class="hidden mb-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex flex-wrap gap-6 text-xs text-blue-800">
+      <span>Marques visibles : <strong id="sumBrands">—</strong></span>
+      <span>Total vendu : <strong id="sumTotalSold">—</strong></span>
+      <span>ST moyen pondéré : <strong id="sumST">—</strong></span>
+      <span>Déséquilibres : <strong id="sumImbalances">—</strong></span>
+    </div>
     <!-- Accordéon -->
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <table class="w-full text-xs">
-        <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+        <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide select-none">
           <tr>
             <th class="px-3 py-2 w-6"></th>
-            <th class="px-3 py-2 text-left">Marque</th>
+            <th class="px-3 py-2 text-left cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="manufacturer">Marque <span class="sizes-sort-icon" data-col="manufacturer"></span></th>
             <th class="px-3 py-2 text-left">Catégorie</th>
-            <th class="px-3 py-2 text-right">Total vendu</th>
-            <th class="px-3 py-2 text-right">Sell-through global</th>
-            <th class="px-3 py-2 text-center">Déséquilibres stock</th>
+            <th class="px-3 py-2 text-right cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="totalSold">Total vendu <span class="sizes-sort-icon" data-col="totalSold"></span></th>
+            <th class="px-3 py-2 text-right cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="stGlobal">Sell-through <span class="sizes-sort-icon" data-col="stGlobal"></span></th>
+            <th class="px-3 py-2 text-center cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="imbalances">Déséquilibres <span class="sizes-sort-icon" data-col="imbalances"></span></th>
           </tr>
         </thead>
         <tbody id="sizesAccordionBody" class="divide-y divide-gray-100"></tbody>
@@ -1492,10 +1514,13 @@ function updateAllBudgetTotals() { BudgetTab.updateTotals(); }
 // SizesTab — Courbes tailles par marque (accordion, brand-level aggregation)
 // ─────────────────────────────────────────────────────────────────────────────
 var SizesTab = (function() {
-  var sizesData      = [];   // raw rows from /api/sizes/brands
+  var sizesData      = [];
   var expandedGroups = new Set();
   var activeSeason   = '';
   var shopsLoaded    = false;
+  var sortCol        = null;   // 'manufacturer' | 'totalSold' | 'stGlobal' | 'imbalances'
+  var sortDir        = 'desc';
+  var hideUnnamed    = false;
 
   var SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
 
@@ -1505,6 +1530,10 @@ var SizesTab = (function() {
     if (ia !== -1) return -1;
     if (ib !== -1) return 1;
     return a < b ? -1 : a > b ? 1 : 0;
+  }
+
+  function isUnnamed(name) {
+    return !name || name === 'Sans marque' || /^\d+$/.test(name.trim());
   }
 
   async function loadShops() {
@@ -1534,7 +1563,14 @@ var SizesTab = (function() {
     await loadShops();
 
     var params = new URLSearchParams();
-    if (activeSeason) params.set('season', activeSeason);
+    if (activeSeason === 'custom') {
+      var df = document.getElementById('sizesDateFrom').value;
+      var dt = document.getElementById('sizesDateTo').value;
+      if (df) params.set('date_from', df);
+      if (dt) params.set('date_to', dt);
+    } else if (activeSeason) {
+      params.set('season', activeSeason);
+    }
     var cat    = document.getElementById('sizesCatFilter').value;
     var shopId = document.getElementById('sizesShop').value;
     if (cat)    params.set('category', cat);
@@ -1545,7 +1581,6 @@ var SizesTab = (function() {
       var d = await r.json();
       sizesData = d.sizes || [];
 
-      // Populate category dropdown on first load
       var catSel = document.getElementById('sizesCatFilter');
       if (catSel.options.length <= 1 && d.categories) {
         d.categories.forEach(function(c) {
@@ -1563,17 +1598,58 @@ var SizesTab = (function() {
     loader.classList.add('hidden');
   }
 
+  function computeGroup(g) {
+    var totalSold = 0, totalStock = 0;
+    g.sizes.forEach(function(s) { totalSold += s.units_sold; totalStock += s.qty_on_hand; });
+    var stGlobal = totalSold + totalStock > 0 ? Math.round(totalSold / (totalSold + totalStock) * 100) : 0;
+    var noStock = totalStock === 0;
+
+    var sizesSorted = g.sizes.slice().sort(function(a, b) { return sizeSort(a.size_label, b.size_label); });
+    var imbalances = 0;
+    if (!noStock) {
+      sizesSorted.forEach(function(s) {
+        var ps = totalSold  > 0 ? s.units_sold  / totalSold  * 100 : 0;
+        var pk = totalStock > 0 ? s.qty_on_hand / totalStock * 100 : 0;
+        if (Math.abs(pk - ps) > 8) imbalances++;
+      });
+    }
+    return { totalSold: totalSold, totalStock: totalStock, stGlobal: stGlobal, noStock: noStock, sizesSorted: sizesSorted, imbalances: imbalances };
+  }
+
   function buildGroups() {
     var search = (document.getElementById('sizesBrandSearch').value || '').toLowerCase().trim();
     var map = {};
     sizesData.forEach(function(row) {
       if (!row.size_label) return;
+      if (hideUnnamed && isUnnamed(row.manufacturer)) return;
       var key = row.manufacturer + '||' + row.category;
       if (search && row.manufacturer.toLowerCase().indexOf(search) === -1) return;
       if (!map[key]) map[key] = { manufacturer: row.manufacturer, category: row.category, sizes: [] };
       map[key].sizes.push(row);
     });
-    return Object.values(map);
+    var groups = Object.values(map);
+
+    // Attach computed stats for sorting
+    groups.forEach(function(g) {
+      var c = computeGroup(g);
+      g._totalSold  = c.totalSold;
+      g._stGlobal   = c.stGlobal;
+      g._imbalances = c.imbalances;
+    });
+
+    if (sortCol) {
+      groups.sort(function(a, b) {
+        var va, vb;
+        if (sortCol === 'manufacturer') { va = a.manufacturer.toLowerCase(); vb = b.manufacturer.toLowerCase(); }
+        else if (sortCol === 'totalSold')  { va = a._totalSold;  vb = b._totalSold; }
+        else if (sortCol === 'stGlobal')   { va = a._stGlobal;   vb = b._stGlobal; }
+        else if (sortCol === 'imbalances') { va = a._imbalances; vb = b._imbalances; }
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return groups;
   }
 
   function stBadgeClass(st) {
@@ -1587,9 +1663,33 @@ var SizesTab = (function() {
     return '<span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>';
   }
   function alignIcon(diff) {
-    if (diff >  8) return '<span class="text-amber-600 font-bold" title="Surplus +" >↑</span>';
-    if (diff < -8) return '<span class="text-red-600   font-bold" title="Déficit −">↓</span>';
-    return '<span class="text-green-600 font-bold" title="Aligné">✓</span>';
+    if (diff >  8) return '<span class="text-amber-600 font-bold">↑</span>';
+    if (diff < -8) return '<span class="text-red-600 font-bold">↓</span>';
+    return '<span class="text-green-600 font-bold">✓</span>';
+  }
+
+  function updateSortIcons() {
+    document.querySelectorAll('.sizes-sort-icon').forEach(function(el) {
+      var col = el.dataset.col;
+      el.textContent = col === sortCol ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
+    });
+  }
+
+  function updateSummary(groups) {
+    var bar = document.getElementById('sizesSummaryBar');
+    if (!groups.length) { bar.classList.add('hidden'); return; }
+    var sumSold = 0, sumW = 0, sumST = 0, sumImb = 0;
+    groups.forEach(function(g) {
+      sumSold += g._totalSold;
+      sumW    += g._totalSold;
+      sumST   += g._stGlobal * g._totalSold;
+      sumImb  += g._imbalances;
+    });
+    document.getElementById('sumBrands').textContent    = groups.length;
+    document.getElementById('sumTotalSold').textContent = fmt(sumSold);
+    document.getElementById('sumST').textContent        = sumW > 0 ? Math.round(sumST / sumW) + '%' : '—';
+    document.getElementById('sumImbalances').textContent = sumImb;
+    bar.classList.remove('hidden');
   }
 
   function render() {
@@ -1598,6 +1698,8 @@ var SizesTab = (function() {
     var groups = buildGroups();
 
     document.getElementById('sizesCount').textContent = groups.length + ' marque' + (groups.length !== 1 ? 's' : '');
+    updateSortIcons();
+    updateSummary(groups);
 
     if (!groups.length) {
       body.innerHTML = '';
@@ -1608,58 +1710,43 @@ var SizesTab = (function() {
 
     var html = '';
     groups.forEach(function(g) {
-      var key = g.manufacturer + '||' + g.category;
+      var key    = g.manufacturer + '||' + g.category;
       var isOpen = expandedGroups.has(key);
+      var c      = computeGroup(g);
 
-      // Aggregate totals
-      var totalSold  = 0, totalStock = 0;
-      g.sizes.forEach(function(s) { totalSold += s.units_sold; totalStock += s.qty_on_hand; });
-      var stGlobal = totalSold + totalStock > 0 ? Math.round(totalSold / (totalSold + totalStock) * 100) : 0;
+      var imbalanceBadge = c.noStock
+        ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500">Épuisé</span>'
+        : c.imbalances > 0
+          ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">' + c.imbalances + ' ⚠</span>'
+          : '<span class="text-green-600 text-xs">✓</span>';
 
-      // Count imbalances
-      var imbalances = 0;
-      var totalPctSold = 0;
-      g.sizes.forEach(function(s) { totalPctSold += s.units_sold; });
-
-      var sizesSorted = g.sizes.slice().sort(function(a, b) { return sizeSort(a.size_label, b.size_label); });
-      var totalPctStock = 0;
-      sizesSorted.forEach(function(s) { totalPctStock += s.qty_on_hand; });
-
-      sizesSorted.forEach(function(s) {
-        var ps = totalPctSold  > 0 ? s.units_sold  / totalPctSold  * 100 : 0;
-        var pk = totalPctStock > 0 ? s.qty_on_hand / totalPctStock * 100 : 0;
-        if (Math.abs(pk - ps) > 8) imbalances++;
-      });
-
-      var imbalanceBadge = imbalances > 0
-        ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">' + imbalances + ' ⚠</span>'
-        : '<span class="text-green-600 text-xs">✓</span>';
-
-      // Accordion header row
       html += '<tr class="cursor-pointer hover:bg-gray-50 transition-colors sizes-group-row" data-key="' + escHtml(key) + '">';
       html += '<td class="px-3 py-2 text-gray-400 text-center">' + (isOpen ? '▾' : '▸') + '</td>';
       html += '<td class="px-3 py-2 font-semibold text-gray-800">' + escHtml(g.manufacturer) + '</td>';
       html += '<td class="px-3 py-2 text-gray-500">' + escHtml(g.category) + '</td>';
-      html += '<td class="px-3 py-2 text-right">' + fmt(totalSold) + '</td>';
-      html += '<td class="px-3 py-2 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ' + stBadgeClass(stGlobal) + '">' + stGlobal + '%</span></td>';
+      html += '<td class="px-3 py-2 text-right">' + fmt(c.totalSold) + '</td>';
+      html += '<td class="px-3 py-2 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ' + stBadgeClass(c.stGlobal) + '">' + c.stGlobal + '%</span></td>';
       html += '<td class="px-3 py-2 text-center">' + imbalanceBadge + '</td>';
       html += '</tr>';
 
       if (isOpen) {
-        // Detail header
         html += '<tr class="bg-blue-50 text-[10px] text-gray-500 uppercase tracking-wide">';
-        html += '<td></td><td colspan="1" class="px-3 py-1">Taille</td>';
+        html += '<td></td><td class="px-3 py-1">Taille</td>';
         html += '<td class="px-3 py-1 text-right">% Ventes</td>';
         html += '<td class="px-3 py-1 text-right">% Stock</td>';
         html += '<td class="px-3 py-1 text-right">ST</td>';
         html += '<td class="px-3 py-1 text-center">Alignement</td>';
         html += '</tr>';
 
-        sizesSorted.forEach(function(s) {
-          var ps  = totalPctSold  > 0 ? s.units_sold  / totalPctSold  * 100 : 0;
-          var pk  = totalPctStock > 0 ? s.qty_on_hand / totalPctStock * 100 : 0;
+        c.sizesSorted.forEach(function(s) {
+          var ps  = c.totalSold  > 0 ? s.units_sold  / c.totalSold  * 100 : 0;
+          var pk  = c.totalStock > 0 ? s.qty_on_hand / c.totalStock * 100 : 0;
           var stS = s.units_sold + s.qty_on_hand > 0 ? Math.round(s.units_sold / (s.units_sold + s.qty_on_hand) * 100) : 0;
           var diff = pk - ps;
+
+          var alignCell = c.noStock
+            ? '<span class="text-gray-400 text-[10px]">—</span>'
+            : alignIcon(diff) + ' <span class="text-gray-400 text-[10px]">' + (diff >= 0 ? '+' : '') + diff.toFixed(1) + 'pp</span>';
 
           html += '<tr class="bg-blue-50/40 hover:bg-blue-100/30 transition-colors">';
           html += '<td></td>';
@@ -1667,7 +1754,7 @@ var SizesTab = (function() {
           html += '<td class="px-3 py-1.5 text-right text-gray-600">' + ps.toFixed(1) + '%</td>';
           html += '<td class="px-3 py-1.5 text-right text-gray-600">' + pk.toFixed(1) + '%</td>';
           html += '<td class="px-3 py-1.5 text-right"><span class="' + stBadgeClass(stS) + ' px-1 rounded">' + stS + '%</span></td>';
-          html += '<td class="px-3 py-1.5 text-center">' + alignIcon(diff) + ' <span class="text-gray-400 text-[10px]">' + (diff >= 0 ? '+' : '') + diff.toFixed(1) + 'pp</span></td>';
+          html += '<td class="px-3 py-1.5 text-center">' + alignCell + '</td>';
           html += '</tr>';
         });
       }
@@ -1675,7 +1762,6 @@ var SizesTab = (function() {
 
     body.innerHTML = html;
 
-    // Wire accordion click handlers
     body.querySelectorAll('.sizes-group-row').forEach(function(row) {
       row.addEventListener('click', function() {
         var key = row.dataset.key;
@@ -1686,36 +1772,58 @@ var SizesTab = (function() {
     });
   }
 
+  function setHideUnnamed(hide) {
+    hideUnnamed = hide;
+    document.getElementById('sizesHideUnnamedBtn').classList.toggle('hidden', hide);
+    document.getElementById('sizesUnnamedChip').classList.toggle('hidden', !hide);
+    render();
+  }
+
+  function updateSeasonBtns() {
+    var btns = document.querySelectorAll('.sizes-season-btn');
+    btns.forEach(function(b, i) {
+      var active = b.dataset.season === activeSeason;
+      b.className = 'sizes-season-btn px-3 py-1.5 text-xs font-semibold' +
+        (i > 0 ? ' border-l border-gray-300' : '') +
+        (active ? ' bg-blue-600 text-white' : ' bg-white text-gray-600 hover:bg-gray-50');
+    });
+    var dateRange = document.getElementById('sizesDateRange');
+    if (activeSeason === 'custom') dateRange.classList.remove('hidden'), dateRange.style.display = 'flex';
+    else dateRange.classList.add('hidden'), dateRange.style.display = '';
+  }
+
   function init() {
     if (document.getElementById('tab-sizes').dataset.sizesListeners) return;
     document.getElementById('tab-sizes').dataset.sizesListeners = '1';
 
-    // Season toggle
     document.querySelectorAll('.sizes-season-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         activeSeason = btn.dataset.season;
-        document.querySelectorAll('.sizes-season-btn').forEach(function(b) {
-          var active = b.dataset.season === activeSeason;
-          b.className = 'sizes-season-btn px-3 py-1.5 text-xs font-semibold' +
-            (b !== document.querySelectorAll('.sizes-season-btn')[0] ? ' border-l border-gray-300' : '') +
-            (active ? ' bg-blue-600 text-white' : ' bg-white text-gray-600 hover:bg-gray-50');
-        });
+        updateSeasonBtns();
       });
     });
 
-    // Apply button
     document.getElementById('sizesApplyBtn').addEventListener('click', function() {
       expandedGroups.clear();
       load();
     });
 
-    // Brand search Enter/Escape
     document.getElementById('sizesBrandSearch').addEventListener('keydown', function(e) {
       if (e.key === 'Enter')  render();
       if (e.key === 'Escape') { this.value = ''; render(); }
     });
-    document.getElementById('sizesBrandSearch').addEventListener('input', function() {
-      render();
+    document.getElementById('sizesBrandSearch').addEventListener('input', function() { render(); });
+
+    document.getElementById('sizesHideUnnamedBtn').addEventListener('click', function() { setHideUnnamed(true); });
+    document.getElementById('sizesShowUnnamedBtn').addEventListener('click', function() { setHideUnnamed(false); });
+
+    document.querySelectorAll('.sizes-sort-th').forEach(function(th) {
+      th.addEventListener('click', function() {
+        var col = th.dataset.sortCol;
+        if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        else { sortCol = col; sortDir = col === 'manufacturer' ? 'asc' : 'desc'; }
+        render();
+      });
     });
   }
 
