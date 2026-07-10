@@ -703,6 +703,98 @@ app.get('/api/sizes', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/sizes/brands — Size curve analysis aggregated by brand + category
+// Extracts size from description via regex, computes ST% and stock alignment.
+// ?season=p|a|''  ?category=X  ?shop_id=Y
+// ---------------------------------------------------------------------------
+app.get('/api/sizes/brands', async (req, res, next) => {
+  try {
+    const { season, category, shop_id } = req.query;
+    const params = [];
+
+    const sizeCase = `
+      CASE
+        WHEN p.description ~* '\\m(XXXL|3XL)\\M' THEN 'XXXL'
+        WHEN p.description ~* '\\m(XXL|2XL)\\M'  THEN 'XXL'
+        WHEN p.description ~* '\\mXL\\M'           THEN 'XL'
+        WHEN p.description ~* '\\mL\\M'            THEN 'L'
+        WHEN p.description ~* '\\mM\\M'            THEN 'M'
+        WHEN p.description ~* '\\mXS\\M'           THEN 'XS'
+        WHEN p.description ~* '\\mS\\M'            THEN 'S'
+        WHEN p.description ~  '\\m\\d{2}/\\d{2}\\M' THEN substring(p.description from '\\m(\\d{2}/\\d{2})\\M')
+        WHEN p.description ~  '\\m[3-6][02468]\\M'  THEN substring(p.description from '\\m([3-6][02468])\\M')
+        ELSE NULL
+      END`;
+
+    let seasonFilter = '';
+    if (season === 'p') seasonFilter = `AND EXTRACT(MONTH FROM sl.completed_time) BETWEEN 2 AND 8`;
+    else if (season === 'a') seasonFilter = `AND (EXTRACT(MONTH FROM sl.completed_time) >= 9 OR EXTRACT(MONTH FROM sl.completed_time) = 1)`;
+
+    let catFilter = '';
+    if (category) { params.push(category); catFilter = `AND p.category = $${params.length}`; }
+
+    let shopFilterSL = '', shopFilterInv = '';
+    if (shop_id) {
+      params.push(shop_id);
+      shopFilterSL  = `AND sl.shop_id = $${params.length}`;
+      shopFilterInv = `AND i.shop_id  = $${params.length}`;
+    }
+
+    const baseWhere = `p.matrix_id IS NOT NULL AND p.archived = false
+      AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
+      AND NOT (p.default_cost = 0 AND p.default_price = 0)`;
+
+    const [{ rows }, { rows: catRows }] = await Promise.all([
+      pool.query(`
+        WITH size_sales AS (
+          SELECT
+            COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+            COALESCE(p.category, 'Sans catégorie')  AS category,
+            ${sizeCase} AS size_label,
+            SUM(GREATEST(sl.qty, 0)) AS units_sold
+          FROM products p
+          JOIN sale_lines sl ON sl.item_id = p.item_id
+            AND sl.completed_time >= now() - INTERVAL '2 years'
+            AND sl.completed_time IS NOT NULL
+            ${seasonFilter} ${shopFilterSL}
+          WHERE ${baseWhere} ${catFilter}
+          GROUP BY p.manufacturer, p.category, size_label
+          HAVING SUM(GREATEST(sl.qty, 0)) > 0
+        ),
+        size_stock AS (
+          SELECT
+            COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+            COALESCE(p.category, 'Sans catégorie')  AS category,
+            ${sizeCase} AS size_label,
+            SUM(COALESCE(i.qty_on_hand, 0)) AS qty_on_hand
+          FROM products p
+          JOIN inventory i ON i.item_id = p.item_id ${shopFilterInv}
+          WHERE ${baseWhere} ${catFilter}
+          GROUP BY p.manufacturer, p.category, size_label
+        )
+        SELECT
+          ss.manufacturer, ss.category, ss.size_label,
+          ss.units_sold::float8                       AS units_sold,
+          COALESCE(sk.qty_on_hand, 0)::float8         AS qty_on_hand
+        FROM size_sales ss
+        LEFT JOIN size_stock sk USING (manufacturer, category, size_label)
+        WHERE ss.size_label IS NOT NULL
+        ORDER BY ss.manufacturer, ss.category, ss.units_sold DESC
+      `, params),
+      pool.query(`
+        SELECT DISTINCT COALESCE(category, 'Sans catégorie') AS category
+        FROM products
+        WHERE matrix_id IS NOT NULL AND archived = false
+          AND category NOT ILIKE 'Alt%ration%' AND description NOT ILIKE '%shopify%'
+        ORDER BY category
+      `),
+    ]);
+
+    res.json({ count: rows.length, sizes: rows, categories: catRows.map(r => r.category) });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // /api/budget — Buying budget summary
 // Total estimated cost of all open recommendations (NOS + seasonal).
 // ---------------------------------------------------------------------------

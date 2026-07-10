@@ -292,43 +292,49 @@
 
   <!-- ── SIZES ──────────────────────────────────────────────────── -->
   <section id="tab-sizes" class="hidden">
-    <div class="flex flex-wrap items-end gap-4 mb-4">
-      <div>
-        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_boutique">Boutique</label>
-        <select id="sizesShop" class="border border-gray-300 rounded px-2 py-1 text-sm">
-          <option value="" data-i18n="opt_all">Toutes</option>
-        </select>
+    <!-- Filtres -->
+    <div class="flex flex-wrap items-center gap-3 mb-3">
+      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Courbes tailles — par marque</span>
+      <div class="flex rounded-lg border border-gray-300 overflow-hidden text-xs">
+        <button class="sizes-season-btn px-3 py-1.5 bg-blue-600 text-white font-semibold" data-season="">Tout</button>
+        <button class="sizes-season-btn px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 border-l border-gray-300" data-season="p">Printemps</button>
+        <button class="sizes-season-btn px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 border-l border-gray-300" data-season="a">Automne</button>
       </div>
-      <div class="flex-1">
-        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_search">Recherche</label>
-        <input id="sizesSearch" type="text" placeholder="Description…"
-          data-i18n-ph="search_desc_ph"
-          class="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-xs">
-      </div>
-      <div id="sizesCount" class="text-xs text-gray-500 ml-auto self-end"></div>
+      <select id="sizesCatFilter" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">Toutes les catégories</option>
+      </select>
+      <select id="sizesShop" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">Toutes les boutiques</option>
+      </select>
+      <input id="sizesBrandSearch" type="text" placeholder="Rechercher une marque…"
+        class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs w-48 focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <button id="sizesApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Appliquer</button>
+      <span id="sizesCount" class="text-xs text-gray-500 ml-auto"></span>
     </div>
+    <!-- Légende -->
+    <div class="flex flex-wrap gap-4 mb-3 text-[10px] text-gray-500">
+      <span><span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>ST ≥ 70%</span>
+      <span><span class="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1"></span>ST 40–70%</span>
+      <span><span class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1"></span>ST &lt; 40%</span>
+      <span class="ml-2">Alignement stock : <span class="text-green-600 font-semibold">✓</span> ok · <span class="text-amber-600 font-semibold">↑</span> surplus · <span class="text-red-600 font-semibold">↓</span> déficit (&gt; ±8 pts)</span>
+    </div>
+    <!-- Accordéon -->
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-xs">
-          <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
-            <tr>
-              <th class="px-3 py-2 text-left"  data-i18n="col_description">Description</th>
-              <th class="px-3 py-2 text-left"  data-i18n="col_boutique">Boutique</th>
-              <th class="px-3 py-2 text-right" data-i18n="sizes_col_sold">Unités vendues</th>
-              <th class="px-3 py-2 text-right" data-i18n="sizes_col_total">Total matrice</th>
-              <th class="px-3 py-2 text-right" data-i18n="sizes_col_pct">% matrice</th>
-              <th class="px-3 py-2 text-right" data-i18n="sizes_col_stock">Stock actuel</th>
-            </tr>
-          </thead>
-          <tbody id="sizesBody" class="divide-y divide-gray-100"></tbody>
-        </table>
-      </div>
-      <div id="sizesLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
-      <div id="sizesPager" class="flex items-center justify-between px-4 py-2 border-t border-gray-100 hidden">
-        <button id="sizesPrev" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_prev">← Précédent</button>
-        <span id="sizesPage" class="text-xs text-gray-500"></span>
-        <button id="sizesNext" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_next">Suivant →</button>
-      </div>
+      <table class="w-full text-xs">
+        <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+          <tr>
+            <th class="px-3 py-2 w-6"></th>
+            <th class="px-3 py-2 text-left">Marque</th>
+            <th class="px-3 py-2 text-left">Catégorie</th>
+            <th class="px-3 py-2 text-right">Total vendu</th>
+            <th class="px-3 py-2 text-right">Sell-through global</th>
+            <th class="px-3 py-2 text-center">Déséquilibres stock</th>
+          </tr>
+        </thead>
+        <tbody id="sizesAccordionBody" class="divide-y divide-gray-100"></tbody>
+      </table>
+      <div id="sizesLoader" class="hidden flex justify-center py-8"><div class="spinner"></div></div>
+      <div id="sizesEmpty" class="hidden text-center py-8 text-xs text-gray-400">Aucune donnée de taille disponible</div>
     </div>
   </section>
 
@@ -816,7 +822,6 @@ function setLanguage(lang) {
   if (state.budgetSeas.data.length) BudgetTab.renderMarqueBudgetTable();
   if (state.budgetNos.data.length)  BudgetTab.renderBudgetTable('budgetNos');
 
-  if (state.sizes.filtered?.length) SizesTab.renderPage();
   if (document.getElementById('tiersTableBody')?.children.length) ParamsTab.renderTiersTable();
 }
 
@@ -836,7 +841,6 @@ const DEFAULT_TIERS = [
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
 
-  sizes:      { data: [], filtered: [], page: 0 },
   budgetNos:  { data: [], expanded: new Set(), multipliers: {} },
   budgetSeas: { data: [], expanded: new Set(), multipliers: {}, season: 'p26', isFuture: false, sort: { col: null, dir: 'desc' } },
   filters:    { shops: new Set(), collections: new Set(), sizes: new Set() },
@@ -1485,59 +1489,237 @@ function fetchBudgetPanel(key, endpoint, extraParams) { return BudgetTab.fetchPa
 function updateAllBudgetTotals() { BudgetTab.updateTotals(); }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SizesTab — Courbes tailles par marque (accordion, brand-level aggregation)
+// ─────────────────────────────────────────────────────────────────────────────
+var SizesTab = (function() {
+  var sizesData      = [];   // raw rows from /api/sizes/brands
+  var expandedGroups = new Set();
+  var activeSeason   = '';
+  var shopsLoaded    = false;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SizesTab — Courbes tailles (tab-sizes)
-// ─────────────────────────────────────────────────────────────────────────────
-const SizesTab = (() => {
-  async function load() {
-    showLoader('sizes', true);
+  var SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+
+  function sizeSort(a, b) {
+    var ia = SIZE_ORDER.indexOf(a), ib = SIZE_ORDER.indexOf(b);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+
+  async function loadShops() {
+    if (shopsLoaded) return;
     try {
-      const r = await fetch(`${BASE}/api/sizes`);
-      const d = await r.json();
-      state.sizes.data = d.size_curves;
-      populateShopFilter(d.size_curves, 'sizesShop');
-      filterAndRender();
-    } catch (e) {
-      document.getElementById('sizesBody').innerHTML = `<tr><td colspan="6" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
+      var r = await fetch(BASE + '/api/shops');
+      var d = await r.json();
+      var sel = document.getElementById('sizesShop');
+      (d.shops || d).forEach(function(sh) {
+        var opt = document.createElement('option');
+        opt.value = sh.shop_id;
+        opt.textContent = sh.name;
+        sel.appendChild(opt);
+      });
+      shopsLoaded = true;
+    } catch(e) {}
+  }
+
+  async function load() {
+    var loader = document.getElementById('sizesLoader');
+    var empty  = document.getElementById('sizesEmpty');
+    var body   = document.getElementById('sizesAccordionBody');
+    loader.classList.remove('hidden');
+    body.innerHTML = '';
+    empty.classList.add('hidden');
+
+    await loadShops();
+
+    var params = new URLSearchParams();
+    if (activeSeason) params.set('season', activeSeason);
+    var cat    = document.getElementById('sizesCatFilter').value;
+    var shopId = document.getElementById('sizesShop').value;
+    if (cat)    params.set('category', cat);
+    if (shopId) params.set('shop_id', shopId);
+
+    try {
+      var r = await fetch(BASE + '/api/sizes/brands?' + params.toString());
+      var d = await r.json();
+      sizesData = d.sizes || [];
+
+      // Populate category dropdown on first load
+      var catSel = document.getElementById('sizesCatFilter');
+      if (catSel.options.length <= 1 && d.categories) {
+        d.categories.forEach(function(c) {
+          var opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          catSel.appendChild(opt);
+        });
+      }
+
+      render();
+    } catch(e) {
+      body.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-red-500">' + escHtml(e.message) + '</td></tr>';
     }
-    showLoader('sizes', false);
+    loader.classList.add('hidden');
   }
 
-  function filterAndRender() {
-    const shop   = document.getElementById('sizesShop').value;
-    const search = document.getElementById('sizesSearch').value.toLowerCase();
-    state.sizes.filtered = state.sizes.data.filter(r =>
-      (!shop || r.shop_id === shop) && (!search || r.description?.toLowerCase().includes(search))
-    );
-    state.sizes.page = 0;
-    renderPage();
+  function buildGroups() {
+    var search = (document.getElementById('sizesBrandSearch').value || '').toLowerCase().trim();
+    var map = {};
+    sizesData.forEach(function(row) {
+      if (!row.size_label) return;
+      var key = row.manufacturer + '||' + row.category;
+      if (search && row.manufacturer.toLowerCase().indexOf(search) === -1) return;
+      if (!map[key]) map[key] = { manufacturer: row.manufacturer, category: row.category, sizes: [] };
+      map[key].sizes.push(row);
+    });
+    return Object.values(map);
   }
 
-  function renderPage() {
-    const { filtered, page } = state.sizes;
-    const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-    document.getElementById('sizesCount').textContent = t('sizes_count')(filtered.length);
-    document.getElementById('sizesBody').innerHTML = slice.map(r => `
-      <tr class="transition-colors">
-        <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
-        <td class="px-3 py-2 text-gray-500">${r.shop_name}</td>
-        <td class="px-3 py-2 text-right">${fmt(r.units_sold)}</td>
-        <td class="px-3 py-2 text-right text-gray-500">${fmt(r.total_units)}</td>
-        <td class="px-3 py-2 text-right font-semibold text-blue-700">${r.pct_of_matrix}%</td>
-        <td class="px-3 py-2 text-right">${fmt(r.qty_on_hand)}</td>
-      </tr>`).join('') || `<tr><td colspan="6" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
-    renderPager('sizes', filtered.length);
+  function stBadgeClass(st) {
+    if (st >= 70) return 'text-green-700 bg-green-50';
+    if (st >= 40) return 'text-amber-700 bg-amber-50';
+    return 'text-red-700 bg-red-50';
+  }
+  function stDot(st) {
+    if (st >= 70) return '<span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>';
+    if (st >= 40) return '<span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>';
+    return '<span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>';
+  }
+  function alignIcon(diff) {
+    if (diff >  8) return '<span class="text-amber-600 font-bold" title="Surplus +" >↑</span>';
+    if (diff < -8) return '<span class="text-red-600   font-bold" title="Déficit −">↓</span>';
+    return '<span class="text-green-600 font-bold" title="Aligné">✓</span>';
+  }
+
+  function render() {
+    var body   = document.getElementById('sizesAccordionBody');
+    var empty  = document.getElementById('sizesEmpty');
+    var groups = buildGroups();
+
+    document.getElementById('sizesCount').textContent = groups.length + ' marque' + (groups.length !== 1 ? 's' : '');
+
+    if (!groups.length) {
+      body.innerHTML = '';
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+
+    var html = '';
+    groups.forEach(function(g) {
+      var key = g.manufacturer + '||' + g.category;
+      var isOpen = expandedGroups.has(key);
+
+      // Aggregate totals
+      var totalSold  = 0, totalStock = 0;
+      g.sizes.forEach(function(s) { totalSold += s.units_sold; totalStock += s.qty_on_hand; });
+      var stGlobal = totalSold + totalStock > 0 ? Math.round(totalSold / (totalSold + totalStock) * 100) : 0;
+
+      // Count imbalances
+      var imbalances = 0;
+      var totalPctSold = 0;
+      g.sizes.forEach(function(s) { totalPctSold += s.units_sold; });
+
+      var sizesSorted = g.sizes.slice().sort(function(a, b) { return sizeSort(a.size_label, b.size_label); });
+      var totalPctStock = 0;
+      sizesSorted.forEach(function(s) { totalPctStock += s.qty_on_hand; });
+
+      sizesSorted.forEach(function(s) {
+        var ps = totalPctSold  > 0 ? s.units_sold  / totalPctSold  * 100 : 0;
+        var pk = totalPctStock > 0 ? s.qty_on_hand / totalPctStock * 100 : 0;
+        if (Math.abs(pk - ps) > 8) imbalances++;
+      });
+
+      var imbalanceBadge = imbalances > 0
+        ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">' + imbalances + ' ⚠</span>'
+        : '<span class="text-green-600 text-xs">✓</span>';
+
+      // Accordion header row
+      html += '<tr class="cursor-pointer hover:bg-gray-50 transition-colors sizes-group-row" data-key="' + escHtml(key) + '">';
+      html += '<td class="px-3 py-2 text-gray-400 text-center">' + (isOpen ? '▾' : '▸') + '</td>';
+      html += '<td class="px-3 py-2 font-semibold text-gray-800">' + escHtml(g.manufacturer) + '</td>';
+      html += '<td class="px-3 py-2 text-gray-500">' + escHtml(g.category) + '</td>';
+      html += '<td class="px-3 py-2 text-right">' + fmt(totalSold) + '</td>';
+      html += '<td class="px-3 py-2 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ' + stBadgeClass(stGlobal) + '">' + stGlobal + '%</span></td>';
+      html += '<td class="px-3 py-2 text-center">' + imbalanceBadge + '</td>';
+      html += '</tr>';
+
+      if (isOpen) {
+        // Detail header
+        html += '<tr class="bg-blue-50 text-[10px] text-gray-500 uppercase tracking-wide">';
+        html += '<td></td><td colspan="1" class="px-3 py-1">Taille</td>';
+        html += '<td class="px-3 py-1 text-right">% Ventes</td>';
+        html += '<td class="px-3 py-1 text-right">% Stock</td>';
+        html += '<td class="px-3 py-1 text-right">ST</td>';
+        html += '<td class="px-3 py-1 text-center">Alignement</td>';
+        html += '</tr>';
+
+        sizesSorted.forEach(function(s) {
+          var ps  = totalPctSold  > 0 ? s.units_sold  / totalPctSold  * 100 : 0;
+          var pk  = totalPctStock > 0 ? s.qty_on_hand / totalPctStock * 100 : 0;
+          var stS = s.units_sold + s.qty_on_hand > 0 ? Math.round(s.units_sold / (s.units_sold + s.qty_on_hand) * 100) : 0;
+          var diff = pk - ps;
+
+          html += '<tr class="bg-blue-50/40 hover:bg-blue-100/30 transition-colors">';
+          html += '<td></td>';
+          html += '<td class="px-3 py-1.5 pl-8 font-medium text-gray-700">' + stDot(stS) + ' <span class="ml-1">' + escHtml(s.size_label) + '</span></td>';
+          html += '<td class="px-3 py-1.5 text-right text-gray-600">' + ps.toFixed(1) + '%</td>';
+          html += '<td class="px-3 py-1.5 text-right text-gray-600">' + pk.toFixed(1) + '%</td>';
+          html += '<td class="px-3 py-1.5 text-right"><span class="' + stBadgeClass(stS) + ' px-1 rounded">' + stS + '%</span></td>';
+          html += '<td class="px-3 py-1.5 text-center">' + alignIcon(diff) + ' <span class="text-gray-400 text-[10px]">' + (diff >= 0 ? '+' : '') + diff.toFixed(1) + 'pp</span></td>';
+          html += '</tr>';
+        });
+      }
+    });
+
+    body.innerHTML = html;
+
+    // Wire accordion click handlers
+    body.querySelectorAll('.sizes-group-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        var key = row.dataset.key;
+        if (expandedGroups.has(key)) expandedGroups.delete(key);
+        else expandedGroups.add(key);
+        render();
+      });
+    });
   }
 
   function init() {
-    let sizD;
-    document.getElementById('sizesShop').addEventListener('change', filterAndRender);
-    document.getElementById('sizesSearch').addEventListener('input', () => { clearTimeout(sizD); sizD = setTimeout(filterAndRender, 250); });
-    bindPager('sizes', renderPage);
+    if (document.getElementById('tab-sizes').dataset.sizesListeners) return;
+    document.getElementById('tab-sizes').dataset.sizesListeners = '1';
+
+    // Season toggle
+    document.querySelectorAll('.sizes-season-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        activeSeason = btn.dataset.season;
+        document.querySelectorAll('.sizes-season-btn').forEach(function(b) {
+          var active = b.dataset.season === activeSeason;
+          b.className = 'sizes-season-btn px-3 py-1.5 text-xs font-semibold' +
+            (b !== document.querySelectorAll('.sizes-season-btn')[0] ? ' border-l border-gray-300' : '') +
+            (active ? ' bg-blue-600 text-white' : ' bg-white text-gray-600 hover:bg-gray-50');
+        });
+      });
+    });
+
+    // Apply button
+    document.getElementById('sizesApplyBtn').addEventListener('click', function() {
+      expandedGroups.clear();
+      load();
+    });
+
+    // Brand search Enter/Escape
+    document.getElementById('sizesBrandSearch').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter')  render();
+      if (e.key === 'Escape') { this.value = ''; render(); }
+    });
+    document.getElementById('sizesBrandSearch').addEventListener('input', function() {
+      render();
+    });
   }
 
-  return { init, load, renderPage, filterAndRender };
+  return { init: init, load: load, render: render };
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
