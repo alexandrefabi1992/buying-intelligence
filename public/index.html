@@ -70,7 +70,6 @@
 <nav class="bg-white border-b border-gray-200 px-6 flex gap-6 items-center">
   <button class="tab py-3 tab-active"   data-tab="budget"    data-i18n="tab_budget">Budget</button>
   <button class="tab py-3 tab-inactive" data-tab="nos"       data-i18n="tab_nos">NOS</button>
-  <button class="tab py-3 tab-inactive" data-tab="seasonal"  data-i18n="tab_seasonal">Saisonnier</button>
   <button class="tab py-3 tab-inactive" data-tab="sizes"     data-i18n="tab_sizes">Courbes tailles</button>
   <button class="tab py-3 tab-inactive" data-tab="transfers" data-i18n="tab_transfers">Transferts / Actions</button>
   <button class="tab py-3 tab-inactive" data-tab="plan"      data-i18n="tab_plan">Création de budget</button>
@@ -290,55 +289,6 @@
 
   </section>
 
-  <!-- ── SEASONAL ────────────────────────────────────────────────── -->
-  <section id="tab-seasonal" class="hidden">
-    <div class="flex flex-wrap items-end gap-4 mb-4">
-      <div>
-        <label class="block text-xs text-gray-500 mb-1" data-i18n="seas_horizon_lbl">Horizon (semaines)</label>
-        <div class="flex items-center gap-2">
-          <input type="range" id="seasWeeks" min="1" max="26" value="8" class="w-32">
-          <span id="seasWeeksLabel" class="font-semibold text-blue-700 w-6">8</span>
-        </div>
-      </div>
-      <div>
-        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_boutique">Boutique</label>
-        <select id="seasShop" class="border border-gray-300 rounded px-2 py-1 text-sm">
-          <option value="" data-i18n="opt_all">Toutes</option>
-        </select>
-      </div>
-      <div class="flex-1">
-        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_search">Recherche</label>
-        <input id="seasSearch" type="text" placeholder="Description…"
-          data-i18n-ph="search_desc_ph"
-          class="border border-gray-300 rounded px-2 py-1 text-sm w-full max-w-xs">
-      </div>
-      <div id="seasCount" class="text-xs text-gray-500 ml-auto self-end"></div>
-    </div>
-    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-xs">
-          <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
-            <tr>
-              <th class="px-3 py-2 text-left"  data-i18n="col_description">Description</th>
-              <th class="px-3 py-2 text-left"  data-i18n="col_boutique">Boutique</th>
-              <th class="px-3 py-2 text-left"  data-i18n="col_category">Catégorie</th>
-              <th class="px-3 py-2 text-right" data-i18n="col_stock_short">Stock</th>
-              <th class="px-3 py-2 text-right" data-i18n="seas_col_forecast">Prévision (unités)</th>
-              <th class="px-3 py-2 text-right" data-i18n="col_qty_suggested">Qté suggérée</th>
-              <th class="px-3 py-2 text-right" data-i18n="seas_col_cost">Coût estimé</th>
-            </tr>
-          </thead>
-          <tbody id="seasBody" class="divide-y divide-gray-100"></tbody>
-        </table>
-      </div>
-      <div id="seasonalLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
-      <div id="seasonalPager" class="flex items-center justify-between px-4 py-2 border-t border-gray-100 hidden">
-        <button id="seasonalPrev" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_prev">← Précédent</button>
-        <span id="seasonalPage" class="text-xs text-gray-500"></span>
-        <button id="seasonalNext" class="text-xs text-blue-600 disabled:text-gray-300" data-i18n="btn_next">Suivant →</button>
-      </div>
-    </div>
-  </section>
 
   <!-- ── SIZES ──────────────────────────────────────────────────── -->
   <section id="tab-sizes" class="hidden">
@@ -865,8 +815,7 @@ function setLanguage(lang) {
   // Re-render dynamic tables
   if (state.budgetSeas.data.length) BudgetTab.renderMarqueBudgetTable();
   if (state.budgetNos.data.length)  BudgetTab.renderBudgetTable('budgetNos');
-  if (state.nos.filtered?.length)   SeasonalTab.renderNosPage();
-  if (state.seasonal.filtered?.length) SeasonalTab.renderPage();
+
   if (state.sizes.filtered?.length) SizesTab.renderPage();
   if (document.getElementById('tiersTableBody')?.children.length) ParamsTab.renderTiersTable();
 }
@@ -886,8 +835,7 @@ const DEFAULT_TIERS = [
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
-  nos:        { data: [], filtered: [], page: 0 },
-  seasonal:   { data: [], filtered: [], page: 0 },
+
   sizes:      { data: [], filtered: [], page: 0 },
   budgetNos:  { data: [], expanded: new Set(), multipliers: {} },
   budgetSeas: { data: [], expanded: new Set(), multipliers: {}, season: 'p26', isFuture: false, sort: { col: null, dir: 'desc' } },
@@ -1044,7 +992,7 @@ document.querySelectorAll('.tab').forEach(btn => {
 function loadTab(id) {
   if (id === 'budget')    BudgetTab.load();
   if (id === 'nos')       NosTab.init();
-  if (id === 'seasonal')  SeasonalTab.load();
+
   if (id === 'sizes')     SizesTab.load();
   if (id === 'transfers') TransfersTab.load();
   if (id === 'plan')      PlanTab.load();
@@ -1537,94 +1485,6 @@ function fetchBudgetPanel(key, endpoint, extraParams) { return BudgetTab.fetchPa
 function updateAllBudgetTotals() { BudgetTab.updateTotals(); }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SeasonalTab — Saisonnier produit (tab-seasonal) + legacy NOS product table
-// ─────────────────────────────────────────────────────────────────────────────
-const SeasonalTab = (() => {
-  // ── Legacy NOS product table (state.nos) — kept for completeness ──────────
-  function filterAndRenderNos() {
-    const shop   = document.getElementById('nosShop')?.value ?? '';
-    const search = (document.getElementById('nosSearch')?.value ?? '').toLowerCase();
-    state.nos.filtered = state.nos.data.filter(r =>
-      (!shop || r.shop_id === shop) &&
-      (!search || r.description?.toLowerCase().includes(search) || String(r.category).includes(search))
-    );
-    state.nos.page = 0;
-    renderNosPage();
-  }
-
-  function renderNosPage() {
-    const { filtered, page } = state.nos;
-    const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-    const nosCount = document.getElementById('nosCount');
-    const nosBody  = document.getElementById('nosBody');
-    if (nosCount) nosCount.textContent = t('nos_count')(filtered.length);
-    if (nosBody) nosBody.innerHTML = slice.map(r => `
-      <tr class="transition-colors">
-        <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
-        <td class="px-3 py-2 text-gray-500">${r.shop_name}</td>
-        <td class="px-3 py-2 text-gray-500">${r.category ?? '—'}</td>
-        <td class="px-3 py-2 text-right">${fmt(r.qty_on_hand)}</td>
-        <td class="px-3 py-2 text-right font-medium">${fmt(r.avg_weekly_units)}</td>
-        <td class="px-3 py-2 text-right">${coverBadge(r.weeks_of_cover)}</td>
-        <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(r.suggested_order_qty)}</td>
-      </tr>`).join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
-    renderPager('nos', filtered.length);
-  }
-
-  // ── Seasonal product table ────────────────────────────────────────────────
-  async function load() {
-    showLoader('seasonal', true);
-    try {
-      const r = await fetch(`${BASE}/api/seasonal?weeks_ahead=${document.getElementById('seasWeeks').value}`);
-      const d = await r.json();
-      state.seasonal.data = d.recommendations;
-      populateShopFilter(d.recommendations, 'seasShop');
-      filterAndRender();
-    } catch (e) {
-      document.getElementById('seasBody').innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
-    }
-    showLoader('seasonal', false);
-  }
-
-  function filterAndRender() {
-    const shop   = document.getElementById('seasShop').value;
-    const search = document.getElementById('seasSearch').value.toLowerCase();
-    state.seasonal.filtered = state.seasonal.data.filter(r =>
-      (!shop || r.shop_id === shop) && (!search || r.description?.toLowerCase().includes(search))
-    );
-    state.seasonal.page = 0;
-    renderPage();
-  }
-
-  function renderPage() {
-    const { filtered, page } = state.seasonal;
-    const slice = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-    document.getElementById('seasCount').textContent = t('seas_count')(filtered.length);
-    document.getElementById('seasBody').innerHTML = slice.map(r => `
-      <tr class="transition-colors">
-        <td class="px-3 py-2 max-w-xs truncate" title="${escHtml(r.description)}">${escHtml(r.description)}</td>
-        <td class="px-3 py-2 text-gray-500">${r.shop_name}</td>
-        <td class="px-3 py-2 text-gray-500">${r.category ?? '—'}</td>
-        <td class="px-3 py-2 text-right">${fmt(r.qty_on_hand)}</td>
-        <td class="px-3 py-2 text-right font-medium">${fmt(r.forecasted_units)}</td>
-        <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(r.suggested_order_qty)}</td>
-        <td class="px-3 py-2 text-right">${r.estimated_cost > 0 ? fmtC(r.estimated_cost) : '—'}</td>
-      </tr>`).join('') || `<tr><td colspan="7" class="text-center py-8 text-gray-400">${t('no_results')}</td></tr>`;
-    renderPager('seasonal', filtered.length);
-  }
-
-  function init() {
-    let seasD;
-    const seasWeeks = document.getElementById('seasWeeks');
-    seasWeeks.addEventListener('input', () => document.getElementById('seasWeeksLabel').textContent = seasWeeks.value);
-    seasWeeks.addEventListener('change', () => { clearTimeout(seasD); seasD = setTimeout(() => { state.seasonal.data = []; load(); }, 200); });
-    document.getElementById('seasShop').addEventListener('change', filterAndRender);
-    document.getElementById('seasSearch').addEventListener('input', () => { clearTimeout(seasD); seasD = setTimeout(filterAndRender, 250); });
-    bindPager('seasonal', renderPage);
-  }
-
-  return { init, load, renderPage, renderNosPage, filterAndRender, filterAndRenderNos };
-})();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SizesTab — Courbes tailles (tab-sizes)
@@ -2797,7 +2657,7 @@ Promise.all([loadTiers(), ParamsTab.loadBudgetParams()]).then(() => {
   loadMultipliers();
   buildFilterBar();
   BudgetTab.init();
-  SeasonalTab.init();
+
   SizesTab.init();
   PlanTab.init();
   loadSyncStatus();

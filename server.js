@@ -644,66 +644,6 @@ app.get('/api/transfers', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ---------------------------------------------------------------------------
-// /api/seasonal — Seasonal buying recommendations
-// Compares same-period sales from prior years to forecast demand.
-// ---------------------------------------------------------------------------
-app.get('/api/seasonal', async (req, res, next) => {
-  try {
-    const weeksAhead = parseInt(req.query.weeks_ahead ?? '8', 10);
-    const { rows } = await pool.query(`
-      WITH target_window AS (
-        SELECT
-          date_trunc('week', now())                      AS start_week,
-          date_trunc('week', now()) + ($1 * interval '1 week') AS end_week
-      ),
-      historical AS (
-        SELECT
-          v.item_id,
-          v.shop_id,
-          EXTRACT(week FROM v.week)  AS iso_week,
-          AVG(v.units_sold)          AS avg_units
-        FROM mv_sales_velocity v, target_window tw
-        WHERE v.week >= now() - interval '2 years'
-          AND EXTRACT(week FROM v.week) BETWEEN
-              EXTRACT(week FROM tw.start_week) AND
-              EXTRACT(week FROM tw.end_week)
-        GROUP BY v.item_id, v.shop_id, EXTRACT(week FROM v.week)
-      ),
-      forecast AS (
-        SELECT
-          item_id, shop_id,
-          ROUND(SUM(avg_units), 0) AS forecasted_units
-        FROM historical
-        GROUP BY item_id, shop_id
-      )
-      SELECT
-        p.item_id,
-        p.description,
-        p.brand,
-        p.category,
-        f.shop_id,
-        s.name              AS shop_name,
-        f.forecasted_units,
-        i.qty_on_hand,
-        i.qty_on_order,
-        GREATEST(0, f.forecasted_units - i.qty_on_hand - i.qty_on_order)
-                            AS suggested_order_qty,
-        ROUND(p.default_cost *
-          GREATEST(0, f.forecasted_units - i.qty_on_hand - i.qty_on_order), 2
-        )                   AS estimated_cost
-      FROM forecast f
-      JOIN inventory  i ON i.item_id = f.item_id AND i.shop_id = f.shop_id
-      JOIN products   p ON p.item_id = f.item_id
-      JOIN shops      s ON s.shop_id = f.shop_id
-      WHERE f.forecasted_units > 0
-        AND GREATEST(0, f.forecasted_units - i.qty_on_hand - i.qty_on_order) > 0
-        AND p.archived = false
-      ORDER BY suggested_order_qty DESC
-    `, [weeksAhead]);
-    res.json({ weeks_ahead: weeksAhead, count: rows.length, recommendations: rows });
-  } catch (err) { next(err); }
-});
 
 // ---------------------------------------------------------------------------
 // /api/sizes — Size curve analysis per product matrix and shop
