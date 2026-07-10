@@ -596,7 +596,7 @@ app.get('/api/transfers', async (req, res, next) => {
     const maxCover    = parseFloat(req.query.max_cover    ?? '2');
     const { rows } = await pool.query(`
       WITH velocity AS (
-        SELECT item_id, shop_id, AVG(units_sold) AS avg_weekly_units
+        SELECT item_id, shop_id, SUM(units_sold) / 12.0 AS avg_weekly_units
         FROM mv_sales_velocity
         WHERE week >= date_trunc('week', now()) - interval '12 weeks'
         GROUP BY item_id, shop_id
@@ -772,7 +772,7 @@ app.get('/api/budget', async (req, res, next) => {
 
     const { rows } = await pool.query(`
       WITH velocity AS (
-        SELECT item_id, shop_id, AVG(units_sold) AS avg_weekly_units
+        SELECT item_id, shop_id, SUM(units_sold) / 12.0 AS avg_weekly_units
         FROM mv_sales_velocity
         WHERE week >= date_trunc('week', now()) - interval '12 weeks'
         GROUP BY item_id, shop_id
@@ -902,7 +902,7 @@ app.get('/api/budget/nos', async (req, res, next) => {
 
     const { rows } = await pool.query(`
       WITH velocity AS (
-        SELECT item_id, shop_id, AVG(units_sold) AS avg_weekly_units
+        SELECT item_id, shop_id, SUM(units_sold) / 12.0 AS avg_weekly_units
         FROM mv_sales_velocity
         WHERE week >= date_trunc('week', now()) - INTERVAL '12 weeks'
         GROUP BY item_id, shop_id
@@ -2148,7 +2148,7 @@ app.get('/api/admin/explain', async (req, res, next) => {
   try {
     const nosQuery = `
       WITH velocity AS (
-        SELECT item_id, shop_id, AVG(units_sold) AS avg_weekly_units
+        SELECT item_id, shop_id, SUM(units_sold) / 12.0 AS avg_weekly_units
         FROM mv_sales_velocity
         WHERE week >= date_trunc('week', now()) - INTERVAL '12 weeks'
         GROUP BY item_id, shop_id
@@ -2471,6 +2471,29 @@ app.put('/api/settings/nos-lead-times', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/settings/nos-excluded  — articles exclus du rapport NOS (array of item_id strings)
+// PUT /api/settings/nos-excluded
+// ---------------------------------------------------------------------------
+app.get('/api/settings/nos-excluded', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'nos_excluded'");
+    res.json(rows.length ? rows[0].value : []);
+  } catch (err) { next(err); }
+});
+
+app.put('/api/settings/nos-excluded', async (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body) ? req.body.map(String) : [];
+    await pool.query(
+      `INSERT INTO app_settings(key, value, updated_at)
+       VALUES ('nos_excluded', $1::jsonb, now())
+       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
+      [JSON.stringify(ids)]
+    );
+    res.json({ ok: true, excluded: ids });
+  } catch (err) { next(err); }
+});
+
 // ---------------------------------------------------------------------------
 // GET /api/nos/urgent — articles NOS à commander maintenant
 // Un article est urgent si sa couverture actuelle < délai fournisseur de sa marque
@@ -2488,7 +2511,7 @@ app.get('/api/nos/urgent', async (req, res, next) => {
 
     const { rows } = await pool.query(`
       WITH velocity AS (
-        SELECT item_id, shop_id, AVG(units_sold) AS avg_weekly_units
+        SELECT item_id, shop_id, SUM(units_sold) / 12.0 AS avg_weekly_units
         FROM mv_sales_velocity
         WHERE week >= date_trunc('week', now()) - INTERVAL '12 weeks'
         GROUP BY item_id, shop_id

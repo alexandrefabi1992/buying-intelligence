@@ -279,6 +279,15 @@
       <div id="nosUrgentEmpty" class="hidden text-center py-8 text-xs text-gray-400">Aucun article urgent — tout est bien approvisionné ✓</div>
     </div>
 
+    <!-- Articles exclus du rapport NOS -->
+    <div id="nosExcludedSection" class="hidden mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-semibold text-amber-700">Articles exclus du rapport NOS</span>
+        <button id="nosRestoreAllBtn" class="text-xs text-amber-600 hover:text-amber-800 underline">Restaurer tout</button>
+      </div>
+      <div id="nosExcludedList" class="flex flex-col gap-1"></div>
+    </div>
+
   </section>
 
   <!-- ── SEASONAL ────────────────────────────────────────────────── -->
@@ -2499,6 +2508,7 @@ const NosTab = (() => {
   // Declared at module level to avoid TDZ in async callbacks (Safari bug).
   var urgentData     = [];
   var expandedBrands = new Set();
+  var excludedItems  = new Set(); // item_id strings
 
   async function initShops() {
     var sel = document.getElementById('nosUrgentShop');
@@ -2513,6 +2523,15 @@ const NosTab = (() => {
     } catch (e) {}
   }
 
+  async function saveExcluded() {
+    try {
+      await fetch(`${BASE}/api/settings/nos-excluded`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([...excludedItems]),
+      });
+    } catch (e) { console.warn('[NOS] saveExcluded:', e.message); }
+  }
+
   async function load() {
     var shopId = document.getElementById('nosUrgentShop')?.value ?? '';
     var loader = document.getElementById('nosUrgentLoader');
@@ -2522,8 +2541,12 @@ const NosTab = (() => {
     empty?.classList.add('hidden');
     try {
       var url = shopId ? `${BASE}/api/nos/urgent?shop_id=${shopId}` : `${BASE}/api/nos/urgent`;
-      var d = await fetch(url).then(function(r) { return r.json(); });
-      urgentData = d.items ?? [];
+      var results = await Promise.all([
+        fetch(url).then(function(r) { return r.json(); }),
+        fetch(`${BASE}/api/settings/nos-excluded`).then(function(r) { return r.json(); }),
+      ]);
+      urgentData    = results[0].items ?? [];
+      excludedItems = new Set((results[1] ?? []).map(String));
       loader?.classList.add('hidden');
       populateBrandList();
       renderAccordion();
@@ -2547,7 +2570,31 @@ const NosTab = (() => {
       + '<td class="px-4 py-1.5 text-right ' + coverCls + '">' + (it.weeks_of_cover !== null ? it.weeks_of_cover + ' sem.' : '—') + '</td>'
       + '<td class="px-4 py-1.5 text-right text-gray-400">' + it.lead_time_weeks + ' sem.</td>'
       + '<td class="px-4 py-1.5 text-right font-semibold text-indigo-700">' + it.suggested_qty + '</td>'
+      + '<td class="px-4 py-1.5 text-center"><button class="nos-exclude-btn text-gray-300 hover:text-red-400 text-xs px-1" data-item-id="' + it.item_id + '" title="Exclure du rapport">✕</button></td>'
       + '</tr>';
+  }
+
+  function renderExcludedSection() {
+    var section = document.getElementById('nosExcludedSection');
+    var list    = document.getElementById('nosExcludedList');
+    if (!section || !list) return;
+    if (excludedItems.size === 0) { section.classList.add('hidden'); return; }
+
+    var excData = urgentData.filter(function(it) { return excludedItems.has(String(it.item_id)); });
+    // Deduplicate by item_id for display (same item can appear in multiple shops)
+    var seen = new Set();
+    var unique = excData.filter(function(it) {
+      if (seen.has(it.item_id)) return false;
+      seen.add(it.item_id); return true;
+    });
+
+    list.innerHTML = unique.map(function(it) {
+      return '<div class="flex items-center justify-between text-xs py-0.5">'
+        + '<span class="text-amber-800">' + it.description + ' <span class="text-amber-400">— ' + it.manufacturer + '</span></span>'
+        + '<button class="nos-restore-btn text-amber-500 hover:text-amber-700 ml-4 underline" data-item-id="' + it.item_id + '">Restaurer</button>'
+        + '</div>';
+    }).join('');
+    section.classList.remove('hidden');
   }
 
   function renderAccordion() {
@@ -2557,6 +2604,7 @@ const NosTab = (() => {
     var showAttn = document.getElementById('nosFilterAttention')?.checked ?? true;
 
     var filtered = urgentData.filter(function(it) {
+      if (excludedItems.has(String(it.item_id))) return false;
       if (!showCrit && it.urgency === 'critique') return false;
       if (!showUrg  && it.urgency === 'urgent')   return false;
       if (!showAttn && it.urgency === 'attention') return false;
@@ -2566,6 +2614,8 @@ const NosTab = (() => {
     var body  = document.getElementById('nosAccordionBody');
     var total = document.getElementById('nosUrgentTotal');
     var empty = document.getElementById('nosUrgentEmpty');
+
+    renderExcludedSection();
 
     if (!filtered.length) {
       body.innerHTML = '';
@@ -2625,6 +2675,7 @@ const NosTab = (() => {
           + '<th class="px-4 py-1.5 text-right">Couverture</th>'
           + '<th class="px-4 py-1.5 text-right">Délai fourn.</th>'
           + '<th class="px-4 py-1.5 text-right">Qté à cmd</th>'
+          + '<th class="px-4 py-1.5 w-8"></th>'
           + '</tr></thead><tbody class="divide-y divide-gray-100">'
           + allItems.map(detailRowHtml).join('')
           + '</tbody></table></td></tr>');
@@ -2632,6 +2683,7 @@ const NosTab = (() => {
     });
 
     body.innerHTML = rows.join('');
+
     body.querySelectorAll('.nos-brand-row').forEach(function(row) {
       row.addEventListener('click', function() {
         var brand = decodeURIComponent(row.dataset.brand);
@@ -2640,6 +2692,29 @@ const NosTab = (() => {
         renderAccordion();
       });
     });
+
+    body.querySelectorAll('.nos-exclude-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        excludedItems.add(String(btn.dataset.itemId));
+        saveExcluded();
+        renderAccordion();
+      });
+    });
+
+    document.getElementById('nosExcludedList')?.querySelectorAll('.nos-restore-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        excludedItems.delete(String(btn.dataset.itemId));
+        saveExcluded();
+        renderAccordion();
+      });
+    });
+
+    document.getElementById('nosRestoreAllBtn')?.onclick = function() {
+      excludedItems.clear();
+      saveExcluded();
+      renderAccordion();
+    };
   }
 
   function populateBrandList() {
