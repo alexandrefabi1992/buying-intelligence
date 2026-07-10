@@ -2561,6 +2561,9 @@ const NosTab = (() => {
   function detailRowHtml(it) {
     var urgIcon  = it.urgency === 'critique' ? '⛔' : it.urgency === 'urgent' ? '⚠' : '◉';
     var coverCls = it.urgency === 'critique' ? 'text-red-600 font-bold' : it.urgency === 'urgent' ? 'text-orange-600' : 'text-yellow-600';
+    var avgLabel = it.recent_boost
+      ? '<span title="Vitesse récente (4 sem.) utilisée : ' + it.avg_4w + '/sem vs ' + it.avg_12w + '/sem sur 12 sem." class="text-amber-500 font-semibold">⚡ ' + it.avg_weekly + '</span>'
+      : '<span class="text-gray-500">' + it.avg_weekly + '</span>';
     return '<tr class="hover:bg-white">'
       + '<td class="px-5 py-1.5 text-center">' + urgIcon + '</td>'
       + '<td class="px-4 py-1.5 text-gray-700 max-w-xs truncate" title="' + it.description + '">' + it.description + '</td>'
@@ -2569,6 +2572,7 @@ const NosTab = (() => {
       + '<td class="px-4 py-1.5 text-right text-blue-500">' + it.qty_on_order + '</td>'
       + '<td class="px-4 py-1.5 text-right ' + coverCls + '">' + (it.weeks_of_cover !== null ? it.weeks_of_cover + ' sem.' : '—') + '</td>'
       + '<td class="px-4 py-1.5 text-right text-gray-400">' + it.lead_time_weeks + ' sem.</td>'
+      + '<td class="px-4 py-1.5 text-right">' + avgLabel + '</td>'
       + '<td class="px-4 py-1.5 text-right font-semibold text-indigo-700">' + it.suggested_qty + '</td>'
       + '<td class="px-4 py-1.5 text-center"><button class="nos-exclude-btn text-gray-400 hover:text-red-500 text-xs font-bold px-2 py-0.5 rounded hover:bg-red-50" data-item-id="' + it.item_id + '" title="Exclure du rapport">✕</button></td>'
       + '</tr>';
@@ -2674,6 +2678,7 @@ const NosTab = (() => {
           + '<th class="px-4 py-1.5 text-right">En cmd</th>'
           + '<th class="px-4 py-1.5 text-right">Couverture</th>'
           + '<th class="px-4 py-1.5 text-right">Délai fourn.</th>'
+          + '<th class="px-4 py-1.5 text-right">Vit./sem.</th>'
           + '<th class="px-4 py-1.5 text-right">Qté à cmd</th>'
           + '<th class="px-4 py-1.5 w-8"></th>'
           + '</tr></thead><tbody class="divide-y divide-gray-100">'

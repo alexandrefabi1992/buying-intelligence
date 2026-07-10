@@ -2511,7 +2511,15 @@ app.get('/api/nos/urgent', async (req, res, next) => {
 
     const { rows } = await pool.query(`
       WITH velocity AS (
-        SELECT item_id, shop_id, SUM(units_sold) / 12.0 AS avg_weekly_units
+        SELECT
+          item_id,
+          shop_id,
+          SUM(units_sold) / 12.0 AS avg_12w,
+          SUM(CASE WHEN week >= date_trunc('week', now()) - INTERVAL '4 weeks' THEN units_sold ELSE 0 END) / 4.0 AS avg_4w,
+          GREATEST(
+            SUM(units_sold) / 12.0,
+            SUM(CASE WHEN week >= date_trunc('week', now()) - INTERVAL '4 weeks' THEN units_sold ELSE 0 END) / 4.0
+          ) AS avg_weekly_units
         FROM mv_sales_velocity
         WHERE week >= date_trunc('week', now()) - INTERVAL '12 weeks'
         GROUP BY item_id, shop_id
@@ -2570,6 +2578,9 @@ app.get('/api/nos/urgent', async (req, res, next) => {
         qty_on_hand:    Number(r.qty_on_hand),
         qty_on_order:   Number(r.qty_on_order),
         avg_weekly:     Number(r.avg_weekly_units),
+        avg_12w:        Math.round(Number(r.avg_12w) * 100) / 100,
+        avg_4w:         Math.round(Number(r.avg_4w) * 100) / 100,
+        recent_boost:   Number(r.avg_4w) > Number(r.avg_12w),
         weeks_of_cover: cover,
         lead_time_weeks: lead,
         deficit_weeks:  deficit !== null ? Math.round(deficit * 10) / 10 : null,
