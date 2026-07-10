@@ -709,7 +709,7 @@ app.get('/api/sizes', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/sizes/brands', async (req, res, next) => {
   try {
-    const { season, category, shop_id } = req.query;
+    const { season, category, shop_id, date_from, date_to } = req.query;
     const params = [];
 
     const sizeCase = `
@@ -727,8 +727,14 @@ app.get('/api/sizes/brands', async (req, res, next) => {
       END`;
 
     let seasonFilter = '';
-    if (season === 'p') seasonFilter = `AND EXTRACT(MONTH FROM sl.completed_time) BETWEEN 2 AND 8`;
-    else if (season === 'a') seasonFilter = `AND (EXTRACT(MONTH FROM sl.completed_time) >= 9 OR EXTRACT(MONTH FROM sl.completed_time) = 1)`;
+    if (date_from && date_to) {
+      params.push(date_from, date_to);
+      seasonFilter = `AND sl.completed_time >= $${params.length - 1} AND sl.completed_time < $${params.length}::date + INTERVAL '1 day'`;
+    } else if (season === 'p') {
+      seasonFilter = `AND EXTRACT(MONTH FROM sl.completed_time) BETWEEN 2 AND 8`;
+    } else if (season === 'a') {
+      seasonFilter = `AND (EXTRACT(MONTH FROM sl.completed_time) >= 9 OR EXTRACT(MONTH FROM sl.completed_time) = 1)`;
+    }
 
     let catFilter = '';
     if (category) { params.push(category); catFilter = `AND p.category = $${params.length}`; }
