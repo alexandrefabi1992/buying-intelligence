@@ -2570,7 +2570,7 @@ const NosTab = (() => {
       + '<td class="px-4 py-1.5 text-right ' + coverCls + '">' + (it.weeks_of_cover !== null ? it.weeks_of_cover + ' sem.' : '—') + '</td>'
       + '<td class="px-4 py-1.5 text-right text-gray-400">' + it.lead_time_weeks + ' sem.</td>'
       + '<td class="px-4 py-1.5 text-right font-semibold text-indigo-700">' + it.suggested_qty + '</td>'
-      + '<td class="px-4 py-1.5 text-center"><button class="nos-exclude-btn text-gray-300 hover:text-red-400 text-xs px-1" data-item-id="' + it.item_id + '" title="Exclure du rapport">✕</button></td>'
+      + '<td class="px-4 py-1.5 text-center"><button class="nos-exclude-btn text-gray-400 hover:text-red-500 text-xs font-bold px-2 py-0.5 rounded hover:bg-red-50" data-item-id="' + it.item_id + '" title="Exclure du rapport">✕</button></td>'
       + '</tr>';
   }
 
@@ -2710,11 +2710,12 @@ const NosTab = (() => {
       });
     });
 
-    document.getElementById('nosRestoreAllBtn')?.onclick = function() {
+    var restoreAllBtn = document.getElementById('nosRestoreAllBtn');
+    if (restoreAllBtn) restoreAllBtn.addEventListener('click', function() {
       excludedItems.clear();
       saveExcluded();
       renderAccordion();
-    };
+    });
   }
 
   function populateBrandList() {
