@@ -317,6 +317,10 @@
         class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-blue-300">
       <button id="sizesApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Appliquer</button>
       <button id="sizesHideUnnamedBtn" class="px-2 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">Masquer sans marque</button>
+      <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+        <input type="checkbox" id="sizesExcludeNos" class="rounded">
+        Exclure NOS
+      </label>
       <span id="sizesCount" class="text-xs text-gray-500 ml-auto"></span>
     </div>
     <!-- Chip filtre actif sans marque -->
@@ -1571,10 +1575,12 @@ var SizesTab = (function() {
     } else if (activeSeason) {
       params.set('season', activeSeason);
     }
-    var cat    = document.getElementById('sizesCatFilter').value;
-    var shopId = document.getElementById('sizesShop').value;
-    if (cat)    params.set('category', cat);
-    if (shopId) params.set('shop_id', shopId);
+    var cat        = document.getElementById('sizesCatFilter').value;
+    var shopId     = document.getElementById('sizesShop').value;
+    var excludeNos = document.getElementById('sizesExcludeNos').checked;
+    if (cat)        params.set('category', cat);
+    if (shopId)     params.set('shop_id', shopId);
+    if (excludeNos) params.set('exclude_nos', '1');
 
     try {
       var r = await fetch(BASE + '/api/sizes/brands?' + params.toString());
