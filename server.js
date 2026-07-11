@@ -2134,6 +2134,33 @@ app.get('/api/admin/raw-sample', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/raw-attr?manufacturer=Eton — inspect raw attribute keys for a brand
+app.get('/api/admin/raw-attr', async (req, res, next) => {
+  try {
+    const mfr = req.query.manufacturer || 'Eton';
+    const { rows } = await pool.query(`
+      SELECT item_id, description, category,
+             raw->'customSku'       AS custom_sku,
+             raw->'Attribute1'      AS attr1_name,
+             raw->'AttributeValue1' AS attr1_val,
+             raw->'Attribute2'      AS attr2_name,
+             raw->'AttributeValue2' AS attr2_val,
+             raw->'Attribute3'      AS attr3_name,
+             raw->'AttributeValue3' AS attr3_val,
+             jsonb_object_keys(raw) AS raw_key
+      FROM products
+      WHERE manufacturer = $1 AND matrix_id IS NOT NULL AND archived = false
+      LIMIT 60
+    `, [mfr]);
+    // collect unique raw keys
+    const keys = [...new Set(rows.map(r => r.raw_key))].sort();
+    // get sample rows (unique by item_id)
+    const seen = new Set();
+    const samples = rows.filter(r => { if (seen.has(r.item_id)) return false; seen.add(r.item_id); return true; }).slice(0, 5);
+    res.json({ raw_keys: keys, samples });
+  } catch (err) { next(err); }
+});
+
 // GET /api/admin/inspect-filters — audit tag tokens, size patterns, parasites
 app.get('/api/admin/inspect-filters', async (req, res, next) => {
   try {
