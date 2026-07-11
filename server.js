@@ -727,8 +727,8 @@ app.get('/api/sizes/brands', async (req, res, next) => {
           THEN (regexp_match(p.description, '(?<![0-9])([0-9]{1,2}\.(25|5|50|75))(?![0-9])'))[1]
         WHEN p.description ~  '(?<![0-9])[0-9]{2}/[0-9]{2,3}(?![0-9])'
           THEN (regexp_match(p.description, '(?<![0-9])([0-9]{2}/[0-9]{2,3})(?![0-9])'))[1]
-        WHEN p.description ~  '(?<![0-9\\-\\.])[0-9]{1,2}(?![0-9\\.])'
-          THEN (regexp_match(p.description, '(?<![0-9\\-\\.])([0-9]{1,2})(?![0-9\\.])'))[1]
+        WHEN p.description ~  '(?<![0-9A-Za-z\\-\\.])[1-9][0-9]?(?![0-9A-Za-z\\.])'
+          THEN (regexp_match(p.description, '(?<![0-9A-Za-z\\-\\.])([1-9][0-9]?)(?![0-9A-Za-z\\.])'))[1]
         ELSE NULL
       END`;
 
