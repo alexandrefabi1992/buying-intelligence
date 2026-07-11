@@ -431,6 +431,11 @@ app.post('/api/sync/run', async (req, res) => {
   });
 });
 
+app.post('/api/sync/reset', (req, res) => {
+  syncRunning = false;
+  res.json({ ok: true, message: 'syncRunning flag reset' });
+});
+
 // ---------------------------------------------------------------------------
 // OAuth2 flow — one-time setup to obtain a refresh_token
 //
