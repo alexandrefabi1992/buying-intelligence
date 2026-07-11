@@ -524,7 +524,7 @@ async function runSync() {
       if (cps.items) console.log(`[sync] Resuming items from checkpoint at ${itemCount}…`);
       else           console.log('[sync] Fetching items…');
       for await (const { items, nextUrl } of paginate(client, 'Item', {
-        load_relations: JSON.stringify(['Tags', 'Category', 'Manufacturer', 'Images']),
+        load_relations: JSON.stringify(['Tags', 'Category', 'Manufacturer', 'Images', 'ItemAttributes']),
       }, cps.items?.next_url)) {
         await upsertProducts(client, items);
         itemCount += items.length;
