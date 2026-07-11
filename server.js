@@ -724,11 +724,20 @@ app.get('/api/sizes/brands', async (req, res, next) => {
       ${expr} ~* '^\\s*(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)\\s*$'
       OR ${expr} ~ '^[0-9]'
     )`;
+    // Normalize fraction notation to decimal: "15 1/2"→"15.5", "15 3/4"→"15.75", "15 1/4"→"15.25"
+    const normAttr = (expr) => `
+      CASE
+        WHEN ${expr} ~ '^[0-9]+ 1/4$' THEN regexp_replace(${expr}, ' 1/4$', '.25')
+        WHEN ${expr} ~ '^[0-9]+ 1/2$' THEN regexp_replace(${expr}, ' 1/2$', '.5')
+        WHEN ${expr} ~ '^[0-9]+ 3/4$' THEN regexp_replace(${expr}, ' 3/4$', '.75')
+        WHEN ${expr} ~ '^[0-9]+,[0-9]' THEN regexp_replace(${expr}, ',', '.')
+        ELSE ${expr}
+      END`;
     const sizeCase = `
       COALESCE(
-        CASE WHEN ${isSizeAttr(sizeAttrExpr(1))} THEN ${sizeAttrExpr(1)} END,
-        CASE WHEN ${isSizeAttr(sizeAttrExpr(2))} THEN ${sizeAttrExpr(2)} END,
-        CASE WHEN ${isSizeAttr(sizeAttrExpr(3))} THEN ${sizeAttrExpr(3)} END,
+        CASE WHEN ${isSizeAttr(sizeAttrExpr(1))} THEN ${normAttr(sizeAttrExpr(1))} END,
+        CASE WHEN ${isSizeAttr(sizeAttrExpr(2))} THEN ${normAttr(sizeAttrExpr(2))} END,
+        CASE WHEN ${isSizeAttr(sizeAttrExpr(3))} THEN ${normAttr(sizeAttrExpr(3))} END,
         CASE
           WHEN p.description ~* '\\m(XXXL|3XL)\\M' THEN 'XXXL'
           WHEN p.description ~* '\\m(XXL|2XL)\\M'  THEN 'XXL'
