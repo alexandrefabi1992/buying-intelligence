@@ -2673,15 +2673,17 @@ app.put('/api/settings/tenant', async (req, res, next) => {
 
 app.get('/api/admin/discover', async (req, res, next) => {
   try {
-    const [cats, tags, descSamples] = await Promise.all([
+    const [cats, tags, descSamples, rawSample] = await Promise.all([
       pool.query(`SELECT DISTINCT category, COUNT(*) as cnt FROM products WHERE category IS NOT NULL AND category != '' AND archived = false GROUP BY category ORDER BY cnt DESC LIMIT 30`),
       pool.query(`SELECT DISTINCT UNNEST(string_to_array(tags, ',')) AS tag, COUNT(*) as cnt FROM products WHERE tags IS NOT NULL AND tags != '' AND archived = false GROUP BY tag ORDER BY cnt DESC LIMIT 50`),
       pool.query(`SELECT description FROM products WHERE archived = false AND description IS NOT NULL ORDER BY RANDOM() LIMIT 5`),
+      pool.query(`SELECT description, raw->>'Attribute1' AS attr1, raw->>'AttributeValue1' AS val1, raw->>'Attribute2' AS attr2, raw->>'AttributeValue2' AS val2 FROM products WHERE archived = false AND description IS NOT NULL AND matrix_id IS NOT NULL ORDER BY RANDOM() LIMIT 10`),
     ]);
     res.json({
-      categories:       cats.rows.map(r => ({ name: r.category, count: Number(r.cnt) })),
-      tags:             tags.rows.map(r => ({ tag: r.tag.trim(), count: Number(r.cnt) })),
+      categories:          cats.rows.map(r => ({ name: r.category, count: Number(r.cnt) })),
+      tags:                tags.rows.map(r => ({ tag: r.tag.trim(), count: Number(r.cnt) })),
       description_samples: descSamples.rows.map(r => r.description),
+      raw_attr_samples:    rawSample.rows,
     });
   } catch (err) { next(err); }
 });
