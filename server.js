@@ -721,12 +721,14 @@ app.get('/api/sizes/brands', async (req, res, next) => {
         WHEN p.description ~* '\\mM\\M'            THEN 'M'
         WHEN p.description ~* '\\mXS\\M'           THEN 'XS'
         WHEN p.description ~* '\\mS\\M'            THEN 'S'
+        WHEN p.description ~  '(?<![0-9])[0-9]{1,2},(25|5|50|75)(?![0-9])'
+          THEN regexp_replace((regexp_match(p.description, '(?<![0-9])([0-9]{1,2},(25|5|50|75))(?![0-9])'))[1], ',', '.')
         WHEN p.description ~  '(?<![0-9])[0-9]{1,2}\.(25|5|50|75)(?![0-9])'
           THEN (regexp_match(p.description, '(?<![0-9])([0-9]{1,2}\.(25|5|50|75))(?![0-9])'))[1]
         WHEN p.description ~  '(?<![0-9])[0-9]{2}/[0-9]{2,3}(?![0-9])'
           THEN (regexp_match(p.description, '(?<![0-9])([0-9]{2}/[0-9]{2,3})(?![0-9])'))[1]
-        WHEN p.description ~  '\\m[0-9]{1,2}\\M'
-          THEN substring(p.description from '\\m([0-9]{1,2})\\M')
+        WHEN p.description ~  '(?<![0-9\\-\\.])[0-9]{1,2}(?![0-9\\.])'
+          THEN (regexp_match(p.description, '(?<![0-9\\-\\.])([0-9]{1,2})(?![0-9\\.])'))[1]
         ELSE NULL
       END`;
 
@@ -790,6 +792,7 @@ app.get('/api/sizes/brands', async (req, res, next) => {
         FROM size_sales ss
         FULL OUTER JOIN size_stock sk USING (manufacturer, category, size_label)
         WHERE size_label IS NOT NULL
+          AND (COALESCE(ss.units_sold, 0) > 0 OR COALESCE(sk.qty_on_hand, 0) > 0)
         ORDER BY manufacturer, category, COALESCE(ss.units_sold, 0) DESC
       `, params),
       pool.query(`
