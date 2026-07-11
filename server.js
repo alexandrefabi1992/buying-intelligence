@@ -2134,30 +2134,27 @@ app.get('/api/admin/raw-sample', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/admin/raw-attr?manufacturer=Eton — inspect raw attribute keys for a brand
+// GET /api/admin/raw-attr?manufacturer=Eton&category=... — inspect raw attribute keys for a brand
 app.get('/api/admin/raw-attr', async (req, res, next) => {
   try {
     const mfr = req.query.manufacturer || 'Eton';
-    const { rows } = await pool.query(`
-      SELECT item_id, description, category,
-             raw->'customSku'       AS custom_sku,
-             raw->'Attribute1'      AS attr1_name,
-             raw->'AttributeValue1' AS attr1_val,
-             raw->'Attribute2'      AS attr2_name,
-             raw->'AttributeValue2' AS attr2_val,
-             raw->'Attribute3'      AS attr3_name,
-             raw->'AttributeValue3' AS attr3_val,
-             jsonb_object_keys(raw) AS raw_key
+    const cat = req.query.category || null;
+    const params = [mfr];
+    const catFilter = cat ? `AND category ILIKE $${params.push('%' + cat + '%') && params.length}` : '';
+    const { rows: keyRows } = await pool.query(`
+      SELECT jsonb_object_keys(raw) AS raw_key FROM products
+      WHERE manufacturer = $1 ${catFilter} AND matrix_id IS NOT NULL AND archived = false
+      LIMIT 300
+    `, params);
+    const keys = [...new Set(keyRows.map(r => r.raw_key))].sort();
+
+    const { rows: samples } = await pool.query(`
+      SELECT item_id, description, category
       FROM products
-      WHERE manufacturer = $1 AND matrix_id IS NOT NULL AND archived = false
-      LIMIT 60
-    `, [mfr]);
-    // collect unique raw keys
-    const keys = [...new Set(rows.map(r => r.raw_key))].sort();
-    // get sample rows (unique by item_id)
-    const seen = new Set();
-    const samples = rows.filter(r => { if (seen.has(r.item_id)) return false; seen.add(r.item_id); return true; }).slice(0, 5);
-    res.json({ raw_keys: keys, samples });
+      WHERE manufacturer = $1 ${catFilter} AND matrix_id IS NOT NULL AND archived = false
+      ORDER BY item_id LIMIT 30
+    `, params);
+    res.json({ raw_keys: keys, descriptions: samples.map(r => ({ id: r.item_id, cat: r.category, desc: r.description })) });
   } catch (err) { next(err); }
 });
 
