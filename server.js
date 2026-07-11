@@ -2681,7 +2681,7 @@ app.get('/api/admin/discover', async (req, res, next) => {
       pool.query(`SELECT DISTINCT category, COUNT(*) as cnt FROM products WHERE category IS NOT NULL AND category != '' AND archived = false GROUP BY category ORDER BY cnt DESC LIMIT 30`),
       pool.query(`SELECT DISTINCT UNNEST(string_to_array(tags, ',')) AS tag, COUNT(*) as cnt FROM products WHERE tags IS NOT NULL AND tags != '' AND archived = false GROUP BY tag ORDER BY cnt DESC LIMIT 50`),
       pool.query(`SELECT description FROM products WHERE archived = false AND description IS NOT NULL ORDER BY RANDOM() LIMIT 5`),
-      pool.query(`SELECT description, jsonb_object_keys(raw) AS key FROM products WHERE archived = false AND matrix_id IS NOT NULL LIMIT 1`),
+      pool.query(`SELECT description, array_agg(k) AS keys FROM products p, jsonb_object_keys(p.raw) k WHERE p.archived = false AND p.matrix_id IS NOT NULL GROUP BY p.item_id, p.description LIMIT 3`),
     ]);
     res.json({
       categories:          cats.rows.map(r => ({ name: r.category, count: Number(r.cnt) })),
