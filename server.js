@@ -780,13 +780,13 @@ app.get('/api/sizes/brands', async (req, res, next) => {
           GROUP BY p.manufacturer, p.category, size_label
         )
         SELECT
-          ss.manufacturer, ss.category, ss.size_label,
-          ss.units_sold::float8                       AS units_sold,
-          COALESCE(sk.qty_on_hand, 0)::float8         AS qty_on_hand
+          manufacturer, category, size_label,
+          COALESCE(ss.units_sold, 0)::float8   AS units_sold,
+          COALESCE(sk.qty_on_hand, 0)::float8  AS qty_on_hand
         FROM size_sales ss
-        LEFT JOIN size_stock sk USING (manufacturer, category, size_label)
-        WHERE ss.size_label IS NOT NULL
-        ORDER BY ss.manufacturer, ss.category, ss.units_sold DESC
+        FULL OUTER JOIN size_stock sk USING (manufacturer, category, size_label)
+        WHERE size_label IS NOT NULL
+        ORDER BY manufacturer, category, COALESCE(ss.units_sold, 0) DESC
       `, params),
       pool.query(`
         SELECT DISTINCT COALESCE(category, 'Sans catégorie') AS category
