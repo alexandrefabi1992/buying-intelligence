@@ -335,14 +335,14 @@
       <span><span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>ST ≥ 70%</span>
       <span><span class="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1"></span>ST 40–70%</span>
       <span><span class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1"></span>ST &lt; 40%</span>
-      <span class="ml-2">Alignement stock : <span class="text-green-600 font-semibold">✓</span> ok · <span class="text-amber-600 font-semibold">↑</span> surplus · <span class="text-red-600 font-semibold">↓</span> déficit (&gt; ±8 pts)</span>
+      <span class="ml-2" title="Alignement : compare la part de chaque taille dans les ventes vs dans le stock actuel. ✓ = équilibré (écart &lt; 8 pts). ↑ surplus = trop de stock pour cette taille. ↓ déficit = manque de stock vs la demande.">Alignement stock : <span class="text-green-600 font-semibold">✓</span> ok · <span class="text-amber-600 font-semibold">↑</span> surplus · <span class="text-red-600 font-semibold">↓</span> déficit (&gt; ±8 pts)</span>
     </div>
     <!-- Barre de résumé -->
     <div id="sizesSummaryBar" class="hidden mb-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex flex-wrap gap-6 text-xs text-blue-800">
       <span>Marques visibles : <strong id="sumBrands">—</strong></span>
       <span>Total vendu : <strong id="sumTotalSold">—</strong></span>
       <span>ST moyen pondéré : <strong id="sumST">—</strong></span>
-      <span>Déséquilibres : <strong id="sumImbalances">—</strong></span>
+      <span title="Nombre total de tailles avec un déséquilibre significatif (écart &gt; ±8 pts entre % ventes et % stock)">Déséquilibres : <strong id="sumImbalances">—</strong></span>
     </div>
     <!-- Accordéon -->
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -353,8 +353,8 @@
             <th class="px-3 py-2 text-left cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="manufacturer">Marque <span class="sizes-sort-icon" data-col="manufacturer"></span></th>
             <th class="px-3 py-2 text-left">Catégorie</th>
             <th class="px-3 py-2 text-right cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="totalSold">Total vendu <span class="sizes-sort-icon" data-col="totalSold"></span></th>
-            <th class="px-3 py-2 text-right cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="stGlobal">Sell-through <span class="sizes-sort-icon" data-col="stGlobal"></span></th>
-            <th class="px-3 py-2 text-center cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="imbalances">Déséquilibres <span class="sizes-sort-icon" data-col="imbalances"></span></th>
+            <th class="px-3 py-2 text-right cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="stGlobal" title="Sell-through : unités vendues ÷ (vendues + stock actuel). Indique quelle proportion de la marchandise reçue a été vendue.">Sell-through <span class="sizes-sort-icon" data-col="stGlobal"></span></th>
+            <th class="px-3 py-2 text-center cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="imbalances" title="Nombre de tailles où l'écart entre la part des ventes et la part du stock dépasse ±8 points de %. Un chiffre élevé indique que le stock n'est pas réparti selon la demande réelle.">Déséquilibres <span class="sizes-sort-icon" data-col="imbalances"></span></th>
           </tr>
         </thead>
         <tbody id="sizesAccordionBody" class="divide-y divide-gray-100"></tbody>
@@ -1750,7 +1750,7 @@ var SizesTab = (function() {
         html += '<td></td><td colspan="2" class="px-3 py-1 pl-14">Taille</td>';
         html += '<td class="px-3 py-1 text-right">% Ventes</td>';
         html += '<td class="px-3 py-1 text-right">ST</td>';
-        html += '<td class="px-3 py-1 text-center">Alignement</td>';
+        html += '<td class="px-3 py-1 text-center" title="Alignement : ✓ = % stock ≈ % ventes (écart &lt; 8 pts) · ↑ surplus = part du stock &gt; part des ventes · ↓ déficit = part du stock &lt; part des ventes. Le chiffre en gris indique l\'écart en points de %.">Alignement</td>';
         html += '</tr>';
 
         c.sizesSorted.forEach(function(s) {
