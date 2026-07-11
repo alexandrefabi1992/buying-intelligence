@@ -721,8 +721,12 @@ app.get('/api/sizes/brands', async (req, res, next) => {
         WHEN p.description ~* '\\mM\\M'            THEN 'M'
         WHEN p.description ~* '\\mXS\\M'           THEN 'XS'
         WHEN p.description ~* '\\mS\\M'            THEN 'S'
-        WHEN p.description ~  '\\m\\d{2}/\\d{2}\\M' THEN substring(p.description from '\\m(\\d{2}/\\d{2})\\M')
-        WHEN p.description ~  '\\m(2[89]|[3-6]\\d)\\M' THEN substring(p.description from '\\m(2[89]|[3-6]\\d)\\M')
+        WHEN p.description ~  '(?<![0-9])[0-9]{1,2}\\.[05](?![0-9])'
+          THEN (regexp_match(p.description, '(?<![0-9])([0-9]{1,2}\\.[05])(?![0-9])'))[1]
+        WHEN p.description ~  '(?<![0-9])[0-9]{2}/[0-9]{2,3}(?![0-9])'
+          THEN (regexp_match(p.description, '(?<![0-9])([0-9]{2}/[0-9]{2,3})(?![0-9])'))[1]
+        WHEN p.description ~  '\\m[0-9]{1,2}\\M'
+          THEN substring(p.description from '\\m([0-9]{1,2})\\M')
         ELSE NULL
       END`;
 
@@ -2677,7 +2681,7 @@ app.get('/api/admin/discover', async (req, res, next) => {
       pool.query(`SELECT DISTINCT category, COUNT(*) as cnt FROM products WHERE category IS NOT NULL AND category != '' AND archived = false GROUP BY category ORDER BY cnt DESC LIMIT 30`),
       pool.query(`SELECT DISTINCT UNNEST(string_to_array(tags, ',')) AS tag, COUNT(*) as cnt FROM products WHERE tags IS NOT NULL AND tags != '' AND archived = false GROUP BY tag ORDER BY cnt DESC LIMIT 50`),
       pool.query(`SELECT description FROM products WHERE archived = false AND description IS NOT NULL ORDER BY RANDOM() LIMIT 5`),
-      pool.query(`SELECT description, raw->>'Attribute1' AS attr1, raw->>'AttributeValue1' AS val1, raw->>'Attribute2' AS attr2, raw->>'AttributeValue2' AS val2 FROM products WHERE archived = false AND description IS NOT NULL AND matrix_id IS NOT NULL ORDER BY RANDOM() LIMIT 10`),
+      pool.query(`SELECT description, jsonb_object_keys(raw) AS key FROM products WHERE archived = false AND matrix_id IS NOT NULL LIMIT 1`),
     ]);
     res.json({
       categories:          cats.rows.map(r => ({ name: r.category, count: Number(r.cnt) })),
