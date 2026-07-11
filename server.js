@@ -721,8 +721,8 @@ app.get('/api/sizes/brands', async (req, res, next) => {
         WHEN p.description ~* '\\mM\\M'            THEN 'M'
         WHEN p.description ~* '\\mXS\\M'           THEN 'XS'
         WHEN p.description ~* '\\mS\\M'            THEN 'S'
-        WHEN p.description ~  '(?<![0-9])[0-9]{1,2}\\.[05](?![0-9])'
-          THEN (regexp_match(p.description, '(?<![0-9])([0-9]{1,2}\\.[05])(?![0-9])'))[1]
+        WHEN p.description ~  '(?<![0-9])[0-9]{1,2}\.(25|5|50|75)(?![0-9])'
+          THEN (regexp_match(p.description, '(?<![0-9])([0-9]{1,2}\.(25|5|50|75))(?![0-9])'))[1]
         WHEN p.description ~  '(?<![0-9])[0-9]{2}/[0-9]{2,3}(?![0-9])'
           THEN (regexp_match(p.description, '(?<![0-9])([0-9]{2}/[0-9]{2,3})(?![0-9])'))[1]
         WHEN p.description ~  '\\m[0-9]{1,2}\\M'
@@ -2677,17 +2677,15 @@ app.put('/api/settings/tenant', async (req, res, next) => {
 
 app.get('/api/admin/discover', async (req, res, next) => {
   try {
-    const [cats, tags, descSamples, rawSample] = await Promise.all([
+    const [cats, tags, descSamples] = await Promise.all([
       pool.query(`SELECT DISTINCT category, COUNT(*) as cnt FROM products WHERE category IS NOT NULL AND category != '' AND archived = false GROUP BY category ORDER BY cnt DESC LIMIT 30`),
       pool.query(`SELECT DISTINCT UNNEST(string_to_array(tags, ',')) AS tag, COUNT(*) as cnt FROM products WHERE tags IS NOT NULL AND tags != '' AND archived = false GROUP BY tag ORDER BY cnt DESC LIMIT 50`),
       pool.query(`SELECT description FROM products WHERE archived = false AND description IS NOT NULL ORDER BY RANDOM() LIMIT 5`),
-      pool.query(`SELECT description, array_agg(k) AS keys FROM products p, jsonb_object_keys(p.raw) k WHERE p.archived = false AND p.matrix_id IS NOT NULL GROUP BY p.item_id, p.description LIMIT 3`),
     ]);
     res.json({
       categories:          cats.rows.map(r => ({ name: r.category, count: Number(r.cnt) })),
       tags:                tags.rows.map(r => ({ tag: r.tag.trim(), count: Number(r.cnt) })),
       description_samples: descSamples.rows.map(r => r.description),
-      raw_attr_samples:    rawSample.rows,
     });
   } catch (err) { next(err); }
 });
