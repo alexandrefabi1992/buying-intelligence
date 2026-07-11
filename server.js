@@ -714,7 +714,7 @@ app.get('/api/sizes', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/sizes/brands', async (req, res, next) => {
   try {
-    const { season, category, shop_id, date_from, date_to, exclude_nos } = req.query;
+    const { season, category, shop_id, date_from, date_to, exclude_nos, stock_tag } = req.query;
     const params = [];
 
     // Priority: ItemAttributes (exact values from Lightspeed matrix) → description parsing (fallback)
@@ -774,6 +774,12 @@ app.get('/api/sizes/brands', async (req, res, next) => {
       AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
       AND NOT (p.default_cost = 0 AND p.default_price = 0) ${nosFilter}`;
 
+    let stockTagFilter = '';
+    if (stock_tag) {
+      params.push(stock_tag);
+      stockTagFilter = `AND p.tags ILIKE $${params.length}`;
+    }
+
     const [{ rows }, { rows: catRows }] = await Promise.all([
       pool.query(`
         WITH size_sales AS (
@@ -799,7 +805,7 @@ app.get('/api/sizes/brands', async (req, res, next) => {
             SUM(COALESCE(i.qty_on_hand, 0)) AS qty_on_hand
           FROM products p
           JOIN inventory i ON i.item_id = p.item_id ${shopFilterInv}
-          WHERE ${baseWhere} ${catFilter}
+          WHERE ${baseWhere} ${catFilter} ${stockTagFilter}
           GROUP BY p.manufacturer, p.category, size_label
         )
         SELECT

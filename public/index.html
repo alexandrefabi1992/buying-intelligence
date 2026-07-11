@@ -321,6 +321,12 @@
         <input type="checkbox" id="sizesExcludeNos" class="rounded">
         Exclure NOS
       </label>
+      <label class="flex items-center gap-1.5 text-xs text-gray-600 select-none" title="Filtre le stock actuel aux seuls articles taggés avec cette saison. Donne un ST basé uniquement sur les achats de la saison choisie.">
+        Stock :
+        <select id="sizesStockTag" class="border border-gray-300 rounded-lg px-2 py-1 text-xs ml-0.5">
+          <option value="">Tout le stock</option>
+        </select>
+      </label>
       <span id="sizesCount" class="text-xs text-gray-500 ml-auto"></span>
     </div>
     <!-- Chip filtre actif sans marque -->
@@ -1573,6 +1579,23 @@ var SizesTab = (function() {
     } catch(e) {}
   }
 
+  var seasonsLoaded = false;
+  async function loadSeasons() {
+    if (seasonsLoaded) return;
+    try {
+      var r = await fetch(BASE + '/api/settings/seasons');
+      var d = await r.json();
+      var sel = document.getElementById('sizesStockTag');
+      (d.seasons || []).slice().reverse().forEach(function(s) {
+        var opt = document.createElement('option');
+        opt.value = '%' + s.tag_pattern + '%';
+        opt.textContent = s.label;
+        sel.appendChild(opt);
+      });
+      seasonsLoaded = true;
+    } catch(e) {}
+  }
+
   async function load() {
     var loader = document.getElementById('sizesLoader');
     var empty  = document.getElementById('sizesEmpty');
@@ -1581,6 +1604,7 @@ var SizesTab = (function() {
     body.innerHTML = '';
     empty.classList.add('hidden');
     await loadShops();
+    await loadSeasons();
 
     var params = new URLSearchParams();
     if (activeSeason === 'custom') {
@@ -1594,9 +1618,11 @@ var SizesTab = (function() {
     var cat        = document.getElementById('sizesCatFilter').value;
     var shopId     = document.getElementById('sizesShop').value;
     var excludeNos = document.getElementById('sizesExcludeNos').checked;
+    var stockTag   = document.getElementById('sizesStockTag').value;
     if (cat)        params.set('category', cat);
     if (shopId)     params.set('shop_id', shopId);
     if (excludeNos) params.set('exclude_nos', '1');
+    if (stockTag)   params.set('stock_tag', stockTag);
 
     try {
       var r = await fetch(BASE + '/api/sizes/brands?' + params.toString());
