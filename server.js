@@ -722,7 +722,7 @@ app.get('/api/sizes/brands', async (req, res, next) => {
         WHEN p.description ~* '\\mXS\\M'           THEN 'XS'
         WHEN p.description ~* '\\mS\\M'            THEN 'S'
         WHEN p.description ~  '\\m\\d{2}/\\d{2}\\M' THEN substring(p.description from '\\m(\\d{2}/\\d{2})\\M')
-        WHEN p.description ~  '\\m[2-6]\\d\\M'        THEN substring(p.description from '\\m([2-6]\\d)\\M')
+        WHEN p.description ~  '\\m(2[89]|[3-6]\\d)\\M' THEN substring(p.description from '\\m(2[89]|[3-6]\\d)\\M')
         ELSE NULL
       END`;
 
