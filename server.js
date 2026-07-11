@@ -712,25 +712,37 @@ app.get('/api/sizes/brands', async (req, res, next) => {
     const { season, category, shop_id, date_from, date_to, exclude_nos } = req.query;
     const params = [];
 
+    // Priority: ItemAttributes (exact values from Lightspeed matrix) → description parsing (fallback)
+    // ItemAttributes populated after sync with load_relations=['ItemAttributes']
+    const sizeAttrExpr = (n) => `p.raw->'ItemAttributes'->>'attribute${n}'`;
+    const isSizeAttr = (expr) => `(
+      ${expr} ~* '^\\s*(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)\\s*$'
+      OR ${expr} ~ '^[0-9]'
+    )`;
     const sizeCase = `
-      CASE
-        WHEN p.description ~* '\\m(XXXL|3XL)\\M' THEN 'XXXL'
-        WHEN p.description ~* '\\m(XXL|2XL)\\M'  THEN 'XXL'
-        WHEN p.description ~* '\\mXL\\M'           THEN 'XL'
-        WHEN p.description ~* '\\mL\\M'            THEN 'L'
-        WHEN p.description ~* '\\mM\\M'            THEN 'M'
-        WHEN p.description ~* '\\mXS\\M'           THEN 'XS'
-        WHEN p.description ~* '\\mS\\M'            THEN 'S'
-        WHEN p.description ~  '(?<![0-9])[0-9]{1,2},(25|5|50|75)(?![0-9])'
-          THEN regexp_replace((regexp_match(p.description, '(?<![0-9])([0-9]{1,2},(25|5|50|75))(?![0-9])'))[1], ',', '.')
-        WHEN p.description ~  '(?<![0-9])[0-9]{1,2}\.(25|5|50|75)(?![0-9])'
-          THEN (regexp_match(p.description, '(?<![0-9])([0-9]{1,2}\.(25|5|50|75))(?![0-9])'))[1]
-        WHEN p.description ~  '(?<![0-9])[0-9]{2}/[0-9]{2,3}(?![0-9])'
-          THEN (regexp_match(p.description, '(?<![0-9])([0-9]{2}/[0-9]{2,3})(?![0-9])'))[1]
-        WHEN p.description ~  '(?<![0-9A-Za-z\\-\\.])[1-9][0-9]?(?![0-9A-Za-z\\.])'
-          THEN (regexp_match(p.description, '(?<![0-9A-Za-z\\-\\.])([1-9][0-9]?)(?![0-9A-Za-z\\.])'))[1]
-        ELSE NULL
-      END`;
+      COALESCE(
+        CASE WHEN ${isSizeAttr(sizeAttrExpr(1))} THEN ${sizeAttrExpr(1)} END,
+        CASE WHEN ${isSizeAttr(sizeAttrExpr(2))} THEN ${sizeAttrExpr(2)} END,
+        CASE WHEN ${isSizeAttr(sizeAttrExpr(3))} THEN ${sizeAttrExpr(3)} END,
+        CASE
+          WHEN p.description ~* '\\m(XXXL|3XL)\\M' THEN 'XXXL'
+          WHEN p.description ~* '\\m(XXL|2XL)\\M'  THEN 'XXL'
+          WHEN p.description ~* '\\mXL\\M'           THEN 'XL'
+          WHEN p.description ~* '\\mL\\M'            THEN 'L'
+          WHEN p.description ~* '\\mM\\M'            THEN 'M'
+          WHEN p.description ~* '\\mXS\\M'           THEN 'XS'
+          WHEN p.description ~* '\\mS\\M'            THEN 'S'
+          WHEN p.description ~  '(?<![0-9])[0-9]{1,2},(25|5|50|75)(?![0-9])'
+            THEN regexp_replace((regexp_match(p.description, '(?<![0-9])([0-9]{1,2},(25|5|50|75))(?![0-9])'))[1], ',', '.')
+          WHEN p.description ~  '(?<![0-9])[0-9]{1,2}\\.(25|5|50|75)(?![0-9])'
+            THEN (regexp_match(p.description, '(?<![0-9])([0-9]{1,2}\\.(25|5|50|75))(?![0-9])'))[1]
+          WHEN p.description ~  '(?<![0-9])[0-9]{2}/[0-9]{2,3}(?![0-9])'
+            THEN (regexp_match(p.description, '(?<![0-9])([0-9]{2}/[0-9]{2,3})(?![0-9])'))[1]
+          WHEN p.description ~  '(?<![0-9A-Za-z\\-\\.])[1-9][0-9]?(?![0-9A-Za-z\\.])'
+            THEN (regexp_match(p.description, '(?<![0-9A-Za-z\\-\\.])([1-9][0-9]?)(?![0-9A-Za-z\\.])'))[1]
+          ELSE NULL
+        END
+      )`;
 
     let seasonFilter = '';
     if (date_from && date_to) {
