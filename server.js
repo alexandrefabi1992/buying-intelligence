@@ -652,6 +652,12 @@ app.get('/api/transfers', async (req, res, next) => {
         WHERE last_sale_date >= now() - (interval '1 day' * $1)
           AND units_sold_30d >= 1
       ),
+      -- Specific items (exact size+color) ever sold at each shop (last 3 years)
+      item_ever_sold AS (
+        SELECT DISTINCT item_id, shop_id
+        FROM sale_lines
+        WHERE completed_time >= now() - interval '3 years'
+      ),
       -- Best active shop per (matrix, dormant_shop): most recently sold
       best_active AS (
         SELECT DISTINCT ON (dm.matrix_id, dm.shop_id)
@@ -681,6 +687,7 @@ app.get('/api/transfers', async (req, res, next) => {
         ba.active_last_sale,         ba.units_sold_30d AS active_sold_30d
       FROM best_active ba
       JOIN products p  ON p.matrix_id = ba.matrix_id AND p.archived = false
+      JOIN item_ever_sold ies ON ies.item_id = p.item_id AND ies.shop_id = ba.active_shop_id
       JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = ba.dormant_shop_id
         AND i.qty_on_hand >= $2
       JOIN shops sh_d ON sh_d.shop_id = ba.dormant_shop_id
