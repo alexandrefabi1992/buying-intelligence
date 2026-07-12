@@ -592,60 +592,78 @@ app.get('/api/nos', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// /api/transfers — Inter-shop transfer recommendations
-// Identifies items overstocked at one shop and understocked at another.
+// /api/transfers — Sleeping stock transfer recommendations
+// Logic: matrix with no sales in X days at shop A (dormant) but sold recently at shop B (active)
+// -> recommend transferring specific items (exact size/color) from A to B
 // ---------------------------------------------------------------------------
 app.get('/api/transfers', async (req, res, next) => {
   try {
-    const minCover    = parseFloat(req.query.min_cover    ?? '8');   // weeks
-    const maxCover    = parseFloat(req.query.max_cover    ?? '2');
+    const daysDormant = parseInt(req.query.days_dormant ?? '14', 10);
+    const minStock    = parseInt(req.query.min_stock    ?? '1',  10);
+
     const { rows } = await pool.query(`
-      WITH velocity AS (
-        SELECT item_id, shop_id, SUM(units_sold) / 12.0 AS avg_weekly_units
-        FROM mv_sales_velocity
-        WHERE week >= date_trunc('week', now()) - interval '12 weeks'
-        GROUP BY item_id, shop_id
+      WITH
+      matrix_last_sale AS (
+        SELECT p.matrix_id, sl.shop_id,
+          MAX(sl.completed_time)                                              AS last_sale_date,
+          SUM(CASE WHEN sl.completed_time >= now() - interval '30 days'
+                   THEN sl.qty ELSE 0 END)::int                              AS units_sold_30d
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE sl.completed_time >= now() - interval '90 days'
+          AND sl.completed_time IS NOT NULL
+          AND p.matrix_id IS NOT NULL AND p.archived = false
+        GROUP BY p.matrix_id, sl.shop_id
       ),
-      cover AS (
-        SELECT
-          i.item_id, i.shop_id,
-          i.qty_on_hand,
-          v.avg_weekly_units,
-          CASE WHEN v.avg_weekly_units > 0
-               THEN i.qty_on_hand / v.avg_weekly_units
-               ELSE NULL END AS weeks_of_cover
+      dormant_matrix AS (
+        SELECT DISTINCT p.matrix_id, i.shop_id,
+          mls.last_sale_date,
+          EXTRACT(DAY FROM now() - COALESCE(mls.last_sale_date, now() - interval '999 days'))::int AS days_dormant
         FROM inventory i
-        JOIN velocity v USING (item_id, shop_id)
+        JOIN products p ON p.item_id = i.item_id
+          AND p.matrix_id IS NOT NULL AND p.archived = false
+        LEFT JOIN matrix_last_sale mls ON mls.matrix_id = p.matrix_id AND mls.shop_id = i.shop_id
+        WHERE i.qty_on_hand > 0
+          AND (mls.last_sale_date IS NULL OR mls.last_sale_date < now() - (interval '1 day' * $1))
+        GROUP BY p.matrix_id, i.shop_id, mls.last_sale_date
+      ),
+      active_matrix AS (
+        SELECT matrix_id, shop_id, last_sale_date, units_sold_30d
+        FROM matrix_last_sale
+        WHERE last_sale_date >= now() - (interval '1 day' * $1)
+      ),
+      best_active AS (
+        SELECT DISTINCT ON (dm.matrix_id, dm.shop_id)
+          dm.matrix_id,
+          dm.shop_id        AS dormant_shop_id,
+          dm.last_sale_date AS dormant_last_sale,
+          dm.days_dormant,
+          am.shop_id        AS active_shop_id,
+          am.last_sale_date AS active_last_sale,
+          am.units_sold_30d
+        FROM dormant_matrix dm
+        JOIN active_matrix am ON am.matrix_id = dm.matrix_id AND am.shop_id != dm.shop_id
+        ORDER BY dm.matrix_id, dm.shop_id, am.last_sale_date DESC
       )
       SELECT
-        p.item_id,
-        p.description,
-        p.brand,
-        p.category,
-        over_stocked.shop_id             AS from_shop_id,
-        sf.name                          AS from_shop,
-        under_stocked.shop_id            AS to_shop_id,
-        st.name                          AS to_shop,
-        ROUND(over_stocked.qty_on_hand, 0)  AS from_qty_on_hand,
-        ROUND(under_stocked.qty_on_hand, 0) AS to_qty_on_hand,
-        ROUND(over_stocked.weeks_of_cover, 1)   AS from_weeks_cover,
-        ROUND(under_stocked.weeks_of_cover, 1)  AS to_weeks_cover,
-        ROUND(
-          (over_stocked.weeks_of_cover - $1) / 2
-          * over_stocked.avg_weekly_units, 0
-        ) AS suggested_transfer_qty
-      FROM cover over_stocked
-      JOIN cover under_stocked USING (item_id)
-      JOIN products p ON p.item_id = over_stocked.item_id
-      JOIN shops sf   ON sf.shop_id = over_stocked.shop_id
-      JOIN shops st   ON st.shop_id = under_stocked.shop_id
-      WHERE over_stocked.weeks_of_cover  > $1
-        AND under_stocked.weeks_of_cover < $2
-        AND over_stocked.shop_id        <> under_stocked.shop_id
-        AND p.archived = false
-      ORDER BY suggested_transfer_qty DESC
-    `, [minCover, maxCover]);
-    res.json({ min_cover: minCover, max_cover: maxCover, count: rows.length, transfers: rows });
+        p.item_id, p.description, p.manufacturer, p.category,
+        sh_d.name  AS dormant_shop,  ba.dormant_shop_id,
+        ba.dormant_last_sale,        ba.days_dormant,
+        i.qty_on_hand::int           AS qty,
+        sh_a.name  AS active_shop,   ba.active_shop_id,
+        ba.active_last_sale,         ba.units_sold_30d AS active_sold_30d
+      FROM best_active ba
+      JOIN products p  ON p.matrix_id = ba.matrix_id AND p.archived = false
+      JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = ba.dormant_shop_id
+        AND i.qty_on_hand >= $2
+      JOIN shops sh_d ON sh_d.shop_id = ba.dormant_shop_id
+      JOIN shops sh_a ON sh_a.shop_id = ba.active_shop_id
+      WHERE NOT (p.default_cost = 0 AND p.default_price = 0)
+        AND p.description NOT ILIKE '%shopify%'
+      ORDER BY ba.days_dormant DESC, p.manufacturer, p.description
+    `, [daysDormant, minStock]);
+
+    res.json({ days_dormant: daysDormant, min_stock: minStock, count: rows.length, transfers: rows });
   } catch (err) { next(err); }
 });
 
