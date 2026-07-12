@@ -386,6 +386,9 @@
           class="w-14 border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-center">
         unité(s)
       </label>
+      <select id="transfersShopFilter" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">Toutes les boutiques</option>
+      </select>
       <select id="transfersCatFilter" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
         <option value="">Toutes les catégories</option>
       </select>
@@ -1898,6 +1901,7 @@ var TransfersTab = (function() {
   var transfersData = [];
   var expandedGroups = new Set(); // key = matrix_id + '|' + dormant_shop_id
   var catLoaded = false;
+  var shopLoaded = false;
 
   function dormantLabel(days) {
     if (days == null) return '<span class="text-gray-400 italic">Jamais (90j+)</span>';
@@ -1930,10 +1934,10 @@ var TransfersTab = (function() {
     return Object.values(groups);
   }
 
-  function render() {
+  function render(groups) {
     var body  = document.getElementById('transfersBody');
     var empty = document.getElementById('transfersEmpty');
-    var groups = groupData(transfersData);
+    if (!groups) groups = groupData(transfersData);
 
     if (groups.length === 0) {
       body.innerHTML = '';
@@ -1979,7 +1983,9 @@ var TransfersTab = (function() {
         var key = this.dataset.key;
         if (expandedGroups.has(key)) expandedGroups.delete(key);
         else expandedGroups.add(key);
-        render();
+        var shopId = document.getElementById('transfersShopFilter').value;
+        var filtered = shopId ? transfersData.filter(function(t) { return String(t.active_shop_id) === shopId; }) : transfersData;
+        render(groupData(filtered));
       });
     });
   }
@@ -2003,7 +2009,17 @@ var TransfersTab = (function() {
       var d = await r.json();
       transfersData = d.transfers || [];
 
-      // Populate category dropdown once
+      // Populate dropdowns once from loaded data
+      if (!shopLoaded && transfersData.length) {
+        var shops = [...new Set(transfersData.map(function(t) { return JSON.stringify({ id: t.active_shop_id, name: t.active_shop }); }))]
+          .map(function(s) { return JSON.parse(s); })
+          .sort(function(a, b) { return a.name.localeCompare(b.name); });
+        var selS = document.getElementById('transfersShopFilter');
+        shops.forEach(function(s) {
+          var opt = document.createElement('option'); opt.value = s.id; opt.textContent = s.name; selS.appendChild(opt);
+        });
+        shopLoaded = true;
+      }
       if (!catLoaded && transfersData.length) {
         var cats = [...new Set(transfersData.map(function(t) { return t.category; }).filter(Boolean))].sort();
         var sel = document.getElementById('transfersCatFilter');
@@ -2013,10 +2029,16 @@ var TransfersTab = (function() {
         catLoaded = true;
       }
 
-      var groups = groupData(transfersData);
+      // Client-side shop filter
+      var shopId = document.getElementById('transfersShopFilter').value;
+      var filtered = shopId
+        ? transfersData.filter(function(t) { return String(t.active_shop_id) === shopId; })
+        : transfersData;
+
+      var groups = groupData(filtered);
       document.getElementById('transfersCount').textContent =
-        groups.length > 0 ? groups.length + ' modèle' + (groups.length > 1 ? 's' : '') + ' recommandé' + (groups.length > 1 ? 's' : '') + ' (' + transfersData.length + ' variante' + (transfersData.length > 1 ? 's' : '') + ')' : '';
-      render();
+        groups.length > 0 ? groups.length + ' modèle' + (groups.length > 1 ? 's' : '') + ' recommandé' + (groups.length > 1 ? 's' : '') + ' (' + filtered.length + ' variante' + (filtered.length > 1 ? 's' : '') + ')' : '';
+      render(groups);
     } catch (e) {
       document.getElementById('transfersBody').innerHTML =
         '<tr><td colspan="9" class="text-center py-8 text-red-500">' + e.message + '</td></tr>';
@@ -2026,6 +2048,18 @@ var TransfersTab = (function() {
 
   function init() {
     document.getElementById('transfersApplyBtn').addEventListener('click', load);
+    document.getElementById('transfersShopFilter').addEventListener('change', function() {
+      if (!transfersData.length) return;
+      var shopId = this.value;
+      var filtered = shopId
+        ? transfersData.filter(function(t) { return String(t.active_shop_id) === shopId; })
+        : transfersData;
+      var groups = groupData(filtered);
+      document.getElementById('transfersCount').textContent =
+        groups.length > 0 ? groups.length + ' modèle' + (groups.length > 1 ? 's' : '') + ' recommandé' + (groups.length > 1 ? 's' : '') + ' (' + filtered.length + ' variante' + (filtered.length > 1 ? 's' : '') + ')' : '';
+      expandedGroups.clear();
+      render(groups);
+    });
   }
 
   return { load: load, init: init };
