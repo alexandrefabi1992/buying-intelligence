@@ -1949,7 +1949,7 @@ var TransfersTab = (function() {
       var nTailles  = g.items.length;
       html += '<tr class="tr-group cursor-pointer hover:bg-amber-50 transition-colors" data-key="' + g.key + '">' +
         '<td class="px-3 py-2 text-gray-400 text-center">' + (isOpen ? '▾' : '▸') + '</td>' +
-        '<td class="px-3 py-2 font-medium max-w-[180px] truncate" title="' + modelName + '">' + modelName +
+        '<td class="px-3 py-2 font-medium max-w-[320px] truncate" title="' + modelName + '">' + modelName +
           (nTailles > 1 ? ' <span class="text-gray-400 font-normal">+' + (nTailles - 1) + ' taille' + (nTailles > 2 ? 's' : '') + '</span>' : '') + '</td>' +
         '<td class="px-3 py-2 text-gray-600">' + escHtml(g.manufacturer) + '</td>' +
         '<td class="px-3 py-2 text-gray-500 max-w-[130px] truncate" title="' + escHtml(g.category) + '">' + escHtml(g.category) + '</td>' +
@@ -1964,7 +1964,7 @@ var TransfersTab = (function() {
         g.items.forEach(function(item) {
           html += '<tr class="bg-gray-50 text-gray-500">' +
             '<td></td>' +
-            '<td class="px-3 py-1.5 pl-8 max-w-[180px] truncate" title="' + escHtml(item.description) + '">' + escHtml(item.description) + '</td>' +
+            '<td class="px-3 py-1.5 pl-8 max-w-[320px] truncate" title="' + escHtml(item.description) + '">' + escHtml(item.description) + '</td>' +
             '<td colspan="4"></td>' +
             '<td class="px-3 py-1.5 text-right font-semibold text-gray-700">' + item.qty + ' unité' + (item.qty > 1 ? 's' : '') + '</td>' +
             '<td colspan="2"></td>' +
