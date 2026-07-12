@@ -1966,9 +1966,10 @@ var TransfersTab = (function() {
 
       if (isOpen) {
         g.items.forEach(function(item) {
+          var sizeLabel = item.size ? '<span class="inline-block bg-gray-200 text-gray-700 rounded px-1.5 py-0.5 text-[10px] font-semibold mr-1">' + escHtml(item.size) + '</span>' : '';
           html += '<tr class="bg-gray-50 text-gray-500">' +
             '<td></td>' +
-            '<td class="px-3 py-1.5 pl-8 max-w-[320px] truncate" title="' + escHtml(item.description) + '">' + escHtml(item.description) + '</td>' +
+            '<td class="px-3 py-1.5 pl-8 max-w-[320px] truncate" title="' + escHtml(item.description) + '">' + sizeLabel + escHtml(item.description) + '</td>' +
             '<td colspan="4"></td>' +
             '<td class="px-3 py-1.5 text-right font-semibold text-gray-700">' + item.qty + ' unité' + (item.qty > 1 ? 's' : '') + '</td>' +
             '<td colspan="2"></td>' +

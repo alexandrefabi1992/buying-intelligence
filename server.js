@@ -669,6 +669,11 @@ app.get('/api/transfers', async (req, res, next) => {
       SELECT
         p.item_id, p.description, p.manufacturer, p.category,
         p.matrix_id,
+        COALESCE(
+          CASE WHEN p.raw->'ItemAttributes'->>'attribute1' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute1' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute1' END,
+          CASE WHEN p.raw->'ItemAttributes'->>'attribute2' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute2' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute2' END,
+          CASE WHEN p.raw->'ItemAttributes'->>'attribute3' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute3' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute3' END
+        ) AS size,
         sh_d.name  AS dormant_shop,  ba.dormant_shop_id,
         ba.dormant_last_sale,        ba.days_dormant,
         i.qty_on_hand::int           AS qty,
