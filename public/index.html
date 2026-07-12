@@ -372,27 +372,45 @@
 
   <!-- ── TRANSFERS ──────────────────────────────────────────────── -->
   <section id="tab-transfers" class="hidden">
-    <div class="flex flex-wrap items-end gap-4 mb-4">
-      <div id="transfersCount" class="text-xs text-gray-500"></div>
+    <!-- Paramètres -->
+    <div class="flex flex-wrap items-end gap-3 mb-4">
+      <label class="flex items-center gap-1.5 text-xs text-gray-600" title="Nombre de jours sans vente sur la matrice complète pour considérer le stock comme dormant">
+        Inactif depuis
+        <input id="transfersDays" type="number" min="1" max="365" value="14"
+          class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-center">
+        jours
+      </label>
+      <label class="flex items-center gap-1.5 text-xs text-gray-600" title="Stock minimum (unités) pour déclencher une recommandation">
+        Stock min.
+        <input id="transfersMinStock" type="number" min="1" max="99" value="1"
+          class="w-14 border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-center">
+        unité(s)
+      </label>
+      <button id="transfersApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Appliquer</button>
+      <span id="transfersCount" class="text-xs text-gray-500 ml-auto"></span>
     </div>
+    <!-- Tableau -->
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-xs">
           <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
             <tr>
-              <th class="px-3 py-2 text-left"  data-i18n="col_description">Description</th>
-              <th class="px-3 py-2 text-left"  data-i18n="transfers_col_from">De</th>
-              <th class="px-3 py-2 text-left"  data-i18n="transfers_col_to">Vers</th>
-              <th class="px-3 py-2 text-right" data-i18n="transfers_col_qty">Qté à transférer</th>
+              <th class="px-3 py-2 text-left">Article</th>
+              <th class="px-3 py-2 text-left">Marque</th>
+              <th class="px-3 py-2 text-left">Catégorie</th>
+              <th class="px-3 py-2 text-left" title="Boutique avec stock dormant — aucune vente depuis X jours">Stock dort chez</th>
+              <th class="px-3 py-2 text-right" title="Unités disponibles à transférer">Qté</th>
+              <th class="px-3 py-2 text-right" title="Nombre de jours sans vente sur ce modèle dans cette boutique">Inactif depuis</th>
+              <th class="px-3 py-2 text-left" title="Boutique qui a vendu ce modèle récemment">Actif chez</th>
+              <th class="px-3 py-2 text-right" title="Unités vendues dans les 30 derniers jours dans la boutique active">Vendu (30j)</th>
             </tr>
           </thead>
           <tbody id="transfersBody" class="divide-y divide-gray-100"></tbody>
         </table>
       </div>
       <div id="transfersLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
-      <div id="transfersEmpty" class="hidden text-center text-gray-400 py-12"
-           data-i18n="transfers_empty">
-        Aucun transfert recommandé pour le moment.
+      <div id="transfersEmpty" class="hidden text-center text-gray-400 py-12">
+        Aucun transfert recommandé avec ces paramètres.
       </div>
     </div>
   </section>
@@ -1867,35 +1885,56 @@ var SizesTab = (function() {
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TransfersTab — Transferts / Actions (tab-transfers)
+// TransfersTab — Stock dormant / transferts recommandés
 // ─────────────────────────────────────────────────────────────────────────────
 const TransfersTab = (() => {
+  function daysSince(dateStr) {
+    if (!dateStr) return '—';
+    var d = Math.round((Date.now() - new Date(dateStr)) / 86400000);
+    return d + 'j';
+  }
+
   async function load() {
     showLoader('transfers', true);
+    document.getElementById('transfersEmpty').classList.add('hidden');
+    document.getElementById('transfersBody').innerHTML = '';
+    var days     = parseInt(document.getElementById('transfersDays').value)    || 14;
+    var minStock = parseInt(document.getElementById('transfersMinStock').value) || 1;
     try {
-      const r = await fetch(`${BASE}/api/transfers`);
-      const d = await r.json();
-      document.getElementById('transfersCount').textContent = d.count > 0 ? t('transfers_count')(d.count) : '';
+      var r = await fetch(BASE + '/api/transfers?days_dormant=' + days + '&min_stock=' + minStock);
+      var d = await r.json();
+      document.getElementById('transfersCount').textContent =
+        d.count > 0 ? d.count + ' transfert' + (d.count > 1 ? 's' : '') + ' recommandé' + (d.count > 1 ? 's' : '') : '';
       if (d.count === 0) {
         document.getElementById('transfersEmpty').classList.remove('hidden');
-        document.getElementById('transfersBody').innerHTML = '';
       } else {
-        document.getElementById('transfersEmpty').classList.add('hidden');
-        document.getElementById('transfersBody').innerHTML = d.transfers.map(tr => `
-          <tr class="transition-colors">
-            <td class="px-3 py-2 max-w-xs truncate">${escHtml(tr.description)}</td>
-            <td class="px-3 py-2 text-gray-500">${tr.from_shop}</td>
-            <td class="px-3 py-2 text-gray-500">${tr.to_shop}</td>
-            <td class="px-3 py-2 text-right font-semibold text-blue-700">${fmt(tr.qty)}</td>
-          </tr>`).join('');
+        document.getElementById('transfersBody').innerHTML = d.transfers.map(function(tr) {
+          var dormantDays = tr.days_dormant != null ? tr.days_dormant + 'j' : '—';
+          var lastActive  = tr.active_last_sale ? new Date(tr.active_last_sale).toLocaleDateString('fr-CA') : '—';
+          return '<tr class="hover:bg-gray-50 transition-colors">' +
+            '<td class="px-3 py-2 max-w-[200px] truncate" title="' + escHtml(tr.description) + '">' + escHtml(tr.description) + '</td>' +
+            '<td class="px-3 py-2 text-gray-600">' + escHtml(tr.manufacturer || '—') + '</td>' +
+            '<td class="px-3 py-2 text-gray-500 max-w-[140px] truncate" title="' + escHtml(tr.category || '') + '">' + escHtml(tr.category || '—') + '</td>' +
+            '<td class="px-3 py-2 text-amber-700 font-medium">' + escHtml(tr.dormant_shop) + '</td>' +
+            '<td class="px-3 py-2 text-right font-semibold">' + tr.qty + '</td>' +
+            '<td class="px-3 py-2 text-right text-red-600 font-semibold">' + dormantDays + '</td>' +
+            '<td class="px-3 py-2 text-green-700 font-medium">' + escHtml(tr.active_shop) + '</td>' +
+            '<td class="px-3 py-2 text-right text-green-700">' + (tr.active_sold_30d || 0) + '</td>' +
+            '</tr>';
+        }).join('');
       }
     } catch (e) {
-      document.getElementById('transfersBody').innerHTML = `<tr><td colspan="4" class="text-center py-8 text-red-500">${e.message}</td></tr>`;
+      document.getElementById('transfersBody').innerHTML =
+        '<tr><td colspan="8" class="text-center py-8 text-red-500">' + e.message + '</td></tr>';
     }
     showLoader('transfers', false);
   }
 
-  return { load };
+  function init() {
+    document.getElementById('transfersApplyBtn').addEventListener('click', load);
+  }
+
+  return { load: load, init: init };
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2986,6 +3025,7 @@ Promise.all([loadTiers(), ParamsTab.loadBudgetParams()]).then(() => {
 
   SizesTab.init();
   PlanTab.init();
+  TransfersTab.init();
   loadSyncStatus();
   tabLoaded['budget'] = true;
   // Apply saved language (updates static elements + button styling)
