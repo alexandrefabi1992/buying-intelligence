@@ -4218,7 +4218,7 @@ app.get('/api/velocity/articles', async (req, res, next) => {
         COALESCE(cs.stock, 0)::float8                                          AS current_stock,
         (COALESCE(ia.u_total,0) + COALESCE(cs.stock,0))::float8               AS initial_stock,
         ROUND((COALESCE(ia.u_total,0) / NULLIF(COALESCE(ia.u_total,0)+COALESCE(cs.stock,0),0))::numeric,3)::float8 AS st_final,
-        ROUND(COALESCE(ia.u_fp,0) / NULLIF(COALESCE(ia.u_gross,0),0),3)::float8 AS fp_pct,
+        ROUND((COALESCE(ia.u_fp,0) / NULLIF(COALESCE(ia.u_gross,0),0))::numeric,3)::float8 AS fp_pct,
         CASE WHEN COALESCE(cs.stock,0) = 0 THEN ia.last_sale_dt END           AS sellout_date,
         CASE WHEN COALESCE(cs.stock,0) = 0 AND ia.last_sale_dt IS NOT NULL
              THEN GREATEST(1, CEIL((ia.last_sale_dt::date - '${season.from}'::date + 1) / 7.0))::int
