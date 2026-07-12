@@ -373,35 +373,42 @@
   <!-- ── TRANSFERS ──────────────────────────────────────────────── -->
   <section id="tab-transfers" class="hidden">
     <!-- Paramètres -->
-    <div class="flex flex-wrap items-end gap-3 mb-4">
-      <label class="flex items-center gap-1.5 text-xs text-gray-600" title="Nombre de jours sans vente sur la matrice complète pour considérer le stock comme dormant">
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <label class="flex items-center gap-1.5 text-xs text-gray-600" title="Aucune vente sur le modèle complet (toutes tailles) depuis N jours dans la boutique = stock dormant">
         Inactif depuis
         <input id="transfersDays" type="number" min="1" max="365" value="14"
           class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-center">
         jours
       </label>
-      <label class="flex items-center gap-1.5 text-xs text-gray-600" title="Stock minimum (unités) pour déclencher une recommandation">
+      <label class="flex items-center gap-1.5 text-xs text-gray-600" title="Nombre minimum d'unités en stock pour déclencher une recommandation">
         Stock min.
         <input id="transfersMinStock" type="number" min="1" max="99" value="1"
           class="w-14 border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-center">
         unité(s)
       </label>
+      <select id="transfersCatFilter" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
+        <option value="">Toutes les catégories</option>
+      </select>
+      <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+        <input type="checkbox" id="transfersExcludeNos" class="rounded"> Exclure NOS
+      </label>
       <button id="transfersApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Appliquer</button>
       <span id="transfersCount" class="text-xs text-gray-500 ml-auto"></span>
     </div>
-    <!-- Tableau -->
+    <!-- Tableau accordéon -->
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-xs">
-          <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+          <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide select-none">
             <tr>
-              <th class="px-3 py-2 text-left">Article</th>
+              <th class="px-3 py-2 w-6"></th>
+              <th class="px-3 py-2 text-left">Modèle</th>
               <th class="px-3 py-2 text-left">Marque</th>
               <th class="px-3 py-2 text-left">Catégorie</th>
-              <th class="px-3 py-2 text-left" title="Boutique avec stock dormant — aucune vente depuis X jours">Stock dort chez</th>
-              <th class="px-3 py-2 text-right" title="Unités disponibles à transférer">Qté</th>
-              <th class="px-3 py-2 text-right" title="Nombre de jours sans vente sur ce modèle dans cette boutique">Inactif depuis</th>
-              <th class="px-3 py-2 text-left" title="Boutique qui a vendu ce modèle récemment">Actif chez</th>
+              <th class="px-3 py-2 text-left" title="Boutique avec stock dormant — n'a pas vendu ce modèle depuis X jours">Stock dort chez</th>
+              <th class="px-3 py-2 text-right" title="Total des unités disponibles à transférer">Qté</th>
+              <th class="px-3 py-2 text-right" title="Jours sans vente sur ce modèle dans la boutique dormante. «Jamais» = aucune vente dans les 90 derniers jours.">Inactif depuis</th>
+              <th class="px-3 py-2 text-left" title="Boutique qui a vendu ce modèle dans les X derniers jours">Actif chez</th>
               <th class="px-3 py-2 text-right" title="Unités vendues dans les 30 derniers jours dans la boutique active">Vendu (30j)</th>
             </tr>
           </thead>
@@ -1885,47 +1892,134 @@ var SizesTab = (function() {
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TransfersTab — Stock dormant / transferts recommandés
+// TransfersTab — Stock dormant / transferts recommandés (accordéon par modèle)
 // ─────────────────────────────────────────────────────────────────────────────
-const TransfersTab = (() => {
-  function daysSince(dateStr) {
-    if (!dateStr) return '—';
-    var d = Math.round((Date.now() - new Date(dateStr)) / 86400000);
-    return d + 'j';
+var TransfersTab = (function() {
+  var transfersData = [];
+  var expandedGroups = new Set(); // key = matrix_id + '|' + dormant_shop_id
+  var catLoaded = false;
+
+  function dormantLabel(days) {
+    if (days == null) return '<span class="text-gray-400 italic">Jamais (90j+)</span>';
+    return '<span class="text-red-600 font-semibold">' + days + 'j</span>';
+  }
+
+  function groupData(rows) {
+    var groups = {};
+    rows.forEach(function(r) {
+      var key = r.matrix_id + '|' + r.dormant_shop_id;
+      if (!groups[key]) {
+        groups[key] = {
+          key: key,
+          matrix_id: r.matrix_id,
+          manufacturer: r.manufacturer || '—',
+          category: r.category || '—',
+          dormant_shop: r.dormant_shop,
+          dormant_shop_id: r.dormant_shop_id,
+          dormant_last_sale: r.dormant_last_sale,
+          days_dormant: r.days_dormant,
+          active_shop: r.active_shop,
+          active_sold_30d: r.active_sold_30d,
+          total_qty: 0,
+          items: []
+        };
+      }
+      groups[key].total_qty += r.qty;
+      groups[key].items.push(r);
+    });
+    return Object.values(groups);
+  }
+
+  function render() {
+    var body  = document.getElementById('transfersBody');
+    var empty = document.getElementById('transfersEmpty');
+    var groups = groupData(transfersData);
+
+    if (groups.length === 0) {
+      body.innerHTML = '';
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+
+    var html = '';
+    groups.forEach(function(g) {
+      var isOpen = expandedGroups.has(g.key);
+      var modelName = g.items[0] ? escHtml(g.items[0].description) : '—';
+      var nTailles  = g.items.length;
+      html += '<tr class="tr-group cursor-pointer hover:bg-amber-50 transition-colors" data-key="' + g.key + '">' +
+        '<td class="px-3 py-2 text-gray-400 text-center">' + (isOpen ? '▾' : '▸') + '</td>' +
+        '<td class="px-3 py-2 font-medium max-w-[180px] truncate" title="' + modelName + '">' + modelName +
+          (nTailles > 1 ? ' <span class="text-gray-400 font-normal">+' + (nTailles - 1) + ' taille' + (nTailles > 2 ? 's' : '') + '</span>' : '') + '</td>' +
+        '<td class="px-3 py-2 text-gray-600">' + escHtml(g.manufacturer) + '</td>' +
+        '<td class="px-3 py-2 text-gray-500 max-w-[130px] truncate" title="' + escHtml(g.category) + '">' + escHtml(g.category) + '</td>' +
+        '<td class="px-3 py-2 text-amber-700 font-medium">' + escHtml(g.dormant_shop) + '</td>' +
+        '<td class="px-3 py-2 text-right font-semibold">' + g.total_qty + '</td>' +
+        '<td class="px-3 py-2 text-right">' + dormantLabel(g.days_dormant) + '</td>' +
+        '<td class="px-3 py-2 text-green-700 font-medium">' + escHtml(g.active_shop) + '</td>' +
+        '<td class="px-3 py-2 text-right text-green-700">' + (g.active_sold_30d || 0) + '</td>' +
+        '</tr>';
+
+      if (isOpen) {
+        g.items.forEach(function(item) {
+          html += '<tr class="bg-gray-50 text-gray-500">' +
+            '<td></td>' +
+            '<td class="px-3 py-1.5 pl-8 max-w-[180px] truncate" title="' + escHtml(item.description) + '">' + escHtml(item.description) + '</td>' +
+            '<td colspan="4"></td>' +
+            '<td class="px-3 py-1.5 text-right font-semibold text-gray-700">' + item.qty + ' unité' + (item.qty > 1 ? 's' : '') + '</td>' +
+            '<td colspan="2"></td>' +
+            '</tr>';
+        });
+      }
+    });
+    body.innerHTML = html;
+
+    body.querySelectorAll('.tr-group').forEach(function(tr) {
+      tr.addEventListener('click', function() {
+        var key = this.dataset.key;
+        if (expandedGroups.has(key)) expandedGroups.delete(key);
+        else expandedGroups.add(key);
+        render();
+      });
+    });
   }
 
   async function load() {
     showLoader('transfers', true);
     document.getElementById('transfersEmpty').classList.add('hidden');
     document.getElementById('transfersBody').innerHTML = '';
-    var days     = parseInt(document.getElementById('transfersDays').value)    || 14;
-    var minStock = parseInt(document.getElementById('transfersMinStock').value) || 1;
+    expandedGroups.clear();
+
+    var days       = parseInt(document.getElementById('transfersDays').value) || 14;
+    var minStock   = parseInt(document.getElementById('transfersMinStock').value) || 1;
+    var cat        = document.getElementById('transfersCatFilter').value;
+    var excludeNos = document.getElementById('transfersExcludeNos').checked;
+    var p = new URLSearchParams({ days_dormant: days, min_stock: minStock });
+    if (cat) p.set('category', cat);
+    if (excludeNos) p.set('exclude_nos', '1');
+
     try {
-      var r = await fetch(BASE + '/api/transfers?days_dormant=' + days + '&min_stock=' + minStock);
+      var r = await fetch(BASE + '/api/transfers?' + p.toString());
       var d = await r.json();
-      document.getElementById('transfersCount').textContent =
-        d.count > 0 ? d.count + ' transfert' + (d.count > 1 ? 's' : '') + ' recommandé' + (d.count > 1 ? 's' : '') : '';
-      if (d.count === 0) {
-        document.getElementById('transfersEmpty').classList.remove('hidden');
-      } else {
-        document.getElementById('transfersBody').innerHTML = d.transfers.map(function(tr) {
-          var dormantDays = tr.days_dormant != null ? tr.days_dormant + 'j' : '—';
-          var lastActive  = tr.active_last_sale ? new Date(tr.active_last_sale).toLocaleDateString('fr-CA') : '—';
-          return '<tr class="hover:bg-gray-50 transition-colors">' +
-            '<td class="px-3 py-2 max-w-[200px] truncate" title="' + escHtml(tr.description) + '">' + escHtml(tr.description) + '</td>' +
-            '<td class="px-3 py-2 text-gray-600">' + escHtml(tr.manufacturer || '—') + '</td>' +
-            '<td class="px-3 py-2 text-gray-500 max-w-[140px] truncate" title="' + escHtml(tr.category || '') + '">' + escHtml(tr.category || '—') + '</td>' +
-            '<td class="px-3 py-2 text-amber-700 font-medium">' + escHtml(tr.dormant_shop) + '</td>' +
-            '<td class="px-3 py-2 text-right font-semibold">' + tr.qty + '</td>' +
-            '<td class="px-3 py-2 text-right text-red-600 font-semibold">' + dormantDays + '</td>' +
-            '<td class="px-3 py-2 text-green-700 font-medium">' + escHtml(tr.active_shop) + '</td>' +
-            '<td class="px-3 py-2 text-right text-green-700">' + (tr.active_sold_30d || 0) + '</td>' +
-            '</tr>';
-        }).join('');
+      transfersData = d.transfers || [];
+
+      // Populate category dropdown once
+      if (!catLoaded && transfersData.length) {
+        var cats = [...new Set(transfersData.map(function(t) { return t.category; }).filter(Boolean))].sort();
+        var sel = document.getElementById('transfersCatFilter');
+        cats.forEach(function(c) {
+          var opt = document.createElement('option'); opt.value = c; opt.textContent = c; sel.appendChild(opt);
+        });
+        catLoaded = true;
       }
+
+      var groups = groupData(transfersData);
+      document.getElementById('transfersCount').textContent =
+        groups.length > 0 ? groups.length + ' modèle' + (groups.length > 1 ? 's' : '') + ' recommandé' + (groups.length > 1 ? 's' : '') + ' (' + transfersData.length + ' variante' + (transfersData.length > 1 ? 's' : '') + ')' : '';
+      render();
     } catch (e) {
       document.getElementById('transfersBody').innerHTML =
-        '<tr><td colspan="8" class="text-center py-8 text-red-500">' + e.message + '</td></tr>';
+        '<tr><td colspan="9" class="text-center py-8 text-red-500">' + e.message + '</td></tr>';
     }
     showLoader('transfers', false);
   }

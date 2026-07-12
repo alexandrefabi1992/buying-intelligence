@@ -593,16 +593,23 @@ app.get('/api/nos', async (req, res, next) => {
 
 // ---------------------------------------------------------------------------
 // /api/transfers — Sleeping stock transfer recommendations
-// Logic: matrix with no sales in X days at shop A (dormant) but sold recently at shop B (active)
-// -> recommend transferring specific items (exact size/color) from A to B
+// Only shops that have EVER sold this matrix are considered dormant candidates
+// active_sold_30d >= 1 required to avoid false positives from returns
 // ---------------------------------------------------------------------------
 app.get('/api/transfers', async (req, res, next) => {
   try {
     const daysDormant = parseInt(req.query.days_dormant ?? '14', 10);
     const minStock    = parseInt(req.query.min_stock    ?? '1',  10);
+    const params      = [daysDormant, minStock];
+
+    const nosFilter = req.query.exclude_nos === '1'
+      ? "AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')" : '';
+    let catFilter = '';
+    if (req.query.category) { params.push(req.query.category); catFilter = `AND p.category = $${params.length}`; }
 
     const { rows } = await pool.query(`
       WITH
+      -- Matrix-level sales: last 90d window for dormant/active detection
       matrix_last_sale AS (
         SELECT p.matrix_id, sl.shop_id,
           MAX(sl.completed_time)                                              AS last_sale_date,
@@ -615,23 +622,37 @@ app.get('/api/transfers', async (req, res, next) => {
           AND p.matrix_id IS NOT NULL AND p.archived = false
         GROUP BY p.matrix_id, sl.shop_id
       ),
+      -- Shops that have EVER sold this matrix (last 3 years) — filters out shops that never carried it
+      matrix_ever_sold AS (
+        SELECT DISTINCT p.matrix_id, sl.shop_id
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE sl.completed_time >= now() - interval '3 years'
+          AND p.matrix_id IS NOT NULL AND p.archived = false
+      ),
+      -- Dormant: has stock + no sale in X days + shop has EVER sold this matrix
       dormant_matrix AS (
         SELECT DISTINCT p.matrix_id, i.shop_id,
           mls.last_sale_date,
-          EXTRACT(DAY FROM now() - COALESCE(mls.last_sale_date, now() - interval '999 days'))::int AS days_dormant
+          CASE WHEN mls.last_sale_date IS NULL THEN NULL
+               ELSE EXTRACT(DAY FROM now() - mls.last_sale_date)::int END   AS days_dormant
         FROM inventory i
         JOIN products p ON p.item_id = i.item_id
           AND p.matrix_id IS NOT NULL AND p.archived = false
+        JOIN matrix_ever_sold mes ON mes.matrix_id = p.matrix_id AND mes.shop_id = i.shop_id
         LEFT JOIN matrix_last_sale mls ON mls.matrix_id = p.matrix_id AND mls.shop_id = i.shop_id
         WHERE i.qty_on_hand > 0
           AND (mls.last_sale_date IS NULL OR mls.last_sale_date < now() - (interval '1 day' * $1))
         GROUP BY p.matrix_id, i.shop_id, mls.last_sale_date
       ),
+      -- Active: sold in last X days AND units_sold_30d >= 1 (excludes returns/cancellations)
       active_matrix AS (
         SELECT matrix_id, shop_id, last_sale_date, units_sold_30d
         FROM matrix_last_sale
         WHERE last_sale_date >= now() - (interval '1 day' * $1)
+          AND units_sold_30d >= 1
       ),
+      -- Best active shop per (matrix, dormant_shop): most recently sold
       best_active AS (
         SELECT DISTINCT ON (dm.matrix_id, dm.shop_id)
           dm.matrix_id,
@@ -647,6 +668,7 @@ app.get('/api/transfers', async (req, res, next) => {
       )
       SELECT
         p.item_id, p.description, p.manufacturer, p.category,
+        p.matrix_id,
         sh_d.name  AS dormant_shop,  ba.dormant_shop_id,
         ba.dormant_last_sale,        ba.days_dormant,
         i.qty_on_hand::int           AS qty,
@@ -660,11 +682,13 @@ app.get('/api/transfers', async (req, res, next) => {
       JOIN shops sh_a ON sh_a.shop_id = ba.active_shop_id
       WHERE NOT (p.default_cost = 0 AND p.default_price = 0)
         AND p.description NOT ILIKE '%shopify%'
-      ORDER BY ba.days_dormant DESC, p.manufacturer, p.description
-    `, [daysDormant, minStock]);
+        ${nosFilter} ${catFilter}
+      ORDER BY ba.days_dormant ASC NULLS LAST, p.manufacturer, p.matrix_id, p.description
+    `, params);
 
     res.json({ days_dormant: daysDormant, min_stock: minStock, count: rows.length, transfers: rows });
   } catch (err) { next(err); }
+});
 });
 
 
