@@ -645,11 +645,11 @@ app.get('/api/transfers', async (req, res, next) => {
           AND (mls.last_sale_date IS NULL OR mls.last_sale_date < now() - (interval '1 day' * $1))
         GROUP BY p.matrix_id, i.shop_id, mls.last_sale_date
       ),
-      -- Active: sold in last X days AND units_sold_30d >= 1 (excludes returns/cancellations)
+      -- Active: sold in last 30 days (fixed window, independent of dormant threshold)
       active_matrix AS (
         SELECT matrix_id, shop_id, last_sale_date, units_sold_30d
         FROM matrix_last_sale
-        WHERE last_sale_date >= now() - (interval '1 day' * $1)
+        WHERE last_sale_date >= now() - interval '30 days'
           AND units_sold_30d >= 1
       ),
       -- Specific items (exact size+color) ever sold at each shop (last 3 years)
