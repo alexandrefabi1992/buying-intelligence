@@ -4053,15 +4053,15 @@ app.get('/api/velocity/brands', async (req, res, next) => {
       SELECT
         manufacturer,
         COUNT(DISTINCT item_id)::int                                            AS items_count,
-        ROUND(SUM(initial_stock), 0)::float8                                   AS initial_stock,
-        ROUND(SUM(u_total), 0)::float8                                         AS units_sold,
-        ROUND(SUM(current_stock), 0)::float8                                   AS current_stock,
-        ROUND(SUM(u_s4)   / NULLIF(SUM(initial_stock), 0), 3)::float8         AS st_s4,
-        ROUND(SUM(u_s7)   / NULLIF(SUM(initial_stock), 0), 3)::float8         AS st_s7,
-        ROUND(SUM(u_s10)  / NULLIF(SUM(initial_stock), 0), 3)::float8         AS st_s10,
-        ROUND(SUM(u_s14)  / NULLIF(SUM(initial_stock), 0), 3)::float8         AS st_s14,
-        ROUND(SUM(u_total)/ NULLIF(SUM(initial_stock), 0), 3)::float8         AS st_final,
-        ROUND(SUM(u_fp)   / NULLIF(SUM(u_gross), 0), 3)::float8               AS fp_pct
+        ROUND(SUM(initial_stock)::numeric, 0)::float8                          AS initial_stock,
+        ROUND(SUM(u_total)::numeric, 0)::float8                               AS units_sold,
+        ROUND(SUM(current_stock)::numeric, 0)::float8                         AS current_stock,
+        ROUND((SUM(u_s4)   / NULLIF(SUM(initial_stock), 0))::numeric, 3)::float8 AS st_s4,
+        ROUND((SUM(u_s7)   / NULLIF(SUM(initial_stock), 0))::numeric, 3)::float8 AS st_s7,
+        ROUND((SUM(u_s10)  / NULLIF(SUM(initial_stock), 0))::numeric, 3)::float8 AS st_s10,
+        ROUND((SUM(u_s14)  / NULLIF(SUM(initial_stock), 0))::numeric, 3)::float8 AS st_s14,
+        ROUND((SUM(u_total)/ NULLIF(SUM(initial_stock), 0))::numeric, 3)::float8 AS st_final,
+        ROUND((SUM(u_fp)   / NULLIF(SUM(u_gross), 0))::numeric, 3)::float8   AS fp_pct
       FROM item_full
       WHERE initial_stock > 0
       GROUP BY manufacturer
@@ -4108,15 +4108,15 @@ app.get('/api/velocity/matrices', async (req, res, next) => {
         )                                                                        AS matrix_name,
         MAX(p2.image_url)                                                        AS image_url,
         COUNT(DISTINCT f.item_id)::int                                           AS items_count,
-        ROUND(SUM(f.initial_stock), 0)::float8                                  AS initial_stock,
-        ROUND(SUM(f.u_total), 0)::float8                                        AS units_sold,
-        ROUND(SUM(f.current_stock), 0)::float8                                  AS current_stock,
-        ROUND(SUM(f.u_s4)   / NULLIF(SUM(f.initial_stock), 0), 3)::float8      AS st_s4,
-        ROUND(SUM(f.u_s7)   / NULLIF(SUM(f.initial_stock), 0), 3)::float8      AS st_s7,
-        ROUND(SUM(f.u_s10)  / NULLIF(SUM(f.initial_stock), 0), 3)::float8      AS st_s10,
-        ROUND(SUM(f.u_s14)  / NULLIF(SUM(f.initial_stock), 0), 3)::float8      AS st_s14,
-        ROUND(SUM(f.u_total)/ NULLIF(SUM(f.initial_stock), 0), 3)::float8      AS st_final,
-        ROUND(SUM(f.u_fp)   / NULLIF(SUM(f.u_gross), 0), 3)::float8            AS fp_pct,
+        ROUND(SUM(f.initial_stock)::numeric, 0)::float8                         AS initial_stock,
+        ROUND(SUM(f.u_total)::numeric, 0)::float8                              AS units_sold,
+        ROUND(SUM(f.current_stock)::numeric, 0)::float8                        AS current_stock,
+        ROUND((SUM(f.u_s4)   / NULLIF(SUM(f.initial_stock), 0))::numeric, 3)::float8 AS st_s4,
+        ROUND((SUM(f.u_s7)   / NULLIF(SUM(f.initial_stock), 0))::numeric, 3)::float8 AS st_s7,
+        ROUND((SUM(f.u_s10)  / NULLIF(SUM(f.initial_stock), 0))::numeric, 3)::float8 AS st_s10,
+        ROUND((SUM(f.u_s14)  / NULLIF(SUM(f.initial_stock), 0))::numeric, 3)::float8 AS st_s14,
+        ROUND((SUM(f.u_total)/ NULLIF(SUM(f.initial_stock), 0))::numeric, 3)::float8 AS st_final,
+        ROUND((SUM(f.u_fp)   / NULLIF(SUM(f.u_gross), 0))::numeric, 3)::float8 AS fp_pct,
         -- Sell-out date: last positive sale if all stock is gone
         CASE WHEN SUM(f.current_stock) = 0 THEN MAX(f.last_sale_dt) END        AS sellout_date,
         CASE WHEN SUM(f.current_stock) = 0 AND MAX(f.last_sale_dt) IS NOT NULL
@@ -4217,7 +4217,7 @@ app.get('/api/velocity/articles', async (req, res, next) => {
         COALESCE(ia.u_gross,0)::float8                                         AS u_gross,
         COALESCE(cs.stock, 0)::float8                                          AS current_stock,
         (COALESCE(ia.u_total,0) + COALESCE(cs.stock,0))::float8               AS initial_stock,
-        ROUND(COALESCE(ia.u_total,0) / NULLIF(COALESCE(ia.u_total,0)+COALESCE(cs.stock,0),0),3)::float8 AS st_final,
+        ROUND((COALESCE(ia.u_total,0) / NULLIF(COALESCE(ia.u_total,0)+COALESCE(cs.stock,0),0))::numeric,3)::float8 AS st_final,
         ROUND(COALESCE(ia.u_fp,0) / NULLIF(COALESCE(ia.u_gross,0),0),3)::float8 AS fp_pct,
         CASE WHEN COALESCE(cs.stock,0) = 0 THEN ia.last_sale_dt END           AS sellout_date,
         CASE WHEN COALESCE(cs.stock,0) = 0 AND ia.last_sale_dt IS NOT NULL
