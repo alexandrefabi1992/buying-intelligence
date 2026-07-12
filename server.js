@@ -689,7 +689,6 @@ app.get('/api/transfers', async (req, res, next) => {
     res.json({ days_dormant: daysDormant, min_stock: minStock, count: rows.length, transfers: rows });
   } catch (err) { next(err); }
 });
-});
 
 
 // ---------------------------------------------------------------------------
