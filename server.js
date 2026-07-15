@@ -4287,6 +4287,146 @@ app.post('/api/admin/refresh-view', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/debug/st-breakdown — debug ST discrepancy for a brand+tag+shop
+// Query params: manufacturer, tag, shop_id
+// ---------------------------------------------------------------------------
+app.get('/api/debug/st-breakdown', async (req, res, next) => {
+  try {
+    const { manufacturer, tag, shop_id } = req.query;
+    if (!manufacturer || !tag || !shop_id) {
+      return res.status(400).json({ error: 'manufacturer, tag, shop_id required' });
+    }
+
+    const seasons = await getSeasonsConfig();
+    const s = seasons.find(x => x.tag_pattern === tag || x.code === tag);
+    if (!s) return res.status(400).json({ error: `Season not found for tag "${tag}"` });
+
+    const from = s.reception_from ?? s.sell_from;
+    const today = new Date().toISOString().slice(0, 10);
+    const to = s.sell_to < today ? s.sell_to : today;
+
+    // 1. Raw sales in date range
+    const salesRes = await pool.query(`
+      SELECT SUM(sl.qty) AS total_sold
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.completed_time BETWEEN $1 AND $2
+        AND sl.shop_id = $3
+        AND sl.qty > 0
+        AND p.manufacturer ILIKE $4
+        AND p.tags ILIKE $5
+    `, [from, to, shop_id, `%${manufacturer}%`, `%${tag}%`]);
+
+    // 2. Current stock
+    const stockRes = await pool.query(`
+      SELECT SUM(inv.qty_on_hand) AS total_stock
+      FROM inventory inv
+      JOIN products p ON p.item_id = inv.item_id AND p.archived = false
+      WHERE inv.shop_id = $1
+        AND p.manufacturer ILIKE $2
+        AND p.tags ILIKE $3
+    `, [shop_id, `%${manufacturer}%`, `%${tag}%`]);
+
+    // 3. Transfers IN (received at this shop)
+    const transInRes = await pool.query(`
+      SELECT SUM(t.qty_received) AS total_in, COUNT(DISTINCT t.item_id) AS nb_items
+      FROM transfers t
+      JOIN products p ON p.item_id = t.item_id
+      WHERE t.to_shop_id = $1
+        AND t.transfer_received = true
+        AND t.transfer_date BETWEEN $2 AND $3
+        AND p.manufacturer ILIKE $4
+        AND p.tags ILIKE $5
+    `, [shop_id, from, to, `%${manufacturer}%`, `%${tag}%`]);
+
+    // 4. Transfers OUT (sent from this shop — completed + pending)
+    const transOutRes = await pool.query(`
+      SELECT
+        SUM(CASE WHEN t.transfer_received THEN t.qty_received ELSE t.qty_sent END) AS total_out,
+        SUM(CASE WHEN t.transfer_received THEN t.qty_received ELSE 0 END) AS total_out_completed,
+        SUM(CASE WHEN NOT t.transfer_received THEN t.qty_sent ELSE 0 END) AS total_out_pending,
+        COUNT(DISTINCT t.item_id) AS nb_items
+      FROM transfers t
+      JOIN products p ON p.item_id = t.item_id
+      WHERE t.from_shop_id = $1
+        AND t.transfer_sent = true
+        AND t.transfer_date BETWEEN $2 AND $3
+        AND p.manufacturer ILIKE $4
+        AND p.tags ILIKE $5
+    `, [shop_id, from, to, `%${manufacturer}%`, `%${tag}%`]);
+
+    // 5. Items where GREATEST clips (received_supplier would be negative)
+    const clippedRes = await pool.query(`
+      WITH sales_by_item AS (
+        SELECT sl.item_id, SUM(sl.qty) AS sold
+        FROM sale_lines sl WHERE sl.completed_time BETWEEN $1 AND $2 AND sl.shop_id = $3 AND sl.qty > 0 GROUP BY sl.item_id
+      ),
+      stock_by_item AS (
+        SELECT inv.item_id, SUM(inv.qty_on_hand) AS stock
+        FROM inventory inv JOIN products px ON px.item_id = inv.item_id AND px.archived = false
+        WHERE inv.shop_id = $3 GROUP BY inv.item_id
+      ),
+      transfers_in AS (
+        SELECT t.item_id, SUM(t.qty_received) AS qty_in
+        FROM transfers t WHERE t.to_shop_id = $3 AND t.transfer_received = true AND t.transfer_date BETWEEN $1 AND $2
+        GROUP BY t.item_id
+      ),
+      transfers_out AS (
+        SELECT t.item_id, SUM(CASE WHEN t.transfer_received THEN t.qty_received ELSE t.qty_sent END) AS qty_out
+        FROM transfers t WHERE t.from_shop_id = $3 AND t.transfer_sent = true AND t.transfer_date BETWEEN $1 AND $2
+        GROUP BY t.item_id
+      )
+      SELECT
+        COUNT(*) AS nb_items_clipped,
+        SUM(ABS(COALESCE(s.sold,0) + COALESCE(st.stock,0) + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0))) AS units_lost_to_clip
+      FROM products p
+      LEFT JOIN sales_by_item s ON s.item_id = p.item_id
+      LEFT JOIN stock_by_item st ON st.item_id = p.item_id
+      LEFT JOIN transfers_in ti ON ti.item_id = p.item_id
+      LEFT JOIN transfers_out to2 ON to2.item_id = p.item_id
+      WHERE p.manufacturer ILIKE $4 AND p.tags ILIKE $5
+        AND (COALESCE(s.sold,0) + COALESCE(st.stock,0)) > 0
+        AND (COALESCE(s.sold,0) + COALESCE(st.stock,0) + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)) < 0
+    `, [from, to, shop_id, `%${manufacturer}%`, `%${tag}%`]);
+
+    const sold     = Number(salesRes.rows[0].total_sold   ?? 0);
+    const stock    = Number(stockRes.rows[0].total_stock  ?? 0);
+    const trans_in = Number(transInRes.rows[0].total_in   ?? 0);
+    const trans_out= Number(transOutRes.rows[0].total_out ?? 0);
+    const trans_out_completed = Number(transOutRes.rows[0].total_out_completed ?? 0);
+    const trans_out_pending   = Number(transOutRes.rows[0].total_out_pending   ?? 0);
+    const nb_items_clipped    = Number(clippedRes.rows[0].nb_items_clipped     ?? 0);
+    const units_lost_to_clip  = Number(clippedRes.rows[0].units_lost_to_clip   ?? 0);
+
+    const received_supplier_no_clip = sold + stock + trans_out - trans_in;
+    const received_supplier_clipped = Math.max(0, received_supplier_no_clip);
+    const lightspeed_style = sold + stock + trans_out; // Lightspeed counts trans_in as received
+
+    res.json({
+      periode: { de: from, a: to },
+      filtre: { manufacturer, tag, shop_id },
+      raw: {
+        total_sold: sold,
+        total_stock: stock,
+        transfers_in: { total: trans_in, nb_items: Number(transInRes.rows[0].nb_items) },
+        transfers_out: { total: trans_out, completed: trans_out_completed, pending: trans_out_pending, nb_items: Number(transOutRes.rows[0].nb_items) },
+      },
+      calcul: {
+        received_supplier: received_supplier_clipped,
+        received_supplier_avant_clip: received_supplier_no_clip,
+        received_lightspeed_style: lightspeed_style,
+        diff_vs_lightspeed_695: lightspeed_style - 695,
+      },
+      clipping: {
+        nb_items_clipped,
+        units_lost_to_clip,
+        note: 'Items where sold+stock+out-in < 0 — GREATEST(0,...) floors to 0, hiding these units',
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/ai/chat — AI agent endpoint
 // Body: { messages: [...] }   (OpenAI-format conversation history)
 // Returns: { content, messages }
