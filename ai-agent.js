@@ -545,7 +545,9 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
     from = d.toISOString().slice(0, 10); to = today;
   }
 
-  const prodWhere = ['p.archived = false'];
+  // No archived filter on products — archived items were still received and sold.
+  // Convention: archived = false only for inventory queries, not sales.
+  const prodWhere = [];
   const params    = [from, to]; // $1, $2
 
   if (manufacturer) { prodWhere.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
@@ -599,8 +601,8 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
       FROM products p
       LEFT JOIN sales_by_item  s  ON s.item_id  = p.item_id
       LEFT JOIN stock_by_item  st ON st.item_id = p.item_id
-      WHERE ${prodWhere.join(' AND ')}
-        AND (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)) > 0
+      WHERE ${prodWhere.length ? prodWhere.join(' AND ') + ' AND' : ''}
+        (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)) > 0
     )
     SELECT *,
       SUM(sold)  OVER () AS total_sold_all,
