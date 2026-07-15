@@ -24,6 +24,20 @@ function fmtPct(v) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: resolve shop name → numeric shop_id.
+// Accepts a numeric ID (returned as-is) or a partial name (ILIKE lookup).
+// ---------------------------------------------------------------------------
+async function resolveShopId(shop_id, pool) {
+  if (!shop_id) return null;
+  if (/^\d+$/.test(String(shop_id))) return shop_id; // already numeric
+  const { rows } = await pool.query(
+    "SELECT shop_id FROM shops WHERE name ILIKE $1 LIMIT 1",
+    [`%${shop_id}%`]
+  );
+  return rows[0]?.shop_id ?? null;
+}
+
+// ---------------------------------------------------------------------------
 // Helper: build AND conditions for tag inclusion + exclusion arrays.
 // Normalizes string → [string] so the model can pass either form.
 // ---------------------------------------------------------------------------
@@ -221,6 +235,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
 }
 
 async function toolGetStockByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id }, { pool }) {
+  shop_id = await resolveShopId(shop_id, pool);
   const conditions = ['p.archived = false'];
   const params     = [];
 
@@ -293,6 +308,7 @@ function buildSizeCondition(size, params) {
 }
 
 async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
+  shop_id = await resolveShopId(shop_id, pool);
   let from, to;
   if (period) {
     const resolved = resolvePeriod(period);
@@ -502,6 +518,7 @@ async function toolSearchBrands({ query }, { pool }) {
 }
 
 async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tags, exclude_tags, season, shop_id, sort = 'st_desc', limit = 50 }, { pool, getSeasonsConfig }) {
+  shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
   let from, to;
 
