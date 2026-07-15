@@ -571,6 +571,12 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
                : sort === 'sold_desc' ? 'sold DESC, st_pct DESC'
                : /* st_desc default */ 'st_pct DESC NULLS LAST, sold DESC';
 
+  // Transfer CTEs reuse the same shopIdx parameter.
+  // When shopIdx is null, to_shop_id = NULL is always false → CTEs return 0 rows
+  // → no adjustment, which is correct (transfers cancel out at company level).
+  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
+
   const { rows } = await pool.query(`
     WITH sales_by_item AS (
       SELECT sl2.item_id, SUM(sl2.qty) AS sold
@@ -587,56 +593,91 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
       ${shopStockWhere}
       GROUP BY inv.item_id
     ),
+    transfers_in AS (
+      SELECT t.item_id, SUM(t.qty_received) AS qty_in
+      FROM transfers t
+      WHERE ${transferInCond}
+        AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
+    transfers_out AS (
+      SELECT t.item_id, SUM(t.qty_sent) AS qty_out
+      FROM transfers t
+      WHERE ${transferOutCond}
+        AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
     base AS (
       SELECT
         p.description,
         p.manufacturer,
         p.category,
-        COALESCE(s.sold,   0)::int                                           AS sold,
-        COALESCE(st.stock, 0)::int                                           AS stock,
-        (COALESCE(s.sold, 0) + COALESCE(st.stock, 0))::int                  AS received_proxy,
-        CASE WHEN (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)) > 0
-          THEN ROUND(COALESCE(s.sold, 0)::numeric
-               / (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)) * 100, 1)
-          ELSE 0 END                                                          AS st_pct
+        COALESCE(s.sold,    0)::int  AS sold,
+        COALESCE(st.stock,  0)::int  AS stock,
+        COALESCE(ti.qty_in, 0)::int  AS transferred_in,
+        COALESCE(to2.qty_out, 0)::int AS transferred_out,
+        -- True supplier received = sold + stock + out - in (transfers cancel)
+        GREATEST(0,
+          COALESCE(s.sold, 0) + COALESCE(st.stock, 0)
+          + COALESCE(to2.qty_out, 0) - COALESCE(ti.qty_in, 0)
+        )::int AS received_supplier,
+        CASE WHEN GREATEST(0,
+          COALESCE(s.sold, 0) + COALESCE(st.stock, 0)
+          + COALESCE(to2.qty_out, 0) - COALESCE(ti.qty_in, 0)) > 0
+          THEN ROUND(COALESCE(s.sold, 0)::numeric / GREATEST(1,
+            COALESCE(s.sold, 0) + COALESCE(st.stock, 0)
+            + COALESCE(to2.qty_out, 0) - COALESCE(ti.qty_in, 0)) * 100, 1)
+          ELSE 0 END AS st_pct
       FROM products p
-      LEFT JOIN sales_by_item  s  ON s.item_id  = p.item_id
-      LEFT JOIN stock_by_item  st ON st.item_id = p.item_id
+      LEFT JOIN sales_by_item  s    ON s.item_id    = p.item_id
+      LEFT JOIN stock_by_item  st   ON st.item_id   = p.item_id
+      LEFT JOIN transfers_in   ti   ON ti.item_id   = p.item_id
+      LEFT JOIN transfers_out  to2  ON to2.item_id  = p.item_id
       WHERE ${prodWhere.length ? prodWhere.join(' AND ') + ' AND' : ''}
-        (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)) > 0
+        (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)
+         + COALESCE(to2.qty_out, 0) - COALESCE(ti.qty_in, 0)) > 0
     )
     SELECT *,
-      SUM(sold)  OVER () AS total_sold_all,
-      SUM(stock) OVER () AS total_stock_all,
-      COUNT(*)   OVER () AS nb_variantes_total
+      SUM(received_supplier) OVER () AS total_recu_all,
+      SUM(sold)              OVER () AS total_sold_all,
+      SUM(stock)             OVER () AS total_stock_all,
+      SUM(transferred_in)    OVER () AS total_in_all,
+      SUM(transferred_out)   OVER () AS total_out_all,
+      COUNT(*)               OVER () AS nb_variantes_total
     FROM base
     ORDER BY ${orderBy}
     LIMIT $${limitIdx}
   `, params);
 
   // Totals from window functions — correct even when LIMIT truncates the rows
+  const total_recu  = rows[0] ? Number(rows[0].total_recu_all)  : 0;
   const total_sold  = rows[0] ? Number(rows[0].total_sold_all)  : 0;
   const total_stock = rows[0] ? Number(rows[0].total_stock_all) : 0;
-  const total_proxy = total_sold + total_stock;
-  const total_st    = total_proxy > 0 ? Math.round(total_sold / total_proxy * 1000) / 10 : 0;
+  const total_in    = rows[0] ? Number(rows[0].total_in_all)    : 0;
+  const total_out   = rows[0] ? Number(rows[0].total_out_all)   : 0;
+  const total_st    = total_recu > 0 ? Math.round(total_sold / total_recu * 1000) / 10 : 0;
   const nb_total    = rows[0] ? Number(rows[0].nb_variantes_total) : 0;
 
   return {
     periode:              { de: from, a: to },
     filtre:               { marque: manufacturer, categorie: category, genre, tags, exclude_tags, taille: size, saison: season },
     tri:                  sort,
-    total_recu:           total_proxy,
+    total_recu_fournisseur: total_recu,
     total_vendu:          total_sold,
     total_stock_restant:  total_stock,
+    total_transferts_entrants:  total_in,
+    total_transferts_sortants:  total_out,
     st_global:            `${total_st}%`,
     nb_variantes_total:   nb_total,
     nb_variantes_affiches: rows.length,
     variantes:            rows.map(r => ({
-      description: r.description,
-      recu:        Number(r.received_proxy),
-      vendu:       Number(r.sold),
-      stock:       Number(r.stock),
-      st_pct:      `${Number(r.st_pct)}%`,
+      description:       r.description,
+      recu_fournisseur:  Number(r.received_supplier),
+      vendu:             Number(r.sold),
+      stock:             Number(r.stock),
+      transferts_entrants: Number(r.transferred_in),
+      transferts_sortants: Number(r.transferred_out),
+      st_pct:            `${Number(r.st_pct)}%`,
     })),
   };
 }
