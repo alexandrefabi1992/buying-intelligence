@@ -525,21 +525,34 @@ async function runSync() {
     }
 
     // ── 2. Items (products) ───────────────────────────────────────────────
+    // Delta sync: only fetch items modified since last completed items sync.
+    // First sync (isFirstSync) always pulls everything.
     if (cps.items?.next_url === 'COMPLETED') {
       console.log('[sync] items: skipping (already completed)');
     } else {
-      let itemCount = cps.items?.processed_count ?? 0;
-      if (cps.items) console.log(`[sync] Resuming items from checkpoint at ${itemCount}…`);
-      else           console.log('[sync] Fetching items…');
-      for await (const { items, nextUrl } of paginate(client, 'Item', {
+      const itemsDeltaRow = await getCheckpoint('items_delta_since');
+      const itemsDelta    = !isFirstSync && itemsDeltaRow?.next_url && itemsDeltaRow.next_url !== 'COMPLETED'
+        ? itemsDeltaRow.next_url
+        : null;
+      const itemsParams = {
         load_relations: JSON.stringify(['Tags', 'Category', 'Manufacturer', 'Images', 'ItemAttributes']),
-      }, cps.items?.next_url)) {
+        ...(itemsDelta ? { timeStamp: `>,${itemsDelta}` } : {}),
+      };
+      const itemsSyncStarted = new Date().toISOString();
+
+      let itemCount = cps.items?.processed_count ?? 0;
+      if (cps.items)    console.log(`[sync] Resuming items from checkpoint at ${itemCount}…`);
+      else if (itemsDelta) console.log(`[sync] Items delta sync since ${itemsDelta}…`);
+      else              console.log('[sync] Items full sync…');
+
+      for await (const { items, nextUrl } of paginate(client, 'Item', itemsParams, cps.items?.next_url)) {
         await upsertProducts(client, items);
         itemCount += items.length;
         console.log(`[sync] Items upserted: ${itemCount}`);
         if (nextUrl) await saveCheckpoint('items', nextUrl, itemCount);
       }
       await markStepCompleted('items', itemCount);
+      await saveCheckpoint('items_delta_since', itemsSyncStarted, itemCount);
     }
 
     // ── 3. ItemMatrix — skipped; matrix_id stored on each product row ─────
