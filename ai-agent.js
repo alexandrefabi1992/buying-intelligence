@@ -199,7 +199,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
   };
 }
 
-async function toolGetStockByVariant({ manufacturer, size, category, genre, tag, description_search, shop_id }, { pool }) {
+async function toolGetStockByVariant({ manufacturer, size, category, genre, tag, exclude_tag, description_search, shop_id }, { pool }) {
   const conditions = ['p.archived = false'];
   const params     = [];
 
@@ -209,10 +209,11 @@ async function toolGetStockByVariant({ manufacturer, size, category, genre, tag,
     conditions.push(`(p.category ILIKE $${params.length + 1} OR p.tags ILIKE $${params.length + 2} OR p.description ILIKE $${params.length + 3})`);
     params.push(`%${genre}%`, `%${genre}%`, `%${genre}%`);
   }
-  if (tag)               { conditions.push(`p.tags ILIKE $${params.length + 1}`);          params.push(`%${tag}%`); }
+  if (tag)         { conditions.push(`p.tags ILIKE $${params.length + 1}`);                                  params.push(`%${tag}%`); }
+  if (exclude_tag) { conditions.push(`(p.tags NOT ILIKE $${params.length + 1} OR p.tags IS NULL)`);          params.push(`%${exclude_tag}%`); }
   if (description_search && !category) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
-  if (size)              { conditions.push(buildSizeCondition(size, params)); }
-  if (shop_id)           { conditions.push(`i.shop_id = $${params.length + 1}`);            params.push(shop_id); }
+  if (size)    { conditions.push(buildSizeCondition(size, params)); }
+  if (shop_id) { conditions.push(`i.shop_id = $${params.length + 1}`); params.push(shop_id); }
 
   const { rows } = await pool.query(`
     SELECT
@@ -271,7 +272,7 @@ function buildSizeCondition(size, params) {
   return `p.description ILIKE $${i}`;
 }
 
-async function toolGetSalesByVariant({ manufacturer, size, category, genre, tag, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
+async function toolGetSalesByVariant({ manufacturer, size, category, genre, tag, exclude_tag, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
   let from, to;
   if (period) {
     const resolved = resolvePeriod(period);
@@ -294,11 +295,12 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tag,
     conditions.push(`(p.category ILIKE $${params.length + 1} OR p.tags ILIKE $${params.length + 2} OR p.description ILIKE $${params.length + 3})`);
     params.push(`%${genre}%`, `%${genre}%`, `%${genre}%`);
   }
-  if (tag)               { conditions.push(`p.tags ILIKE $${params.length + 1}`);          params.push(`%${tag}%`); }
+  if (tag)         { conditions.push(`p.tags ILIKE $${params.length + 1}`);                                  params.push(`%${tag}%`); }
+  if (exclude_tag) { conditions.push(`(p.tags NOT ILIKE $${params.length + 1} OR p.tags IS NULL)`);          params.push(`%${exclude_tag}%`); }
   // Ignore description_search if category is already set — model tends to duplicate the type word
   if (description_search && !category) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
-  if (size)              { conditions.push(buildSizeCondition(size, params)); }
-  if (shop_id)           { conditions.push(`sl.shop_id = $${params.length + 1}`);           params.push(shop_id); }
+  if (size)    { conditions.push(buildSizeCondition(size, params)); }
+  if (shop_id) { conditions.push(`sl.shop_id = $${params.length + 1}`); params.push(shop_id); }
 
   const { rows } = await pool.query(`
     SELECT
@@ -480,7 +482,7 @@ async function toolSearchBrands({ query }, { pool }) {
   return { resultats: rows.map(r => ({ marque: r.manufacturer, nb_articles: Number(r.nb_articles) })) };
 }
 
-async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tag, season, shop_id, sort = 'st_desc', limit = 50 }, { pool, getSeasonsConfig }) {
+async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tag, exclude_tag, season, shop_id, sort = 'st_desc', limit = 50 }, { pool, getSeasonsConfig }) {
   const today = new Date().toISOString().slice(0, 10);
   let from, to;
 
@@ -503,8 +505,9 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
     prodWhere.push(`(p.category ILIKE $${params.length + 1} OR p.tags ILIKE $${params.length + 2} OR p.description ILIKE $${params.length + 3})`);
     params.push(`%${genre}%`, `%${genre}%`, `%${genre}%`);
   }
-  if (tag)  { prodWhere.push(`p.tags ILIKE $${params.length + 1}`); params.push(`%${tag}%`); }
-  if (size) { prodWhere.push(buildSizeCondition(size, params)); }
+  if (tag)         { prodWhere.push(`p.tags ILIKE $${params.length + 1}`);                                 params.push(`%${tag}%`); }
+  if (exclude_tag) { prodWhere.push(`(p.tags NOT ILIKE $${params.length + 1} OR p.tags IS NULL)`);         params.push(`%${exclude_tag}%`); }
+  if (size)        { prodWhere.push(buildSizeCondition(size, params)); }
 
   const shopIdx        = shop_id ? params.length + 1 : null;
   if (shop_id) params.push(shop_id);

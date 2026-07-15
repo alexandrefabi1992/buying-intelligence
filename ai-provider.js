@@ -134,7 +134,8 @@ const TOOL_DEFS = [
         size:               { type: 'string', description: 'Taille à rechercher, ex: "15.5", "M", "40". Supporte automatiquement "15 1/2" = "15.5"' },
         category:           { type: 'string', description: 'Type de produit dans la catégorie Lightspeed, ex: "Pantalon", "Chemise", "Jean", "Hauts", "Chandail". Ne pas inclure le genre ici — utiliser le paramètre "genre" séparément.' },
         genre:              { type: 'string', description: 'Genre du produit : "Homme" ou "Femme". Cherche dans la catégorie, les balises ET la description du produit. Utiliser quand l\'utilisateur précise homme/femme/pour lui/pour elle.' },
-        tag:                { type: 'string', description: 'Balise produit Lightspeed, ex: "p26", "a25". Utiliser quand l\'utilisateur mentionne une balise ou une saison comme critère produit.' },
+        tag:                { type: 'string', description: 'N\'importe quelle balise produit Lightspeed, ex: "p26", "a25", "consigne", "nos", "solde". Filtre les produits qui ONT cette balise. Pour exclure une balise, utiliser exclude_tag.' },
+        exclude_tag:        { type: 'string', description: 'Exclure les produits qui ont cette balise. Ex: "consigne" pour exclure les consignes, "nos" pour exclure les permanents.' },
         description_search: { type: 'string', description: 'Mot-clé dans la description : couleur (ex: "BLEU", "BLANC", "MARINE"), coupe (ex: "SLIM", "CONTEMPORAIN"), style (ex: "TUXEDO", "TWILL"). Jamais pour le genre ni le type de produit.' },
         shop_id:            { type: 'string', description: 'ID de la boutique (optionnel)' },
         period:             { type: 'string', description: 'Période relative, ex: "1y", "2y", "ytd", "last_year", "6m"' },
@@ -153,7 +154,8 @@ const TOOL_DEFS = [
         size:               { type: 'string',  description: 'Taille à rechercher dans la description, ex: "15.5", "M", "40" (optionnel)' },
         category:           { type: 'string',  description: 'Type de produit dans la catégorie, ex: "Pantalon", "Chemise", "Jean", "Hauts". Ne pas inclure le genre ici — utiliser "genre" séparément.' },
         genre:              { type: 'string',  description: 'Genre du produit : "Homme" ou "Femme". Cherche dans la catégorie, les balises ET la description. Utiliser quand l\'utilisateur précise homme/femme/pour lui/pour elle.' },
-        tag:                { type: 'string',  description: 'Balise produit Lightspeed, ex: "p26", "a25". Utiliser quand l\'utilisateur mentionne une balise comme critère produit.' },
+        tag:                { type: 'string',  description: 'N\'importe quelle balise produit Lightspeed, ex: "p26", "a25", "consigne", "nos". Filtre les produits qui ONT cette balise.' },
+        exclude_tag:        { type: 'string',  description: 'Exclure les produits qui ont cette balise. Ex: "consigne" pour exclure les consignes.' },
         description_search: { type: 'string',  description: 'Mot-clé dans la description : couleur (ex: "BLEU", "BLANC"), coupe (ex: "SLIM", "CONTEMPORAIN"), style (ex: "TUXEDO"). Jamais pour le genre ni le type de produit.' },
         shop_id:            { type: 'string',  description: 'ID de la boutique (optionnel)' },
       },
@@ -170,7 +172,8 @@ const TOOL_DEFS = [
         size:         { type: 'string',  description: 'Taille à filtrer, ex: "15.5", "36", "L". Optionnel — omettre pour voir toutes les tailles.' },
         category:     { type: 'string',  description: 'Type de produit, ex: "Pantalon", "Chemise"' },
         genre:        { type: 'string',  description: '"Homme" ou "Femme"' },
-        tag:          { type: 'string',  description: 'Balise saison, ex: "p26". Filtre les produits par collection.' },
+        tag:          { type: 'string',  description: 'N\'importe quelle balise produit Lightspeed, ex: "p26", "a25", "consigne", "nos". Filtre les produits qui ONT cette balise.' },
+        exclude_tag:  { type: 'string',  description: 'Exclure les produits qui ont cette balise. Ex: "consigne" pour exclure les consignes, "nos" pour exclure les permanents.' },
         season:       { type: 'string',  description: 'Code saison pour la période de vente, ex: "p26", "a25"' },
         shop_id:      { type: 'string',  description: 'ID boutique (optionnel)' },
         sort:         { type: 'string',  enum: ['st_desc', 'st_asc', 'sold_desc'], description: 'Tri: st_desc = meilleures performances, st_asc = pires performances (flop), sold_desc = plus vendu' },
@@ -279,6 +282,7 @@ RÈGLES ABSOLUES
 - Si tu n'es pas certain du nom exact d'une catégorie : appelle get_categories(manufacturer=X) d'abord
 - TRANSFERTS : pour toute question sur le stock dormant, les transferts recommandés ou "quoi bouger", utiliser get_transfer_recommendations — JAMAIS inventer une réponse
 - MATRICES / TAILLES : pour voir toutes les tailles d'un modèle ou le stock par taille, utiliser get_matrix_info avec le code modèle (ex: "A45118") dans description_search
+- TAGS : le paramètre "tag" filtre les produits QUI ONT ce tag (ex: tag="consigne" → uniquement les consignes). Le paramètre "exclude_tag" filtre les produits QUI N'ONT PAS ce tag (ex: exclude_tag="consigne" → tout sauf les consignes). Utiliser pour n'importe quel tag Lightspeed : saisons (p26, a25), types (consigne, nos, solde), etc.
 - QUESTIONS DE CLARIFICATION : UNE SEULE question, UNIQUEMENT si l'info manquante est BLOQUANTE. JAMAIS demander la couleur, la boutique ou la période.`;
 }
 
