@@ -14,7 +14,7 @@ const LIMIT = 200;
 // Steps whose data doesn't change daily — only re-sync if stale (> STATIC_SYNC_DAYS old).
 // Time-filtered steps (sales, orders, transfers) always re-run to pick up the daily delta.
 const STATIC_STEPS    = new Set(['shops', 'items', 'inventory']);
-const STATIC_SYNC_DAYS = parseInt(process.env.STATIC_SYNC_DAYS ?? '7', 10);
+const STATIC_SYNC_DAYS = parseInt(process.env.STATIC_SYNC_DAYS ?? '1', 10);
 
 // ---------------------------------------------------------------------------
 // OAuth2 — access token cache + rotation-safe refresh token persistence.

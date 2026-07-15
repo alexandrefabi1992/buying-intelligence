@@ -4629,6 +4629,31 @@ app.listen(PORT, '0.0.0.0', async () => {
   } catch (err) {
     console.error('[startup] Auto-resume check failed:', err.message);
   }
+
+  // Hourly sync — spawns sync.js --once every hour if no sync is already running.
+  // SYNC_DAYS_BACK controls the sales/transfers window (keep it small, e.g. 7,
+  // since full historical data is already in the DB from the initial sync).
+  // STATIC_SYNC_DAYS controls how often inventory/items/shops re-sync (default 1 = daily).
+  const nodeCron = require('node-cron');
+  nodeCron.schedule('0 * * * *', () => {
+    if (syncRunning || !process.env.LIGHTSPEED_REFRESH_TOKEN) return;
+    console.log('[sync/cron] Starting hourly sync…');
+    syncRunning = true;
+    const { spawn } = require('child_process');
+    const child = spawn('node', ['sync.js', '--once'], { cwd: __dirname });
+    const capture = chunk => {
+      const text = chunk.toString();
+      process.stdout.write(text);
+      text.split('\n').filter(Boolean).forEach(appendLog);
+    };
+    child.stdout.on('data', capture);
+    child.stderr.on('data', capture);
+    child.on('close', code => {
+      syncRunning = false;
+      console.log(`[sync/cron] exited with code ${code}`);
+    });
+  });
+  console.log('[sync/cron] Hourly sync scheduled (runs at :00 every hour)');
 });
 
 } catch (err) {
