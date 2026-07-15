@@ -581,7 +581,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
 
   return {
     periode:      { de: from, a: to },
-    filtre:       { marque: manufacturer, categorie: category, genre, tag, taille: size, saison: season },
+    filtre:       { marque: manufacturer, categorie: category, genre, tags, exclude_tags, taille: size, saison: season },
     tri:          sort,
     total_vendu:  total_sold,
     total_stock:  total_stock,
