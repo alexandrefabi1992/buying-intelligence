@@ -616,6 +616,160 @@ async function toolGetCategories({ manufacturer }, { pool }) {
   };
 }
 
+async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1, receiving_shop_id, category, exclude_nos = false }, { pool }) {
+  const params = [days_dormant, min_stock];
+  const nosFilter = exclude_nos ? "AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')" : '';
+  let catFilter = '';
+  if (category) { params.push(`%${category}%`); catFilter = `AND p.category ILIKE $${params.length}`; }
+
+  const { rows } = await pool.query(`
+    WITH
+    matrix_last_sale AS (
+      SELECT p.matrix_id, sl.shop_id,
+        MAX(sl.completed_time) AS last_sale_date,
+        SUM(CASE WHEN sl.completed_time >= now() - interval '30 days' THEN sl.qty ELSE 0 END)::int AS units_sold_30d
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.completed_time >= now() - interval '90 days'
+        AND sl.completed_time IS NOT NULL
+        AND p.matrix_id IS NOT NULL AND p.archived = false
+      GROUP BY p.matrix_id, sl.shop_id
+    ),
+    matrix_ever_sold AS (
+      SELECT DISTINCT p.matrix_id, sl.shop_id
+      FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.completed_time >= now() - interval '3 years'
+        AND p.matrix_id IS NOT NULL AND p.archived = false
+    ),
+    item_ever_sold AS (
+      SELECT DISTINCT item_id, shop_id FROM sale_lines
+      WHERE completed_time >= now() - interval '3 years'
+    ),
+    dormant_matrix AS (
+      SELECT DISTINCT p.matrix_id, i.shop_id,
+        CASE WHEN mls.last_sale_date IS NULL THEN NULL
+             ELSE EXTRACT(DAY FROM now() - mls.last_sale_date)::int END AS days_dormant
+      FROM inventory i
+      JOIN products p ON p.item_id = i.item_id AND p.matrix_id IS NOT NULL AND p.archived = false
+      JOIN matrix_ever_sold mes ON mes.matrix_id = p.matrix_id AND mes.shop_id = i.shop_id
+      LEFT JOIN matrix_last_sale mls ON mls.matrix_id = p.matrix_id AND mls.shop_id = i.shop_id
+      WHERE i.qty_on_hand > 0
+        AND (mls.last_sale_date IS NULL OR mls.last_sale_date < now() - (interval '1 day' * $1))
+      GROUP BY p.matrix_id, i.shop_id, mls.last_sale_date
+    ),
+    active_matrix AS (
+      SELECT matrix_id, shop_id, last_sale_date, units_sold_30d
+      FROM matrix_last_sale
+      WHERE last_sale_date >= now() - interval '30 days' AND units_sold_30d >= 1
+    ),
+    best_active AS (
+      SELECT DISTINCT ON (dm.matrix_id, dm.shop_id)
+        dm.matrix_id, dm.shop_id AS dormant_shop_id, dm.days_dormant,
+        am.shop_id AS active_shop_id, am.units_sold_30d
+      FROM dormant_matrix dm
+      JOIN active_matrix am ON am.matrix_id = dm.matrix_id AND am.shop_id != dm.shop_id
+      ORDER BY dm.matrix_id, dm.shop_id, am.last_sale_date DESC
+    )
+    SELECT
+      p.manufacturer,
+      p.matrix_id,
+      MIN(p.description) AS model_name,
+      sh_d.name AS boutique_dormante,
+      sh_a.name AS boutique_active,
+      ba.days_dormant,
+      ba.units_sold_30d AS vendu_30j,
+      SUM(i.qty_on_hand)::int AS stock_total,
+      COUNT(DISTINCT p.item_id)::int AS nb_tailles,
+      string_agg(DISTINCT COALESCE(
+        CASE WHEN p.raw->'ItemAttributes'->>'attribute1' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute1' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute1' END,
+        CASE WHEN p.raw->'ItemAttributes'->>'attribute2' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute2' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute2' END
+      ), ', ' ORDER BY COALESCE(
+        CASE WHEN p.raw->'ItemAttributes'->>'attribute1' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute1' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute1' END,
+        CASE WHEN p.raw->'ItemAttributes'->>'attribute2' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute2' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute2' END
+      )) AS tailles
+    FROM best_active ba
+    JOIN products p ON p.matrix_id = ba.matrix_id AND p.archived = false
+    JOIN item_ever_sold ies ON ies.item_id = p.item_id AND ies.shop_id = ba.active_shop_id
+    JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = ba.dormant_shop_id AND i.qty_on_hand >= $2
+    JOIN shops sh_d ON sh_d.shop_id = ba.dormant_shop_id
+    JOIN shops sh_a ON sh_a.shop_id = ba.active_shop_id
+    WHERE NOT (p.default_cost = 0 AND p.default_price = 0)
+      AND p.description NOT ILIKE '%shopify%'
+      ${nosFilter} ${catFilter}
+    GROUP BY p.manufacturer, p.matrix_id, sh_d.name, sh_a.name, ba.days_dormant, ba.units_sold_30d
+    ORDER BY ba.days_dormant ASC NULLS LAST, p.manufacturer
+    LIMIT 50
+  `, params);
+
+  const filtered = receiving_shop_id
+    ? rows.filter(r => r.boutique_active.toLowerCase().includes(receiving_shop_id.toLowerCase()))
+    : rows;
+
+  return {
+    parametres: { jours_inactif: days_dormant, stock_min: min_stock },
+    nb_modeles: filtered.length,
+    recommandations: filtered.map(r => ({
+      marque:           r.manufacturer,
+      modele:           r.model_name,
+      tailles:          r.tailles ?? '—',
+      nb_tailles:       Number(r.nb_tailles),
+      stock_total:      Number(r.stock_total),
+      boutique_dormante: r.boutique_dormante,
+      jours_inactif:    r.days_dormant ?? 'Jamais vendu',
+      boutique_active:  r.boutique_active,
+      vendu_30j:        Number(r.vendu_30j),
+    })),
+  };
+}
+
+async function toolGetMatrixInfo({ manufacturer, description_search, category, shop_id }, { pool }) {
+  const conditions = ['p.archived = false', 'p.matrix_id IS NOT NULL'];
+  const params = [];
+  if (manufacturer)      { conditions.push(`p.manufacturer ILIKE $${params.length+1}`); params.push(`%${manufacturer}%`); }
+  if (description_search){ conditions.push(`p.description  ILIKE $${params.length+1}`); params.push(`%${description_search}%`); }
+  if (category)          { conditions.push(`p.category     ILIKE $${params.length+1}`); params.push(`%${category}%`); }
+
+  const shopJoin  = shop_id ? `JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = $${params.length+1}` : 'LEFT JOIN inventory i ON i.item_id = p.item_id';
+  if (shop_id) params.push(shop_id);
+
+  const { rows } = await pool.query(`
+    SELECT
+      p.matrix_id,
+      p.manufacturer,
+      MIN(p.description) AS exemple_description,
+      COUNT(DISTINCT p.item_id)::int AS nb_variantes,
+      COALESCE(SUM(i.qty_on_hand), 0)::int AS stock_total,
+      string_agg(DISTINCT COALESCE(
+        CASE WHEN p.raw->'ItemAttributes'->>'attribute1' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute1' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute1' END,
+        CASE WHEN p.raw->'ItemAttributes'->>'attribute2' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute2' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute2' END,
+        CASE WHEN p.raw->'ItemAttributes'->>'attribute3' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute3' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute3' END
+      ), ', ') AS tailles_disponibles,
+      (SELECT SUM(sl2.qty) FROM sale_lines sl2
+       JOIN products p2 ON p2.item_id = sl2.item_id
+       WHERE p2.matrix_id = p.matrix_id
+         AND sl2.completed_time >= now() - interval '365 days')::int AS ventes_12m
+    FROM products p
+    ${shopJoin}
+    WHERE ${conditions.join(' AND ')}
+    GROUP BY p.matrix_id, p.manufacturer
+    ORDER BY stock_total DESC NULLS LAST
+    LIMIT 30
+  `, params);
+
+  return {
+    nb_matrices: rows.length,
+    matrices: rows.map(r => ({
+      matrix_id:      r.matrix_id,
+      marque:         r.manufacturer,
+      modele:         r.exemple_description,
+      nb_variantes:   r.nb_variantes,
+      tailles:        r.tailles_disponibles ?? '—',
+      stock_total:    r.stock_total,
+      ventes_12m:     r.ventes_12m ?? 0,
+    })),
+  };
+}
+
 async function toolGetSeasonsList(_, { getSeasonsConfig }) {
   const seasons = await getSeasonsConfig();
   return {
@@ -645,8 +799,10 @@ async function dispatchTool(name, args, ctx) {
     case 'search_brands':              return await toolSearchBrands(args, ctx);
     case 'get_seasons_list':           return await toolGetSeasonsList(args, ctx);
     case 'get_categories':             return await toolGetCategories(args, ctx);
-    case 'get_sellthrough_by_size':    return await toolGetSellthroughBySize(args, ctx);
-    default:                           return { erreur: `Outil inconnu: ${name}` };
+    case 'get_sellthrough_by_size':         return await toolGetSellthroughBySize(args, ctx);
+    case 'get_transfer_recommendations':    return await toolGetTransferRecommendations(args, ctx);
+    case 'get_matrix_info':                 return await toolGetMatrixInfo(args, ctx);
+    default:                                return { erreur: `Outil inconnu: ${name}` };
   }
 }
 

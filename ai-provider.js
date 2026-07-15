@@ -180,6 +180,35 @@ const TOOL_DEFS = [
     },
   },
   {
+    name: 'get_transfer_recommendations',
+    description: "Obtenir les recommandations de transfert de stock : modèles dormants dans une boutique qui se vendent encore dans une autre. Utiliser quand l'utilisateur demande quoi transférer, quel stock dort, ou quelles pièces bouger entre boutiques.",
+    parameters: {
+      type: 'object',
+      properties: {
+        days_dormant:      { type: 'integer', description: 'Nombre de jours sans vente pour considérer le stock comme dormant (défaut: 14)' },
+        min_stock:         { type: 'integer', description: 'Stock minimum pour déclencher une recommandation (défaut: 1)' },
+        receiving_shop_id: { type: 'string',  description: 'Filtrer par boutique réceptrice (nom partiel, ex: "Fan Club", "Saint-Bruno"). Laisser vide pour toutes les boutiques.' },
+        category:          { type: 'string',  description: 'Filtrer par catégorie de produit (optionnel)' },
+        exclude_nos:       { type: 'boolean', description: 'Si true, exclure les produits NOS (permanents)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_matrix_info',
+    description: "Obtenir les informations sur les matrices de produits (modèles regroupant toutes leurs tailles/couleurs). Utiliser quand l'utilisateur demande les tailles disponibles d'un modèle, le stock par taille, ou veut voir toutes les variantes d'un produit.",
+    parameters: {
+      type: 'object',
+      properties: {
+        manufacturer:       { type: 'string', description: 'Nom de la marque (optionnel)' },
+        description_search: { type: 'string', description: 'Mot-clé dans la description du produit ou le code modèle (ex: "A45118", "MARON", "RENA")' },
+        category:           { type: 'string', description: 'Catégorie de produit (optionnel)' },
+        shop_id:            { type: 'string', description: 'Filtrer le stock par boutique (optionnel)' },
+      },
+      required: [],
+    },
+  },
+  {
     name: 'get_categories',
     description: 'Obtenir la liste des catégories de produits disponibles dans la base de données. UTILISER AVANT de filtrer par category dans get_sales_by_variant ou get_stock_by_variant quand on ne connaît pas la structure exacte des catégories. Retourne l\'arbre complet des catégories avec le nombre de produits par catégorie.',
     parameters: {
@@ -248,6 +277,8 @@ RÈGLES ABSOLUES
 - Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
 - Si tu n'es pas certain du nom exact d'une catégorie : appelle get_categories(manufacturer=X) d'abord
+- TRANSFERTS : pour toute question sur le stock dormant, les transferts recommandés ou "quoi bouger", utiliser get_transfer_recommendations — JAMAIS inventer une réponse
+- MATRICES / TAILLES : pour voir toutes les tailles d'un modèle ou le stock par taille, utiliser get_matrix_info avec le code modèle (ex: "A45118") dans description_search
 - QUESTIONS DE CLARIFICATION : UNE SEULE question, UNIQUEMENT si l'info manquante est BLOQUANTE. JAMAIS demander la couleur, la boutique ou la période.`;
 }
 
