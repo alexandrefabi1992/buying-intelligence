@@ -601,7 +601,10 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
       GROUP BY t.item_id
     ),
     transfers_out AS (
-      SELECT t.item_id, SUM(t.qty_sent) AS qty_out
+      -- Completed transfers: qty_sent is cleared to 0 once received, use qty_received.
+      -- Pending transfers (in transit): qty_received = 0, use qty_sent.
+      SELECT t.item_id,
+        SUM(CASE WHEN t.transfer_received THEN t.qty_received ELSE t.qty_sent END) AS qty_out
       FROM transfers t
       WHERE ${transferOutCond}
         AND t.transfer_date BETWEEN $1 AND $2
