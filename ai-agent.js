@@ -637,9 +637,9 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
       LEFT JOIN transfers_in   ti   ON ti.item_id   = p.item_id
       LEFT JOIN transfers_out  to2  ON to2.item_id  = p.item_id
       WHERE ${prodWhere.length ? prodWhere.join(' AND ') + ' AND' : ''}
-        -- Filter on implied_received (sold+stock), not received_supplier.
-        -- Items received only via transfer have received_supplier=0 but still had real sales.
-        (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)) > 0
+        -- Include any item with sales, stock, OR transfer activity.
+        -- Items transferred out with 0 sales and 0 stock still have real supplier received.
+        (COALESCE(s.sold, 0) + COALESCE(st.stock, 0) + COALESCE(ti.qty_in, 0) + COALESCE(to2.qty_out, 0)) > 0
     )
     SELECT *,
       SUM(received_supplier) OVER () AS total_recu_all,
