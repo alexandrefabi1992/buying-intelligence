@@ -4402,13 +4402,82 @@ app.get('/api/debug/st-breakdown', async (req, res, next) => {
     const received_supplier_clipped = Math.max(0, received_supplier_no_clip);
     const lightspeed_style = sold + stock + trans_out; // Lightspeed counts trans_in as received
 
+    // 6. Sales BEFORE the season window (could indicate Lightspeed uses a wider date range)
+    const salesBeforeRes = await pool.query(`
+      SELECT SUM(sl.qty) AS total_sold_before, MIN(sl.completed_time)::date AS earliest_sale
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.completed_time < $1
+        AND sl.shop_id = $2
+        AND sl.qty > 0
+        AND p.manufacturer ILIKE $3
+        AND p.tags ILIKE $4
+    `, [from, shop_id, `%${manufacturer}%`, `%${tag}%`]);
+
+    // 7. Transfers IN outside the date range
+    const transInBeforeRes = await pool.query(`
+      SELECT SUM(t.qty_received) AS total_in_before
+      FROM transfers t
+      JOIN products p ON p.item_id = t.item_id
+      WHERE t.to_shop_id = $1
+        AND t.transfer_received = true
+        AND t.transfer_date < $2
+        AND p.manufacturer ILIKE $3
+        AND p.tags ILIKE $4
+    `, [shop_id, from, `%${manufacturer}%`, `%${tag}%`]);
+
+    // 8. Transfers OUT outside the date range
+    const transOutBeforeRes = await pool.query(`
+      SELECT SUM(CASE WHEN t.transfer_received THEN t.qty_received ELSE t.qty_sent END) AS total_out_before
+      FROM transfers t
+      JOIN products p ON p.item_id = t.item_id
+      WHERE t.from_shop_id = $1
+        AND t.transfer_sent = true
+        AND t.transfer_date < $2
+        AND p.manufacturer ILIKE $3
+        AND p.tags ILIKE $4
+    `, [shop_id, from, `%${manufacturer}%`, `%${tag}%`]);
+
+    // 9. Last sync timestamps
+    const lastSaleRes = await pool.query(`
+      SELECT MAX(sl.completed_time)::date AS last_sale_date
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.shop_id = $1 AND p.manufacturer ILIKE $2 AND p.tags ILIKE $3
+    `, [shop_id, `%${manufacturer}%`, `%${tag}%`]);
+
+    const lastTransferRes = await pool.query(`
+      SELECT MAX(t.transfer_date)::date AS last_transfer_date
+      FROM transfers t
+      JOIN products p ON p.item_id = t.item_id
+      WHERE (t.to_shop_id = $1 OR t.from_shop_id = $1)
+        AND p.manufacturer ILIKE $2 AND p.tags ILIKE $3
+    `, [shop_id, `%${manufacturer}%`, `%${tag}%`]);
+
+    // 10. Distinct items with stock vs with sales (overlap check)
+    const itemsRes = await pool.query(`
+      SELECT
+        COUNT(DISTINCT p.item_id) AS nb_items_with_tag,
+        COUNT(DISTINCT CASE WHEN inv.qty_on_hand > 0 THEN inv.item_id END) AS nb_items_with_stock,
+        COUNT(DISTINCT CASE WHEN sl.item_id IS NOT NULL THEN sl.item_id END) AS nb_items_with_sales
+      FROM products p
+      LEFT JOIN inventory inv ON inv.item_id = p.item_id AND inv.shop_id = $1 AND inv.qty_on_hand > 0
+      LEFT JOIN sale_lines sl ON sl.item_id = p.item_id AND sl.shop_id = $1
+        AND sl.completed_time BETWEEN $2 AND $3 AND sl.qty > 0
+      WHERE p.manufacturer ILIKE $4 AND p.tags ILIKE $5 AND p.archived = false
+    `, [shop_id, from, to, `%${manufacturer}%`, `%${tag}%`]);
+
+    const sold_before     = Number(salesBeforeRes.rows[0].total_sold_before ?? 0);
+    const trans_in_before = Number(transInBeforeRes.rows[0].total_in_before  ?? 0);
+    const trans_out_before= Number(transOutBeforeRes.rows[0].total_out_before ?? 0);
+
     res.json({
       periode: { de: from, a: to },
       filtre: { manufacturer, tag, shop_id },
       raw: {
         total_sold: sold,
         total_stock: stock,
-        transfers_in: { total: trans_in, nb_items: Number(transInRes.rows[0].nb_items) },
+        transfers_in:  { total: trans_in,  nb_items: Number(transInRes.rows[0].nb_items) },
         transfers_out: { total: trans_out, completed: trans_out_completed, pending: trans_out_pending, nb_items: Number(transOutRes.rows[0].nb_items) },
       },
       calcul: {
@@ -4422,6 +4491,17 @@ app.get('/api/debug/st-breakdown', async (req, res, next) => {
         units_lost_to_clip,
         note: 'Items where sold+stock+out-in < 0 — GREATEST(0,...) floors to 0, hiding these units',
       },
+      hors_periode: {
+        ventes_avant_from: sold_before,
+        transfers_in_avant_from: trans_in_before,
+        transfers_out_avant_from: trans_out_before,
+        note: `Activité avant ${from} — exclue de notre calcul, peut-être incluse dans Lightspeed`,
+      },
+      sync: {
+        derniere_vente: lastSaleRes.rows[0]?.last_sale_date,
+        dernier_transfert: lastTransferRes.rows[0]?.last_transfer_date,
+      },
+      items: itemsRes.rows[0],
     });
   } catch (err) { next(err); }
 });
