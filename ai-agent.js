@@ -583,6 +583,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
     stock_by_item AS (
       SELECT inv.item_id, SUM(inv.qty_on_hand) AS stock
       FROM inventory inv
+      JOIN products px ON px.item_id = inv.item_id AND px.archived = false
       ${shopStockWhere}
       GROUP BY inv.item_id
     ),
