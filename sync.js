@@ -454,8 +454,16 @@ async function runSync() {
   await getAccessToken();
 
   const client = await apiClient();
-  const daysBack = parseInt(process.env.SYNC_DAYS_BACK ?? '90', 10);
-  const since    = new Date(Date.now() - daysBack * 86_400_000).toISOString();
+
+  // Auto-detect initial sync: if sale_lines is empty, pull full history regardless of SYNC_DAYS_BACK.
+  // This ensures new client onboarding always gets complete historical data without manual config.
+  const { rows: countRows } = await pool.query('SELECT COUNT(*) AS n FROM sale_lines');
+  const isFirstSync = Number(countRows[0].n) === 0;
+  const daysBack = isFirstSync
+    ? 3650
+    : parseInt(process.env.SYNC_DAYS_BACK ?? '7', 10);
+  if (isFirstSync) console.log('[sync] First sync detected (sale_lines empty) — pulling full 10-year history');
+  const since = new Date(Date.now() - daysBack * 86_400_000).toISOString();
 
   // Keepalive: force token refresh every 5 min to survive long inventory phases
   const keepalive = setInterval(async () => {
