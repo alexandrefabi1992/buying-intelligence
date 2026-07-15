@@ -545,21 +545,38 @@ async function runSync() {
     // ── 3. ItemMatrix — skipped; matrix_id stored on each product row ─────
 
     // ── 4. Inventory (ItemShop) ───────────────────────────────────────────
+    // Delta sync: on subsequent runs, only fetch records modified since the last
+    // completed inventory sync (stored as 'inventory_delta_since' in sync_state).
+    // First sync (isFirstSync) always pulls everything — no timeStamp filter.
     if (cps.inventory?.next_url === 'COMPLETED') {
       console.log('[sync] inventory: skipping (already completed)');
     } else {
+      const deltaSinceRow = await getCheckpoint('inventory_delta_since');
+      const deltaSince    = !isFirstSync && deltaSinceRow?.next_url && deltaSinceRow.next_url !== 'COMPLETED'
+        ? deltaSinceRow.next_url   // stored as ISO timestamp string in next_url field
+        : null;
+      const invParams = deltaSince ? { timeStamp: `>,${deltaSince}` } : {};
+
       let invCount = cps.inventory?.processed_count ?? 0;
-      if (cps.inventory) console.log(`[sync] Resuming inventory from checkpoint at ${invCount}…`);
-      else               console.log('[sync] Fetching inventory (ItemShop)…');
-      for await (const { items, nextUrl } of paginate(client, 'ItemShop', {}, cps.inventory?.next_url)) {
+      if (cps.inventory)  console.log(`[sync] Resuming inventory from checkpoint at ${invCount}…`);
+      else if (deltaSince) console.log(`[sync] Inventory delta sync since ${deltaSince}…`);
+      else                 console.log('[sync] Inventory full sync (ItemShop)…');
+
+      // Record the start time before fetching — use this as the next delta boundary.
+      const invSyncStarted = new Date().toISOString();
+
+      for await (const { items, nextUrl } of paginate(client, 'ItemShop', invParams, cps.inventory?.next_url)) {
         await upsertInventory(client, items);
         invCount += items.length;
         if (invCount % 1000 === 0)  console.log(`[sync] Inventory upserted: ${invCount}`);
-        // Checkpoint every 10,000 records to limit DB writes on high-volume step
         if (nextUrl && invCount % 10_000 === 0) await saveCheckpoint('inventory', nextUrl, invCount);
       }
       console.log(`[sync] Inventory done: ${invCount} records`);
       await markStepCompleted('inventory', invCount);
+      // Save the start time of this run as the next delta boundary.
+      // Using start (not end) ensures no records are missed if Lightspeed updates
+      // an ItemShop while we're mid-sync.
+      await saveCheckpoint('inventory_delta_since', invSyncStarted, invCount);
     }
 
     // ── 5. Sales (with embedded SaleLines) ───────────────────────────────
