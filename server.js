@@ -4402,17 +4402,22 @@ app.get('/api/debug/st-breakdown', async (req, res, next) => {
     const received_supplier_clipped = Math.max(0, received_supplier_no_clip);
     const lightspeed_style = sold + stock + trans_out; // Lightspeed counts trans_in as received
 
-    // 6. Sales BEFORE the season window (could indicate Lightspeed uses a wider date range)
+    // 6. Sales split by pre-sell_from vs sell period (to explain diff vs Lightspeed "vendu")
+    const sellFrom = s.sell_from ?? from;
     const salesBeforeRes = await pool.query(`
-      SELECT SUM(sl.qty) AS total_sold_before, MIN(sl.completed_time)::date AS earliest_sale
+      SELECT
+        SUM(CASE WHEN sl.completed_time < $5 THEN sl.qty ELSE 0 END) AS sold_pre_sell,
+        SUM(CASE WHEN sl.completed_time >= $5 THEN sl.qty ELSE 0 END) AS sold_in_sell_period,
+        SUM(sl.qty) AS total_sold_before,
+        MIN(sl.completed_time)::date AS earliest_sale
       FROM sale_lines sl
       JOIN products p ON p.item_id = sl.item_id
-      WHERE sl.completed_time < $1
-        AND sl.shop_id = $2
+      WHERE sl.completed_time BETWEEN $1 AND $2
+        AND sl.shop_id = $3
         AND sl.qty > 0
-        AND p.manufacturer ILIKE $3
-        AND p.tags ILIKE $4
-    `, [from, shop_id, `%${manufacturer}%`, `%${tag}%`]);
+        AND p.manufacturer ILIKE $4
+        AND p.tags ILIKE $6
+    `, [from, to, shop_id, `%${manufacturer}%`, sellFrom, `%${tag}%`]);
 
     // 7. Transfers IN outside the date range
     const transInBeforeRes = await pool.query(`
@@ -4496,6 +4501,12 @@ app.get('/api/debug/st-breakdown', async (req, res, next) => {
         transfers_in_avant_from: trans_in_before,
         transfers_out_avant_from: trans_out_before,
         note: `Activité avant ${from} — exclue de notre calcul, peut-être incluse dans Lightspeed`,
+      },
+      periode_vente: {
+        sell_from: sellFrom,
+        vendu_pre_sell_from: Number(salesBeforeRes.rows[0].sold_pre_sell ?? 0),
+        vendu_depuis_sell_from: Number(salesBeforeRes.rows[0].sold_in_sell_period ?? 0),
+        note: `Lightspeed compte probablement "vendu" depuis sell_from (${sellFrom}), pas depuis reception_from (${from})`,
       },
       sync: {
         derniere_vente: lastSaleRes.rows[0]?.last_sale_date,
