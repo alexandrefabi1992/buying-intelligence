@@ -4305,14 +4305,16 @@ app.get('/api/debug/st-breakdown', async (req, res, next) => {
     const today = new Date().toISOString().slice(0, 10);
     const to = s.sell_to < today ? s.sell_to : today;
 
-    // 1. Raw sales in date range
+    // 1. Raw sales in date range — gross (qty>0) and net (includes returns/negatives)
     const salesRes = await pool.query(`
-      SELECT SUM(sl.qty) AS total_sold
+      SELECT
+        SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS total_sold,
+        SUM(sl.qty)                                        AS total_sold_net,
+        SUM(CASE WHEN sl.qty < 0 THEN ABS(sl.qty) ELSE 0 END) AS total_returns
       FROM sale_lines sl
       JOIN products p ON p.item_id = sl.item_id
       WHERE sl.completed_time BETWEEN $1 AND $2
         AND sl.shop_id = $3
-        AND sl.qty > 0
         AND p.manufacturer ILIKE $4
         AND p.tags ILIKE $5
     `, [from, to, shop_id, `%${manufacturer}%`, `%${tag}%`]);
@@ -4480,7 +4482,9 @@ app.get('/api/debug/st-breakdown', async (req, res, next) => {
       periode: { de: from, a: to },
       filtre: { manufacturer, tag, shop_id },
       raw: {
-        total_sold: sold,
+        total_sold_brut: sold,
+        total_retours: Number(salesRes.rows[0].total_returns ?? 0),
+        total_sold_net: Number(salesRes.rows[0].total_sold_net ?? 0),
         total_stock: stock,
         transfers_in:  { total: trans_in,  nb_items: Number(transInRes.rows[0].nb_items) },
         transfers_out: { total: trans_out, completed: trans_out_completed, pending: trans_out_pending, nb_items: Number(transOutRes.rows[0].nb_items) },
