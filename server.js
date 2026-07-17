@@ -2900,7 +2900,6 @@ app.get('/api/budget/marque', async (req, res, next) => {
       WHERE sl.completed_time >= $${coSalesFromIdx}::date
         AND sl.completed_time <= $${coSalesToIdx}::date
         AND sl.completed_time IS NOT NULL
-        AND sl.qty > 0
         AND p.tags ILIKE $${coSalesTagIdx}
         AND p.tags NOT ILIKE '%nos%'
         AND p.default_cost > 0
@@ -2935,7 +2934,6 @@ app.get('/api/budget/marque', async (req, res, next) => {
         JOIN products p ON p.item_id = sl.item_id
         WHERE sl.completed_time >= $${irSlFromIdx}::date
           AND sl.completed_time IS NOT NULL
-          AND sl.qty > 0
           AND p.tags ILIKE $${irSlTagIdx}
           AND p.tags NOT ILIKE '%nos%'
           AND p.category    NOT ILIKE 'Alt%ration%'
@@ -2977,7 +2975,6 @@ app.get('/api/budget/marque', async (req, res, next) => {
         WHERE sl.completed_time >= $${slFromIdx}::date
           AND sl.completed_time <= $${slToIdx}::date
           AND sl.completed_time IS NOT NULL
-          AND sl.qty > 0
           AND p.tags ILIKE $${slTagIdx}
           AND p.tags NOT ILIKE '%nos%'
           AND p.category    NOT ILIKE 'Alt%ration%'
@@ -3040,7 +3037,6 @@ app.get('/api/budget/marque', async (req, res, next) => {
                 WHERE sl.completed_time >= $${rwFromIdx}::date
                   AND sl.completed_time <= $${rwToIdx}::date
                   AND sl.completed_time IS NOT NULL
-                  AND sl.qty > 0
                   AND p.tags ILIKE $${rwTagIdx}
                   AND p.tags NOT ILIKE '%nos%'
                   AND p.category    NOT ILIKE 'Alt%ration%'
