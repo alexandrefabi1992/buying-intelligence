@@ -4528,6 +4528,109 @@ app.get('/api/debug/st-breakdown', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/debug/st-gap — find exact source of discrepancy vs Lightspeed
+// Checks: sale_lines for items without current tag (tag removed after sale),
+// NULL completed_time, and returns-as-full-sale patterns.
+// ---------------------------------------------------------------------------
+app.get('/api/debug/st-gap', async (req, res, next) => {
+  try {
+    const { manufacturer, tag, shop_id } = req.query;
+    if (!manufacturer || !tag || !shop_id) {
+      return res.status(400).json({ error: 'manufacturer, tag, shop_id required' });
+    }
+    const today      = new Date().toISOString().slice(0, 10);
+    const tenYrsAgo  = new Date(Date.now() - 3650 * 86_400_000).toISOString().slice(0, 10);
+    const from       = req.query.from ?? tenYrsAgo;
+    const to         = req.query.to   ?? today;
+
+    // 1. Sales for items that NO LONGER have the tag (tag removed after sale)
+    const tagRemovedRes = await pool.query(`
+      SELECT
+        SUM(sl.qty)                             AS net_qty_no_tag,
+        SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS brut_qty_no_tag,
+        COUNT(DISTINCT sl.item_id)              AS nb_items,
+        array_agg(DISTINCT p.description ORDER BY p.description) FILTER (WHERE sl.qty != 0) AS sample_descriptions
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.completed_time BETWEEN $1 AND $2
+        AND sl.shop_id = $3
+        AND p.manufacturer ILIKE $4
+        AND (p.tags NOT ILIKE $5 OR p.tags IS NULL)
+    `, [from, to, shop_id, `%${manufacturer}%`, `%${tag}%`]);
+
+    // 2. Sales for items with tag but different manufacturer (manufacturer changed)
+    const mfrChangedRes = await pool.query(`
+      SELECT
+        SUM(sl.qty)                             AS net_qty_mfr_changed,
+        COUNT(DISTINCT sl.item_id)              AS nb_items,
+        array_agg(DISTINCT p.manufacturer)      AS current_manufacturers
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.completed_time BETWEEN $1 AND $2
+        AND sl.shop_id = $3
+        AND p.tags ILIKE $4
+        AND p.manufacturer NOT ILIKE $5
+    `, [from, to, shop_id, `%${tag}%`, `%${manufacturer}%`]);
+
+    // 3. Sale_lines with NULL completed_time
+    const nullTimeRes = await pool.query(`
+      SELECT COUNT(*) AS nb_null_time, SUM(sl.qty) AS qty_null_time
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.completed_time IS NULL
+        AND sl.shop_id = $1
+        AND p.manufacturer ILIKE $2
+        AND p.tags ILIKE $3
+    `, [shop_id, `%${manufacturer}%`, `%${tag}%`]);
+
+    // 4. Distribution of returns by month (to spot anomalies)
+    const returnsDistRes = await pool.query(`
+      SELECT
+        to_char(sl.completed_time, 'YYYY-MM') AS month,
+        SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS brut,
+        SUM(CASE WHEN sl.qty < 0 THEN ABS(sl.qty) ELSE 0 END) AS retours,
+        SUM(sl.qty) AS net
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.completed_time BETWEEN $1 AND $2
+        AND sl.shop_id = $3
+        AND p.manufacturer ILIKE $4
+        AND p.tags ILIKE $5
+      GROUP BY 1 ORDER BY 1
+    `, [from, to, shop_id, `%${manufacturer}%`, `%${tag}%`]);
+
+    const tr = tagRemovedRes.rows[0];
+    const mr = mfrChangedRes.rows[0];
+    const nr = nullTimeRes.rows[0];
+
+    res.json({
+      periode: { de: from, a: to },
+      hypotheses: {
+        tag_retire_apres_vente: {
+          net_qty: Number(tr.net_qty_no_tag ?? 0),
+          brut_qty: Number(tr.brut_qty_no_tag ?? 0),
+          nb_items: Number(tr.nb_items ?? 0),
+          note: 'Ventes pour produits Part Two qui N ont PLUS le tag p26 — Lightspeed les comptait au moment de la vente',
+          sample: tr.sample_descriptions?.slice(0, 5) ?? [],
+        },
+        fabricant_change_apres_vente: {
+          net_qty: Number(mr.net_qty_mfr_changed ?? 0),
+          nb_items: Number(mr.nb_items ?? 0),
+          current_manufacturers: mr.current_manufacturers ?? [],
+          note: 'Items avec tag p26 mais dont le fabricant actuel n est pas Part Two',
+        },
+        completed_time_null: {
+          nb_lignes: Number(nr.nb_null_time ?? 0),
+          qty: Number(nr.qty_null_time ?? 0),
+          note: 'Sale_lines exclues de nos queries car completed_time IS NULL',
+        },
+      },
+      ventes_par_mois: returnsDistRes.rows,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/ai/chat — AI agent endpoint
 // Body: { messages: [...] }   (OpenAI-format conversation history)
 // Returns: { content, messages }
