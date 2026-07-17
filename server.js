@@ -4301,9 +4301,12 @@ app.get('/api/debug/st-breakdown', async (req, res, next) => {
     const s = seasons.find(x => x.tag_pattern === tag || x.code === tag);
     if (!s) return res.status(400).json({ error: `Season not found for tag "${tag}"` });
 
-    const from = s.reception_from ?? s.sell_from;
     const today = new Date().toISOString().slice(0, 10);
-    const to = s.sell_to < today ? s.sell_to : today;
+    // Default: 10-year window to match Lightspeed reports; override with ?from= and ?to=
+    const tenYearsAgo = new Date(Date.now() - 3650 * 86_400_000).toISOString().slice(0, 10);
+    const from     = req.query.from ?? tenYearsAgo;
+    const to       = req.query.to   ?? today;
+    const sellFrom = s.sell_from ?? from;
 
     // 1. Raw sales in date range — gross (qty>0) and net (includes returns/negatives)
     const salesRes = await pool.query(`
@@ -4404,19 +4407,29 @@ app.get('/api/debug/st-breakdown', async (req, res, next) => {
     const received_supplier_clipped = Math.max(0, received_supplier_no_clip);
     const lightspeed_style = sold + stock + trans_out; // Lightspeed counts trans_in as received
 
-    // 6. Sales split by pre-sell_from vs sell period (to explain diff vs Lightspeed "vendu")
-    const sellFrom = s.sell_from ?? from;
+    // 6. Sales split: before reception_from / pre-sell_from / in sell period (gross + net)
     const salesBeforeRes = await pool.query(`
       SELECT
-        SUM(CASE WHEN sl.completed_time < $5 THEN sl.qty ELSE 0 END) AS sold_pre_sell,
-        SUM(CASE WHEN sl.completed_time >= $5 THEN sl.qty ELSE 0 END) AS sold_in_sell_period,
-        SUM(sl.qty) AS total_sold_before,
-        MIN(sl.completed_time)::date AS earliest_sale
+        SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS sold_before_brut,
+        SUM(sl.qty)                                        AS sold_before_net
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE sl.completed_time < $1
+        AND sl.shop_id = $2
+        AND p.manufacturer ILIKE $3
+        AND p.tags ILIKE $4
+    `, [from, shop_id, `%${manufacturer}%`, `%${tag}%`]);
+
+    const salesSplitRes = await pool.query(`
+      SELECT
+        SUM(CASE WHEN sl.completed_time < $5 AND sl.qty > 0 THEN sl.qty ELSE 0 END) AS sold_pre_sell_brut,
+        SUM(CASE WHEN sl.completed_time < $5 THEN sl.qty ELSE 0 END)                 AS sold_pre_sell_net,
+        SUM(CASE WHEN sl.completed_time >= $5 AND sl.qty > 0 THEN sl.qty ELSE 0 END) AS sold_in_sell_brut,
+        SUM(CASE WHEN sl.completed_time >= $5 THEN sl.qty ELSE 0 END)                AS sold_in_sell_net
       FROM sale_lines sl
       JOIN products p ON p.item_id = sl.item_id
       WHERE sl.completed_time BETWEEN $1 AND $2
         AND sl.shop_id = $3
-        AND sl.qty > 0
         AND p.manufacturer ILIKE $4
         AND p.tags ILIKE $6
     `, [from, to, shop_id, `%${manufacturer}%`, sellFrom, `%${tag}%`]);
@@ -4474,9 +4487,9 @@ app.get('/api/debug/st-breakdown', async (req, res, next) => {
       WHERE p.manufacturer ILIKE $4 AND p.tags ILIKE $5 AND p.archived = false
     `, [shop_id, from, to, `%${manufacturer}%`, `%${tag}%`]);
 
-    const sold_before     = Number(salesBeforeRes.rows[0].total_sold_before ?? 0);
-    const trans_in_before = Number(transInBeforeRes.rows[0].total_in_before  ?? 0);
-    const trans_out_before= Number(transOutBeforeRes.rows[0].total_out_before ?? 0);
+    const trans_in_before  = Number(transInBeforeRes.rows[0].total_in_before   ?? 0);
+    const trans_out_before = Number(transOutBeforeRes.rows[0].total_out_before  ?? 0);
+    const sr               = salesSplitRes.rows[0];
 
     res.json({
       periode: { de: from, a: to },
@@ -4491,26 +4504,23 @@ app.get('/api/debug/st-breakdown', async (req, res, next) => {
       },
       calcul: {
         received_supplier: received_supplier_clipped,
-        received_supplier_avant_clip: received_supplier_no_clip,
         received_lightspeed_style: lightspeed_style,
-        diff_vs_lightspeed_695: lightspeed_style - 695,
       },
-      clipping: {
-        nb_items_clipped,
-        units_lost_to_clip,
-        note: 'Items where sold+stock+out-in < 0 — GREATEST(0,...) floors to 0, hiding these units',
-      },
+      clipping: { nb_items_clipped, units_lost_to_clip },
       hors_periode: {
-        ventes_avant_from: sold_before,
-        transfers_in_avant_from: trans_in_before,
-        transfers_out_avant_from: trans_out_before,
-        note: `Activité avant ${from} — exclue de notre calcul, peut-être incluse dans Lightspeed`,
+        note: `Activité avant ${from} (non incluse dans notre calcul)`,
+        ventes_brut: Number(salesBeforeRes.rows[0].sold_before_brut ?? 0),
+        ventes_net:  Number(salesBeforeRes.rows[0].sold_before_net  ?? 0),
+        transfers_in:  trans_in_before,
+        transfers_out: trans_out_before,
       },
       periode_vente: {
         sell_from: sellFrom,
-        vendu_pre_sell_from: Number(salesBeforeRes.rows[0].sold_pre_sell ?? 0),
-        vendu_depuis_sell_from: Number(salesBeforeRes.rows[0].sold_in_sell_period ?? 0),
-        note: `Lightspeed compte probablement "vendu" depuis sell_from (${sellFrom}), pas depuis reception_from (${from})`,
+        pre_sell_brut: Number(sr.sold_pre_sell_brut ?? 0),
+        pre_sell_net:  Number(sr.sold_pre_sell_net  ?? 0),
+        in_sell_brut:  Number(sr.sold_in_sell_brut  ?? 0),
+        in_sell_net:   Number(sr.sold_in_sell_net   ?? 0),
+        note: `Ventes ventilées autour du sell_from (${sellFrom})`,
       },
       sync: {
         derniere_vente: lastSaleRes.rows[0]?.last_sale_date,
