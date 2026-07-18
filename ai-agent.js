@@ -456,7 +456,8 @@ async function toolGetPlanVsRecommended({ season }, { pool, budgetCache }) {
 
 async function toolGetTopPerformers({ season, metric, order = 'desc', limit = 10, shops }, { pool, budgetCache, getSeasonsConfig }) {
   season = (season ?? 'p26').toLowerCase();
-  const shopIds = shops ? shops.split(',').map(s => s.trim()).filter(Boolean) : null;
+  const rawShops = shops ? shops.split(',').map(s => s.trim()).filter(Boolean) : null;
+  const shopIds  = rawShops ? (await Promise.all(rawShops.map(s => resolveShopId(s, pool)))).filter(Boolean) : null;
   const cacheKey = `marque:${season}:${shopIds?.join(',') ?? 'all'}`;
   const cached = budgetCache?.get(cacheKey);
 
@@ -842,6 +843,7 @@ async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1
 }
 
 async function toolGetMatrixInfo({ manufacturer, description_search, category, shop_id }, { pool }) {
+  shop_id = await resolveShopId(shop_id, pool);
   const conditions = ['p.archived = false', 'p.matrix_id IS NOT NULL'];
   const params = [];
   if (manufacturer)      { conditions.push(`p.manufacturer ILIKE $${params.length+1}`); params.push(`%${manufacturer}%`); }
