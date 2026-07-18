@@ -666,15 +666,31 @@ async function runMigrations() {
     }
   }
   {
-    const { rows: pkCols } = await pool.query(`
+    // Guard on budget_plan_drops (budget_plans may already be composite from a partial run)
+    const { rows: dpCols } = await pool.query(`
       SELECT a.attname FROM pg_index i
       JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-      WHERE i.indrelid = 'budget_plans'::regclass AND i.indisprimary
+      WHERE i.indrelid = 'budget_plan_drops'::regclass AND i.indisprimary
     `);
-    if (!pkCols.some(r => r.attname === 'tenant_id')) {
-      const { rows: c1 } = await pool.query(`SELECT conname FROM pg_constraint WHERE conrelid = 'budget_plans'::regclass AND contype = 'p'`);
-      if (c1.length) await pool.query(`ALTER TABLE budget_plans DROP CONSTRAINT "${c1[0].conname}" CASCADE`);
-      await pool.query(`ALTER TABLE budget_plans ADD PRIMARY KEY (tenant_id, season_code, manufacturer, drop_id, shop_id)`);
+    if (!dpCols.some(r => r.attname === 'tenant_id')) {
+      // Backfill NULL tenant_ids to first tenant before adding NOT NULL PK
+      const { rows: ft } = await pool.query(`SELECT id FROM tenants ORDER BY created_at LIMIT 1`);
+      if (ft.length) {
+        await pool.query(`UPDATE budget_plans      SET tenant_id = $1 WHERE tenant_id IS NULL OR tenant_id = ''`, [ft[0].id]);
+        await pool.query(`UPDATE budget_plan_drops SET tenant_id = $1 WHERE tenant_id IS NULL OR tenant_id = ''`, [ft[0].id]);
+      }
+      // budget_plans PK — only drop/re-add if not already composite
+      const { rows: bpCols } = await pool.query(`
+        SELECT a.attname FROM pg_index i
+        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+        WHERE i.indrelid = 'budget_plans'::regclass AND i.indisprimary
+      `);
+      if (!bpCols.some(r => r.attname === 'tenant_id')) {
+        const { rows: c1 } = await pool.query(`SELECT conname FROM pg_constraint WHERE conrelid = 'budget_plans'::regclass AND contype = 'p'`);
+        if (c1.length) await pool.query(`ALTER TABLE budget_plans DROP CONSTRAINT "${c1[0].conname}" CASCADE`);
+        await pool.query(`ALTER TABLE budget_plans ADD PRIMARY KEY (tenant_id, season_code, manufacturer, drop_id, shop_id)`);
+      }
+      // budget_plan_drops PK
       const { rows: c2 } = await pool.query(`SELECT conname FROM pg_constraint WHERE conrelid = 'budget_plan_drops'::regclass AND contype = 'p'`);
       if (c2.length) await pool.query(`ALTER TABLE budget_plan_drops DROP CONSTRAINT "${c2[0].conname}" CASCADE`);
       await pool.query(`ALTER TABLE budget_plan_drops ADD PRIMARY KEY (tenant_id, season_code, manufacturer, drop_id)`);
