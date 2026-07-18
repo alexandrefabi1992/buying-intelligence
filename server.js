@@ -4709,7 +4709,7 @@ app.get('/api/debug/product-search', async (req, res, next) => {
         SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS brut,
         SUM(CASE WHEN sl.qty < 0 THEN ABS(sl.qty) ELSE 0 END) AS retours,
         SUM(sl.qty) AS net,
-        COUNT(sl.id) AS nb_lignes
+        COUNT(sl.item_id) AS nb_lignes
       FROM products p
       LEFT JOIN sale_lines sl ON sl.item_id = p.item_id
         AND sl.completed_time BETWEEN $1 AND $2
