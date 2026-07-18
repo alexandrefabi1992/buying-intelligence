@@ -16,6 +16,7 @@ const path    = require('path');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 const { runAgentLoop } = require('./ai-agent');
+const HELP             = require('./help-content');
 
 const app  = express();
 
@@ -4684,6 +4685,11 @@ app.post('/api/admin/refresh-view', async (req, res, next) => {
 
 
 // ---------------------------------------------------------------------------
+// GET /api/help — app section guide (used by UI + AI)
+app.get('/api/help', requireAuth, (req, res) => {
+  res.json(HELP);
+});
+
 // POST /api/ai/chat — AI agent endpoint
 // Body: { messages: [...] }   (OpenAI-format conversation history)
 // Returns: { content, messages }

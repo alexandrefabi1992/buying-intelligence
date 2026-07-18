@@ -115,6 +115,10 @@
   <button class="tab py-3 tab-inactive" data-tab="params"    data-i18n="tab_params">Paramètres</button>
   <a href="/velocity" class="py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors" data-i18n="tab_velocity">Vélocité →</a>
   <a href="/onboarding.html" class="ml-2 py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">⚙ Configuration</a>
+  <button id="help-btn" onclick="HelpPanel.open()" class="ml-auto py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5" title="Guide d'utilisation">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="currentColor" stroke-width="0"/></svg>
+    Aide
+  </button>
 </nav>
 
 <main class="p-6 max-w-7xl mx-auto">
@@ -3356,6 +3360,123 @@ if (getToken()) {
     if (e.target.closest('.col-tip')) tip.style.display = 'none';
   });
 })();
+</script>
+
+<!-- ── Help Panel ──────────────────────────────────────────────────────── -->
+<style>
+  #help-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:2000; opacity:0; pointer-events:none; transition:opacity 0.2s ease; }
+  #help-overlay.open { opacity:1; pointer-events:all; }
+  #help-drawer {
+    position:fixed; top:0; right:0; height:100%; width:520px; max-width:95vw;
+    background:#fff; box-shadow:-4px 0 32px rgba(0,0,0,0.12); z-index:2001;
+    display:flex; flex-direction:column;
+    transform:translateX(100%); transition:transform 0.25s cubic-bezier(.4,0,.2,1);
+  }
+  #help-drawer.open { transform:translateX(0); }
+  .help-nav-btn { display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:9px 14px; border-radius:8px; font-size:13px; color:#374151; transition:background 0.15s; }
+  .help-nav-btn:hover { background:#f3f4f6; }
+  .help-nav-btn.active { background:#eff6ff; color:#1d4ed8; font-weight:600; }
+  .help-section { display:none; }
+  .help-section.active { display:block; }
+  .help-section h2 { font-size:18px; font-weight:700; color:#111827; margin-bottom:4px; }
+  .help-section .summary { font-size:13px; color:#6b7280; margin-bottom:20px; line-height:1.6; }
+  .help-block { margin-bottom:20px; }
+  .help-block h3 { font-size:13px; font-weight:600; color:#1d4ed8; margin-bottom:6px; }
+  .help-block p, .help-block ul { font-size:13px; color:#374151; line-height:1.65; margin:0; }
+  .help-block ul { padding-left:18px; }
+  .help-block li { margin-bottom:3px; }
+  .help-block strong { font-weight:600; color:#111827; }
+</style>
+
+<div id="help-overlay" onclick="HelpPanel.close()"></div>
+<div id="help-drawer">
+  <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+    <div class="flex items-center gap-2">
+      <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="currentColor" stroke-width="0"/></svg>
+      <span class="font-bold text-gray-900 text-base">Guide d'utilisation</span>
+    </div>
+    <button onclick="HelpPanel.close()" class="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="flex flex-1 overflow-hidden">
+    <div id="help-nav" class="w-44 shrink-0 border-r border-gray-100 p-3 overflow-y-auto flex flex-col gap-1"></div>
+    <div id="help-content" class="flex-1 overflow-y-auto p-6"></div>
+  </div>
+</div>
+
+<script>
+const HelpPanel = (() => {
+  let helpData = null;
+  const TAB_TO_SECTION = { budget:'budget', nos:'nos', sizes:'sizes', transfers:'transfers', plan:'plan', params:'params' };
+
+  function renderNav(activeKey) {
+    const nav = document.getElementById('help-nav');
+    if (!helpData) return;
+    nav.innerHTML = Object.entries(helpData).map(([key, s]) => `
+      <button class="help-nav-btn ${key === activeKey ? 'active' : ''}" onclick="HelpPanel.show('${key}')">
+        <span>${s.icon}</span><span>${s.title}</span>
+      </button>`).join('');
+  }
+
+  function renderSection(key) {
+    const s = helpData[key];
+    if (!s) return;
+    const blocksHtml = s.sections.map(sec => {
+      const bodyHtml = sec.body
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>\n?)+/gs, m => `<ul>${m}</ul>`)
+        .replace(/\n/g, '<br>');
+      return `<div class="help-block"><h3>${sec.heading}</h3><p>${bodyHtml}</p></div>`;
+    }).join('');
+    document.getElementById('help-content').innerHTML = `
+      <h2>${s.icon} ${s.title}</h2>
+      <p class="summary">${s.summary}</p>
+      ${blocksHtml}
+      <div class="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+        <p class="text-xs text-blue-700"><strong>💬 Astuce :</strong> L'assistant IA connaît toutes ces sections. Vous pouvez lui poser des questions comme <em>« Comment fonctionne le budget saisonnier ? »</em> ou <em>« Explique-moi le carryover »</em>.</p>
+      </div>`;
+    renderNav(key);
+  }
+
+  async function load() {
+    if (helpData) return;
+    try {
+      const r = await fetch('/api/help', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') } });
+      helpData = await r.json();
+    } catch { helpData = {}; }
+  }
+
+  function currentTab() {
+    const active = document.querySelector('.tab.tab-active');
+    return active ? TAB_TO_SECTION[active.dataset.tab] || 'budget' : 'budget';
+  }
+
+  return {
+    async open(section) {
+      await load();
+      const key = section || currentTab();
+      renderSection(key);
+      document.getElementById('help-overlay').classList.add('open');
+      document.getElementById('help-drawer').classList.add('open');
+    },
+    close() {
+      document.getElementById('help-overlay').classList.remove('open');
+      document.getElementById('help-drawer').classList.remove('open');
+    },
+    show(key) { renderSection(key); },
+  };
+})();
+
+// Open help for current section when ? is clicked from any tab
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (document.getElementById('help-drawer').classList.contains('open')) {
+      HelpPanel.show(btn.dataset.tab);
+    }
+  });
+});
 </script>
 
 <!-- ── AI Chat Widget ──────────────────────────────────────────────────── -->
