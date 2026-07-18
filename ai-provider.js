@@ -1,4 +1,5 @@
 'use strict';
+const HELP = require('./help-content');
 // ---------------------------------------------------------------------------
 // AI Provider Abstraction Layer
 //
@@ -285,7 +286,13 @@ RÈGLES ABSOLUES
 - MATRICES / TAILLES : pour voir toutes les tailles d'un modèle ou le stock par taille, utiliser get_matrix_info avec le code modèle (ex: "A45118") dans description_search
 - TAGS : "tags" (tableau, max 10) filtre les produits qui ont TOUS les tags listés — logique AND. Ex: tags=["p26","consigne"] → uniquement les produits avec les deux tags. "exclude_tags" (tableau, max 10) exclut les produits ayant N'IMPORTE LEQUEL de ces tags. Ex: exclude_tags=["nos","solde"] → aucun NOS ni solde. Les deux paramètres sont combinables simultanément.
 - PARSING DES TAGS : quand l'utilisateur dit "tager X", "tagé X", "tagué X", "avec le tag X", "avec la balise X", "tagged X", "with tag X", "labelled X", "étiquetté X" — extraire X comme tag et NE JAMAIS l'inclure dans le nom de la marque. Ex: "Part Two tager p26" → manufacturer="Part Two", tags=["p26"]. Ex: "Eton tagged p25 slim" → manufacturer="Eton", tags=["p25"], description_search="slim".
-- QUESTIONS DE CLARIFICATION : UNE SEULE question, UNIQUEMENT si l'info manquante est BLOQUANTE. JAMAIS demander la couleur, la boutique ou la période.`;
+- QUESTIONS DE CLARIFICATION : UNE SEULE question, UNIQUEMENT si l'info manquante est BLOQUANTE. JAMAIS demander la couleur, la boutique ou la période.
+
+GUIDE DES SECTIONS DE L’APPLICATION
+${Object.values(HELP).map(s =>
+  `### ${s.icon} ${s.title}\n${s.summary}\n${s.sections.map(sec => `**${sec.heading}**\n${sec.body}`).join('\\n\\n')}`
+).join('\\n\\n---\\n\\n')}
+`;
 }
 
 const SYSTEM_PROMPT = buildSystemPrompt();
