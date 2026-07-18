@@ -29,7 +29,12 @@ function fmtPct(v) {
 // ---------------------------------------------------------------------------
 async function resolveShopId(shop_id, pool) {
   if (!shop_id) return null;
-  if (/^\d+$/.test(String(shop_id))) return shop_id; // already numeric
+  if (/^\d+$/.test(String(shop_id))) {
+    // Verify the numeric ID actually exists
+    const { rows } = await pool.query("SELECT shop_id FROM shops WHERE shop_id = $1", [shop_id]);
+    if (rows.length) return shop_id;
+    return null;
+  }
   const { rows } = await pool.query(
     "SELECT shop_id FROM shops WHERE name ILIKE $1 LIMIT 1",
     [`%${shop_id}%`]
