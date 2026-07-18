@@ -115,6 +115,10 @@
   <button class="tab py-3 tab-inactive" data-tab="params"    data-i18n="tab_params">Paramètres</button>
   <a href="/velocity" class="py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors" data-i18n="tab_velocity">Vélocité →</a>
   <a href="/onboarding.html" class="ml-2 py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">⚙ Configuration</a>
+  <button id="admin-btn" onclick="AdminPanel.open()" class="hidden ml-auto py-2 px-3 text-xs font-semibold text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-1.5" title="Administration">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+    Admin
+  </button>
   <button id="help-btn" onclick="HelpPanel.open()" class="ml-auto py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5" title="Guide d'utilisation">
     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="currentColor" stroke-width="0"/></svg>
     Aide
@@ -938,7 +942,18 @@ const PAGE_SIZE = 50;
 // ── Auth ───────────────────────────────────────────────────────────────────
 function getToken()    { return localStorage.getItem('auth_token'); }
 function setToken(t)   { localStorage.setItem('auth_token', t); }
-function clearToken()  { localStorage.removeItem('auth_token'); }
+function clearToken()  { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); }
+function getRole()     { return localStorage.getItem('auth_role') ?? ''; }
+function setRole(r)    { localStorage.setItem('auth_role', r); }
+
+function applyRoleUI() {
+  const isSuperAdmin = getRole() === 'superadmin';
+  const btn = document.getElementById('admin-btn');
+  if (btn) { btn.classList.toggle('hidden', !isSuperAdmin); btn.classList.toggle('ml-auto', isSuperAdmin); }
+  // help-btn loses ml-auto when admin-btn takes it
+  const helpBtn = document.getElementById('help-btn');
+  if (helpBtn) helpBtn.classList.toggle('ml-auto', !isSuperAdmin);
+}
 
 function showLogin() { document.getElementById('loginOverlay').classList.remove('hidden'); }
 function hideLogin() { document.getElementById('loginOverlay').classList.add('hidden'); }
@@ -978,11 +993,13 @@ async function handleLogin(e) {
       return;
     }
     setToken(data.token);
+    if (data.role) setRole(data.role);
     if (data.tenant?.name) {
       const badge = document.getElementById('tenantBadge');
       badge.textContent = data.tenant.name;
       badge.classList.remove('hidden');
     }
+    applyRoleUI();
     hideLogin();
     initApp();
   } catch (err) {
@@ -3327,6 +3344,7 @@ function initApp() {
 }
 
 if (getToken()) {
+  applyRoleUI();
   initApp();
 } else {
   showLogin();
@@ -3546,6 +3564,240 @@ document.querySelectorAll('.tab').forEach(btn => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && document.getElementById('help-drawer').classList.contains('open')) HelpPanel.close();
 });
+</script>
+
+<!-- ── Admin Panel ─────────────────────────────────────────────────────── -->
+<style>
+  #admin-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:3000; opacity:0; pointer-events:none; transition:opacity 0.2s ease; }
+  #admin-overlay.open { opacity:1; pointer-events:all; }
+  #admin-drawer {
+    position:fixed; top:0; right:0; height:100%; width:820px; max-width:96vw;
+    background:#f8fafc; box-shadow:-4px 0 32px rgba(0,0,0,0.15); z-index:3001;
+    display:flex; flex-direction:column;
+    transform:translateX(100%); transition:transform 0.25s cubic-bezier(.4,0,.2,1);
+  }
+  #admin-drawer.open { transform:translateX(0); }
+  .admin-tenant-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:18px 20px; }
+  .admin-tenant-card .stat { text-align:center; }
+  .admin-tenant-card .stat-val { font-size:22px; font-weight:700; color:#111827; }
+  .admin-tenant-card .stat-lbl { font-size:11px; color:#9ca3af; margin-top:2px; }
+  .admin-badge-active   { background:#dcfce7; color:#166534; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; }
+  .admin-badge-inactive { background:#fee2e2; color:#991b1b; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; }
+  .admin-user-row { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-radius:8px; background:#f8fafc; border:1px solid #f1f5f9; }
+  #admin-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:4000; display:none; align-items:center; justify-content:center; }
+  #admin-modal-overlay.open { display:flex; }
+  #admin-modal { background:#fff; border-radius:16px; padding:28px 28px 24px; width:420px; max-width:94vw; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+</style>
+
+<div id="admin-overlay" onclick="AdminPanel.close()"></div>
+<div id="admin-drawer">
+  <div class="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
+    <div class="flex items-center gap-2">
+      <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      <span class="font-bold text-gray-900 text-base">Administration</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="AdminPanel.openNewTenantModal()" class="py-1.5 px-3 text-xs font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-1">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Nouveau compte
+      </button>
+      <button onclick="AdminPanel.close()" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+  <div id="admin-content" class="flex-1 overflow-y-auto p-6 space-y-4">
+    <p class="text-gray-400 text-sm">Chargement…</p>
+  </div>
+</div>
+
+<!-- Admin modals -->
+<div id="admin-modal-overlay">
+  <div id="admin-modal">
+    <h3 id="admin-modal-title" class="text-base font-bold text-gray-900 mb-4"></h3>
+    <div id="admin-modal-body"></div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button onclick="AdminPanel.closeModal()" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Annuler</button>
+      <button id="admin-modal-submit" class="px-4 py-2 text-sm font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const AdminPanel = (() => {
+  let _tenants = [];
+
+  function getRole() { return localStorage.getItem('auth_role') ?? ''; }
+
+  function open() { AdminPanel.load(); document.getElementById('admin-overlay').classList.add('open'); document.getElementById('admin-drawer').classList.add('open'); }
+  function close() { document.getElementById('admin-overlay').classList.remove('open'); document.getElementById('admin-drawer').classList.remove('open'); }
+
+  async function load() {
+    const el = document.getElementById('admin-content');
+    el.innerHTML = '<p class="text-gray-400 text-sm">Chargement…</p>';
+    try {
+      const r = await apiFetch('/api/superadmin/dashboard');
+      _tenants = await r.json();
+      renderDashboard();
+    } catch(e) { el.innerHTML = `<p class="text-red-500 text-sm">${e.message}</p>`; }
+  }
+
+  function fmtDate(d) {
+    if (!d) return '—';
+    const dt = new Date(d);
+    return dt.toLocaleString('fr-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  function fmtNum(n) { return Number(n).toLocaleString('fr-CA'); }
+
+  function renderDashboard() {
+    const el = document.getElementById('admin-content');
+    el.innerHTML = _tenants.map(t => `
+      <div class="admin-tenant-card">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-bold text-gray-900">${t.name}</span>
+              <span class="${t.active ? 'admin-badge-active' : 'admin-badge-inactive'}">${t.active ? 'Actif' : 'Inactif'}</span>
+            </div>
+            <div class="text-xs text-gray-400">ID: <code class="bg-gray-100 px-1 rounded">${t.id}</code> · Créé le ${fmtDate(t.created_at)}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="AdminPanel.toggleActive('${t.id}', ${!t.active})" class="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
+              ${t.active ? 'Désactiver' : 'Activer'}
+            </button>
+          </div>
+        </div>
+        <div class="grid grid-cols-4 gap-3 mb-4">
+          <div class="stat"><div class="stat-val">${fmtNum(t.product_count)}</div><div class="stat-lbl">Produits</div></div>
+          <div class="stat"><div class="stat-val">${fmtNum(t.sale_line_count)}</div><div class="stat-lbl">Lignes ventes</div></div>
+          <div class="stat"><div class="stat-val">${fmtNum(t.user_count)}</div><div class="stat-lbl">Utilisateurs</div></div>
+          <div class="stat"><div class="stat-val text-sm font-medium text-gray-500">${fmtDate(t.last_sync_at)}</div><div class="stat-lbl">Dernière sync</div></div>
+        </div>
+        <div id="users-${t.id}" class="space-y-2">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Utilisateurs</span>
+            <button onclick="AdminPanel.openNewUserModal('${t.id}')" class="text-xs text-purple-600 hover:text-purple-800 font-medium">+ Ajouter</button>
+          </div>
+          <p class="text-xs text-gray-400">Chargement…</p>
+        </div>
+      </div>
+    `).join('');
+
+    _tenants.forEach(t => loadUsers(t.id));
+  }
+
+  async function loadUsers(tenantId) {
+    const el = document.getElementById(`users-${tenantId}`);
+    if (!el) return;
+    try {
+      const r = await apiFetch(`/api/superadmin/tenants/${tenantId}/users`);
+      const users = await r.json();
+      const header = el.querySelector('.flex');
+      el.innerHTML = '';
+      el.appendChild(header);
+      if (!users.length) { el.insertAdjacentHTML('beforeend', '<p class="text-xs text-gray-400">Aucun utilisateur</p>'); return; }
+      users.forEach(u => {
+        el.insertAdjacentHTML('beforeend', `
+          <div class="admin-user-row">
+            <div>
+              <div class="text-sm font-medium text-gray-800">${u.email}</div>
+              <div class="text-xs text-gray-400">${u.role} · depuis ${fmtDate(u.created_at)}</div>
+            </div>
+            <button onclick="AdminPanel.openResetPasswordModal(${u.id}, '${u.email}')" class="text-xs text-gray-400 hover:text-purple-600 px-2 py-1 rounded hover:bg-gray-100 transition-colors">
+              Reset mot de passe
+            </button>
+          </div>
+        `);
+      });
+    } catch(e) { el.insertAdjacentHTML('beforeend', `<p class="text-red-400 text-xs">${e.message}</p>`); }
+  }
+
+  function closeModal() { document.getElementById('admin-modal-overlay').classList.remove('open'); }
+
+  function openModal(title, bodyHtml, onSubmit) {
+    document.getElementById('admin-modal-title').textContent = title;
+    document.getElementById('admin-modal-body').innerHTML = bodyHtml;
+    const btn = document.getElementById('admin-modal-submit');
+    btn.onclick = onSubmit;
+    document.getElementById('admin-modal-overlay').classList.add('open');
+  }
+
+  function fieldHtml(id, label, type = 'text', placeholder = '') {
+    return `<div class="mb-3"><label class="block text-xs font-semibold text-gray-600 mb-1">${label}</label><input id="${id}" type="${type}" placeholder="${placeholder}" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"></div>`;
+  }
+
+  function openNewTenantModal() {
+    openModal('Nouveau compte client',
+      fieldHtml('m-tenant-id',   'ID (ex: boutique-xyz)', 'text', 'boutique-xyz') +
+      fieldHtml('m-tenant-name', 'Nom affiché', 'text', 'Boutique XYZ') +
+      fieldHtml('m-user-email',  'Email premier utilisateur', 'email') +
+      fieldHtml('m-user-pass',   'Mot de passe', 'password'),
+      async () => {
+        const id = document.getElementById('m-tenant-id').value.trim();
+        const name = document.getElementById('m-tenant-name').value.trim();
+        const email = document.getElementById('m-user-email').value.trim();
+        const password = document.getElementById('m-user-pass').value;
+        if (!id || !name || !email || !password) { alert('Tous les champs sont requis.'); return; }
+        try {
+          const r = await apiFetch('/api/superadmin/tenants', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, name, email, password }) });
+          const d = await r.json();
+          if (!r.ok) { alert(d.error); return; }
+          closeModal(); load();
+        } catch(e) { alert(e.message); }
+      }
+    );
+  }
+
+  function openNewUserModal(tenantId) {
+    openModal(`Ajouter un utilisateur`,
+      fieldHtml('m-user-email2', 'Email', 'email') +
+      fieldHtml('m-user-pass2',  'Mot de passe', 'password') +
+      `<div class="mb-3"><label class="block text-xs font-semibold text-gray-600 mb-1">Rôle</label><select id="m-user-role" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"><option value="user">user</option><option value="admin">admin</option></select></div>`,
+      async () => {
+        const email = document.getElementById('m-user-email2').value.trim();
+        const password = document.getElementById('m-user-pass2').value;
+        const role = document.getElementById('m-user-role').value;
+        if (!email || !password) { alert('Email et mot de passe requis.'); return; }
+        try {
+          const r = await apiFetch(`/api/superadmin/tenants/${tenantId}/users`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password, role }) });
+          const d = await r.json();
+          if (!r.ok) { alert(d.error); return; }
+          closeModal(); loadUsers(tenantId);
+        } catch(e) { alert(e.message); }
+      }
+    );
+  }
+
+  function openResetPasswordModal(userId, email) {
+    openModal(`Reset mot de passe — ${email}`,
+      fieldHtml('m-new-pass', 'Nouveau mot de passe', 'password'),
+      async () => {
+        const password = document.getElementById('m-new-pass').value;
+        if (!password) { alert('Mot de passe requis.'); return; }
+        try {
+          const r = await apiFetch(`/api/superadmin/users/${userId}/password`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password }) });
+          const d = await r.json();
+          if (!r.ok) { alert(d.error); return; }
+          closeModal();
+        } catch(e) { alert(e.message); }
+      }
+    );
+  }
+
+  async function toggleActive(tenantId, active) {
+    try {
+      const r = await apiFetch(`/api/superadmin/tenants/${tenantId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active }) });
+      if (!r.ok) { const d = await r.json(); alert(d.error); return; }
+      load();
+    } catch(e) { alert(e.message); }
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('admin-drawer').classList.contains('open')) close();
+  });
+
+  return { open, close, load, openNewTenantModal, openNewUserModal, openResetPasswordModal, toggleActive, closeModal };
+})();
 </script>
 
 <!-- ── AI Chat Widget ──────────────────────────────────────────────────── -->

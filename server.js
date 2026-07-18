@@ -50,6 +50,7 @@ function requireAuth(req, res, next) {
     const payload = jwt.verify(token, process.env.JWT_SECRET ?? 'dev-secret');
     req.tenantId = payload.tenantId;
     req.userId   = payload.userId;
+    req.role     = payload.role;
     next();
   } catch {
     res.status(401).json({ error: 'Invalid token' });
@@ -61,6 +62,11 @@ function requireAdmin(req, res, next) {
   if (!secret || secret !== process.env.ADMIN_SECRET) {
     return res.status(403).json({ error: 'Admin secret required' });
   }
+  next();
+}
+
+function requireSuperAdmin(req, res, next) {
+  if (req.role !== 'superadmin') return res.status(403).json({ error: 'Superadmin required' });
   next();
 }
 
@@ -232,7 +238,9 @@ app.post('/api/auth/login', async (req, res) => {
     if (!match) return res.status(401).json({ error: 'Invalid credentials' });
 
     const { rows: tenantRows } = await pool.query(
-      'SELECT id, name FROM tenants WHERE id = $1 AND active = true',
+      user.role === 'superadmin'
+        ? 'SELECT id, name FROM tenants WHERE id = $1'
+        : 'SELECT id, name FROM tenants WHERE id = $1 AND active = true',
       [user.tenant_id]
     );
     if (!tenantRows.length) return res.status(403).json({ error: 'Tenant inactive' });
@@ -242,7 +250,7 @@ app.post('/api/auth/login', async (req, res) => {
       process.env.JWT_SECRET ?? 'dev-secret',
       { expiresIn: '7d' }
     );
-    res.json({ token, tenant: tenantRows[0] });
+    res.json({ token, tenant: tenantRows[0], role: user.role });
   } catch (err) {
     console.error('[auth/login]', err.message);
     res.status(500).json({ error: 'Internal server error' });
@@ -304,6 +312,106 @@ app.put('/api/admin/users/:id/password', requireAdmin, async (req, res) => {
     if (!rowCount) return res.status(404).json({ error: 'User not found' });
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---------------------------------------------------------------------------
+// Superadmin API — JWT-protected, role=superadmin required
+// ---------------------------------------------------------------------------
+
+// GET /api/superadmin/dashboard — all tenants with stats
+app.get('/api/superadmin/dashboard', requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const { rows: tenants } = await pool.query(
+      `SELECT t.id, t.name, t.active, t.created_at,
+        (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id) AS user_count,
+        (SELECT COUNT(*) FROM products p WHERE p.tenant_id = t.id) AS product_count,
+        (SELECT COUNT(*) FROM sale_lines sl WHERE sl.tenant_id = t.id) AS sale_line_count,
+        (SELECT MAX(sc.updated_at) FROM sync_checkpoints sc WHERE sc.tenant_id = t.id) AS last_sync_at
+       FROM tenants t
+       ORDER BY t.created_at`
+    );
+    res.json(tenants);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/superadmin/tenants/:id/users
+app.get('/api/superadmin/tenants/:id/users', requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, email, role, created_at FROM users WHERE tenant_id = $1 ORDER BY created_at`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/superadmin/tenants/:id/users — create user
+app.post('/api/superadmin/tenants/:id/users', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { email, password, role = 'user' } = req.body ?? {};
+  if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+  try {
+    const password_hash = await bcrypt.hash(password, 12);
+    const { rows } = await pool.query(
+      `INSERT INTO users (tenant_id, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [req.params.id, email.toLowerCase().trim(), password_hash, role]
+    );
+    res.json({ ok: true, userId: rows[0].id });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Email already exists' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/superadmin/users/:id/password — reset password
+app.put('/api/superadmin/users/:id/password', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { password } = req.body ?? {};
+  if (!password) return res.status(400).json({ error: 'password required' });
+  try {
+    const password_hash = await bcrypt.hash(password, 12);
+    const { rowCount } = await pool.query(
+      `UPDATE users SET password_hash = $1 WHERE id = $2`,
+      [password_hash, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'User not found' });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/superadmin/tenants/:id — toggle active or rename
+app.put('/api/superadmin/tenants/:id', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { active, name } = req.body ?? {};
+  try {
+    const sets = [];
+    const vals = [];
+    if (active !== undefined) { sets.push(`active = $${sets.length + 1}`); vals.push(active); }
+    if (name   !== undefined) { sets.push(`name   = $${sets.length + 1}`); vals.push(name); }
+    if (!sets.length) return res.status(400).json({ error: 'Nothing to update' });
+    vals.push(req.params.id);
+    await pool.query(`UPDATE tenants SET ${sets.join(', ')} WHERE id = $${vals.length}`, vals);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/superadmin/tenants — create new tenant + first user
+app.post('/api/superadmin/tenants', requireAuth, requireSuperAdmin, async (req, res) => {
+  const { id, name, email, password } = req.body ?? {};
+  if (!id || !name || !email || !password) return res.status(400).json({ error: 'id, name, email, password required' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`INSERT INTO tenants (id, name) VALUES ($1, $2)`, [id.toLowerCase().trim(), name.trim()]);
+    const password_hash = await bcrypt.hash(password, 12);
+    await client.query(
+      `INSERT INTO users (tenant_id, email, password_hash, role) VALUES ($1, $2, $3, 'user')`,
+      [id.toLowerCase().trim(), email.toLowerCase().trim(), password_hash]
+    );
+    await client.query('COMMIT');
+    res.json({ ok: true, id: id.toLowerCase().trim() });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (err.code === '23505') return res.status(409).json({ error: 'Tenant or email already exists' });
+    res.status(500).json({ error: err.message });
+  } finally { client.release(); }
 });
 
 // ---------------------------------------------------------------------------
@@ -724,6 +832,27 @@ async function runMigrations() {
     if (!cols.length) {
       await pool.query(`ALTER TABLE conversations ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''`);
       console.log('[migration] conversations.tenant_id column added');
+    }
+  }
+
+  // Superadmin role — ensure 'superadmin' is an accepted role value
+  {
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role_check') THEN
+          ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+          ALTER TABLE users ADD CONSTRAINT users_role_check
+            CHECK (role IN ('user','admin','superadmin'));
+        END IF;
+      EXCEPTION WHEN others THEN NULL;
+      END $$
+    `);
+    // Add constraint idempotently
+    const { rows: cc } = await pool.query(`
+      SELECT 1 FROM pg_constraint WHERE conname = 'users_role_check'
+    `);
+    if (!cc.length) {
+      await pool.query(`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('user','admin','superadmin'))`);
     }
   }
 
