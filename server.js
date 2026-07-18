@@ -4705,7 +4705,7 @@ app.get('/api/debug/product-search', async (req, res, next) => {
 
     const result = await pool.query(`
       SELECT p.item_id::text, p.description, p.upc, p.ean, p.manufacturer,
-        COALESCE(array_to_string(p.tags, ','), '') AS tags,
+        p.tags::text AS tags,
         SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS brut,
         SUM(CASE WHEN sl.qty < 0 THEN ABS(sl.qty) ELSE 0 END) AS retours,
         SUM(sl.qty) AS net,
