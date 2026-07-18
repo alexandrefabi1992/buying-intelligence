@@ -13,6 +13,8 @@ const axios   = require('axios');
 const { Pool } = require('pg');
 const fs      = require('fs');
 const path    = require('path');
+const bcrypt  = require('bcrypt');
+const jwt     = require('jsonwebtoken');
 const { runAgentLoop } = require('./ai-agent');
 
 const app  = express();
@@ -36,6 +38,30 @@ pool.on('error', (err) => {
 process.on('unhandledRejection', (reason) => {
   console.error('[process] Unhandled rejection:', reason?.message ?? reason);
 });
+
+// ---------------------------------------------------------------------------
+// Auth middleware
+// ---------------------------------------------------------------------------
+function requireAuth(req, res, next) {
+  const token = (req.headers.authorization ?? '').replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET ?? 'dev-secret');
+    req.tenantId = payload.tenantId;
+    req.userId   = payload.userId;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+function requireAdmin(req, res, next) {
+  const secret = req.headers['x-admin-secret'];
+  if (!secret || secret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'Admin secret required' });
+  }
+  next();
+}
 
 // ---------------------------------------------------------------------------
 // Multiplier tiers — default values; overridden by app_settings DB table.
@@ -162,6 +188,119 @@ app.use(express.json({ limit: '25mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
+// ---------------------------------------------------------------------------
+// Route-level auth — global middleware for /api/* routes
+// - JWT required for all client routes
+// - X-Admin-Secret required for system/admin routes
+// ---------------------------------------------------------------------------
+app.use('/api', (req, res, next) => {
+  const p = req.path;
+  // Public: auth login
+  if (p === '/auth/login') return next();
+  // System routes: skip JWT, handled by requireAdmin below
+  if (p.startsWith('/admin') || p.startsWith('/sync') || p === '/logs' ||
+      p.startsWith('/test') || p.startsWith('/token')) return next();
+  // All other /api/* routes require JWT
+  requireAuth(req, res, next);
+});
+// Admin secret for system/admin routes
+app.use('/api/admin',  requireAdmin);
+app.use('/api/sync',   requireAdmin);
+app.use('/api/logs',   requireAdmin);
+app.use('/api/test',   requireAdmin);
+app.use('/api/token',  requireAdmin);
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/login — email + password → JWT (no auth required)
+// ---------------------------------------------------------------------------
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body ?? {};
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, tenant_id, role, password_hash FROM users WHERE email = $1',
+      [email.toLowerCase().trim()]
+    );
+    const user = rows[0];
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+
+    const { rows: tenantRows } = await pool.query(
+      'SELECT id, name FROM tenants WHERE id = $1 AND active = true',
+      [user.tenant_id]
+    );
+    if (!tenantRows.length) return res.status(403).json({ error: 'Tenant inactive' });
+
+    const token = jwt.sign(
+      { userId: user.id, tenantId: user.tenant_id, role: user.role },
+      process.env.JWT_SECRET ?? 'dev-secret',
+      { expiresIn: '7d' }
+    );
+    res.json({ token, tenant: tenantRows[0] });
+  } catch (err) {
+    console.error('[auth/login]', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Admin API — tenant + user management (protected by X-Admin-Secret header)
+// ---------------------------------------------------------------------------
+app.get('/api/admin/tenants', requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, name, ls_account_id, active, created_at FROM tenants ORDER BY created_at'
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/tenants', requireAdmin, async (req, res) => {
+  const { id, name } = req.body ?? {};
+  if (!id || !name) return res.status(400).json({ error: 'id and name required' });
+  try {
+    await pool.query(
+      'INSERT INTO tenants (id, name) VALUES ($1, $2)',
+      [id.toLowerCase().trim(), name.trim()]
+    );
+    res.json({ ok: true, id });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Tenant already exists' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/users', requireAdmin, async (req, res) => {
+  const { tenant_id, email, password, role = 'user' } = req.body ?? {};
+  if (!tenant_id || !email || !password) return res.status(400).json({ error: 'tenant_id, email and password required' });
+  try {
+    const password_hash = await bcrypt.hash(password, 12);
+    const { rows } = await pool.query(
+      'INSERT INTO users (tenant_id, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
+      [tenant_id, email.toLowerCase().trim(), password_hash, role]
+    );
+    res.json({ ok: true, userId: rows[0].id });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Email already exists' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/admin/users/:id/password', requireAdmin, async (req, res) => {
+  const { password } = req.body ?? {};
+  if (!password) return res.status(400).json({ error: 'password required' });
+  try {
+    const password_hash = await bcrypt.hash(password, 12);
+    const { rowCount } = await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [password_hash, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'User not found' });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // ---------------------------------------------------------------------------
 // GET /api/test/token-rotation — verify refresh token rotation persists to DB
@@ -396,6 +535,61 @@ async function runMigrations() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_budget_docs_lookup
     ON budget_documents(season_code, manufacturer, drop_id)`);
+
+  // ---------------------------------------------------------------------------
+  // Multi-tenant migration (Phase 1)
+  // ---------------------------------------------------------------------------
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tenants (
+      id               TEXT PRIMARY KEY,
+      name             TEXT NOT NULL,
+      ls_account_id    TEXT,
+      ls_refresh_token TEXT,
+      active           BOOLEAN DEFAULT true,
+      created_at       TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id            BIGSERIAL PRIMARY KEY,
+      tenant_id     TEXT NOT NULL REFERENCES tenants(id),
+      email         TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role          TEXT NOT NULL DEFAULT 'user',
+      created_at    TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  // Seed first tenant (existing Valérie Simon data)
+  await pool.query(
+    `INSERT INTO tenants (id, name) VALUES ('valerie-simon', 'Valérie Simon') ON CONFLICT DO NOTHING`
+  );
+
+  // Add tenant_id to all data tables (nullable, idempotent)
+  const TENANT_TABLES = [
+    'products','sales','sale_lines','inventory','shops','orders','transfers',
+    'app_settings','budget_plans','budget_plan_drops','budget_documents','conversations',
+  ];
+  for (const t of TENANT_TABLES) {
+    await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS tenant_id TEXT REFERENCES tenants(id)`);
+  }
+  // sync_state: no FK (has global migration marker rows)
+  await pool.query(`ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS tenant_id TEXT`);
+
+  // Backfill existing rows with the first tenant
+  for (const t of TENANT_TABLES) {
+    await pool.query(`UPDATE ${t} SET tenant_id = 'valerie-simon' WHERE tenant_id IS NULL`);
+  }
+  await pool.query(`UPDATE sync_state SET tenant_id = 'valerie-simon' WHERE tenant_id IS NULL`);
+
+  // Promote columns to NOT NULL (idempotent — checks nullability first)
+  for (const t of TENANT_TABLES) {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_name=$1 AND column_name='tenant_id' AND is_nullable='YES'`,
+      [t]
+    );
+    if (rows.length) await pool.query(`ALTER TABLE ${t} ALTER COLUMN tenant_id SET NOT NULL`);
+  }
 
   console.log('[migration] Schema up to date');
 }

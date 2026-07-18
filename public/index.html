@@ -28,6 +28,11 @@
     .tog-btn.active { background:#dbeafe; border-color:#3b82f6; color:#1d4ed8; font-weight:600; }
     .col-tip { cursor: help; }
     th.sort-col:hover { background-color: #f3f4f6; }
+    /* Login overlay */
+    #loginOverlay { position: fixed; inset: 0; z-index: 9000; background: #f1f5f9; display: flex; align-items: center; justify-content: center; }
+    #loginOverlay.hidden { display: none; }
+    #loginBox { background: #fff; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); padding: 40px; width: 100%; max-width: 380px; }
+
     #col-tooltip {
       position: fixed;
       z-index: 9999;
@@ -51,6 +56,37 @@
 </head>
 <body class="bg-gray-50 min-h-screen font-sans text-sm text-gray-800">
 
+<!-- Login overlay -->
+<div id="loginOverlay" class="hidden">
+  <div id="loginBox">
+    <div class="flex items-center gap-2 mb-8">
+      <svg class="w-7 h-7 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+      </svg>
+      <span class="text-xl font-bold text-gray-900">Buying Intelligence</span>
+    </div>
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <div class="mb-4">
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Email</label>
+        <input id="loginEmail" type="email" required autocomplete="email"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400"
+          placeholder="vous@boutique.com">
+      </div>
+      <div class="mb-6">
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Mot de passe</label>
+        <input id="loginPassword" type="password" required autocomplete="current-password"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400">
+      </div>
+      <div id="loginError" class="hidden text-red-600 text-xs mb-4 bg-red-50 rounded-lg px-3 py-2"></div>
+      <button type="submit" id="loginBtn"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm">
+        Se connecter
+      </button>
+    </form>
+  </div>
+</div>
+
 <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
   <div class="flex items-center gap-3">
     <svg class="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -61,10 +97,12 @@
   </div>
   <div class="flex items-center gap-4">
     <div id="syncStatus" class="text-xs text-gray-400">Chargement…</div>
+    <div id="tenantBadge" class="text-xs text-gray-400 hidden"></div>
     <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
       <button id="lang-fr" onclick="setLanguage('fr')" class="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 border-r border-gray-200">FR</button>
       <button id="lang-en" onclick="setLanguage('en')" class="text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600">EN</button>
     </div>
+    <button onclick="handleLogout()" class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded hover:bg-gray-100 transition-colors">Déconnexion</button>
   </div>
 </header>
 
@@ -892,6 +930,71 @@ function setLanguage(lang) {
 
 const BASE      = '';
 const PAGE_SIZE = 50;
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+function getToken()    { return localStorage.getItem('auth_token'); }
+function setToken(t)   { localStorage.setItem('auth_token', t); }
+function clearToken()  { localStorage.removeItem('auth_token'); }
+
+function showLogin() { document.getElementById('loginOverlay').classList.remove('hidden'); }
+function hideLogin() { document.getElementById('loginOverlay').classList.add('hidden'); }
+
+async function apiFetch(url, options = {}) {
+  const token = getToken();
+  const headers = { ...(options.headers ?? {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401) {
+    clearToken();
+    showLogin();
+    throw new Error('Session expirée — veuillez vous reconnecter');
+  }
+  return res;
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email    = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  const errEl    = document.getElementById('loginError');
+  const btn      = document.getElementById('loginBtn');
+  errEl.classList.add('hidden');
+  btn.disabled = true;
+  btn.textContent = 'Connexion…';
+  try {
+    const res  = await apiFetch(`${BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errEl.textContent = data.error ?? 'Identifiants invalides';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    setToken(data.token);
+    if (data.tenant?.name) {
+      const badge = document.getElementById('tenantBadge');
+      badge.textContent = data.tenant.name;
+      badge.classList.remove('hidden');
+    }
+    hideLogin();
+    initApp();
+  } catch (err) {
+    errEl.textContent = err.message ?? 'Erreur réseau';
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Se connecter';
+  }
+}
+
+function handleLogout() {
+  clearToken();
+  document.getElementById('tenantBadge').classList.add('hidden');
+  showLogin();
+}
 const LS_KEY       = 'buying_hypothesis';
 const LS_TIERS_KEY = 'buying_tiers';
 
@@ -946,7 +1049,7 @@ function saveMultipliers() {
 // ── Tiers (multiplier table) ──────────────────────────────────────────────
 async function loadTiers() {
   try {
-    const d = await fetch(`${BASE}/api/settings/multipliers`).then(r => r.json());
+    const d = await apiFetch(`${BASE}/api/settings/multipliers`).then(r => r.json());
     if (d.tiers?.length) {
       state.tiers = d.tiers.map(t => ({
         label:      t.label,
@@ -970,7 +1073,7 @@ async function saveTiersToServer() {
       multiplier: t.multiplier,
       label:      t.label,
     }));
-    await fetch(`${BASE}/api/settings/multipliers`, {
+    await apiFetch(`${BASE}/api/settings/multipliers`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tiers: serverTiers }),
@@ -1072,7 +1175,7 @@ function loadTab(id) {
 async function loadSyncStatus() {
   const el = document.getElementById('syncStatus');
   try {
-    const d = await fetch(`${BASE}/api/sync/checkpoints`).then(r => r.json());
+    const d = await apiFetch(`${BASE}/api/sync/checkpoints`).then(r => r.json());
     const all = d.checkpoints ?? [];
     const completed = all.filter(c => c.status === 'completed').sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at));
     const inProgress = all.some(c => c.status === 'in_progress');
@@ -1473,7 +1576,7 @@ const BudgetTab = (() => {
     showLoader(key, true);
     try {
       const qs = buildQuerySuffix(extraParams);
-      const d  = await fetch(`${BASE}${endpoint}${qs}`).then(r => r.json());
+      const d  = await apiFetch(`${BASE}${endpoint}${qs}`).then(r => r.json());
       state[key].data     = d.by_manufacturer ?? [];
       state[key].expanded = new Set();
       if (key === 'budgetSeas') {
@@ -1650,7 +1753,7 @@ var SizesTab = (function() {
   async function loadShops() {
     if (shopsLoaded) return;
     try {
-      var r = await fetch(BASE + '/api/shops');
+      var r = await apiFetch(BASE + '/api/shops');
       var d = await r.json();
       var sel = document.getElementById('sizesShop');
       (d.shops || d).forEach(function(sh) {
@@ -1666,7 +1769,7 @@ var SizesTab = (function() {
   async function loadSeasons() {
     if (seasonsLoaded) return;
     try {
-      var r = await fetch(BASE + '/api/settings/seasons');
+      var r = await apiFetch(BASE + '/api/settings/seasons');
       var d = await r.json();
       var sel = document.getElementById('sizesStockTag');
       (d.seasons || []).slice().reverse().forEach(function(s) {
@@ -1708,7 +1811,7 @@ var SizesTab = (function() {
     if (stockTag)   params.set('stock_tag', stockTag);
 
     try {
-      var r = await fetch(BASE + '/api/sizes/brands?' + params.toString());
+      var r = await apiFetch(BASE + '/api/sizes/brands?' + params.toString());
       var d = await r.json();
       sizesData = d.sizes || [];
       var catSel = document.getElementById('sizesCatFilter');
@@ -2061,7 +2164,7 @@ var TransfersTab = (function() {
     if (excludeNos) p.set('exclude_nos', '1');
 
     try {
-      var r = await fetch(BASE + '/api/transfers?' + p.toString());
+      var r = await apiFetch(BASE + '/api/transfers?' + p.toString());
       var d = await r.json();
       transfersData = d.transfers || [];
 
@@ -2193,7 +2296,7 @@ const PlanTab = (() => {
     loadExcluded();
     loadOverrides();
     if (!planState.allMfrs.length) {
-      fetch(`${BASE}/api/manufacturers`).then(r => r.json()).then(list => {
+      apiFetch(`${BASE}/api/manufacturers`).then(r => r.json()).then(list => {
         planState.allMfrs = list;
         const sel = document.getElementById('planAddExistingBrand');
         if (sel) {
@@ -2212,8 +2315,8 @@ const PlanTab = (() => {
       : '';
     try {
       const [budgetRes, planRes] = await Promise.all([
-        fetch(`${BASE}/api/budget/marque?season=${season}${shopParam}`).then(r => r.json()),
-        fetch(`${BASE}/api/budget-plan?season=${season}`).then(r => r.json()),
+        apiFetch(`${BASE}/api/budget/marque?season=${season}${shopParam}`).then(r => r.json()),
+        apiFetch(`${BASE}/api/budget-plan?season=${season}`).then(r => r.json()),
       ]);
       planState.budget = budgetRes.by_manufacturer ?? [];
       planState.plan   = planRes.by_manufacturer   ?? {};
@@ -2476,7 +2579,7 @@ const PlanTab = (() => {
     const containers = document.querySelectorAll(`.plan-docs-list[data-mfr="${CSS.escape(mfr)}"][data-drop="${CSS.escape(dropId)}"]`);
     if (!containers.length) return;
     try {
-      const r    = await fetch(`${BASE}/api/budget-plan/documents?season=${planState.season}&manufacturer=${encodeURIComponent(mfr)}&drop_id=${dropId}`);
+      const r    = await apiFetch(`${BASE}/api/budget-plan/documents?season=${planState.season}&manufacturer=${encodeURIComponent(mfr)}&drop_id=${dropId}`);
       const data = await r.json();
       const html = data.docs && data.docs.length
         ? data.docs.map(doc => `
@@ -2521,7 +2624,7 @@ const PlanTab = (() => {
       }
 
       try {
-        await fetch(`${BASE}/api/budget-plan`, {
+        await apiFetch(`${BASE}/api/budget-plan`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ season_code: season, manufacturer: mfr, drop_id: dropId, shop_id: shopId, planned_amount: amount }),
@@ -2558,7 +2661,7 @@ const PlanTab = (() => {
       const drop   = planState.drops[mfr]?.find(d => d.drop_id === dropId);
       if (drop) drop.drop_name = name;
       try {
-        await fetch(`${BASE}/api/budget-plan/drop`, {
+        await apiFetch(`${BASE}/api/budget-plan/drop`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_id: dropId, drop_name: name }),
@@ -2573,7 +2676,7 @@ const PlanTab = (() => {
       if (!btn) return;
       const mfr = btn.dataset.mfr;
       try {
-        const res  = await fetch(`${BASE}/api/budget-plan/drop`, {
+        const res  = await apiFetch(`${BASE}/api/budget-plan/drop`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_name: '' }),
         });
@@ -2600,7 +2703,7 @@ const PlanTab = (() => {
       const dropId = btn.dataset.drop;
       if (!confirm('Supprimer cette livraison et ses montants ?')) return;
       try {
-        await fetch(`${BASE}/api/budget-plan/drop`, {
+        await apiFetch(`${BASE}/api/budget-plan/drop`, {
           method: 'DELETE', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_id: dropId }),
         });
@@ -2705,7 +2808,7 @@ const PlanTab = (() => {
       reader.onload = async evt => {
         const base64 = evt.target.result.split(',')[1];
         try {
-          const res = await fetch(`${BASE}/api/budget-plan/document`, {
+          const res = await apiFetch(`${BASE}/api/budget-plan/document`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               season_code: planState.season, manufacturer: mfr, drop_id: drop,
@@ -2727,7 +2830,7 @@ const PlanTab = (() => {
       const docId = btn.dataset.docId, mfr = btn.dataset.mfr, drop = btn.dataset.drop;
       if (!confirm('Supprimer ce document ?')) return;
       try {
-        await fetch(`${BASE}/api/budget-plan/document/${docId}`, { method: 'DELETE' });
+        await apiFetch(`${BASE}/api/budget-plan/document/${docId}`, { method: 'DELETE' });
         loadDocs(mfr, drop);
       } catch {}
     });
@@ -2802,7 +2905,7 @@ const ParamsTab = (() => {
 
   async function loadBudgetParams() {
     try {
-      const d = await fetch(`${BASE}/api/settings/budget-params`).then(r => r.json());
+      const d = await apiFetch(`${BASE}/api/settings/budget-params`).then(r => r.json());
       const nbEl = document.getElementById('budgetNbSaisons');
       const coEl = document.getElementById('budgetCarryoverRate');
       const cbEl = document.getElementById('budgetSameRate');
@@ -2831,7 +2934,7 @@ const ParamsTab = (() => {
     }
     const rf         = parseFloat(document.getElementById('budgetRecencyFactor')?.value ?? 2.0);
     const absentMode = document.querySelector('input[name="absentBrandMode"]:checked')?.value ?? 'show';
-    await fetch(`${BASE}/api/settings/budget-params`, {
+    await apiFetch(`${BASE}/api/settings/budget-params`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nb_saisons_reference: nb, carryover_deduction_rate: co,
@@ -2923,7 +3026,7 @@ const NosTab = (() => {
     var sel = document.getElementById('nosUrgentShop');
     if (!sel || sel.options.length > 1) return;
     try {
-      var shops = await fetch(`${BASE}/api/shops`).then(function(r) { return r.json(); });
+      var shops = await apiFetch(`${BASE}/api/shops`).then(function(r) { return r.json(); });
       shops.forEach(function(s) {
         var opt = document.createElement('option');
         opt.value = s.shop_id; opt.textContent = s.name;
@@ -2934,7 +3037,7 @@ const NosTab = (() => {
 
   async function saveExcluded() {
     try {
-      await fetch(`${BASE}/api/settings/nos-excluded`, {
+      await apiFetch(`${BASE}/api/settings/nos-excluded`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify([...excludedItems]),
       });
@@ -2951,8 +3054,8 @@ const NosTab = (() => {
     try {
       var url = shopId ? `${BASE}/api/nos/urgent?shop_id=${shopId}` : `${BASE}/api/nos/urgent`;
       var results = await Promise.all([
-        fetch(url).then(function(r) { return r.json(); }),
-        fetch(`${BASE}/api/settings/nos-excluded`).then(function(r) { return r.json(); }),
+        apiFetch(url).then(function(r) { return r.json(); }),
+        apiFetch(`${BASE}/api/settings/nos-excluded`).then(function(r) { return r.json(); }),
       ]);
       urgentData    = results[0].items ?? [];
       excludedItems = new Set((results[1] ?? []).map(String));
@@ -3164,8 +3267,8 @@ let leadTimesData = {};
 
 async function loadLeadTimes() {
   try {
-    leadTimesData = await fetch(`${BASE}/api/settings/nos-lead-times`).then(r => r.json());
-    const brands = await fetch(`${BASE}/api/manufacturers`).then(r => r.json());
+    leadTimesData = await apiFetch(`${BASE}/api/settings/nos-lead-times`).then(r => r.json());
+    const brands = await apiFetch(`${BASE}/api/manufacturers`).then(r => r.json());
     const container = document.getElementById('leadTimesContainer');
     if (!container) return;
     container.innerHTML = brands.map(b => {
@@ -3189,7 +3292,7 @@ document.getElementById('leadTimesApply')?.addEventListener('click', async () =>
     if (!isNaN(v) && v > 0) payload[inp.dataset.brand] = v;
   });
   try {
-    await fetch(`${BASE}/api/settings/nos-lead-times`, {
+    await apiFetch(`${BASE}/api/settings/nos-lead-times`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
@@ -3202,20 +3305,28 @@ document.getElementById('leadTimesApply')?.addEventListener('click', async () =>
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────
-Promise.all([loadTiers(), ParamsTab.loadBudgetParams()]).then(() => {
-  loadMultipliers();
-  buildFilterBar();
-  BudgetTab.init();
+function initApp() {
+  Promise.all([loadTiers(), ParamsTab.loadBudgetParams()]).then(() => {
+    loadMultipliers();
+    buildFilterBar();
+    BudgetTab.init();
 
-  SizesTab.init();
-  PlanTab.init();
-  TransfersTab.init();
-  loadSyncStatus();
-  tabLoaded['budget'] = true;
-  // Apply saved language (updates static elements + button styling)
-  setLanguage(_lang);
-  BudgetTab.load();
-});
+    SizesTab.init();
+    PlanTab.init();
+    TransfersTab.init();
+    loadSyncStatus();
+    tabLoaded['budget'] = true;
+    // Apply saved language (updates static elements + button styling)
+    setLanguage(_lang);
+    BudgetTab.load();
+  });
+}
+
+if (getToken()) {
+  initApp();
+} else {
+  showLogin();
+}
 
 // ── Column tooltips (JS-based to bypass overflow:hidden on containers) ────
 (function() {
@@ -3357,7 +3468,7 @@ Promise.all([loadTiers(), ParamsTab.loadBudgetParams()]).then(() => {
     if (!isOpen) return;
     histPanel.innerHTML = '<span style="font-size:11px;color:#94a3b8;padding:4px 8px">Chargement…</span>';
     try {
-      const convs = await fetch(`${BASE}/api/conversations?limit=20`).then(r => r.json());
+      const convs = await apiFetch(`${BASE}/api/conversations?limit=20`).then(r => r.json());
       if (!convs.length) { histPanel.innerHTML = '<span style="font-size:11px;color:#94a3b8;padding:4px 8px">Aucune conversation sauvegardée.</span>'; return; }
       histPanel.innerHTML = '';
       convs.forEach(c => {
@@ -3367,7 +3478,7 @@ Promise.all([loadTiers(), ParamsTab.loadBudgetParams()]).then(() => {
         item.className = 'history-item';
         item.innerHTML = `<span class="truncate">${c.preview || '(sans titre)'}</span><span class="hist-date">${dateStr}</span>`;
         item.addEventListener('click', async () => {
-          const full = await fetch(`${BASE}/api/conversations/${c.id}`).then(r => r.json());
+          const full = await apiFetch(`${BASE}/api/conversations/${c.id}`).then(r => r.json());
           history = full.messages ?? [];
           msgs.innerHTML = '';
           appendMsg('assistant', 'Bonjour ! Je suis votre assistant achat. Posez-moi des questions sur vos budgets, ventes, stocks ou sell-through.');
@@ -3382,7 +3493,7 @@ Promise.all([loadTiers(), ParamsTab.loadBudgetParams()]).then(() => {
   });
 
   // Detect provider from a lightweight ping (optional enhancement)
-  fetch(`${BASE}/api/ai/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+  apiFetch(`${BASE}/api/ai/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages: [] }) })
     .then(r => r.json()).then(d => {
       if (d.error?.includes('non configuré')) badge.textContent = '⚠ Non configuré';
@@ -3430,7 +3541,7 @@ Promise.all([loadTiers(), ParamsTab.loadBudgetParams()]).then(() => {
     const thinking = appendMsg('thinking', '…');
 
     try {
-      const res = await fetch(`${BASE}/api/ai/chat`, {
+      const res = await apiFetch(`${BASE}/api/ai/chat`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ messages: history }),
