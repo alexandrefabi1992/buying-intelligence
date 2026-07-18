@@ -3443,7 +3443,7 @@ const HelpPanel = (() => {
   async function load() {
     if (helpData) return;
     try {
-      const r = await fetch('/api/help', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('token') || '') } });
+      const r = await fetch('/api/help', { headers: { Authorization: 'Bearer ' + (getToken() || '') } });
       helpData = await r.json();
     } catch { helpData = {}; }
   }
