@@ -4685,6 +4685,44 @@ app.post('/api/debug/item-diff', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/debug/item-shops — show per-shop sales breakdown for a product (by item_id or description)
+// Query: ?item_id=132378  OR  ?q=Ariel+36+Marine
+// ---------------------------------------------------------------------------
+app.get('/api/debug/item-shops', async (req, res, next) => {
+  try {
+    const { item_id, q, from, to } = req.query;
+    if (!item_id && !q) return res.status(400).json({ error: 'item_id or q required' });
+    const today     = new Date().toISOString().slice(0, 10);
+    const tenYrsAgo = new Date(Date.now() - 3650 * 86_400_000).toISOString().slice(0, 10);
+    const fromDate  = from ?? tenYrsAgo;
+    const toDate    = to   ?? today;
+
+    const filter = item_id
+      ? `AND sl.item_id = $3::bigint`
+      : `AND p.description ILIKE $3`;
+    const param4 = item_id ? item_id : `%${q}%`;
+
+    const result = await pool.query(`
+      SELECT sl.shop_id, s.name AS shop_name,
+        p.item_id::text, p.description, p.upc, p.tags::text AS tags,
+        SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS brut,
+        SUM(CASE WHEN sl.qty < 0 THEN ABS(sl.qty) ELSE 0 END) AS retours,
+        SUM(sl.qty) AS net
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      LEFT JOIN shops s ON s.shop_id::text = sl.shop_id::text
+      WHERE sl.completed_time BETWEEN $1 AND $2
+        ${filter}
+        AND sl.qty != 0
+      GROUP BY sl.shop_id, s.name, p.item_id, p.description, p.upc, p.tags
+      ORDER BY sl.shop_id
+    `, [fromDate, toDate, param4]);
+
+    res.json({ periode: { de: fromDate, a: toDate }, nb_rows: result.rows.length, rows: result.rows });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/debug/product-search — search products by description + check sale_lines
 // Query: ?q=Nela+L&shop_id=6&from=2025-08-01&to=2026-07-17&tag=p26
 // ---------------------------------------------------------------------------
