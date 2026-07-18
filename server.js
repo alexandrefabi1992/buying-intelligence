@@ -58,7 +58,7 @@ function requireAuth(req, res, next) {
 function requireAdmin(req, res, next) {
   const secret = req.headers['x-admin-secret'];
   if (!secret || secret !== process.env.ADMIN_SECRET) {
-    return res.status(401).json({ error: 'Admin secret required' });
+    return res.status(403).json({ error: 'Admin secret required' });
   }
   next();
 }
@@ -198,18 +198,20 @@ app.use('/api', (req, res, next) => {
   const p = req.path;
   // Public: auth login
   if (p === '/auth/login') return next();
-  // System routes: skip JWT, handled by requireAdmin below
-  if (p.startsWith('/admin') || p.startsWith('/sync') || p === '/logs' ||
-      p.startsWith('/test') || p.startsWith('/token')) return next();
-  // All other /api/* routes require JWT
+  // Admin-only system routes (protected by X-Admin-Secret, not JWT)
+  if (p.startsWith('/admin') ||
+      p === '/sync/run' || p === '/sync/reset' ||
+      p === '/logs' || p.startsWith('/test') || p.startsWith('/token')) return next();
+  // All other /api/* routes (including /sync/checkpoints) require JWT
   requireAuth(req, res, next);
 });
-// Admin secret for system/admin routes
-app.use('/api/admin',  requireAdmin);
-app.use('/api/sync',   requireAdmin);
-app.use('/api/logs',   requireAdmin);
-app.use('/api/test',   requireAdmin);
-app.use('/api/token',  requireAdmin);
+// Admin secret for system routes
+app.use('/api/admin',       requireAdmin);
+app.use('/api/sync/run',    requireAdmin);
+app.use('/api/sync/reset',  requireAdmin);
+app.use('/api/logs',        requireAdmin);
+app.use('/api/test',        requireAdmin);
+app.use('/api/token',       requireAdmin);
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/login — email + password → JWT (no auth required)
