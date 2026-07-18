@@ -43,7 +43,7 @@ const TOOL_DEFS = [
       type: 'object',
       properties: {
         season: { type: 'string', description: 'Code de saison, ex: p26, a26, p25' },
-        shops:  { type: 'string', description: 'IDs de boutiques séparés par virgules (optionnel), ex: "1,2,5"' },
+        shops:  { type: 'string', description: 'Noms ou IDs de boutiques séparés par virgules (optionnel), ex: "Saint-Bruno,Fan Club". La résolution par nom se fait automatiquement.' },
         limit:  { type: 'integer', description: 'Nombre maximum de marques à retourner (défaut: 20)' },
       },
       required: ['season'],
@@ -58,7 +58,7 @@ const TOOL_DEFS = [
         period:       { type: 'string',  description: 'OBLIGATOIRE pour toute période relative. Valeurs: "1y" "2y" "3y" "4y" "5y" "6m" "3m" "1m" "4w" "8w" "10w" "12w" "30d" "ytd" "last_year". Ex: "4 dernières années" → "4y", "10 dernières semaines" → "10w", "cette année" → "ytd"' },
         season:       { type: 'string',  description: 'Code de saison (ex: p26, a25) — seulement si la question porte sur une saison nommée' },
         manufacturer: { type: 'string',  description: 'Nom de la marque (optionnel)' },
-        shop_id:      { type: 'string',  description: 'ID de la boutique (optionnel)' },
+        shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel). Passer le nom tel quel, ex: "Saint-Bruno", "Fan Club", "Valérie Simon" — la résolution se fait automatiquement.' },
         total_only:   { type: 'boolean', description: 'true pour total toutes marques par boutique (ventes globales compagnie)' },
       },
       required: [],
@@ -98,7 +98,7 @@ const TOOL_DEFS = [
         metric: { type: 'string',  enum: ['sell_through', 'sold_cost', 'net_budget'], description: 'Critère de tri' },
         order:  { type: 'string',  enum: ['desc', 'asc'], description: 'desc = meilleures en premier, asc = pires en premier' },
         limit:  { type: 'integer', description: 'Nombre de marques (défaut: 10)' },
-        shops:  { type: 'string',  description: 'Filtre boutiques (optionnel)' },
+        shops:  { type: 'string',  description: 'Noms ou IDs de boutiques séparés par virgules (optionnel), ex: "Saint-Bruno,Fan Club".' },
       },
       required: ['season', 'metric'],
     },
@@ -266,7 +266,7 @@ STRUCTURE DES DONNÉES
 - ${genreInstruction}
 - ${nosInstruction}
 
-BOUTIQUES : utilise get_shops_list() si tu as besoin des IDs exacts.
+BOUTIQUES : passe toujours le nom de la boutique tel quel dans shop_id (ex: "Saint-Bruno", "Fan Club") — JAMAIS inventer ou deviner un ID numérique. La résolution se fait automatiquement.
 
 RÈGLES ABSOLUES
 - Réponds TOUJOURS en français
