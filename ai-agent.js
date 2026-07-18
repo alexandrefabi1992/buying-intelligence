@@ -320,7 +320,7 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
     if (s) { from = s.sell_from; to = s.sell_to; }
   }
 
-  const conditions = [];
+  const conditions = ['sl.qty > 0'];
   const params     = [];
 
   if (from) { conditions.push(`sl.completed_time >= $${params.length + 1}`); params.push(from); }
@@ -582,6 +582,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
       SELECT sl2.item_id, SUM(sl2.qty) AS sold
       FROM sale_lines sl2
       WHERE sl2.completed_time BETWEEN $1 AND $2
+        AND sl2.qty > 0
         ${shopSaleCond}
       GROUP BY sl2.item_id
     ),
