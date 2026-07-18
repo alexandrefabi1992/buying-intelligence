@@ -4685,6 +4685,46 @@ app.post('/api/debug/item-diff', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/debug/product-search — search products by description + check sale_lines
+// Query: ?q=Nela+L&shop_id=6&from=2025-08-01&to=2026-07-17&tag=p26
+// ---------------------------------------------------------------------------
+app.get('/api/debug/product-search', async (req, res, next) => {
+  try {
+    const { q, shop_id, from, to, tag } = req.query;
+    if (!q) return res.status(400).json({ error: 'q (description search) required' });
+    const today     = new Date().toISOString().slice(0, 10);
+    const tenYrsAgo = new Date(Date.now() - 3650 * 86_400_000).toISOString().slice(0, 10);
+    const fromDate  = from ?? tenYrsAgo;
+    const toDate    = to   ?? today;
+
+    const tagFilter = tag ? `AND $5 = ANY(p.tags)` : '';
+    const shopSaleCond = shop_id ? `AND sl.shop_id = $${tag ? 6 : 5}` : '';
+    const params = [fromDate, toDate, `%${q}%`];
+    if (tag) params.push(tag);
+    if (shop_id) params.push(shop_id);
+
+    const result = await pool.query(`
+      SELECT p.item_id::text, p.description, p.upc, p.ean, p.manufacturer,
+        COALESCE(array_to_string(p.tags, ','), '') AS tags,
+        SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS brut,
+        SUM(CASE WHEN sl.qty < 0 THEN ABS(sl.qty) ELSE 0 END) AS retours,
+        SUM(sl.qty) AS net,
+        COUNT(sl.id) AS nb_lignes
+      FROM products p
+      LEFT JOIN sale_lines sl ON sl.item_id = p.item_id
+        AND sl.completed_time BETWEEN $1 AND $2
+        ${shopSaleCond}
+      WHERE p.description ILIKE $3
+        ${tagFilter}
+      GROUP BY p.item_id, p.description, p.upc, p.ean, p.manufacturer, p.tags
+      ORDER BY p.description
+    `, params);
+
+    res.json({ q, periode: { de: fromDate, a: toDate }, shop_id, tag, nb_found: result.rows.length, items: result.rows });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/ai/chat — AI agent endpoint
 // Body: { messages: [...] }   (OpenAI-format conversation history)
 // Returns: { content, messages }
