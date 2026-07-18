@@ -4698,7 +4698,7 @@ app.get('/api/debug/item-shops', async (req, res, next) => {
     const toDate    = to   ?? today;
 
     const filter = item_id
-      ? `AND sl.item_id = $3::bigint`
+      ? `AND sl.item_id::text = $3`
       : `AND p.description ILIKE $3`;
     const param4 = item_id ? item_id : `%${q}%`;
 
