@@ -7,6 +7,15 @@ const poolConfig = { connectionString: process.env.DATABASE_URL };
 if (process.env.DATABASE_URL) poolConfig.ssl = { rejectUnauthorized: false };
 const pool = new Pool(poolConfig);
 
+// Tenant ID for this sync process. Set SYNC_TENANT_ID env var, or the first tenant in DB is used.
+let _syncTenantId = process.env.SYNC_TENANT_ID ?? null;
+async function getSyncTenantId() {
+  if (_syncTenantId) return _syncTenantId;
+  const { rows } = await pool.query(`SELECT id FROM tenants ORDER BY created_at LIMIT 1`);
+  _syncTenantId = rows[0]?.id ?? null;
+  return _syncTenantId;
+}
+
 const BASE_URL = `https://api.lightspeedapp.com/API/V3/Account/${process.env.LIGHTSPEED_ACCOUNT_ID}`;
 const TOKEN_URL = 'https://cloud.lightspeedapp.com/oauth/access_token.php';
 const LIMIT = 200;
@@ -230,19 +239,19 @@ function numOrNull(v) {
 // ---------------------------------------------------------------------------
 // Upsert helpers
 // ---------------------------------------------------------------------------
-async function upsertShops(client, rows) {
+async function upsertShops(tenantId, rows) {
   for (const s of rows) {
     await pool.query(
-      `INSERT INTO shops(shop_id, name, time_zone, raw)
-       VALUES ($1,$2,$3,$4)
-       ON CONFLICT(shop_id) DO UPDATE
+      `INSERT INTO shops(shop_id, name, time_zone, raw, tenant_id)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT(tenant_id, shop_id) DO UPDATE
          SET name=$2, time_zone=$3, raw=$4, synced_at=now()`,
-      [s.shopID, s.name, s.timeZone ?? null, s],
+      [s.shopID, s.name, s.timeZone ?? null, s, tenantId],
     );
   }
 }
 
-async function upsertProducts(client, rows) {
+async function upsertProducts(tenantId, rows) {
   for (const item of rows) {
     // Category: prefer fullPathName from loaded relation, fall back to raw ID
     const category = item.Category?.fullPathName ?? item.Category?.name ?? item.categoryID ?? null;
@@ -270,9 +279,9 @@ async function upsertProducts(client, rows) {
 
     await pool.query(
       `INSERT INTO products(item_id, matrix_id, description, ean, upc, manufacturer, brand,
-         category, department, tags, image_url, default_cost, default_price, archived, raw)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-       ON CONFLICT(item_id) DO UPDATE
+         category, department, tags, image_url, default_cost, default_price, archived, raw, tenant_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       ON CONFLICT(tenant_id, item_id) DO UPDATE
          SET matrix_id=$2, description=$3, ean=$4, upc=$5, manufacturer=$6, brand=$7,
              category=$8, department=$9, tags=$10, image_url=$11,
              default_cost=$12, default_price=$13, archived=$14, raw=$15, synced_at=now()`,
@@ -283,26 +292,26 @@ async function upsertProducts(client, rows) {
         category, item.departmentID ?? null,
         tags, imageUrl,
         item.defaultCost ?? null, defaultPrice,
-        item.archived === 'true', item,
+        item.archived === 'true', item, tenantId,
       ],
     );
   }
 }
 
-async function upsertInventory(client, rows) {
+async function upsertInventory(tenantId, rows) {
   for (const is of rows) {
     try {
       await pool.query(
-        `INSERT INTO inventory(item_id, shop_id, qty_on_hand, qty_on_order, reorder_point, reorder_level, raw)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         ON CONFLICT(item_id, shop_id) DO UPDATE
+        `INSERT INTO inventory(item_id, shop_id, qty_on_hand, qty_on_order, reorder_point, reorder_level, raw, tenant_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT(tenant_id, item_id, shop_id) DO UPDATE
            SET qty_on_hand=$3, qty_on_order=$4, reorder_point=$5, reorder_level=$6,
                raw=$7, synced_at=now()`,
         [
           is.itemID, is.shopID,
           is.qoh ?? 0, is.qoo ?? 0,
           is.reorderPoint ?? null, is.reorderLevel ?? null,
-          is,
+          is, tenantId,
         ],
       );
     } catch (err) {
@@ -312,19 +321,19 @@ async function upsertInventory(client, rows) {
   }
 }
 
-async function upsertSales(client, rows) {
+async function upsertSales(tenantId, rows) {
   for (const s of rows) {
     try {
       await pool.query(
-        `INSERT INTO sales(sale_id, shop_id, register_id, customer_id, completed_time, total, discount, tax, raw)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-         ON CONFLICT(sale_id) DO UPDATE
+        `INSERT INTO sales(sale_id, shop_id, register_id, customer_id, completed_time, total, discount, tax, raw, tenant_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         ON CONFLICT(tenant_id, sale_id) DO UPDATE
            SET shop_id=$2, completed_time=$5, total=$6, discount=$7, tax=$8, raw=$9, synced_at=now()`,
         [
           s.saleID, s.shopID ?? null, s.registerID ?? null, s.customerID ?? null,
           s.completeTime ?? s.completedTime ?? null,
           numOrNull(s.calcTotal), numOrNull(s.calcDiscount), numOrNull(s.calcTax),
-          s,
+          s, tenantId,
         ],
       );
     } catch (err) {
@@ -334,14 +343,14 @@ async function upsertSales(client, rows) {
   }
 }
 
-async function upsertSaleLines(client, rows, completedTime) {
+async function upsertSaleLines(tenantId, rows, completedTime) {
   for (const sl of rows) {
     try {
       await pool.query(
         `INSERT INTO sale_lines(sale_line_id, sale_id, item_id, shop_id,
-           unit_price, unit_cost, qty, discount, tax, completed_time, raw)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-         ON CONFLICT(sale_line_id) DO UPDATE
+           unit_price, unit_cost, qty, discount, tax, completed_time, raw, tenant_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         ON CONFLICT(tenant_id, sale_line_id) DO UPDATE
            SET item_id=$3, shop_id=$4, unit_price=$5, unit_cost=$6, qty=$7,
                discount=$8, tax=$9, completed_time=$10, raw=$11, synced_at=now()`,
         [
@@ -350,7 +359,7 @@ async function upsertSaleLines(client, rows, completedTime) {
           numOrNull(sl.unitPrice), numOrNull(sl.unitCost),
           numOrNull(sl.unitQuantity), numOrNull(sl.calcLineDiscount), numOrNull(sl.tax),
           completedTime ?? null,
-          sl,
+          sl, tenantId,
         ],
       );
     } catch (err) {
@@ -360,7 +369,7 @@ async function upsertSaleLines(client, rows, completedTime) {
   }
 }
 
-async function upsertTransfers(client, transfers) {
+async function upsertTransfers(tenantId, transfers) {
   for (const t of transfers) {
     const fromShopId = t.TransferFrom?.shopID  ?? null;
     const toShopId   = t.TransferTo?.shopID    ?? null;
@@ -383,9 +392,9 @@ async function upsertTransfers(client, transfers) {
           `INSERT INTO transfers(
              transfer_item_id, transfer_id, from_shop_id, to_shop_id,
              item_id, qty_sent, qty_received,
-             transfer_sent, transfer_received, transfer_date, note, raw)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-           ON CONFLICT(transfer_item_id) DO UPDATE
+             transfer_sent, transfer_received, transfer_date, note, raw, tenant_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+           ON CONFLICT(tenant_id, transfer_item_id) DO UPDATE
              SET transfer_id=$2, from_shop_id=$3, to_shop_id=$4,
                  item_id=$5, qty_sent=$6, qty_received=$7,
                  transfer_sent=$8, transfer_received=$9,
@@ -398,7 +407,7 @@ async function upsertTransfers(client, transfers) {
             numOrNull(ti.received) ?? 0,
             tSent, tReceived,
             transferDate, note,
-            { header: t, item: ti },
+            { header: t, item: ti }, tenantId,
           ],
         );
       } catch (err) {
@@ -409,19 +418,19 @@ async function upsertTransfers(client, transfers) {
   }
 }
 
-async function upsertOrders(client, rows) {
+async function upsertOrders(tenantId, rows) {
   for (const o of rows) {
     await pool.query(
-      `INSERT INTO orders(order_id, shop_id, vendor_id, status, order_date, eta, total, raw)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-       ON CONFLICT(order_id) DO UPDATE
+      `INSERT INTO orders(order_id, shop_id, vendor_id, status, order_date, eta, total, raw, tenant_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT(tenant_id, order_id) DO UPDATE
          SET shop_id=$2, vendor_id=$3, status=$4, order_date=$5, eta=$6,
              total=$7, raw=$8, synced_at=now()`,
       [
         o.orderID, o.shopID ?? null, o.vendorID ?? null,
         o.orderStatus ?? null,
         o.orderDate ?? null, o.eta ?? null,
-        numOrNull(o.total), o,
+        numOrNull(o.total), o, tenantId,
       ],
     );
   }
@@ -448,6 +457,10 @@ const SYNC_STEPS = ['shops', 'items', 'inventory', 'sales', 'orders', 'transfers
 
 async function runSync() {
   console.log(`[sync] Starting — ${new Date().toISOString()}`);
+
+  const tenantId = await getSyncTenantId();
+  if (!tenantId) throw new Error('No tenant found — set SYNC_TENANT_ID env var or run onboarding first');
+  console.log(`[sync] Tenant: ${tenantId}`);
 
   // Force immediate token refresh + persist new refresh_token before any work
   tokenExpiresAt = 0;
@@ -517,7 +530,7 @@ async function runSync() {
       else           console.log('[sync] Fetching shops…');
       let shopCount = 0;
       for await (const { items, nextUrl } of paginate(client, 'Shop', {}, cps.shops?.next_url)) {
-        await upsertShops(client, items);
+        await upsertShops(tenantId, items);
         shopCount += items.length;
         if (nextUrl) await saveCheckpoint('shops', nextUrl, shopCount);
       }
@@ -546,7 +559,7 @@ async function runSync() {
       else              console.log('[sync] Items full sync…');
 
       for await (const { items, nextUrl } of paginate(client, 'Item', itemsParams, cps.items?.next_url)) {
-        await upsertProducts(client, items);
+        await upsertProducts(tenantId, items);
         itemCount += items.length;
         console.log(`[sync] Items upserted: ${itemCount}`);
         if (nextUrl) await saveCheckpoint('items', nextUrl, itemCount);
@@ -579,7 +592,7 @@ async function runSync() {
       const invSyncStarted = new Date().toISOString();
 
       for await (const { items, nextUrl } of paginate(client, 'ItemShop', invParams, cps.inventory?.next_url)) {
-        await upsertInventory(client, items);
+        await upsertInventory(tenantId, items);
         invCount += items.length;
         if (invCount % 1000 === 0)  console.log(`[sync] Inventory upserted: ${invCount}`);
         if (nextUrl && invCount % 10_000 === 0) await saveCheckpoint('inventory', nextUrl, invCount);
@@ -603,14 +616,14 @@ async function runSync() {
         load_relations: JSON.stringify(['SaleLines']),
         completeTime: `>,${since}`,
       }, cps.sales?.next_url)) {
-        await upsertSales(client, items);
+        await upsertSales(tenantId, items);
         for (const sale of items) {
           const lines = sale.SaleLines?.SaleLine;
           if (!lines) continue;
           const lineArr = Array.isArray(lines) ? lines : [lines];
           // Lightspeed uses completeTime (no 'd') in the response object
           const ct = sale.completeTime ?? sale.completedTime ?? null;
-          await upsertSaleLines(client, lineArr, ct);
+          await upsertSaleLines(tenantId, lineArr, ct);
         }
         salesCount += items.length;
         // Checkpoint every 10,000 records
@@ -627,7 +640,7 @@ async function runSync() {
       if (cps.orders) console.log(`[sync] Resuming orders from checkpoint at ${ordersCount}…`);
       else            console.log('[sync] Fetching orders…');
       for await (const { items, nextUrl } of paginate(client, 'Order', {}, cps.orders?.next_url)) {
-        await upsertOrders(client, items);
+        await upsertOrders(tenantId, items);
         ordersCount += items.length;
         if (nextUrl) await saveCheckpoint('orders', nextUrl, ordersCount);
       }
@@ -644,7 +657,7 @@ async function runSync() {
       for await (const { items, nextUrl } of paginate(client, 'Transfer', {
         load_relations: 'all',
       }, cps.transfers?.next_url)) {
-        await upsertTransfers(client, items);
+        await upsertTransfers(tenantId, items);
         txCount += items.length;
         if (txCount % 500 === 0) console.log(`[sync] Transfers processed: ${txCount}`);
         if (nextUrl && txCount % 2_000 === 0) await saveCheckpoint('transfers', nextUrl, txCount);
