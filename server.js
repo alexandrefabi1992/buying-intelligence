@@ -4697,7 +4697,10 @@ app.get('/api/debug/product-search', async (req, res, next) => {
     const fromDate  = from ?? tenYrsAgo;
     const toDate    = to   ?? today;
 
-    // Always pass all 5 params; use IS NULL checks to make filters optional
+    const params = [fromDate, toDate, `%${q}%`];
+    const shopJoinCond = shop_id ? `AND sl.shop_id = $${params.push(shop_id)}` : '';
+    const tagWhereCond = tag     ? `AND $${params.push(tag)} = ANY(p.tags)` : '';
+
     const result = await pool.query(`
       SELECT p.item_id::text, p.description, p.upc, p.ean, p.manufacturer,
         p.tags::text AS tags,
@@ -4708,12 +4711,12 @@ app.get('/api/debug/product-search', async (req, res, next) => {
       FROM products p
       LEFT JOIN sale_lines sl ON sl.item_id = p.item_id
         AND sl.completed_time BETWEEN $1 AND $2
-        AND ($4::int IS NULL OR sl.shop_id = $4::int)
+        ${shopJoinCond}
       WHERE p.description ILIKE $3
-        AND ($5::text IS NULL OR $5 = ANY(p.tags))
+        ${tagWhereCond}
       GROUP BY p.item_id, p.description, p.upc, p.ean, p.manufacturer, p.tags
       ORDER BY p.description
-    `, [fromDate, toDate, `%${q}%`, shop_id || null, tag || null]);
+    `, params);
 
     res.json({ q, periode: { de: fromDate, a: toDate }, shop_id, tag, nb_found: result.rows.length, items: result.rows });
   } catch (err) { next(err); }
