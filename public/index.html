@@ -182,6 +182,10 @@
         <div class="flex flex-col items-end self-end gap-1">
           <div id="budgetSeasTotal" class="text-base font-bold text-amber-700"></div>
           <div id="budgetSeasPeriod" class="text-xs text-gray-400"></div>
+          <button id="exportBudgetBtn" onclick="BudgetTab.exportCSV()"
+            class="mt-1 px-2.5 py-1 text-xs font-medium rounded border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors">
+            ↓ Export CSV
+          </button>
         </div>
       </div>
       <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -1542,7 +1546,57 @@ const BudgetTab = (() => {
     bindTableListeners();
   }
 
-  return { init, load, updateTotals, renderMarqueBudgetTable, renderBudgetTable, fetchPanel };
+  function exportCSV() {
+    const data = state.budgetSeas.data;
+    if (!data.length) return;
+
+    const season = (document.getElementById('budgetSeasSeason')?.value ?? 'budget').toUpperCase();
+    const today  = new Date().toISOString().slice(0, 10);
+
+    const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const num    = v => v != null ? Math.round(v) : '';
+    const pct    = v => v != null ? (v * 100).toFixed(1) + '%' : '';
+
+    const headers = [
+      'Marque', 'Reçu actuel ($)', 'Réceptions moy. ($)',
+      'Min ($)', 'Max ($)',
+      'ST moyen (%)', 'ST récent projeté (%)', 'ST récent YTD (%)',
+      'Tendance', 'Multiplicateur', 'Décision',
+      'Budget ajusté ($)', 'Carryover déduit ($)', 'Budget net ($)'
+    ];
+
+    const rows = data.map(m => {
+      const recentSeasonData = m.seasons?.[m.most_recent_ref];
+      const recentRecvCost   = recentSeasonData?.received_cost_raw ?? null;
+      return [
+        escape(m.manufacturer),
+        num(recentRecvCost),
+        num(m.avg_received_cost),
+        num(m.min_received_cost),
+        num(m.max_received_cost),
+        pct(m.avg_st),
+        pct(m.recent_st_projected),
+        pct(m.recent_st_ytd),
+        escape(m.trend ?? ''),
+        m.multiplier != null ? m.multiplier.toFixed(2) : '',
+        escape(m.multiplier_label ?? ''),
+        num(m.adjusted_budget),
+        num(m.carryover_deduction),
+        num(m.net_budget)
+      ].join(',');
+    });
+
+    const csv  = [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `budget_${season}_${today}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return { init, load, updateTotals, renderMarqueBudgetTable, renderBudgetTable, fetchPanel, exportCSV };
 })();
 
 // Alias used by ParamsTab to re-fetch budget after tiers change
