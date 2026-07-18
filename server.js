@@ -509,15 +509,32 @@ async function runMigrations() {
       console.log('[migration] budget_plans PK updated to include drop_id');
     }
   }
-  // Seed drop metadata for any existing plan rows that don't have a drop entry yet
-  await pool.query(`
-    INSERT INTO budget_plan_drops (season_code, manufacturer, drop_id, drop_name, drop_order)
-    SELECT DISTINCT season_code, manufacturer, drop_id,
-      'Drop ' || split_part(drop_id, '_', 2),
-      COALESCE(NULLIF(split_part(drop_id, '_', 2), '')::int, 1)
-    FROM budget_plans
-    ON CONFLICT DO NOTHING
-  `);
+  // Seed drop metadata for any existing plan rows that don't have a drop entry yet.
+  // Branch on whether tenant_id column already exists (added by Phase 1 on existing DBs).
+  {
+    const { rows: bpdTid } = await pool.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_name = 'budget_plan_drops' AND column_name = 'tenant_id'`
+    );
+    if (bpdTid.length) {
+      await pool.query(`
+        INSERT INTO budget_plan_drops (tenant_id, season_code, manufacturer, drop_id, drop_name, drop_order)
+        SELECT DISTINCT bp.tenant_id, bp.season_code, bp.manufacturer, bp.drop_id,
+          'Drop ' || split_part(bp.drop_id, '_', 2),
+          COALESCE(NULLIF(split_part(bp.drop_id, '_', 2), '')::int, 1)
+        FROM budget_plans bp
+        ON CONFLICT DO NOTHING
+      `);
+    } else {
+      await pool.query(`
+        INSERT INTO budget_plan_drops (season_code, manufacturer, drop_id, drop_name, drop_order)
+        SELECT DISTINCT season_code, manufacturer, drop_id,
+          'Drop ' || split_part(drop_id, '_', 2),
+          COALESCE(NULLIF(split_part(drop_id, '_', 2), '')::int, 1)
+        FROM budget_plans
+        ON CONFLICT DO NOTHING
+      `);
+    }
+  }
   await pool.query(
     "INSERT INTO sync_state(step, next_url) VALUES ('budget_plans_drops_v1', 'COMPLETED') ON CONFLICT(step) DO NOTHING"
   );
