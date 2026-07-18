@@ -4697,28 +4697,23 @@ app.get('/api/debug/product-search', async (req, res, next) => {
     const fromDate  = from ?? tenYrsAgo;
     const toDate    = to   ?? today;
 
-    const tagFilter = tag ? `AND $5 = ANY(p.tags)` : '';
-    const shopSaleCond = shop_id ? `AND sl.shop_id = $${tag ? 6 : 5}` : '';
-    const params = [fromDate, toDate, `%${q}%`];
-    if (tag) params.push(tag);
-    if (shop_id) params.push(shop_id);
-
+    // Always pass all 5 params; use IS NULL checks to make filters optional
     const result = await pool.query(`
       SELECT p.item_id::text, p.description, p.upc, p.ean, p.manufacturer,
         p.tags::text AS tags,
         SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS brut,
         SUM(CASE WHEN sl.qty < 0 THEN ABS(sl.qty) ELSE 0 END) AS retours,
-        SUM(sl.qty) AS net,
+        COALESCE(SUM(sl.qty), 0) AS net,
         COUNT(sl.item_id) AS nb_lignes
       FROM products p
       LEFT JOIN sale_lines sl ON sl.item_id = p.item_id
         AND sl.completed_time BETWEEN $1 AND $2
-        ${shopSaleCond}
+        AND ($4::int IS NULL OR sl.shop_id = $4::int)
       WHERE p.description ILIKE $3
-        ${tagFilter}
+        AND ($5::text IS NULL OR $5 = ANY(p.tags))
       GROUP BY p.item_id, p.description, p.upc, p.ean, p.manufacturer, p.tags
       ORDER BY p.description
-    `, params);
+    `, [fromDate, toDate, `%${q}%`, shop_id || null, tag || null]);
 
     res.json({ q, periode: { de: fromDate, a: toDate }, shop_id, tag, nb_found: result.rows.length, items: result.rows });
   } catch (err) { next(err); }
