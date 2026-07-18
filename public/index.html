@@ -3367,53 +3367,105 @@ if (getToken()) {
   #help-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:2000; opacity:0; pointer-events:none; transition:opacity 0.2s ease; }
   #help-overlay.open { opacity:1; pointer-events:all; }
   #help-drawer {
-    position:fixed; top:0; right:0; height:100%; width:520px; max-width:95vw;
+    position:fixed; top:0; right:0; height:100%; width:540px; max-width:95vw;
     background:#fff; box-shadow:-4px 0 32px rgba(0,0,0,0.12); z-index:2001;
     display:flex; flex-direction:column;
-    transform:translateX(100%); transition:transform 0.25s cubic-bezier(.4,0,.2,1);
+    transform:translateX(100%); transition:transform 0.25s cubic-bezier(.4,0,.2,1), width 0.25s ease, left 0.25s ease;
   }
   #help-drawer.open { transform:translateX(0); }
+  #help-drawer.fullscreen { width:100%; left:0; }
+  #help-nav-col { width:200px; min-width:200px; }
+  #help-drawer.fullscreen #help-nav-col { width:240px; min-width:240px; }
+  #help-drawer.fullscreen #help-content { max-width:860px; margin:0 auto; }
   .help-nav-btn { display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:9px 14px; border-radius:8px; font-size:13px; color:#374151; transition:background 0.15s; }
   .help-nav-btn:hover { background:#f3f4f6; }
   .help-nav-btn.active { background:#eff6ff; color:#1d4ed8; font-weight:600; }
-  .help-section { display:none; }
-  .help-section.active { display:block; }
-  .help-section h2 { font-size:18px; font-weight:700; color:#111827; margin-bottom:4px; }
-  .help-section .summary { font-size:13px; color:#6b7280; margin-bottom:20px; line-height:1.6; }
-  .help-block { margin-bottom:20px; }
-  .help-block h3 { font-size:13px; font-weight:600; color:#1d4ed8; margin-bottom:6px; }
-  .help-block p, .help-block ul { font-size:13px; color:#374151; line-height:1.65; margin:0; }
-  .help-block ul { padding-left:18px; }
-  .help-block li { margin-bottom:3px; }
-  .help-block strong { font-weight:600; color:#111827; }
+  .help-section h2 { font-size:20px; font-weight:700; color:#111827; margin-bottom:6px; }
+  .help-section .summary { font-size:14px; color:#6b7280; margin-bottom:24px; line-height:1.65; padding-bottom:20px; border-bottom:1px solid #f3f4f6; }
+  .help-block { margin-bottom:24px; }
+  .help-block h3 { font-size:13px; font-weight:600; color:#1d4ed8; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.04em; }
+  .help-block-body { font-size:13.5px; color:#374151; line-height:1.7; }
+  .help-block-body ul { padding-left:20px; margin:6px 0; }
+  .help-block-body li { margin-bottom:4px; }
+  .help-block-body strong { font-weight:600; color:#111827; }
+  .help-block-body table { width:100%; border-collapse:collapse; margin:10px 0; font-size:12.5px; }
+  .help-block-body th { background:#f1f5f9; font-weight:600; padding:7px 10px; text-align:left; border:1px solid #e2e8f0; color:#374151; }
+  .help-block-body td { padding:6px 10px; border:1px solid #e2e8f0; color:#374151; }
+  .help-block-body tr:nth-child(even) td { background:#f8fafc; }
+  .help-tip { margin-top:24px; padding:14px 16px; background:#eff6ff; border-radius:12px; border:1px solid #bfdbfe; font-size:13px; color:#1d4ed8; line-height:1.6; }
 </style>
 
 <div id="help-overlay" onclick="HelpPanel.close()"></div>
 <div id="help-drawer">
-  <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+  <div class="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
     <div class="flex items-center gap-2">
       <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="currentColor" stroke-width="0"/></svg>
       <span class="font-bold text-gray-900 text-base">Guide d'utilisation</span>
     </div>
-    <button onclick="HelpPanel.close()" class="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-    </button>
+    <div class="flex items-center gap-1">
+      <button id="help-expand-btn" onclick="HelpPanel.toggleFullscreen()" title="Plein écran" class="text-gray-400 hover:text-gray-600 p-1.5 rounded hover:bg-gray-100 transition-colors">
+        <svg id="help-expand-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"/></svg>
+      </button>
+      <button onclick="HelpPanel.close()" title="Fermer" class="text-gray-400 hover:text-gray-600 p-1.5 rounded hover:bg-gray-100 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
   </div>
   <div class="flex flex-1 overflow-hidden">
-    <div id="help-nav" class="w-44 shrink-0 border-r border-gray-100 p-3 overflow-y-auto flex flex-col gap-1"></div>
-    <div id="help-content" class="flex-1 overflow-y-auto p-6"></div>
+    <div id="help-nav-col" class="shrink-0 border-r border-gray-100 p-3 overflow-y-auto flex flex-col gap-1">
+      <div id="help-nav"></div>
+    </div>
+    <div id="help-content" class="flex-1 overflow-y-auto p-6 help-section"></div>
   </div>
 </div>
 
 <script>
 const HelpPanel = (() => {
   let helpData = null;
+  let currentKey = 'quickstart';
+  let isFullscreen = false;
   const TAB_TO_SECTION = { budget:'budget', nos:'nos', sizes:'sizes', transfers:'transfers', plan:'plan', params:'params' };
 
+  function md(text) {
+    // Bold
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Inline code
+    text = text.replace(/`(.+?)`/g, '<code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">$1</code>');
+    // Tables: | col | col | → <table>
+    const tableRegex = /(\|.+\|\n\|[-| :]+\|\n(?:\|.+\|\n?)+)/g;
+    text = text.replace(tableRegex, match => {
+      const rows = match.trim().split('\n');
+      const headers = rows[0].split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+      const body = rows.slice(2).map(r => {
+        const cells = r.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+        return `<tr>${cells}</tr>`;
+      }).join('');
+      return `<table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>`;
+    });
+    // Numbered list
+    const lines = text.split('\n');
+    let out = [], inList = false, listType = null;
+    for (const line of lines) {
+      const ulMatch = line.match(/^- (.+)/);
+      const olMatch = line.match(/^\*\*(\d+)\.\*\* (.+)/) || line.match(/^(\d+)\. (.+)/);
+      if (ulMatch) {
+        if (listType !== 'ul') { if (inList) out.push(`</${listType}>`); out.push('<ul>'); inList = true; listType = 'ul'; }
+        out.push(`<li>${ulMatch[1]}</li>`);
+      } else if (olMatch) {
+        if (listType !== 'ol') { if (inList) out.push(`</${listType}>`); out.push('<ol>'); inList = true; listType = 'ol'; }
+        out.push(`<li>${olMatch[2] || olMatch[1]}</li>`);
+      } else {
+        if (inList) { out.push(`</${listType}>`); inList = false; listType = null; }
+        out.push(line ? `<p>${line}</p>` : '');
+      }
+    }
+    if (inList) out.push(`</${listType}>`);
+    return out.join('');
+  }
+
   function renderNav(activeKey) {
-    const nav = document.getElementById('help-nav');
     if (!helpData) return;
-    nav.innerHTML = Object.entries(helpData).map(([key, s]) => `
+    document.getElementById('help-nav').innerHTML = Object.entries(helpData).map(([key, s]) => `
       <button class="help-nav-btn ${key === activeKey ? 'active' : ''}" onclick="HelpPanel.show('${key}')">
         <span>${s.icon}</span><span>${s.title}</span>
       </button>`).join('');
@@ -3422,22 +3474,24 @@ const HelpPanel = (() => {
   function renderSection(key) {
     const s = helpData[key];
     if (!s) return;
-    const blocksHtml = s.sections.map(sec => {
-      const bodyHtml = sec.body
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/^- (.+)$/gm, '<li>$1</li>')
-        .replace(/(<li>.*<\/li>\n?)+/gs, m => `<ul>${m}</ul>`)
-        .replace(/\n/g, '<br>');
-      return `<div class="help-block"><h3>${sec.heading}</h3><p>${bodyHtml}</p></div>`;
-    }).join('');
+    currentKey = key;
+    const blocksHtml = s.sections.map(sec =>
+      `<div class="help-block">
+        <h3>${sec.heading}</h3>
+        <div class="help-block-body">${md(sec.body)}</div>
+      </div>`
+    ).join('');
     document.getElementById('help-content').innerHTML = `
-      <h2>${s.icon} ${s.title}</h2>
-      <p class="summary">${s.summary}</p>
-      ${blocksHtml}
-      <div class="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
-        <p class="text-xs text-blue-700"><strong>💬 Astuce :</strong> L'assistant IA connaît toutes ces sections. Vous pouvez lui poser des questions comme <em>« Comment fonctionne le budget saisonnier ? »</em> ou <em>« Explique-moi le carryover »</em>.</p>
+      <div class="help-section">
+        <h2>${s.icon} ${s.title}</h2>
+        <p class="summary">${s.summary}</p>
+        ${blocksHtml}
+        <div class="help-tip">
+          <strong>💬 Astuce :</strong> L'assistant IA (bouton en bas à droite) connaît toutes ces sections. Essayez : <em>« Comment fonctionne le carryover ? »</em> ou <em>« Explique-moi les paliers de multiplicateurs »</em>.
+        </div>
       </div>`;
     renderNav(key);
+    document.getElementById('help-content').scrollTop = 0;
   }
 
   async function load() {
@@ -3450,7 +3504,14 @@ const HelpPanel = (() => {
 
   function currentTab() {
     const active = document.querySelector('.tab.tab-active');
-    return active ? TAB_TO_SECTION[active.dataset.tab] || 'budget' : 'budget';
+    return active ? (TAB_TO_SECTION[active.dataset.tab] || 'budget') : 'budget';
+  }
+
+  function updateExpandIcon() {
+    document.getElementById('help-expand-icon').innerHTML = isFullscreen
+      ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9L4 4m0 0v4m0-4h4M15 9l5-5m0 0v4m0-4h-4M9 15l-5 5m0 0v-4m0 4h4M15 15l5 5m0 0v-4m0 4h-4"/>'
+      : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"/>';
+    document.getElementById('help-expand-btn').title = isFullscreen ? 'Réduire' : 'Plein écran';
   }
 
   return {
@@ -3464,18 +3525,26 @@ const HelpPanel = (() => {
     close() {
       document.getElementById('help-overlay').classList.remove('open');
       document.getElementById('help-drawer').classList.remove('open');
+      if (isFullscreen) { isFullscreen = false; document.getElementById('help-drawer').classList.remove('fullscreen'); updateExpandIcon(); }
     },
-    show(key) { renderSection(key); },
+    show(key) { if (helpData) renderSection(key); },
+    toggleFullscreen() {
+      isFullscreen = !isFullscreen;
+      document.getElementById('help-drawer').classList.toggle('fullscreen', isFullscreen);
+      document.getElementById('help-overlay').style.display = isFullscreen ? 'none' : '';
+      updateExpandIcon();
+    },
   };
 })();
 
-// Open help for current section when ? is clicked from any tab
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
-    if (document.getElementById('help-drawer').classList.contains('open')) {
-      HelpPanel.show(btn.dataset.tab);
-    }
+    if (document.getElementById('help-drawer').classList.contains('open')) HelpPanel.show(btn.dataset.tab);
   });
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('help-drawer').classList.contains('open')) HelpPanel.close();
 });
 </script>
 
