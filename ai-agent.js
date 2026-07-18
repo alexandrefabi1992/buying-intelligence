@@ -587,7 +587,6 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
       SELECT sl2.item_id, SUM(sl2.qty) AS sold
       FROM sale_lines sl2
       WHERE sl2.completed_time BETWEEN $1 AND $2
-        AND sl2.qty > 0
         ${shopSaleCond}
       GROUP BY sl2.item_id
     ),
@@ -632,7 +631,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
         CASE WHEN GREATEST(0,
           COALESCE(s.sold, 0) + COALESCE(st.stock, 0)
           + COALESCE(to2.qty_out, 0) - COALESCE(ti.qty_in, 0)) > 0
-          THEN ROUND(COALESCE(s.sold, 0)::numeric / GREATEST(1,
+          THEN ROUND(GREATEST(0, COALESCE(s.sold, 0))::numeric / GREATEST(1,
             COALESCE(s.sold, 0) + COALESCE(st.stock, 0)
             + COALESCE(to2.qty_out, 0) - COALESCE(ti.qty_in, 0)) * 100, 1)
           ELSE 0 END AS st_pct
@@ -644,7 +643,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
       WHERE ${prodWhere.length ? prodWhere.join(' AND ') + ' AND' : ''}
         -- Include any item with sales, stock, OR transfer activity.
         -- Items transferred out with 0 sales and 0 stock still have real supplier received.
-        (COALESCE(s.sold, 0) + COALESCE(st.stock, 0) + COALESCE(ti.qty_in, 0) + COALESCE(to2.qty_out, 0)) > 0
+        (GREATEST(0, COALESCE(s.sold, 0)) + COALESCE(st.stock, 0) + COALESCE(ti.qty_in, 0) + COALESCE(to2.qty_out, 0)) > 0
     )
     SELECT *,
       SUM(received_supplier) OVER () AS total_recu_all,
