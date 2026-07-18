@@ -4636,33 +4636,51 @@ app.get('/api/debug/st-gap', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.post('/api/debug/item-diff', async (req, res, next) => {
   try {
-    const { item_ids, shop_id, from, to } = req.body;
-    if (!Array.isArray(item_ids) || !shop_id) {
-      return res.status(400).json({ error: 'item_ids (array) and shop_id required' });
+    const { item_ids, upcs, shop_id, from, to } = req.body;
+    if ((!Array.isArray(item_ids) && !Array.isArray(upcs)) || !shop_id) {
+      return res.status(400).json({ error: 'item_ids or upcs (array) and shop_id required' });
     }
     const today     = new Date().toISOString().slice(0, 10);
     const tenYrsAgo = new Date(Date.now() - 3650 * 86_400_000).toISOString().slice(0, 10);
     const fromDate  = from ?? tenYrsAgo;
     const toDate    = to   ?? today;
 
-    const result = await pool.query(`
-      SELECT sl.item_id::text, p.description,
-        SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS brut,
-        SUM(CASE WHEN sl.qty < 0 THEN ABS(sl.qty) ELSE 0 END) AS retours,
-        SUM(sl.qty) AS net
-      FROM sale_lines sl
-      JOIN products p ON p.item_id = sl.item_id
-      WHERE sl.completed_time BETWEEN $1 AND $2
-        AND sl.shop_id = $3
-        AND sl.item_id::text = ANY($4)
-      GROUP BY sl.item_id, p.description
-    `, [fromDate, toDate, shop_id, item_ids]);
+    let result;
+    if (Array.isArray(upcs) && upcs.length > 0) {
+      result = await pool.query(`
+        SELECT p.upc, p.ean, sl.item_id::text, p.description,
+          SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS brut,
+          SUM(CASE WHEN sl.qty < 0 THEN ABS(sl.qty) ELSE 0 END) AS retours,
+          SUM(sl.qty) AS net
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE sl.completed_time BETWEEN $1 AND $2
+          AND sl.shop_id = $3
+          AND (p.upc = ANY($4) OR p.ean = ANY($4))
+        GROUP BY p.upc, p.ean, sl.item_id, p.description
+      `, [fromDate, toDate, shop_id, upcs]);
+    } else {
+      result = await pool.query(`
+        SELECT sl.item_id::text, p.description,
+          SUM(CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END) AS brut,
+          SUM(CASE WHEN sl.qty < 0 THEN ABS(sl.qty) ELSE 0 END) AS retours,
+          SUM(sl.qty) AS net
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE sl.completed_time BETWEEN $1 AND $2
+          AND sl.shop_id = $3
+          AND sl.item_id::text = ANY($4)
+        GROUP BY sl.item_id, p.description
+      `, [fromDate, toDate, shop_id, item_ids]);
+    }
 
     const db = {};
     for (const r of result.rows) {
-      db[r.item_id] = { net: Number(r.net), brut: Number(r.brut), retours: Number(r.retours), description: r.description };
+      const key = r.upc || r.item_id;
+      db[key] = { item_id: r.item_id, net: Number(r.net), brut: Number(r.brut), retours: Number(r.retours), description: r.description, upc: r.upc, ean: r.ean };
     }
-    res.json({ periode: { de: fromDate, a: toDate }, shop_id, nb_items_queried: item_ids.length, nb_items_found: result.rows.length, by_item: db });
+    const queried = Array.isArray(upcs) ? upcs : item_ids;
+    res.json({ periode: { de: fromDate, a: toDate }, shop_id, nb_items_queried: queried.length, nb_items_found: result.rows.length, by_item: db });
   } catch (err) { next(err); }
 });
 
