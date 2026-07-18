@@ -593,6 +593,62 @@ async function runMigrations() {
     if (rows.length) await pool.query(`ALTER TABLE ${t} ALTER COLUMN tenant_id SET NOT NULL`);
   }
 
+  // ---------------------------------------------------------------------------
+  // Multi-tenant Phase 4 — composite PKs + sync_checkpoints table
+  // ---------------------------------------------------------------------------
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sync_checkpoints (
+      tenant_id       TEXT NOT NULL REFERENCES tenants(id),
+      step            TEXT NOT NULL,
+      next_url        TEXT,
+      processed_count INTEGER DEFAULT 0,
+      updated_at      TIMESTAMPTZ DEFAULT now(),
+      PRIMARY KEY (tenant_id, step)
+    )
+  `);
+
+  // Change single-column PKs to composite (tenant_id, original_id).
+  // Idempotent: only runs if products PK does not yet include tenant_id.
+  {
+    const { rows: pkCols } = await pool.query(`
+      SELECT a.attname FROM pg_index i
+      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+      WHERE i.indrelid = 'products'::regclass AND i.indisprimary
+    `);
+    const alreadyComposite = pkCols.some(r => r.attname === 'tenant_id');
+    if (!alreadyComposite) {
+      console.log('[migration] Upgrading to composite PKs for multi-tenant…');
+      // Drop old PKs with CASCADE — auto-removes any FK constraints referencing them
+      for (const [tbl, conName] of [
+        ['products',   'products_pkey'],
+        ['shops',      'shops_pkey'],
+        ['sales',      'sales_pkey'],
+        ['sale_lines', 'sale_lines_pkey'],
+        ['orders',     'orders_pkey'],
+        ['transfers',  'transfers_pkey'],
+      ]) {
+        await pool.query(`ALTER TABLE ${tbl} DROP CONSTRAINT IF EXISTS "${conName}" CASCADE`);
+      }
+      // Drop inventory unique constraint (name may vary — query for it)
+      const { rows: invUq } = await pool.query(`
+        SELECT conname FROM pg_constraint
+        WHERE conrelid = 'inventory'::regclass AND contype = 'u'
+      `);
+      for (const r of invUq) {
+        await pool.query(`ALTER TABLE inventory DROP CONSTRAINT "${r.conname}"`);
+      }
+      // Add composite PKs
+      await pool.query(`ALTER TABLE products   ADD PRIMARY KEY (tenant_id, item_id)`);
+      await pool.query(`ALTER TABLE shops       ADD PRIMARY KEY (tenant_id, shop_id)`);
+      await pool.query(`ALTER TABLE sales       ADD PRIMARY KEY (tenant_id, sale_id)`);
+      await pool.query(`ALTER TABLE sale_lines  ADD PRIMARY KEY (tenant_id, sale_line_id)`);
+      await pool.query(`ALTER TABLE orders      ADD PRIMARY KEY (tenant_id, order_id)`);
+      await pool.query(`ALTER TABLE transfers   ADD PRIMARY KEY (tenant_id, transfer_item_id)`);
+      await pool.query(`ALTER TABLE inventory   ADD UNIQUE (tenant_id, item_id, shop_id)`);
+      console.log('[migration] Composite PKs applied');
+    }
+  }
+
   console.log('[migration] Schema up to date');
 }
 
@@ -651,11 +707,18 @@ app.get('/oauth/start', (req, res) => {
   const redirectUri = process.env.LIGHTSPEED_REDIRECT_URI
     ?? `http://localhost:${process.env.PORT ?? 3000}/oauth/callback`;
 
+  // Encode tenant_id in state (signed JWT) so /oauth/callback knows which tenant
+  const tenantId = req.query.tenant_id ?? null;
+  const state    = tenantId
+    ? jwt.sign({ tenantId }, process.env.JWT_SECRET ?? 'dev-secret', { expiresIn: '1h' })
+    : null;
+
   const params = new URLSearchParams({
     response_type: 'code',
     client_id:     process.env.LIGHTSPEED_CLIENT_ID,
     redirect_uri:  redirectUri,
     scope:         'employee:all',
+    ...(state ? { state } : {}),
   });
 
   res.redirect(`${AUTHORIZE_URL}?${params}`);
@@ -663,7 +726,7 @@ app.get('/oauth/start', (req, res) => {
 
 app.get('/oauth/callback', async (req, res, next) => {
   try {
-    const { code, error } = req.query;
+    const { code, error, state } = req.query;
 
     if (error) {
       return res.status(400).send(`<pre>Lightspeed returned an error:\n${error}</pre>`);
@@ -685,39 +748,51 @@ app.get('/oauth/callback', async (req, res, next) => {
 
     const { access_token, refresh_token, expires_in } = data;
 
+    // Auto-discover account_id from Lightspeed API
+    let accountId = null;
+    try {
+      const acctRes = await axios.get('https://api.lightspeedapp.com/API/V3/Account.json', {
+        headers: { Authorization: `Bearer ${access_token}` },
+        timeout: 10000,
+      });
+      accountId = acctRes.data?.Account?.accountID ?? null;
+    } catch (e) {
+      console.warn('[oauth] Could not auto-discover account ID:', e.message);
+    }
+
+    // If state encodes a tenant_id, store tokens directly in the tenants table
+    let tenantName = null;
+    if (state) {
+      try {
+        const payload = jwt.verify(state, process.env.JWT_SECRET ?? 'dev-secret');
+        const tenantId = payload.tenantId;
+        await pool.query(
+          `UPDATE tenants SET ls_refresh_token = $1, ls_account_id = COALESCE($2, ls_account_id) WHERE id = $3`,
+          [refresh_token, accountId, tenantId]
+        );
+        const { rows } = await pool.query('SELECT name FROM tenants WHERE id = $1', [tenantId]);
+        tenantName = rows[0]?.name ?? tenantId;
+        console.log(`[oauth] Tokens stored for tenant: ${tenantId} (account ${accountId})`);
+      } catch (e) {
+        console.warn('[oauth] Invalid state JWT:', e.message);
+      }
+    }
+
     console.log('\n========== LIGHTSPEED TOKENS ==========');
+    if (tenantName) console.log('tenant        :', tenantName);
+    if (accountId)  console.log('account_id    :', accountId);
     console.log('refresh_token :', refresh_token);
     console.log('access_token  :', access_token);
     console.log('expires_in    :', expires_in, 'seconds');
     console.log('=======================================\n');
 
-    res.send(`
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><title>OAuth2 Success</title>
-<style>
-  body { font-family: monospace; max-width: 700px; margin: 60px auto; padding: 0 20px; }
-  h1   { color: #2d7d46; }
-  .token-box { background: #f4f4f4; border: 1px solid #ccc; padding: 16px;
-               border-radius: 6px; word-break: break-all; }
-  label { font-weight: bold; display: block; margin-top: 16px; }
-  .note { color: #555; margin-top: 24px; font-size: 0.9em; }
-</style>
-</head>
-<body>
-  <h1>Authorization successful</h1>
-  <p>Copy the <strong>refresh_token</strong> into your <code>.env</code> file
-     as <code>LIGHTSPEED_REFRESH_TOKEN</code>.</p>
+    const successMsg = tenantName
+      ? `<h1 style="color:#2d7d46">✓ Lightspeed connecté — ${tenantName}</h1><p>Le compte Lightspeed (ID ${accountId ?? '?'}) a été lié automatiquement. Le prochain sync importera les données.</p><p><a href="/">← Retour à l'application</a></p>`
+      : `<h1>Authorization successful</h1><p>Copy the <strong>refresh_token</strong> into your environment:<br><code>${refresh_token}</code></p>`;
 
-  <label>refresh_token</label>
-  <div class="token-box">${refresh_token}</div>
-
-  <label>access_token (short-lived, ${expires_in}s)</label>
-  <div class="token-box">${access_token}</div>
-
-  <p class="note">Both tokens have also been printed to the server console.</p>
-</body>
-</html>`);
+    res.send(`<!doctype html><html><head><meta charset="utf-8"><title>OAuth2</title>
+<style>body{font-family:sans-serif;max-width:600px;margin:60px auto;padding:0 20px}</style>
+</head><body>${successMsg}</body></html>`);
   } catch (err) { next(err); }
 });
 
