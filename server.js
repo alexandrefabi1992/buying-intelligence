@@ -76,10 +76,11 @@ const DEFAULT_MULTIPLIER_TIERS = [
   { st_min: 0.00, multiplier: 0.50, label: 'Couper'        },
 ];
 
-async function getMultiplierTiers() {
+async function getMultiplierTiers(tenantId) {
   try {
     const { rows } = await pool.query(
-      "SELECT value FROM app_settings WHERE key = 'multiplier_tiers'"
+      "SELECT value FROM app_settings WHERE key = 'multiplier_tiers' AND tenant_id = $1",
+      [tenantId]
     );
     if (rows.length && Array.isArray(rows[0].value)) return rows[0].value;
   } catch {}
@@ -129,25 +130,25 @@ const DEFAULT_BUDGET_PARAMS = {
   absent_brand_mode:          'show', // 'show' = afficher avec badge | 'hide' = masquer
 };
 
-async function getTenantConfig() {
+async function getTenantConfig(tenantId) {
   try {
-    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'tenant_config'");
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'tenant_config' AND tenant_id = $1", [tenantId]);
     if (rows.length && rows[0].value) return rows[0].value;
   } catch {}
   return {};
 }
 
-async function getSeasonsConfig() {
+async function getSeasonsConfig(tenantId) {
   try {
-    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'seasons_config'");
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'seasons_config' AND tenant_id = $1", [tenantId]);
     if (rows.length && Array.isArray(rows[0].value) && rows[0].value.length > 0) return rows[0].value;
   } catch {}
   return DEFAULT_SEASONS_CONFIG;
 }
 
-async function getBudgetParams() {
+async function getBudgetParams(tenantId) {
   try {
-    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'budget_params'");
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'budget_params' AND tenant_id = $1", [tenantId]);
     if (rows.length && rows[0].value && typeof rows[0].value === 'object') {
       return { ...DEFAULT_BUDGET_PARAMS, ...rows[0].value };
     }
@@ -649,6 +650,49 @@ async function runMigrations() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Multi-tenant Phase 5 — composite PKs for settings + budget tables
+  // ---------------------------------------------------------------------------
+  {
+    const { rows: pkCols } = await pool.query(`
+      SELECT a.attname FROM pg_index i
+      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+      WHERE i.indrelid = 'app_settings'::regclass AND i.indisprimary
+    `);
+    if (!pkCols.some(r => r.attname === 'tenant_id')) {
+      await pool.query(`ALTER TABLE app_settings DROP CONSTRAINT IF EXISTS app_settings_pkey CASCADE`);
+      await pool.query(`ALTER TABLE app_settings ADD PRIMARY KEY (tenant_id, key)`);
+      console.log('[migration] app_settings composite PK applied');
+    }
+  }
+  {
+    const { rows: pkCols } = await pool.query(`
+      SELECT a.attname FROM pg_index i
+      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+      WHERE i.indrelid = 'budget_plans'::regclass AND i.indisprimary
+    `);
+    if (!pkCols.some(r => r.attname === 'tenant_id')) {
+      const { rows: c1 } = await pool.query(`SELECT conname FROM pg_constraint WHERE conrelid = 'budget_plans'::regclass AND contype = 'p'`);
+      if (c1.length) await pool.query(`ALTER TABLE budget_plans DROP CONSTRAINT "${c1[0].conname}" CASCADE`);
+      await pool.query(`ALTER TABLE budget_plans ADD PRIMARY KEY (tenant_id, season_code, manufacturer, drop_id, shop_id)`);
+      const { rows: c2 } = await pool.query(`SELECT conname FROM pg_constraint WHERE conrelid = 'budget_plan_drops'::regclass AND contype = 'p'`);
+      if (c2.length) await pool.query(`ALTER TABLE budget_plan_drops DROP CONSTRAINT "${c2[0].conname}" CASCADE`);
+      await pool.query(`ALTER TABLE budget_plan_drops ADD PRIMARY KEY (tenant_id, season_code, manufacturer, drop_id)`);
+      console.log('[migration] budget_plans/drops composite PKs applied');
+    }
+  }
+  // conversations tenant_id column
+  {
+    const { rows: cols } = await pool.query(`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'conversations' AND column_name = 'tenant_id'
+    `);
+    if (!cols.length) {
+      await pool.query(`ALTER TABLE conversations ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''`);
+      console.log('[migration] conversations.tenant_id column added');
+    }
+  }
+
   console.log('[migration] Schema up to date');
 }
 
@@ -805,8 +849,9 @@ app.get('/api/manufacturers', async (req, res, next) => {
   try {
     const { rows } = await pool.query(
       `SELECT DISTINCT manufacturer FROM products
-       WHERE manufacturer IS NOT NULL AND manufacturer != ''
-       ORDER BY manufacturer`
+       WHERE manufacturer IS NOT NULL AND manufacturer != '' AND tenant_id = $1
+       ORDER BY manufacturer`,
+      [req.tenantId]
     );
     res.json(rows.map(r => r.manufacturer));
   } catch (err) { next(err); }
@@ -877,6 +922,8 @@ app.get('/api/transfers', async (req, res, next) => {
       ? "AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')" : '';
     let catFilter = '';
     if (req.query.category) { params.push(req.query.category); catFilter = `AND p.category = $${params.length}`; }
+    params.push(req.tenantId);
+    const tidN = params.length;
 
     const { rows } = await pool.query(`
       WITH
@@ -891,6 +938,7 @@ app.get('/api/transfers', async (req, res, next) => {
         WHERE sl.completed_time >= now() - interval '90 days'
           AND sl.completed_time IS NOT NULL
           AND p.matrix_id IS NOT NULL AND p.archived = false
+          AND p.tenant_id = $${tidN}
         GROUP BY p.matrix_id, sl.shop_id
       ),
       -- Shops that have EVER sold this matrix (last 3 years) — filters out shops that never carried it
@@ -900,6 +948,7 @@ app.get('/api/transfers', async (req, res, next) => {
         JOIN products p ON p.item_id = sl.item_id
         WHERE sl.completed_time >= now() - interval '3 years'
           AND p.matrix_id IS NOT NULL AND p.archived = false
+          AND p.tenant_id = $${tidN}
       ),
       -- Dormant: has stock + no sale in X days + shop has EVER sold this matrix
       dormant_matrix AS (
@@ -957,7 +1006,7 @@ app.get('/api/transfers', async (req, res, next) => {
         sh_a.name  AS active_shop,   ba.active_shop_id,
         ba.active_last_sale,         ba.units_sold_30d AS active_sold_30d
       FROM best_active ba
-      JOIN products p  ON p.matrix_id = ba.matrix_id AND p.archived = false
+      JOIN products p  ON p.matrix_id = ba.matrix_id AND p.archived = false AND p.tenant_id = $${tidN}
       JOIN item_ever_sold ies ON ies.item_id = p.item_id AND ies.shop_id = ba.active_shop_id
       JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = ba.dormant_shop_id
         AND i.qty_on_hand >= $2
@@ -992,6 +1041,7 @@ app.get('/api/sizes', async (req, res, next) => {
 
     if (matrix_id) { params.push(matrix_id); conditions.push(`p.matrix_id = $${params.length}`); }
     if (shop_id)   { params.push(shop_id);   conditions.push(`sl.shop_id = $${params.length}`); }
+    params.push(req.tenantId); conditions.push(`p.tenant_id = $${params.length}`);
 
     const { rows } = await pool.query(`
       WITH matrix_sales AS (
@@ -1103,9 +1153,11 @@ app.get('/api/sizes/brands', async (req, res, next) => {
     }
 
     const nosFilter = exclude_nos === '1' ? `AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')` : '';
+    params.push(req.tenantId);
+    const tidN = params.length;
     const baseWhere = `p.matrix_id IS NOT NULL AND p.archived = false
       AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
-      AND NOT (p.default_cost = 0 AND p.default_price = 0) ${nosFilter}`;
+      AND NOT (p.default_cost = 0 AND p.default_price = 0) AND p.tenant_id = $${tidN} ${nosFilter}`;
 
     let stockTagFilter = '';
     if (stock_tag) {
@@ -1192,6 +1244,7 @@ app.get('/api/budget', async (req, res, next) => {
         WHERE v.avg_weekly_units > 0
           AND (i.qty_on_hand + i.qty_on_order) / v.avg_weekly_units < $1
           AND p.archived = false
+          AND p.tenant_id = $2
         GROUP BY i.shop_id
       )
       SELECT
@@ -1202,7 +1255,7 @@ app.get('/api/budget', async (req, res, next) => {
       FROM nos n
       JOIN shops s USING (shop_id)
       ORDER BY recommended_budget DESC
-    `, [weeks]);
+    `, [weeks, req.tenantId]);
 
     const total = rows.reduce((sum, r) => sum + parseFloat(r.recommended_budget ?? 0), 0);
     res.json({
@@ -1301,6 +1354,8 @@ app.get('/api/budget/nos', async (req, res, next) => {
     if (shops?.length) { params.push(shops);                                          shopCond = `AND i.shop_id = ANY($${params.length})`; }
     if (colls?.length) { params.push(colls);                                          collCond = `AND string_to_array(lower(coalesce(p.tags,'')), ',') && $${params.length}::text[]`; }
     if (sizes?.length) { params.push('\\y(' + sizes.join('|') + ')\\y');             sizeCond = `AND p.description ~* $${params.length}`; }
+    params.push(req.tenantId);
+    const tidN = params.length;
 
     const { rows } = await pool.query(`
       WITH velocity AS (
@@ -1326,6 +1381,7 @@ app.get('/api/budget/nos', async (req, res, next) => {
         JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = v.shop_id
         WHERE p.tags ILIKE '%nos%'
           AND p.archived = false
+          AND p.tenant_id = $${tidN}
           AND v.avg_weekly_units > 0
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
@@ -1404,7 +1460,7 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
     const colls = req.query.collections ? req.query.collections.split(',').map(s => s.toLowerCase().trim()).filter(Boolean) : null;
     const sizes = req.query.sizes       ? req.query.sizes.split(',').filter(Boolean)                                       : null;
 
-    const cacheKey = JSON.stringify({ r: 'saisonnier2', season: seasonCode, shops, colls, sizes });
+    const cacheKey = JSON.stringify({ r: 'saisonnier2', season: seasonCode, shops, colls, sizes, tid: req.tenantId });
     const hit = cacheGet(cacheKey);
     if (hit) return res.json({ ...hit, cached: true });
 
@@ -1419,6 +1475,9 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
     }
     if (colls?.length) { params.push(colls); collCond = `AND string_to_array(lower(coalesce(p.tags,'')), ',') && $${params.length}::text[]`; }
     if (sizes?.length) { params.push('\\y(' + sizes.join('|') + ')\\y'); sizeCond = `AND p.description ~* $${params.length}`; }
+    params.push(req.tenantId);
+    const tidN = params.length;
+    const tenantCond = `AND p.tenant_id = $${tidN}`;
 
     const stockCTE = shops?.length
       ? `stock AS (
@@ -1465,6 +1524,7 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
             AND p.tags NOT ILIKE '%nos%'
             AND p.archived = false
             AND p.default_cost > 0
+            ${tenantCond}
             AND p.category    NOT ILIKE 'Alt%ration%'
             AND p.description NOT ILIKE '%shopify%'
             AND NOT (p.default_cost = 0 AND p.default_price = 0)
@@ -1511,6 +1571,7 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
           AND p.tags NOT ILIKE '%nos%'
           AND p.archived = false
           AND p.default_cost > 0
+          ${tenantCond}
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
           AND NOT (p.default_cost = 0 AND p.default_price = 0)
@@ -2664,7 +2725,7 @@ app.get('/api/admin/explain', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/shops', async (req, res, next) => {
   try {
-    const { rows } = await pool.query('SELECT shop_id, name FROM shops ORDER BY name');
+    const { rows } = await pool.query('SELECT shop_id, name FROM shops WHERE tenant_id = $1 ORDER BY name', [req.tenantId]);
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -2777,7 +2838,7 @@ app.get('/api/admin/transfers-diag', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/settings/multipliers', async (req, res, next) => {
   try {
-    const tiers = await getMultiplierTiers();
+    const tiers = await getMultiplierTiers(req.tenantId);
     res.json({ tiers });
   } catch (err) { next(err); }
 });
@@ -2790,10 +2851,10 @@ app.put('/api/settings/multipliers', async (req, res, next) => {
       return res.status(400).json({ error: 'tiers must be a non-empty array' });
     }
     await pool.query(
-      `INSERT INTO app_settings(key, value, updated_at)
-       VALUES ('multiplier_tiers', $1::jsonb, now())
-       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
-      [JSON.stringify(tiers)]
+      `INSERT INTO app_settings(tenant_id, key, value, updated_at)
+       VALUES ($1, 'multiplier_tiers', $2::jsonb, now())
+       ON CONFLICT(tenant_id, key) DO UPDATE SET value = $2::jsonb, updated_at = now()`,
+      [req.tenantId, JSON.stringify(tiers)]
     );
     budgetCache.clear();
     res.json({ ok: true, tiers });
@@ -2806,7 +2867,7 @@ app.put('/api/settings/multipliers', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/settings/seasons', async (req, res, next) => {
   try {
-    const seasons = await getSeasonsConfig();
+    const seasons = await getSeasonsConfig(req.tenantId);
     res.json({ seasons });
   } catch (err) { next(err); }
 });
@@ -2818,10 +2879,10 @@ app.put('/api/settings/seasons', async (req, res, next) => {
       return res.status(400).json({ error: 'seasons must be a non-empty array' });
     }
     await pool.query(
-      `INSERT INTO app_settings(key, value, updated_at)
-       VALUES ('seasons_config', $1::jsonb, now())
-       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
-      [JSON.stringify(seasons)]
+      `INSERT INTO app_settings(tenant_id, key, value, updated_at)
+       VALUES ($1, 'seasons_config', $2::jsonb, now())
+       ON CONFLICT(tenant_id, key) DO UPDATE SET value = $2::jsonb, updated_at = now()`,
+      [req.tenantId, JSON.stringify(seasons)]
     );
     budgetCache.clear();
     res.json({ ok: true, seasons });
@@ -2834,7 +2895,7 @@ app.put('/api/settings/seasons', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/settings/budget-params', async (req, res, next) => {
   try {
-    const params = await getBudgetParams();
+    const params = await getBudgetParams(req.tenantId);
     res.json(params);
   } catch (err) { next(err); }
 });
@@ -2858,10 +2919,10 @@ app.put('/api/settings/budget-params', async (req, res, next) => {
       absent_brand_mode:         absentMode,
     };
     await pool.query(
-      `INSERT INTO app_settings(key, value, updated_at)
-       VALUES ('budget_params', $1::jsonb, now())
-       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
-      [JSON.stringify(params)]
+      `INSERT INTO app_settings(tenant_id, key, value, updated_at)
+       VALUES ($1, 'budget_params', $2::jsonb, now())
+       ON CONFLICT(tenant_id, key) DO UPDATE SET value = $2::jsonb, updated_at = now()`,
+      [req.tenantId, JSON.stringify(params)]
     );
     budgetCache.clear();
     res.json({ ok: true, ...params });
@@ -2874,7 +2935,7 @@ app.put('/api/settings/budget-params', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/settings/nos-lead-times', async (req, res, next) => {
   try {
-    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'nos_lead_times'");
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'nos_lead_times' AND tenant_id = $1", [req.tenantId]);
     res.json(rows.length ? rows[0].value : {});
   } catch (err) { next(err); }
 });
@@ -2888,10 +2949,10 @@ app.put('/api/settings/nos-lead-times', async (req, res, next) => {
       if (brand && !isNaN(w) && w > 0) clean[brand] = w;
     }
     await pool.query(
-      `INSERT INTO app_settings(key, value, updated_at)
-       VALUES ('nos_lead_times', $1::jsonb, now())
-       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
-      [JSON.stringify(clean)]
+      `INSERT INTO app_settings(tenant_id, key, value, updated_at)
+       VALUES ($1, 'nos_lead_times', $2::jsonb, now())
+       ON CONFLICT(tenant_id, key) DO UPDATE SET value = $2::jsonb, updated_at = now()`,
+      [req.tenantId, JSON.stringify(clean)]
     );
     res.json({ ok: true, lead_times: clean });
   } catch (err) { next(err); }
@@ -2902,7 +2963,7 @@ app.put('/api/settings/nos-lead-times', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/settings/nos-excluded', async (req, res, next) => {
   try {
-    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'nos_excluded'");
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'nos_excluded' AND tenant_id = $1", [req.tenantId]);
     res.json(rows.length ? rows[0].value : []);
   } catch (err) { next(err); }
 });
@@ -2911,10 +2972,10 @@ app.put('/api/settings/nos-excluded', async (req, res, next) => {
   try {
     const ids = Array.isArray(req.body) ? req.body.map(String) : [];
     await pool.query(
-      `INSERT INTO app_settings(key, value, updated_at)
-       VALUES ('nos_excluded', $1::jsonb, now())
-       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
-      [JSON.stringify(ids)]
+      `INSERT INTO app_settings(tenant_id, key, value, updated_at)
+       VALUES ($1, 'nos_excluded', $2::jsonb, now())
+       ON CONFLICT(tenant_id, key) DO UPDATE SET value = $2::jsonb, updated_at = now()`,
+      [req.tenantId, JSON.stringify(ids)]
     );
     res.json({ ok: true, excluded: ids });
   } catch (err) { next(err); }
@@ -2927,11 +2988,13 @@ app.put('/api/settings/nos-excluded', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/nos/urgent', async (req, res, next) => {
   try {
+    const params = req.query.shop_id ? [req.query.shop_id] : [];
     const shopFilter = req.query.shop_id ? `AND i.shop_id = $1` : '';
-    const params     = req.query.shop_id ? [req.query.shop_id] : [];
+    params.push(req.tenantId);
+    const tidN = params.length;
 
     // Load lead times from settings
-    const { rows: ltRows } = await pool.query("SELECT value FROM app_settings WHERE key = 'nos_lead_times'");
+    const { rows: ltRows } = await pool.query("SELECT value FROM app_settings WHERE key = 'nos_lead_times' AND tenant_id = $1", [req.tenantId]);
     const leadTimes = ltRows.length ? ltRows[0].value : {};
     const defaultLeadTime = 8; // semaines par défaut si non configuré
 
@@ -2973,6 +3036,7 @@ app.get('/api/nos/urgent', async (req, res, next) => {
       JOIN shops     s ON s.shop_id = i.shop_id
       WHERE p.tags ILIKE '%nos%'
         AND p.archived = false
+        AND p.tenant_id = $${tidN}
         AND v.avg_weekly_units > 0
         AND p.category    NOT ILIKE 'Alt%ration%'
         AND p.description NOT ILIKE '%shopify%'
@@ -3040,7 +3104,7 @@ app.get('/api/nos/urgent', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/settings/tenant', async (req, res, next) => {
   try {
-    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'tenant_config'");
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'tenant_config' AND tenant_id = $1", [req.tenantId]);
     res.json(rows.length ? rows[0].value : {});
   } catch (err) { next(err); }
 });
@@ -3049,10 +3113,10 @@ app.put('/api/settings/tenant', async (req, res, next) => {
   try {
     const config = req.body;
     await pool.query(
-      `INSERT INTO app_settings(key, value, updated_at)
-       VALUES ('tenant_config', $1::jsonb, now())
-       ON CONFLICT(key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
-      [JSON.stringify(config)]
+      `INSERT INTO app_settings(tenant_id, key, value, updated_at)
+       VALUES ($1, 'tenant_config', $2::jsonb, now())
+       ON CONFLICT(tenant_id, key) DO UPDATE SET value = $2::jsonb, updated_at = now()`,
+      [req.tenantId, JSON.stringify(config)]
     );
     res.json({ ok: true, config });
   } catch (err) { next(err); }
@@ -3093,14 +3157,14 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const targetSeasonCode = (req.query.season ?? 'p26').toLowerCase();
     const shops = req.query.shops ? req.query.shops.split(',').filter(Boolean) : null;
 
-    const cacheKey = JSON.stringify({ r: 'marque2', season: targetSeasonCode, shops });
+    const cacheKey = JSON.stringify({ r: 'marque2', season: targetSeasonCode, shops, tid: req.tenantId });
     const hit = cacheGet(cacheKey);
     if (hit) return res.json({ ...hit, cached: true });
 
     const [tiers, seasonsConfig, budgetParams] = await Promise.all([
-      getMultiplierTiers(),
-      getSeasonsConfig(),
-      getBudgetParams(),
+      getMultiplierTiers(req.tenantId),
+      getSeasonsConfig(req.tenantId),
+      getBudgetParams(req.tenantId),
     ]);
     const { nb_saisons_reference: nbRef, carryover_deduction_rate: globalCoRate,
             use_global_carryover_rate: useGlobal, carryover_rates_by_shop: ratesByShop,
@@ -3115,9 +3179,13 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const refSeasons = getReferenceSeasonsFromConfig(targetSeasonCode, seasonsConfig, nbRef);
     if (!refSeasons.length) return res.status(400).json({ error: `No reference seasons found for ${targetSeasonCode}` });
 
-    const baseParams  = shops?.length ? [shops] : [];
-    const shopCondSL  = shops?.length ? `AND sl.shop_id = ANY($1)` : '';
-    const shopCondInv = shops?.length ? `AND i.shop_id = ANY($1)` : '';
+    // baseParams layout: [shops?, tenantId]
+    // tenantIdx is always the last element of baseParams (position 1 or 2)
+    const baseParams     = shops?.length ? [shops, req.tenantId] : [req.tenantId];
+    const tenantIdx      = baseParams.length; // $1 or $2
+    const tenantCond     = `AND p.tenant_id = $${tenantIdx}`;
+    const shopCondSL     = shops?.length ? `AND sl.shop_id = ANY($1)` : '';
+    const shopCondInv    = shops?.length ? `AND i.shop_id = ANY($1)` : '';
 
     // Date math for target season
     const todayDate       = new Date(); todayDate.setHours(0,0,0,0);
@@ -3148,6 +3216,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
       WHERE p.tags ILIKE $${coInvTagIdx}
         AND p.tags NOT ILIKE '%nos%'
         AND p.default_cost > 0
+        ${tenantCond}
         AND p.category    NOT ILIKE 'Alt%ration%'
         AND p.description NOT ILIKE '%shopify%'
         AND i.qty_on_hand > 0
@@ -3174,6 +3243,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         AND p.tags ILIKE $${coSalesTagIdx}
         AND p.tags NOT ILIKE '%nos%'
         AND p.default_cost > 0
+        ${tenantCond}
         AND p.category    NOT ILIKE 'Alt%ration%'
         AND p.description NOT ILIKE '%shopify%'
         ${shopCondSL}
@@ -3207,6 +3277,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
           AND sl.completed_time IS NOT NULL
           AND p.tags ILIKE $${irSlTagIdx}
           AND p.tags NOT ILIKE '%nos%'
+          ${tenantCond}
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
           ${shopCondSL}
@@ -3224,6 +3295,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         JOIN inventory i ON i.item_id = p.item_id
         WHERE p.tags ILIKE $${irInvTagIdx}
           AND p.tags NOT ILIKE '%nos%'
+          ${tenantCond}
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
           AND i.qty_on_hand > 0
@@ -3248,6 +3320,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
           AND sl.completed_time IS NOT NULL
           AND p.tags ILIKE $${slTagIdx}
           AND p.tags NOT ILIKE '%nos%'
+          ${tenantCond}
           AND p.category    NOT ILIKE 'Alt%ration%'
           AND p.description NOT ILIKE '%shopify%'
           ${shopCondSL}
@@ -3310,6 +3383,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
                   AND sl.completed_time IS NOT NULL
                   AND p.tags ILIKE $${rwTagIdx}
                   AND p.tags NOT ILIKE '%nos%'
+                  ${tenantCond}
                   AND p.category    NOT ILIKE 'Alt%ration%'
                   AND p.description NOT ILIKE '%shopify%'
                   ${shopCondSL}
@@ -3584,14 +3658,14 @@ app.get('/api/budget-plan', async (req, res, next) => {
     const [planRows, dropRows] = await Promise.all([
       pool.query(
         `SELECT manufacturer, drop_id, shop_id, planned_amount::float8 AS planned_amount
-         FROM budget_plans WHERE season_code = $1`,
-        [season]
+         FROM budget_plans WHERE season_code = $1 AND tenant_id = $2`,
+        [season, req.tenantId]
       ),
       pool.query(
         `SELECT manufacturer, drop_id, drop_name, drop_order
-         FROM budget_plan_drops WHERE season_code = $1
+         FROM budget_plan_drops WHERE season_code = $1 AND tenant_id = $2
          ORDER BY manufacturer, drop_order`,
-        [season]
+        [season, req.tenantId]
       ),
     ]);
 
@@ -3622,18 +3696,18 @@ app.put('/api/budget-plan', async (req, res, next) => {
     const amount = Math.max(0, parseFloat(planned_amount ?? 0));
     const sc = season_code.toLowerCase();
     await pool.query(
-      `INSERT INTO budget_plans(season_code, manufacturer, drop_id, shop_id, planned_amount, updated_at)
-       VALUES ($1, $2, $3, $4, $5, now())
-       ON CONFLICT(season_code, manufacturer, drop_id, shop_id)
-       DO UPDATE SET planned_amount = $5, updated_at = now()`,
-      [sc, manufacturer, drop_id, shop_id, amount]
+      `INSERT INTO budget_plans(tenant_id, season_code, manufacturer, drop_id, shop_id, planned_amount, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, now())
+       ON CONFLICT(tenant_id, season_code, manufacturer, drop_id, shop_id)
+       DO UPDATE SET planned_amount = $6, updated_at = now()`,
+      [req.tenantId, sc, manufacturer, drop_id, shop_id, amount]
     );
     // Ensure drop metadata exists
     await pool.query(
-      `INSERT INTO budget_plan_drops(season_code, manufacturer, drop_id, drop_name, drop_order)
-       VALUES ($1, $2, $3, 'Drop 1', 1)
+      `INSERT INTO budget_plan_drops(tenant_id, season_code, manufacturer, drop_id, drop_name, drop_order)
+       VALUES ($1, $2, $3, $4, 'Drop 1', 1)
        ON CONFLICT DO NOTHING`,
-      [sc, manufacturer, drop_id]
+      [req.tenantId, sc, manufacturer, drop_id]
     );
     res.json({ ok: true, season_code: sc, manufacturer, drop_id, shop_id, planned_amount: amount });
   } catch (err) { next(err); }
@@ -3646,17 +3720,17 @@ app.post('/api/budget-plan/drop', async (req, res, next) => {
     if (!season_code || !manufacturer) return res.status(400).json({ error: 'season_code and manufacturer are required' });
     const sc = season_code.toLowerCase();
     const { rows: existing } = await pool.query(
-      `SELECT drop_id, drop_order FROM budget_plan_drops WHERE season_code = $1 AND manufacturer = $2 ORDER BY drop_order`,
-      [sc, manufacturer]
+      `SELECT drop_id, drop_order FROM budget_plan_drops WHERE season_code = $1 AND manufacturer = $2 AND tenant_id = $3 ORDER BY drop_order`,
+      [sc, manufacturer, req.tenantId]
     );
     const nextOrder  = (existing[existing.length - 1]?.drop_order ?? 0) + 1;
     const newDropId  = `drop_${nextOrder}`;
     const name       = drop_name?.trim() || `Drop ${nextOrder}`;
     await pool.query(
-      `INSERT INTO budget_plan_drops(season_code, manufacturer, drop_id, drop_name, drop_order)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO budget_plan_drops(tenant_id, season_code, manufacturer, drop_id, drop_name, drop_order)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT DO NOTHING`,
-      [sc, manufacturer, newDropId, name, nextOrder]
+      [req.tenantId, sc, manufacturer, newDropId, name, nextOrder]
     );
     res.json({ ok: true, drop_id: newDropId, drop_name: name, drop_order: nextOrder });
   } catch (err) { next(err); }
@@ -3670,8 +3744,8 @@ app.put('/api/budget-plan/drop', async (req, res, next) => {
     const name = drop_name?.trim() || drop_id;
     await pool.query(
       `UPDATE budget_plan_drops SET drop_name = $4, updated_at = now()
-       WHERE season_code = $1 AND manufacturer = $2 AND drop_id = $3`,
-      [season_code.toLowerCase(), manufacturer, drop_id, name]
+       WHERE season_code = $1 AND manufacturer = $2 AND drop_id = $3 AND tenant_id = $5`,
+      [season_code.toLowerCase(), manufacturer, drop_id, name, req.tenantId]
     );
     res.json({ ok: true });
   } catch (err) { next(err); }
@@ -3684,8 +3758,8 @@ app.delete('/api/budget-plan/drop', async (req, res, next) => {
     if (!season_code || !manufacturer || !drop_id) return res.status(400).json({ error: 'season_code, manufacturer and drop_id are required' });
     if (drop_id === 'drop_1') return res.status(400).json({ error: 'Cannot delete the primary drop' });
     const sc = season_code.toLowerCase();
-    await pool.query(`DELETE FROM budget_plans        WHERE season_code = $1 AND manufacturer = $2 AND drop_id = $3`, [sc, manufacturer, drop_id]);
-    await pool.query(`DELETE FROM budget_plan_drops   WHERE season_code = $1 AND manufacturer = $2 AND drop_id = $3`, [sc, manufacturer, drop_id]);
+    await pool.query(`DELETE FROM budget_plans        WHERE season_code = $1 AND manufacturer = $2 AND drop_id = $3 AND tenant_id = $4`, [sc, manufacturer, drop_id, req.tenantId]);
+    await pool.query(`DELETE FROM budget_plan_drops   WHERE season_code = $1 AND manufacturer = $2 AND drop_id = $3 AND tenant_id = $4`, [sc, manufacturer, drop_id, req.tenantId]);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -3699,8 +3773,8 @@ app.get('/api/budget-plan/documents', async (req, res, next) => {
   try {
     const { season, manufacturer, drop_id } = req.query;
     if (!season || !manufacturer) return res.status(400).json({ error: 'season and manufacturer are required' });
-    const conditions = ['season_code = $1', 'manufacturer = $2'];
-    const params     = [season.toLowerCase(), manufacturer];
+    const conditions = ['season_code = $1', 'manufacturer = $2', 'tenant_id = $3'];
+    const params     = [season.toLowerCase(), manufacturer, req.tenantId];
     if (drop_id) { conditions.push(`drop_id = $${params.length + 1}`); params.push(drop_id); }
     const { rows } = await pool.query(
       `SELECT id, drop_id, filename, content_type, file_size, uploaded_at
@@ -3719,9 +3793,9 @@ app.post('/api/budget-plan/document', async (req, res, next) => {
       return res.status(400).json({ error: 'season_code, manufacturer, filename, data_base64 are required' });
     const buf = Buffer.from(data_base64, 'base64');
     const { rows } = await pool.query(
-      `INSERT INTO budget_documents(season_code, manufacturer, drop_id, filename, content_type, file_size, data)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-      [season_code.toLowerCase(), manufacturer, drop_id, filename,
+      `INSERT INTO budget_documents(tenant_id, season_code, manufacturer, drop_id, filename, content_type, file_size, data)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+      [req.tenantId, season_code.toLowerCase(), manufacturer, drop_id, filename,
        content_type || 'application/octet-stream', buf.length, buf]
     );
     res.json({ ok: true, id: rows[0].id, filename });
@@ -3732,8 +3806,8 @@ app.post('/api/budget-plan/document', async (req, res, next) => {
 app.get('/api/budget-plan/document/:id', async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT filename, content_type, data FROM budget_documents WHERE id = $1`,
-      [req.params.id]
+      `SELECT filename, content_type, data FROM budget_documents WHERE id = $1 AND tenant_id = $2`,
+      [req.params.id, req.tenantId]
     );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     const { filename, content_type, data } = rows[0];
@@ -3746,7 +3820,7 @@ app.get('/api/budget-plan/document/:id', async (req, res, next) => {
 // Delete a document
 app.delete('/api/budget-plan/document/:id', async (req, res, next) => {
   try {
-    await pool.query(`DELETE FROM budget_documents WHERE id = $1`, [req.params.id]);
+    await pool.query(`DELETE FROM budget_documents WHERE id = $1 AND tenant_id = $2`, [req.params.id, req.tenantId]);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -3760,7 +3834,10 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     const mfr    = decodeURIComponent(req.params.manufacturer);
     const shopId = req.query.shop_id || null;
     const hasShop = !!shopId;
-    const p      = hasShop ? [mfr, shopId] : [mfr];
+    // p layout: [mfr, shopId?, tenantId]
+    const p      = hasShop ? [mfr, shopId, req.tenantId] : [mfr, req.tenantId];
+    const tIdx   = p.length; // $3 or $2
+    const tenantCondP = `AND p.tenant_id = $${tIdx}`;
     const slS    = hasShop ? 'AND sl.shop_id = $2'     : '';
     const invJ   = hasShop ? 'AND i.shop_id  = $2'     : '';
     const stCTE  = `
@@ -3800,6 +3877,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
             AND t.transfer_received = true
             AND t.item_id IS NOT NULL
             AND (t.from_shop_id = $2 OR t.to_shop_id = $2)
+            ${tenantCondP}
         `, p)
       : Promise.resolve({ rows: [{ received_in: 0, sent_out: 0 }] });
 
@@ -3826,10 +3904,11 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
           AND sl.completed_time IS NOT NULL
+          ${tenantCondP}
           ${slS}
       `, p);
     } else if (hasShop) {
-      // $1=mfr $2=shopId $3=stFrom $4=stTo $5='%tag%'
+      // $1=mfr $2=shopId $3=stFrom $4=stTo $5='%tag%' $6=tenantId
       // No date filter in WHERE — CASEs handle mode 1 (tag) and mode 2 (tag+period)
       q1Promise = pool.query(`
         SELECT
@@ -3853,9 +3932,10 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         WHERE p.manufacturer ILIKE $1
           AND sl.shop_id = $2
           AND sl.completed_time IS NOT NULL
-      `, [mfr, shopId, stFrom, stTo, seasonTag]);
+          AND p.tenant_id = $6
+      `, [mfr, shopId, stFrom, stTo, seasonTag, req.tenantId]);
     } else {
-      // $1=mfr $2=stFrom $3=stTo $4='%tag%'
+      // $1=mfr $2=stFrom $3=stTo $4='%tag%' $5=tenantId
       // No date filter in WHERE — CASEs handle mode 1 (tag) and mode 2 (tag+period)
       q1Promise = pool.query(`
         SELECT
@@ -3878,7 +3958,8 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
           AND sl.completed_time IS NOT NULL
-      `, [mfr, stFrom, stTo, seasonTag]);
+          AND p.tenant_id = $5
+      `, [mfr, stFrom, stTo, seasonTag, req.tenantId]);
     }
 
     // Q2 — Stock + margin; current_stock_tag = tag-filtered stock for sell-through denominator
@@ -3896,10 +3977,10 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
                          ELSE NULL END), 1)::float8 AS avg_margin_pct
         FROM products p
         LEFT JOIN inventory i ON i.item_id = p.item_id ${invJ}
-        WHERE p.manufacturer ILIKE $1 AND p.archived = false
+        WHERE p.manufacturer ILIKE $1 AND p.archived = false ${tenantCondP}
       `, p);
     } else if (hasShop) {
-      // $1=mfr $2=shopId $3='%tag%'
+      // $1=mfr $2=shopId $3='%tag%' $4=tenantId
       q2Promise = pool.query(`
         SELECT
           COUNT(DISTINCT p.item_id)::int AS total_items,
@@ -3911,10 +3992,10 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
                          ELSE NULL END), 1)::float8 AS avg_margin_pct
         FROM products p
         LEFT JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = $2
-        WHERE p.manufacturer ILIKE $1 AND p.archived = false
-      `, [mfr, shopId, seasonTag]);
+        WHERE p.manufacturer ILIKE $1 AND p.archived = false AND p.tenant_id = $4
+      `, [mfr, shopId, seasonTag, req.tenantId]);
     } else {
-      // $1=mfr $2='%tag%'
+      // $1=mfr $2='%tag%' $3=tenantId
       q2Promise = pool.query(`
         SELECT
           COUNT(DISTINCT p.item_id)::int AS total_items,
@@ -3926,8 +4007,8 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
                          ELSE NULL END), 1)::float8 AS avg_margin_pct
         FROM products p
         LEFT JOIN inventory i ON i.item_id = p.item_id
-        WHERE p.manufacturer ILIKE $1 AND p.archived = false
-      `, [mfr, seasonTag]);
+        WHERE p.manufacturer ILIKE $1 AND p.archived = false AND p.tenant_id = $3
+      `, [mfr, seasonTag, req.tenantId]);
     }
 
     const [q1, q2, q3a, q3b, q4, q5, q6] = await Promise.all([
@@ -3945,6 +4026,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         WHERE p.manufacturer ILIKE $1
           AND sl.completed_time >= now() - INTERVAL '12 weeks'
           AND sl.completed_time IS NOT NULL
+          ${tenantCondP}
           ${slS}
         GROUP BY 1 ORDER BY 1
       `, p),
@@ -3960,6 +4042,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           AND sl.completed_time >= now() - INTERVAL '64 weeks'
           AND sl.completed_time <  now() - INTERVAL '52 weeks'
           AND sl.completed_time IS NOT NULL
+          ${tenantCondP}
           ${slS}
         GROUP BY date_trunc('week', sl.completed_time)
         ORDER BY 1
@@ -3983,6 +4066,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
             AND sl.completed_time IS NOT NULL
             AND p.manufacturer ILIKE $1
             AND p.archived = false
+            ${tenantCondP}
             ${slS}
           GROUP BY COALESCE(p.matrix_id, p.item_id)
         ),
@@ -4012,7 +4096,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           ROUND(s.rev, 2)::float8       AS revenue_12w,
           COALESCE(sm.stock, 0)::float8 AS current_stock
         FROM s
-        JOIN products par ON par.item_id = s.matrix_item_id AND par.archived = false
+        JOIN products par ON par.item_id = s.matrix_item_id AND par.archived = false ${tenantCondP}
         LEFT JOIN st_matrix sm ON sm.matrix_item_id = s.matrix_item_id
         ORDER BY s.units DESC
         LIMIT 10
@@ -4042,6 +4126,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         LEFT JOIN st ON st.item_id = p.item_id
         WHERE p.manufacturer ILIKE $1
           AND p.archived = false
+          ${tenantCondP}
         GROUP BY p.category
         ORDER BY units_sold_12w DESC NULLS LAST
       `, p),
@@ -4123,7 +4208,8 @@ app.get('/api/matrix/:matrixId', async (req, res, next) => {
     const hasShop  = !!shopId;
     const shopSl   = hasShop ? 'AND sl.shop_id = $2' : '';
     const shopInv  = hasShop ? 'AND shop_id = $2'    : '';
-    const p        = hasShop ? [matrixId, shopId] : [matrixId];
+    const p        = hasShop ? [matrixId, shopId, req.tenantId] : [matrixId, req.tenantId];
+    const tIdx     = p.length;
 
     const { rows } = await pool.query(`
       WITH sales AS (
@@ -4150,7 +4236,7 @@ app.get('/api/matrix/:matrixId', async (req, res, next) => {
           '\\s+(\\d{2,3}|XXS|XS|XL|XXL|XXXL|S|M|L|TU|OS|UNI)(\\s.*)?$',
           '', 'i'), '') AS name
         FROM products
-        WHERE (item_id = $1 OR matrix_id = $1) AND archived = false
+        WHERE (item_id = $1 OR matrix_id = $1) AND archived = false AND tenant_id = $${tIdx}
       )
       SELECT
         v.item_id,
@@ -4168,6 +4254,7 @@ app.get('/api/matrix/:matrixId', async (req, res, next) => {
       LEFT JOIN inv       ON inv.item_id = v.item_id
       WHERE (v.item_id = $1 OR v.matrix_id = $1)
         AND v.archived = false
+        AND v.tenant_id = $${tIdx}
       ORDER BY COALESCE(s.units, 0) DESC NULLS LAST, v.description
     `, p);
 
@@ -4209,7 +4296,7 @@ function velocityAction(weeksElapsed, st_s4, st_s7, st_s10, residual_pct, season
 }
 
 // Shared CTE builder — items tagged with season + their sales within the window
-function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam) {
+function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam, tenantCond = '') {
   return `
     season_items AS (
       SELECT item_id, manufacturer, category, default_price, default_cost,
@@ -4218,6 +4305,7 @@ function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam) {
       WHERE tags ILIKE ${tagParam}
         AND archived = false
         AND default_cost > 0
+        ${tenantCond}
         AND category NOT ILIKE 'Alt%ration%'
         AND description NOT ILIKE '%shopify%'
     ),
@@ -4315,8 +4403,11 @@ app.get('/api/velocity/brands', async (req, res, next) => {
     const weeksElapsed = today < seasonFrom ? 0
       : Math.floor((Math.min(today, seasonTo) - seasonFrom) / (7 * 86400000)) + 1;
 
+    const safeTenantId = (req.tenantId ?? '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const tenantCond = safeTenantId ? `AND tenant_id = '${safeTenantId}'` : '';
+
     const { rows } = await pool.query(`
-      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'")}
+      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'", tenantCond)}
       SELECT
         manufacturer,
         COUNT(DISTINCT item_id)::int                                            AS items_count,
@@ -4361,8 +4452,11 @@ app.get('/api/velocity/matrices', async (req, res, next) => {
     const weeksElapsed = today < seasonFrom ? 0
       : Math.floor((Math.min(today, seasonTo) - seasonFrom) / (7 * 86400000)) + 1;
 
+    const safeTenantId = (req.tenantId ?? '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const tenantCond = safeTenantId ? `AND tenant_id = '${safeTenantId}'` : '';
+
     const { rows } = await pool.query(`
-      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'")}
+      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'", tenantCond)}
       SELECT
         matrix_key,
         -- Matrix name: strip size/colour from a non-self-referencing variant
@@ -4425,8 +4519,8 @@ app.get('/api/velocity/articles', async (req, res, next) => {
 
     // Get all item_ids belonging to this matrix
     const { rows: matrixItems } = await pool.query(
-      `SELECT item_id FROM products WHERE (item_id = $1 OR matrix_id = $1) AND archived = false`,
-      [matrixId]
+      `SELECT item_id FROM products WHERE (item_id = $1 OR matrix_id = $1) AND archived = false AND tenant_id = $2`,
+      [matrixId, req.tenantId]
     );
     const itemIds = matrixItems.map(r => r.item_id);
     if (!itemIds.length) return res.json({ articles: [], season_code: seasonCode, weeks_elapsed: weeksElapsed });
@@ -4494,8 +4588,9 @@ app.get('/api/velocity/articles', async (req, res, next) => {
       LEFT JOIN item_agg ia    ON ia.item_id = p.item_id
       LEFT JOIN current_stk cs ON cs.item_id = p.item_id
       WHERE p.item_id = ANY($1)
+        AND p.tenant_id = $2
       ORDER BY COALESCE(ia.u_total,0) DESC NULLS LAST, p.description
-    `, [itemIds]);
+    `, [itemIds, req.tenantId]);
 
     const articles = rows.map(r => {
       const init = parseFloat(r.initial_stock) || 0;
@@ -4577,8 +4672,8 @@ app.post('/api/ai/chat', async (req, res, next) => {
     if (!Array.isArray(messages) || !messages.length) {
       return res.status(400).json({ error: 'messages array required' });
     }
-    const tenantConfig = await getTenantConfig();
-    const ctx = { pool, budgetCache, getSeasonsConfig, tenantConfig };
+    const tenantConfig = await getTenantConfig(req.tenantId);
+    const ctx = { pool, budgetCache, getSeasonsConfig: () => getSeasonsConfig(req.tenantId), tenantConfig };
     const result = await runAgentLoop(messages, ctx);
 
     // Save conversation asynchronously (don't block response)
@@ -4586,8 +4681,8 @@ app.post('/api/ai/chat', async (req, res, next) => {
     if (userMsgs.length) {
       const preview = userMsgs[userMsgs.length - 1].content?.slice(0, 120) ?? '';
       pool.query(
-        `INSERT INTO conversations(preview, messages) VALUES($1, $2::jsonb)`,
-        [preview, JSON.stringify(result.messages ?? [])]
+        `INSERT INTO conversations(tenant_id, preview, messages) VALUES($1, $2, $3::jsonb)`,
+        [req.tenantId, preview, JSON.stringify(result.messages ?? [])]
       ).catch(() => {});
     }
 
@@ -4604,8 +4699,8 @@ app.get('/api/conversations', async (req, res, next) => {
   try {
     const limit = Math.min(parseInt(req.query.limit ?? 50), 200);
     const { rows } = await pool.query(
-      `SELECT id, created_at, preview FROM conversations ORDER BY created_at DESC LIMIT $1`,
-      [limit]
+      `SELECT id, created_at, preview FROM conversations WHERE tenant_id = $1 ORDER BY created_at DESC LIMIT $2`,
+      [req.tenantId, limit]
     );
     res.json(rows);
   } catch (err) { next(err); }
@@ -4614,8 +4709,8 @@ app.get('/api/conversations', async (req, res, next) => {
 app.get('/api/conversations/:id', async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, created_at, preview, messages FROM conversations WHERE id = $1`,
-      [req.params.id]
+      `SELECT id, created_at, preview, messages FROM conversations WHERE id = $1 AND tenant_id = $2`,
+      [req.params.id, req.tenantId]
     );
     if (!rows.length) return res.status(404).json({ error: 'Conversation introuvable' });
     res.json(rows[0]);
@@ -4624,7 +4719,7 @@ app.get('/api/conversations/:id', async (req, res, next) => {
 
 app.delete('/api/conversations/:id', async (req, res, next) => {
   try {
-    await pool.query(`DELETE FROM conversations WHERE id = $1`, [req.params.id]);
+    await pool.query(`DELETE FROM conversations WHERE id = $1 AND tenant_id = $2`, [req.params.id, req.tenantId]);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
