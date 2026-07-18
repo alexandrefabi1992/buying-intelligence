@@ -69,7 +69,8 @@ function buildTagConditions(tags, excludeTags, params) {
 
 async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { pool, budgetCache, getSeasonsConfig }) {
   season = (season ?? 'p26').toLowerCase();
-  const shopIds = shops ? shops.split(',').map(s => s.trim()).filter(Boolean) : null;
+  const rawShops = shops ? shops.split(',').map(s => s.trim()).filter(Boolean) : null;
+  const shopIds  = rawShops ? (await Promise.all(rawShops.map(s => resolveShopId(s, pool)))).filter(Boolean) : null;
   const cacheKey = `marque:${season}:${shopIds?.join(',') ?? 'all'}`;
 
   // Try the in-memory cache first (already computed, fast)
@@ -142,6 +143,7 @@ function resolvePeriod(period) {
 }
 
 async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, date_to, period, total_only = false }, { pool, getSeasonsConfig }) {
+  shop_id = await resolveShopId(shop_id, pool);
   let from = date_from, to = date_to;
 
   // period shorthand takes priority over raw dates
@@ -373,6 +375,7 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
 }
 
 async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = false }, { pool }) {
+  shop_id = await resolveShopId(shop_id, pool);
   const conditions = ['p.archived = false', 'i.qty_on_hand > 0'];
   const params     = [];
 
