@@ -224,6 +224,35 @@ const TOOL_DEFS = [
       required: [],
     },
   },
+  {
+    name: 'compare_seasons',
+    description: 'Comparer les performances d\'une marque (ou de toutes les marques) sur plusieurs saisons côte à côte. Retourne pour chaque saison : unités vendues, ventes brutes, coût des ventes, stock restant, reçus fournisseur et sell-through. Utiliser pour les questions inter-saisons : "comment P26 se compare à P25 et P24 ?", "évolution sur 3 saisons", "croissance par rapport à l\'an dernier".',
+    parameters: {
+      type: 'object',
+      properties: {
+        seasons:      { type: 'array', items: { type: 'string' }, description: 'Codes de saisons à comparer, ex: ["p26", "p25", "p24"]. Maximum 5 saisons.' },
+        manufacturer: { type: 'string',  description: 'Nom de la marque (optionnel — omettre pour toutes les marques)' },
+        shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel)' },
+      },
+      required: ['seasons'],
+    },
+  },
+  {
+    name: 'get_sales_by_category',
+    description: 'Analyser les ventes agrégées par catégorie de produit pour une période ou une saison. Retourne ventes brutes, unités et coût par catégorie. Utiliser quand l\'utilisateur demande : "quelle catégorie se vend le mieux ?", "répartition des ventes par type de produit", "top catégories pour cette saison". Pour une marque spécifique, ajouter manufacturer.',
+    parameters: {
+      type: 'object',
+      properties: {
+        season:       { type: 'string', description: 'Code de saison (ex: p26). Filtre par tag de saison ET définit la période.' },
+        period:       { type: 'string', description: 'Période relative, ex: "1y", "ytd", "6m"' },
+        date_from:    { type: 'string', description: 'Date de début ISO (YYYY-MM-DD)' },
+        date_to:      { type: 'string', description: 'Date de fin ISO (YYYY-MM-DD)' },
+        manufacturer: { type: 'string', description: 'Filtrer par marque (optionnel)' },
+        shop_id:      { type: 'string', description: 'Nom ou ID de la boutique (optionnel)' },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -283,6 +312,8 @@ RÈGLES ABSOLUES
 - Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
 - Si tu n'es pas certain du nom exact d'une catégorie : appelle get_categories(manufacturer=X) d'abord
+- COMPARAISONS INTER-SAISONS : pour toute question comparant plusieurs saisons ("P26 vs P25", "évolution sur 3 saisons", "croissance d'une saison à l'autre"), utiliser compare_seasons avec la liste des codes de saison dans "seasons"
+- CATÉGORIES : pour toute question sur les ventes/répartition par type de produit ("quelle catégorie se vend le mieux?", "top catégories", "répartition par type"), utiliser get_sales_by_category — JAMAIS get_sales_by_variant ni get_categories pour ces questions
 - TRANSFERTS : pour toute question sur le stock dormant, les transferts recommandés ou "quoi bouger", utiliser get_transfer_recommendations — JAMAIS inventer une réponse
 - LECTURE DES TRANSFERTS DANS LE SELL-THROUGH : le champ "stock_actuel" est EXCLUSIF des transferts sortants (les unités transférées ont déjà quitté la boutique et sont déduites de l'inventaire). Ne JAMAIS dire que le stock "inclut" des unités transférées. La formule est : reçu_fournisseur = vendu + stock_actuel + transferts_sortants − transferts_entrants. Présenter les transferts comme une ligne séparée, pas comme faisant partie du stock.
 - MATRICES / TAILLES : pour voir toutes les tailles d'un modèle ou le stock par taille, utiliser get_matrix_info avec le code modèle (ex: "A45118") dans description_search

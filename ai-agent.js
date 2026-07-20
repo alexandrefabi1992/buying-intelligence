@@ -929,6 +929,137 @@ async function toolGetSeasonsList(_, { getSeasonsConfig }) {
   };
 }
 
+async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id }, { pool, getSeasonsConfig }) {
+  shop_id = await resolveShopId(shop_id, pool);
+  const allSeasons = await getSeasonsConfig();
+
+  if (!seasonCodes?.length) return { erreur: 'Fournir au moins une saison dans seasons (ex: ["p26", "p25"]).' };
+
+  const results = await Promise.all(seasonCodes.slice(0, 5).map(async code => {
+    const s = allSeasons.find(x => x.code === code.toLowerCase());
+    if (!s) return { saison: code.toUpperCase(), erreur: 'Saison non trouvée' };
+
+    const seasonTag = s.tag_pattern ?? s.code;
+    const conds  = ['sl.completed_time BETWEEN $1 AND $2', `p.tags ILIKE $3`];
+    const params = [s.reception_from, s.sell_to, `%${seasonTag}%`];
+
+    if (manufacturer) { conds.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
+    if (shop_id)      { conds.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
+
+    const stockConds  = ['p.archived = false', `p.tags ILIKE $1`];
+    const stockParams = [`%${seasonTag}%`];
+    if (manufacturer) { stockConds.push(`p.manufacturer ILIKE $${stockParams.length + 1}`); stockParams.push(`%${manufacturer}%`); }
+    if (shop_id)      { stockConds.push(`i.shop_id = $${stockParams.length + 1}`);           stockParams.push(shop_id); }
+
+    const [salesRes, stockRes] = await Promise.all([
+      pool.query(`
+        SELECT
+          SUM(sl.qty)::int AS unites_vendues,
+          ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0)), 2) AS ventes_brutes,
+          ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2) AS cout_ventes
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE ${conds.join(' AND ')}
+      `, params),
+      pool.query(`
+        SELECT
+          COALESCE(SUM(i.qty_on_hand), 0)::int AS stock_restant,
+          COALESCE(SUM(i.qty_on_hand * COALESCE(p.default_cost, 0)), 0)::numeric(12,2) AS valeur_stock_restant
+        FROM inventory i
+        JOIN products p ON p.item_id = i.item_id
+        WHERE ${stockConds.join(' AND ')}
+      `, stockParams),
+    ]);
+
+    const unites_vendues = Number(salesRes.rows[0]?.unites_vendues ?? 0);
+    const stock_restant  = Number(stockRes.rows[0]?.stock_restant  ?? 0);
+    const implied_recu   = unites_vendues + stock_restant;
+    const st_pct         = implied_recu > 0 ? Math.round(unites_vendues / implied_recu * 1000) / 10 : 0;
+
+    return {
+      saison:               code.toUpperCase(),
+      periode_ventes:       { de: s.sell_from, a: s.sell_to },
+      unites_vendues,
+      ventes_brutes:        fmtMoney(salesRes.rows[0]?.ventes_brutes),
+      cout_ventes:          fmtMoney(salesRes.rows[0]?.cout_ventes),
+      stock_restant,
+      valeur_stock_restant: fmtMoney(stockRes.rows[0]?.valeur_stock_restant),
+      implied_recu_fournisseur: implied_recu,
+      sell_through:         `${st_pct}%`,
+    };
+  }));
+
+  return {
+    marque:      manufacturer ?? 'toutes',
+    boutique:    shop_id ?? 'toutes',
+    comparaison: results,
+  };
+}
+
+async function toolGetSalesByCategory({ season, period, date_from, date_to, manufacturer, shop_id }, { pool, getSeasonsConfig }) {
+  shop_id = await resolveShopId(shop_id, pool);
+  let from = date_from, to = date_to;
+  let seasonTag = null;
+
+  if (period) {
+    const resolved = resolvePeriod(period);
+    if (resolved) [from, to] = resolved;
+  }
+
+  if (season) {
+    const seasons = await getSeasonsConfig();
+    const s = seasons.find(x => x.code === season.toLowerCase());
+    if (!s) return { erreur: `Saison "${season}" non trouvée.` };
+    if (!from) { from = s.reception_from; to = s.sell_to; }
+    seasonTag = s.tag_pattern ?? s.code;
+  }
+
+  if (!from) return { erreur: 'Fournir "period", "season" ou "date_from".' };
+
+  const conditions = [
+    'sl.completed_time BETWEEN $1 AND $2',
+    "p.category IS NOT NULL",
+    "p.category != ''",
+  ];
+  const params = [from, to];
+
+  if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
+  if (shop_id)      { conditions.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
+  if (seasonTag)    { conditions.push(`p.tags ILIKE $${params.length + 1}`);           params.push(`%${seasonTag}%`); }
+
+  const { rows } = await pool.query(`
+    SELECT
+      p.category,
+      SUM(sl.qty)::int AS unites,
+      ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0)), 2) AS ventes_brutes,
+      ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)  AS cout_ventes,
+      COUNT(DISTINCT p.manufacturer)::int AS nb_marques
+    FROM sale_lines sl
+    JOIN products p ON p.item_id = sl.item_id
+    WHERE ${conditions.join(' AND ')}
+    GROUP BY p.category
+    ORDER BY ventes_brutes DESC NULLS LAST
+    LIMIT 60
+  `, params);
+
+  const totVentes = rows.reduce((s, r) => s + parseFloat(r.ventes_brutes ?? 0), 0);
+  const totUnites = rows.reduce((s, r) => s + parseInt(r.unites          ?? 0), 0);
+
+  return {
+    periode:    { de: from, a: to },
+    filtre:     { marque: manufacturer ?? 'toutes', boutique: shop_id ?? 'toutes', saison: season },
+    nb_categories: rows.length,
+    categories: rows.map(r => ({
+      categorie:     r.category,
+      unites:        Number(r.unites),
+      ventes_brutes: fmtMoney(r.ventes_brutes),
+      cout_ventes:   fmtMoney(r.cout_ventes),
+      nb_marques:    Number(r.nb_marques),
+    })),
+    total: { unites: totUnites, ventes_brutes: fmtMoney(totVentes) },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tool dispatcher
 // ---------------------------------------------------------------------------
@@ -948,6 +1079,8 @@ async function dispatchTool(name, args, ctx) {
     case 'get_sellthrough_by_size':         return await toolGetSellthroughBySize(args, ctx);
     case 'get_transfer_recommendations':    return await toolGetTransferRecommendations(args, ctx);
     case 'get_matrix_info':                 return await toolGetMatrixInfo(args, ctx);
+    case 'compare_seasons':                 return await toolCompareSeasons(args, ctx);
+    case 'get_sales_by_category':           return await toolGetSalesByCategory(args, ctx);
     default:                                return { erreur: `Outil inconnu: ${name}` };
   }
 }
@@ -1108,6 +1241,8 @@ const TOOL_LABELS = {
   get_transfer_recommendations: 'Recommandations de transferts',
   get_matrix_info:              'Info produit / matrice',
   get_categories:               'Récupération des catégories',
+  compare_seasons:              'Comparaison inter-saisons',
+  get_sales_by_category:        'Analyse des ventes par catégorie',
 };
 
 // ---------------------------------------------------------------------------
