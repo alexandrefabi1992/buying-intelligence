@@ -976,26 +976,59 @@ async function executeTool(name, args, ctx) {
 // ---------------------------------------------------------------------------
 // Agentic loop
 // messages = OpenAI-format array (history from client, without system prompt)
-// ctx = { pool, budgetCache, getSeasonsConfig }
+// ctx = { pool, budgetCache, getSeasonsConfig, tenantConfig, tenantId, shops, seasons }
 // ---------------------------------------------------------------------------
 async function runAgentLoop(messages, ctx) {
   const provider = createProvider();
 
   const now   = new Date();
   const today = now.toISOString().slice(0, 10);
-  const d = (yearsBack = 0, monthsBack = 0) => {
-    const dt = new Date(now);
-    dt.setFullYear(dt.getFullYear() - yearsBack);
-    dt.setMonth(dt.getMonth() - monthsBack);
-    return dt.toISOString().slice(0, 10);
-  };
 
-  const dateContext = `\n\nDATE ACTUELLE: ${today}
-RÈGLE ABSOLUE SUR LES DATES: utilise TOUJOURS le paramètre "period" pour les périodes relatives — jamais date_from/date_to calculées de ta tête.
-Correspondances period: "4y"=4 ans, "3y"=3 ans, "2y"=2 ans, "1y"=1 an, "6m"=6 mois, "3m"=3 mois, "10w"=10 semaines, "ytd"=cette année, "last_year"=l'an dernier.`;
+  // Build live context — generic, works for any tenant
+  const seasons    = ctx.seasons ?? await ctx.getSeasonsConfig();
+  const shops      = ctx.shops   ?? [];
+  const shopNames  = shops.map(s => s.name).join(', ') || '(aucune boutique configurée)';
+
+  // Active season = sell period contains today
+  const activeSeason = seasons.find(s => today >= s.sell_from && today <= s.sell_to);
+  // Season in preparation = reception started but sell not yet started
+  const prepSeason   = seasons.find(s => today >= s.reception_from && today < s.sell_from);
+  // Next budget season = first season whose reception hasn't started yet
+  const nextSeason   = seasons.find(s => today < s.reception_from);
+
+  const seasonLines = [
+    activeSeason
+      ? `- Saison en cours (ventes actives) : ${activeSeason.code.toUpperCase()} — ${activeSeason.label}`
+      : '- Aucune saison en cours',
+    prepSeason
+      ? `- Saison en préparation (commandes en cours) : ${prepSeason.code.toUpperCase()} — ${prepSeason.label}`
+      : '',
+    nextSeason
+      ? `- Prochaine saison (pas encore commencée) : ${nextSeason.code.toUpperCase()} — ${nextSeason.label}`
+      : '',
+  ].filter(Boolean).join('\n');
+
+  const liveContext = `
+
+DATE ACTUELLE : ${today}
+RÈGLE ABSOLUE SUR LES DATES : utilise TOUJOURS le paramètre "period" pour les périodes relatives — jamais date_from/date_to calculées de ta tête.
+Correspondances period : "4y"=4 ans, "3y"=3 ans, "2y"=2 ans, "1y"=1 an, "6m"=6 mois, "3m"=3 mois, "10w"=10 semaines, "ytd"=cette année, "last_year"=l'an dernier.
+
+BOUTIQUES DISPONIBLES : ${shopNames}
+Quand l'utilisateur mentionne une boutique (même en abrégé), utilise le nom exact ci-dessus dans shop_id.
+"toutes les boutiques" ou "toutes" → ne pas filtrer par boutique (omettre shop_id).
+
+SAISONS :
+${seasonLines}
+Toutes les saisons configurées : ${seasons.map(s => s.code).join(', ')}
+Résolution du langage naturel :
+- "cette saison" / "la saison en cours" → ${activeSeason?.code ?? 'demander précision'}
+- "la saison en préparation" / "la prochaine commande" → ${prepSeason?.code ?? nextSeason?.code ?? 'demander précision'}
+- "l'an dernier" / "last year" → utiliser period="last_year"
+- "les X dernières saisons" → lister les X codes précédant la saison en cours du même type (P ou A)`;
 
   const basePrompt    = ctx.tenantConfig ? buildSystemPrompt(ctx.tenantConfig) : SYSTEM_PROMPT;
-  const systemContent = basePrompt + dateContext;
+  const systemContent = basePrompt + liveContext;
 
   const fullMessages = [
     { role: 'system', content: systemContent },
