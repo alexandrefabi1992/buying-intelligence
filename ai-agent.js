@@ -940,8 +940,10 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
     if (!s) return { saison: code.toUpperCase(), erreur: 'Saison non trouvée' };
 
     const seasonTag = s.tag_pattern ?? s.code;
-    const conds  = ['sl.completed_time BETWEEN $1 AND $2', `p.tags ILIKE $3`];
-    const params = [s.sell_from, s.sell_to, `%${seasonTag}%`];
+    // No date filter — matches Lightspeed "Ventes par Marque, Saison=Pxx" (no date restriction).
+    // All-time sales of season-tagged items. For current/future seasons this naturally caps at today.
+    const conds  = [`p.tags ILIKE $1`];
+    const params = [`%${seasonTag}%`];
 
     if (manufacturer) { conds.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
     if (shop_id)      { conds.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
@@ -956,7 +958,9 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
         SELECT
           SUM(sl.qty)::int AS unites_vendues,
           ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0)), 2) AS ventes_brutes,
-          ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2) AS cout_ventes
+          ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2) AS cout_ventes,
+          MIN(sl.completed_time::date)::text AS premiere_vente,
+          MAX(sl.completed_time::date)::text AS derniere_vente
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE ${conds.join(' AND ')}
@@ -978,7 +982,9 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
 
     return {
       saison:               code.toUpperCase(),
-      periode_comparaison:  `${s.sell_from} → ${s.sell_to}`,
+      note:                 'Toutes ventes des articles tagués ' + seasonTag + ' (sans filtre de date — correspond au rapport Lightspeed Ventes par Marque / Saison)',
+      premiere_vente:       salesRes.rows[0]?.premiere_vente ?? null,
+      derniere_vente:       salesRes.rows[0]?.derniere_vente ?? null,
       unites_vendues,
       ventes_brutes:        fmtMoney(salesRes.rows[0]?.ventes_brutes),
       cout_ventes:          fmtMoney(salesRes.rows[0]?.cout_ventes),
