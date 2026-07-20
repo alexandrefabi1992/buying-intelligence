@@ -142,9 +142,10 @@ function resolvePeriod(period) {
   return null;
 }
 
-async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, date_to, period, total_only = false }, { pool, getSeasonsConfig }) {
+async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, date_to, period, tags, exclude_tags, total_only = false }, { pool, getSeasonsConfig }) {
   shop_id = await resolveShopId(shop_id, pool);
   let from = date_from, to = date_to;
+  let seasonTag = null;
 
   // period shorthand takes priority over raw dates
   if (period) {
@@ -152,12 +153,12 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
     if (resolved) [from, to] = resolved;
   }
 
-  if (season && !from) {
+  if (season) {
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
     if (!s) return { erreur: `Saison "${season}" non trouvée.` };
-    from = s.sell_from;
-    to   = s.sell_to;
+    if (!from) { from = s.sell_from; to = s.sell_to; }
+    seasonTag = s.tag_pattern ?? s.code;
   }
   if (!from) return { erreur: 'Fournir "period" (ex: "4y", "10w", "6m", "ytd") ou "season" ou "date_from".' };
 
@@ -166,6 +167,21 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
   if (shop_id)      { conditions.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
+
+  // Season tag filter: when season is provided, restrict to items tagged with that season
+  if (seasonTag) {
+    conditions.push(`p.tags ILIKE $${params.length + 1}`);
+    params.push(`%${seasonTag}%`);
+  }
+  // Additional explicit tag filters
+  for (const t of normalizeTags(tags)) {
+    conditions.push(`p.tags ILIKE $${params.length + 1}`);
+    params.push(`%${t}%`);
+  }
+  for (const t of normalizeTags(exclude_tags)) {
+    conditions.push(`(p.tags NOT ILIKE $${params.length + 1} OR p.tags IS NULL)`);
+    params.push(`%${t}%`);
+  }
 
   // total_only = true → grand total par boutique, LEFT JOIN pour capturer 100% des ventes
   // (INNER JOIN exclurait les articles supprimés/non-synced → sous-comptage)
