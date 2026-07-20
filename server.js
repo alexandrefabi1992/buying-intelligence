@@ -4840,8 +4840,20 @@ app.post('/api/ai/chat', async (req, res, next) => {
     if (!Array.isArray(messages) || !messages.length) {
       return res.status(400).json({ error: 'messages array required' });
     }
-    const tenantConfig = await getTenantConfig(req.tenantId);
-    const ctx = { pool, budgetCache, getSeasonsConfig: () => getSeasonsConfig(req.tenantId), tenantConfig };
+    const [tenantConfig, seasons, shopsResult] = await Promise.all([
+      getTenantConfig(req.tenantId),
+      getSeasonsConfig(req.tenantId),
+      pool.query('SELECT shop_id, name FROM shops WHERE tenant_id = $1 ORDER BY name', [req.tenantId]),
+    ]);
+    const ctx = {
+      pool,
+      budgetCache,
+      getSeasonsConfig: () => Promise.resolve(seasons),
+      tenantConfig,
+      tenantId: req.tenantId,
+      shops: shopsResult.rows,
+      seasons,
+    };
     const result = await runAgentLoop(messages, ctx);
 
     // Save conversation asynchronously (don't block response)
