@@ -52,14 +52,16 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_sales_analysis',
-    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les ventes brutes HT (prix de vente après escompte) et le coût des ventes. Pour les totaux compagnie (toutes marques), utilise total_only=true — sinon la requête est limitée aux 50 premiers résultats.',
+    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les ventes brutes HT (prix de vente après escompte) et le coût des ventes. IMPORTANT: quand season est fourni, il filtre automatiquement par le tag de la saison (ex: p26) EN PLUS de définir les dates de vente — donc les résultats ne contiennent que les articles de cette saison. Pour les totaux compagnie (toutes marques), utilise total_only=true.',
     parameters: {
       type: 'object',
       properties: {
-        period:       { type: 'string',  description: 'OBLIGATOIRE pour toute période relative. Valeurs: "1y" "2y" "3y" "4y" "5y" "6m" "3m" "1m" "4w" "8w" "10w" "12w" "30d" "ytd" "last_year". Ex: "4 dernières années" → "4y", "10 dernières semaines" → "10w", "cette année" → "ytd"' },
-        season:       { type: 'string',  description: 'Code de saison (ex: p26, a25) — seulement si la question porte sur une saison nommée' },
+        period:       { type: 'string',  description: 'Période relative. Valeurs: "1y" "2y" "3y" "4y" "5y" "6m" "3m" "1m" "4w" "8w" "10w" "12w" "30d" "ytd" "last_year". Si season est fourni, omettre period pour utiliser les dates de la saison.' },
+        season:       { type: 'string',  description: 'Code de saison (ex: p26, a25). Filtre par tag de saison ET définit la période de vente. Privilégier season plutôt que period pour les questions sur une saison.' },
         manufacturer: { type: 'string',  description: 'Nom de la marque (optionnel)' },
-        shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel). Passer le nom tel quel, ex: "Saint-Bruno", "Fan Club", "Valérie Simon" — la résolution se fait automatiquement.' },
+        shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel). Ex: "Saint-Bruno", "Fan Club".' },
+        tags:         { type: 'array', items: { type: 'string' }, description: 'Filtres supplémentaires par tag (optionnel)' },
+        exclude_tags: { type: 'array', items: { type: 'string' }, description: 'Exclure ces tags (optionnel)' },
         total_only:   { type: 'boolean', description: 'true pour total toutes marques par boutique (ventes globales compagnie)' },
       },
       required: [],
