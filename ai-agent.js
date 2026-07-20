@@ -941,7 +941,7 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
 
     const seasonTag = s.tag_pattern ?? s.code;
     const conds  = ['sl.completed_time BETWEEN $1 AND $2', `p.tags ILIKE $3`];
-    const params = [s.reception_from, s.sell_to, `%${seasonTag}%`];
+    const params = [s.sell_from, s.sell_to, `%${seasonTag}%`];
 
     if (manufacturer) { conds.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
     if (shop_id)      { conds.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
@@ -978,7 +978,7 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
 
     return {
       saison:               code.toUpperCase(),
-      periode_ventes:       { de: s.sell_from, a: s.sell_to },
+      periode_comparaison:  `${s.sell_from} → ${s.sell_to}`,
       unites_vendues,
       ventes_brutes:        fmtMoney(salesRes.rows[0]?.ventes_brutes),
       cout_ventes:          fmtMoney(salesRes.rows[0]?.cout_ventes),
