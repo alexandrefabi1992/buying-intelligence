@@ -895,6 +895,36 @@ app.post('/api/sync/reset', (req, res) => {
   res.json({ ok: true, message: 'syncRunning flag reset' });
 });
 
+// POST /api/sync/full-history — re-sync all sale_lines from the past 10 years.
+// Use to fix gaps in historical data (missing sale_lines for past seasons).
+// Safe: upsertSaleLines uses ON CONFLICT UPDATE — no duplicates.
+app.use('/api/sync/full-history', requireAdmin);
+app.post('/api/sync/full-history', async (req, res) => {
+  if (!process.env.LIGHTSPEED_REFRESH_TOKEN) {
+    return res.status(400).json({ error: 'LIGHTSPEED_REFRESH_TOKEN is not set.' });
+  }
+  if (syncRunning) {
+    return res.status(409).json({ status: 'sync already running' });
+  }
+  syncRunning = true;
+  res.json({ status: 'full-history sync started — pulling 10 years of sale_lines', note: 'This may take 10-30 minutes. Check logs for progress.' });
+  const { spawn } = require('child_process');
+  const child = spawn('node', ['sync.js', '--once', '--full-history'], { cwd: __dirname });
+  const capture = chunk => {
+    const text = chunk.toString();
+    process.stdout.write(text);
+    text.split('\n').filter(Boolean).forEach(appendLog);
+  };
+  child.stdout.on('data', capture);
+  child.stderr.on('data', capture);
+  child.on('close', code => {
+    syncRunning = false;
+    const msg = `[sync/full-history] exited with code ${code}`;
+    console.log(msg);
+    appendLog(msg);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // OAuth2 flow — one-time setup to obtain a refresh_token
 //

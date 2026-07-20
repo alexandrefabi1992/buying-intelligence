@@ -455,7 +455,7 @@ async function refreshMaterializedView(viewName) {
 // ---------------------------------------------------------------------------
 const SYNC_STEPS = ['shops', 'items', 'inventory', 'sales', 'orders', 'transfers'];
 
-async function runSync() {
+async function runSync({ forceDaysBack = null } = {}) {
   console.log(`[sync] Starting — ${new Date().toISOString()}`);
 
   const tenantId = await getSyncTenantId();
@@ -472,10 +472,10 @@ async function runSync() {
   // This ensures new client onboarding always gets complete historical data without manual config.
   const { rows: countRows } = await pool.query('SELECT COUNT(*) AS n FROM sale_lines');
   const isFirstSync = Number(countRows[0].n) === 0;
-  const daysBack = isFirstSync
-    ? 3650
-    : parseInt(process.env.SYNC_DAYS_BACK ?? '7', 10);
-  if (isFirstSync) console.log('[sync] First sync detected (sale_lines empty) — pulling full 10-year history');
+  const daysBack = forceDaysBack
+    ?? (isFirstSync ? 3650 : parseInt(process.env.SYNC_DAYS_BACK ?? '7', 10));
+  if (isFirstSync)    console.log('[sync] First sync detected (sale_lines empty) — pulling full 10-year history');
+  if (forceDaysBack)  console.log(`[sync] Force full sync: pulling ${forceDaysBack} days of history`);
   const since = new Date(Date.now() - daysBack * 86_400_000).toISOString();
 
   // Keepalive: force token refresh every 5 min to survive long inventory phases
@@ -682,7 +682,8 @@ async function runSync() {
 // Entrypoint: cron (every Monday at 07:00) or one-shot via --once flag
 // ---------------------------------------------------------------------------
 if (process.argv.includes('--once')) {
-  runSync().catch(err => {
+  const fullHistory = process.argv.includes('--full-history');
+  runSync(fullHistory ? { forceDaysBack: 3650 } : {}).catch(err => {
     if (err.response?.data?.message) {
       console.error('[sync] API error:', err.response.data.message);
     } else {
