@@ -4864,20 +4864,25 @@ app.post('/api/ai/chat', async (req, res, next) => {
 
       const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-      await runAgentLoopStream(messages, ctx, (event) => {
-        send(event);
-        if (event.type === 'done') {
-          // Save conversation asynchronously
-          const userMsgs = (event.messages ?? []).filter(m => m.role === 'user');
-          if (userMsgs.length) {
-            const preview = userMsgs[userMsgs.length - 1].content?.slice(0, 120) ?? '';
-            pool.query(
-              `INSERT INTO conversations(tenant_id, preview, messages) VALUES($1, $2, $3::jsonb)`,
-              [req.tenantId, preview, JSON.stringify(event.messages ?? [])]
-            ).catch(() => {});
+      try {
+        await runAgentLoopStream(messages, ctx, (event) => {
+          send(event);
+          if (event.type === 'done') {
+            const userMsgs = (event.messages ?? []).filter(m => m.role === 'user');
+            if (userMsgs.length) {
+              const preview = userMsgs[userMsgs.length - 1].content?.slice(0, 120) ?? '';
+              pool.query(
+                `INSERT INTO conversations(tenant_id, preview, messages) VALUES($1, $2, $3::jsonb)`,
+                [req.tenantId, preview, JSON.stringify(event.messages ?? [])]
+              ).catch(() => {});
+            }
           }
-        }
-      });
+        });
+      } catch (err) {
+        console.error('[SSE error]', err);
+        send({ type: 'error', message: err.message || 'Erreur interne du serveur.' });
+        send({ type: 'done', messages });
+      }
 
       res.end();
     } else {

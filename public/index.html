@@ -4075,6 +4075,10 @@ const AdminPanel = (() => {
               assistantDiv.textContent = fullText;
             }
             msgs.scrollTop = msgs.scrollHeight;
+          } else if (event.type === 'error') {
+            removeThinking();
+            if (history.length && history[history.length - 1].role === 'user') history.pop();
+            appendError(event.message || 'Erreur serveur.');
           } else if (event.type === 'done') {
             history = event.messages ?? history;
           }
@@ -4082,7 +4086,10 @@ const AdminPanel = (() => {
       }
 
       removeThinking();
-      if (!assistantDiv) appendMsg('assistant', '(pas de réponse)');
+      if (!assistantDiv) {
+        if (history.length && history[history.length - 1].role === 'user') history.pop();
+        appendError('Aucune réponse reçue. Le modèle n\'a pas pu générer de texte.');
+      }
 
     } catch (e) {
       removeThinking();
