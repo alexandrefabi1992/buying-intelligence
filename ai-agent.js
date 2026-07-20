@@ -940,10 +940,9 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
     if (!s) return { saison: code.toUpperCase(), erreur: 'Saison non trouvée' };
 
     const seasonTag = s.tag_pattern ?? s.code;
-    // No date filter — matches Lightspeed "Ventes par Marque, Saison=Pxx" (no date restriction).
-    // All-time sales of season-tagged items. For current/future seasons this naturally caps at today.
-    const conds  = [`p.tags ILIKE $1`];
-    const params = [`%${seasonTag}%`];
+    // sell_from → sell_to matches Lightspeed "Ventes par Marque" with date + balise filters.
+    const conds  = ['sl.completed_time BETWEEN $1 AND $2', `p.tags ILIKE $3`];
+    const params = [s.sell_from, s.sell_to, `%${seasonTag}%`];
 
     if (manufacturer) { conds.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
     if (shop_id)      { conds.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
@@ -982,9 +981,7 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
 
     return {
       saison:               code.toUpperCase(),
-      note:                 'Toutes ventes des articles tagués ' + seasonTag + ' (sans filtre de date — correspond au rapport Lightspeed Ventes par Marque / Saison)',
-      premiere_vente:       salesRes.rows[0]?.premiere_vente ?? null,
-      derniere_vente:       salesRes.rows[0]?.derniere_vente ?? null,
+      periode:              `${s.sell_from} → ${s.sell_to}`,
       unites_vendues,
       ventes_brutes:        fmtMoney(salesRes.rows[0]?.ventes_brutes),
       cout_ventes:          fmtMoney(salesRes.rows[0]?.cout_ventes),
