@@ -62,7 +62,7 @@ const TOOL_DEFS = [
         shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel). Ex: "Saint-Bruno", "Fan Club".' },
         tags:         { type: 'array', items: { type: 'string' }, description: 'Filtres supplémentaires par tag (optionnel)' },
         exclude_tags: { type: 'array', items: { type: 'string' }, description: 'Exclure ces tags (optionnel)' },
-        total_only:   { type: 'boolean', description: 'true pour total toutes marques par boutique (ventes globales compagnie)' },
+        total_only:   { type: 'boolean', description: 'true UNIQUEMENT pour obtenir le total de TOUTES les marques par boutique (chiffre d\'affaires global compagnie). Ne pas utiliser si manufacturer est spécifié.' },
       },
       required: [],
     },

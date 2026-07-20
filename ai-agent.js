@@ -183,9 +183,9 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
     params.push(`%${t}%`);
   }
 
-  // total_only = true → grand total par boutique, LEFT JOIN pour capturer 100% des ventes
-  // (INNER JOIN exclurait les articles supprimés/non-synced → sous-comptage)
-  if (total_only || (!manufacturer && !shop_id)) {
+  // total_only = true → grand total toutes marques par boutique.
+  // Ignoré si manufacturer est fourni (on veut le détail d'une marque, pas un total global).
+  if ((total_only && !manufacturer) || (!manufacturer && !shop_id)) {
     const { rows } = await pool.query(`
       SELECT
         sh.name                              AS boutique,
