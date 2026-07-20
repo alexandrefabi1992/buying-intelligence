@@ -157,7 +157,8 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
     if (!s) return { erreur: `Saison "${season}" non trouvée.` };
-    if (!from) { from = s.sell_from; to = s.sell_to; }
+    // Use reception_from (not sell_from) to capture pre-season sales of tagged items
+    if (!from) { from = s.reception_from; to = s.sell_to; }
     seasonTag = s.tag_pattern ?? s.code;
   }
   if (!from) return { erreur: 'Fournir "period" (ex: "4y", "10w", "6m", "ytd") ou "season" ou "date_from".' };
@@ -190,7 +191,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
       SELECT
         sh.name                              AS boutique,
         SUM(sl.qty)                          AS unites,
-        ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price)), 2)::numeric(14,2) AS ventes_brutes,
+        ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0)), 2)::numeric(14,2) AS ventes_brutes,
         ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(14,2) AS cout_ventes
       FROM sale_lines sl
       LEFT JOIN products p ON p.item_id  = sl.item_id
@@ -225,7 +226,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
       p.manufacturer,
       sh.name                              AS boutique,
       SUM(sl.qty)                          AS unites,
-      ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price)), 2)::numeric(12,2) AS ventes_brutes,
+      ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0)), 2)::numeric(12,2) AS ventes_brutes,
       ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(12,2) AS cout_ventes
     FROM sale_lines sl
     JOIN products p  ON p.item_id  = sl.item_id
