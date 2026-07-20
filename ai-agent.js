@@ -532,13 +532,20 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   let from, to;
 
   // Resolve date range: prefer reception_from (= start of season life) over sell_from.
-  // This matches Lightspeed's "Stocks reçus" which counts from first receipt, not first sale.
+  // Also inject the season tag so only items tagged for this season are included —
+  // matching Lightspeed's "Stocks reçus" filter which uses the season tag, not just dates.
   if (season) {
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
     if (s) {
       from = s.reception_from ?? s.sell_from;
       to   = s.sell_to < today ? s.sell_to : today;
+      // Auto-inject season tag unless caller already provided a tag override
+      const pattern = s.tag_pattern ?? s.code;
+      const existingTags = normalizeTags(tags);
+      if (!existingTags.some(t => t.toLowerCase() === pattern.toLowerCase())) {
+        tags = [...existingTags, pattern];
+      }
     }
   }
   // If tags contain a season-like code (e.g. "p26"), auto-resolve its reception_from
