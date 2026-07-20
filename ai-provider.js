@@ -298,6 +298,44 @@ ${Object.values(HELP).map(s =>
 const SYSTEM_PROMPT = buildSystemPrompt();
 
 // ---------------------------------------------------------------------------
+// Shared SSE stream parser for OpenAI-compatible APIs (Mistral + OpenAI)
+// ---------------------------------------------------------------------------
+async function _parseOpenAIStream(res, onToken) {
+  const reader  = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '', content = '', toolCalls = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n'); buffer = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const raw = line.slice(6).trim();
+      if (raw === '[DONE]') continue;
+      try {
+        const chunk = JSON.parse(raw);
+        const delta = chunk.choices?.[0]?.delta;
+        if (!delta) continue;
+        if (delta.content)     { content += delta.content; onToken(delta.content); }
+        if (delta.tool_calls)  {
+          for (const tc of delta.tool_calls) {
+            const i = tc.index ?? 0;
+            if (!toolCalls[i]) toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+            if (tc.id)                    toolCalls[i].id += tc.id;
+            if (tc.function?.name)        toolCalls[i].function.name += tc.function.name;
+            if (tc.function?.arguments)   toolCalls[i].function.arguments += tc.function.arguments;
+          }
+        }
+      } catch {}
+    }
+  }
+  const message = { role: 'assistant', content: content || null, tool_calls: toolCalls.length ? toolCalls : undefined };
+  return { message, tool_calls: toolCalls, content };
+}
+
+// ---------------------------------------------------------------------------
 // Mistral Provider
 // Compatible avec: api.mistral.ai ET tout serveur OpenAI-compatible (vLLM, Ollama)
 // Pour self-host: MISTRAL_BASE_URL=http://votre-serveur:8000/v1
@@ -334,6 +372,20 @@ class MistralProvider {
     const msg  = data.choices[0].message;
     return { message: msg, tool_calls: msg.tool_calls ?? [], content: msg.content ?? '' };
   }
+
+  async stream(messages, onToken) {
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.apiKey}` },
+      body: JSON.stringify({
+        model: this.model, messages,
+        tools: TOOL_DEFS.map(t => ({ type: 'function', function: t })),
+        tool_choice: 'auto', temperature: 0.2, stream: true,
+      }),
+    });
+    if (!res.ok) throw new Error(`Mistral ${res.status}: ${await res.text()}`);
+    return _parseOpenAIStream(res, onToken);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -367,6 +419,20 @@ class OpenAIProvider {
     const data = await res.json();
     const msg  = data.choices[0].message;
     return { message: msg, tool_calls: msg.tool_calls ?? [], content: msg.content ?? '' };
+  }
+
+  async stream(messages, onToken) {
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.apiKey}` },
+      body: JSON.stringify({
+        model: this.model, messages,
+        tools: TOOL_DEFS.map(t => ({ type: 'function', function: t })),
+        tool_choice: 'auto', temperature: 0.2, stream: true,
+      }),
+    });
+    if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`);
+    return _parseOpenAIStream(res, onToken);
   }
 }
 
@@ -433,7 +499,6 @@ class AnthropicProvider {
     const toolUses   = data.content.filter(c => c.type === 'tool_use');
     const textBlocks = data.content.filter(c => c.type === 'text');
     const content    = textBlocks.map(c => c.text).join('');
-    // Convert back to OpenAI-style message so the agentic loop stays unified
     const tool_calls = toolUses.map(t => ({
       id:       t.id,
       type:     'function',
@@ -445,6 +510,52 @@ class AnthropicProvider {
       tool_calls: tool_calls.length ? tool_calls : undefined,
     };
     return { message, tool_calls, content };
+  }
+
+  async stream(messages, onToken) {
+    const systemMsg = messages.find(m => m.role === 'system');
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:  'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: this.model, max_tokens: 4096,
+        system: systemMsg?.content ?? SYSTEM_PROMPT,
+        messages: this._toAnthropicMessages(messages),
+        tools: TOOL_DEFS.map(t => ({ name: t.name, description: t.description, input_schema: t.parameters })),
+        stream: true,
+      }),
+    });
+    if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '', content = '', toolCalls = [], toolIdx = -1;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n'); buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const ev = JSON.parse(line.slice(6));
+          if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
+            toolIdx++;
+            toolCalls[toolIdx] = { id: ev.content_block.id, type: 'function', function: { name: ev.content_block.name, arguments: '' } };
+          } else if (ev.type === 'content_block_delta') {
+            if (ev.delta?.type === 'text_delta')       { content += ev.delta.text; onToken(ev.delta.text); }
+            if (ev.delta?.type === 'input_json_delta' && toolIdx >= 0) toolCalls[toolIdx].function.arguments += ev.delta.partial_json;
+          }
+        } catch {}
+      }
+    }
+    const message = { role: 'assistant', content: content || null, tool_calls: toolCalls.length ? toolCalls : undefined };
+    return { message, tool_calls: toolCalls, content };
   }
 }
 

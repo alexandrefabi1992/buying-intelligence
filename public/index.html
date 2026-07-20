@@ -3982,10 +3982,17 @@ const AdminPanel = (() => {
 
     const thinking = appendMsg('thinking', '…');
 
+    let assistantDiv = null;
+    let fullText     = '';
+
+    function removeThinking() {
+      if (thinking.parentNode === msgs) msgs.removeChild(thinking);
+    }
+
     try {
       const res = await apiFetch(`${BASE}/api/ai/chat`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
         body:    JSON.stringify({ messages: history }),
       });
 
@@ -3994,15 +4001,49 @@ const AdminPanel = (() => {
         throw new Error(err.error || `Erreur ${res.status}`);
       }
 
-      const data = await res.json();
-      msgs.removeChild(thinking);
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      const reply = data.content || '(pas de réponse)';
-      appendMsg('assistant', reply);
-      history = data.messages ?? history;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let event;
+          try { event = JSON.parse(line.slice(6)); } catch { continue; }
+
+          if (event.type === 'tool_call') {
+            thinking.textContent = event.label + '…';
+          } else if (event.type === 'token') {
+            removeThinking();
+            if (!assistantDiv) {
+              assistantDiv = document.createElement('div');
+              assistantDiv.className = 'ai-msg assistant';
+              msgs.appendChild(assistantDiv);
+            }
+            fullText += event.text;
+            if (typeof marked !== 'undefined') {
+              assistantDiv.innerHTML = marked.parse(fullText);
+            } else {
+              assistantDiv.textContent = fullText;
+            }
+            msgs.scrollTop = msgs.scrollHeight;
+          } else if (event.type === 'done') {
+            history = event.messages ?? history;
+          }
+        }
+      }
+
+      removeThinking();
+      if (!assistantDiv) appendMsg('assistant', '(pas de réponse)');
 
     } catch (e) {
-      msgs.removeChild(thinking);
+      removeThinking();
       appendMsg('assistant', `Erreur : ${e.message}`);
     }
 

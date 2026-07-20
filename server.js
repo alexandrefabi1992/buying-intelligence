@@ -15,7 +15,7 @@ const fs      = require('fs');
 const path    = require('path');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
-const { runAgentLoop } = require('./ai-agent');
+const { runAgentLoop, runAgentLoopStream } = require('./ai-agent');
 const HELP             = require('./help-content');
 
 const app  = express();
@@ -4854,19 +4854,46 @@ app.post('/api/ai/chat', async (req, res, next) => {
       shops: shopsResult.rows,
       seasons,
     };
-    const result = await runAgentLoop(messages, ctx);
+    const wantsStream = (req.headers.accept ?? '').includes('text/event-stream');
 
-    // Save conversation asynchronously (don't block response)
-    const userMsgs = (result.messages ?? []).filter(m => m.role === 'user');
-    if (userMsgs.length) {
-      const preview = userMsgs[userMsgs.length - 1].content?.slice(0, 120) ?? '';
-      pool.query(
-        `INSERT INTO conversations(tenant_id, preview, messages) VALUES($1, $2, $3::jsonb)`,
-        [req.tenantId, preview, JSON.stringify(result.messages ?? [])]
-      ).catch(() => {});
+    if (wantsStream) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+      await runAgentLoopStream(messages, ctx, (event) => {
+        send(event);
+        if (event.type === 'done') {
+          // Save conversation asynchronously
+          const userMsgs = (event.messages ?? []).filter(m => m.role === 'user');
+          if (userMsgs.length) {
+            const preview = userMsgs[userMsgs.length - 1].content?.slice(0, 120) ?? '';
+            pool.query(
+              `INSERT INTO conversations(tenant_id, preview, messages) VALUES($1, $2, $3::jsonb)`,
+              [req.tenantId, preview, JSON.stringify(event.messages ?? [])]
+            ).catch(() => {});
+          }
+        }
+      });
+
+      res.end();
+    } else {
+      const result = await runAgentLoop(messages, ctx);
+
+      const userMsgs = (result.messages ?? []).filter(m => m.role === 'user');
+      if (userMsgs.length) {
+        const preview = userMsgs[userMsgs.length - 1].content?.slice(0, 120) ?? '';
+        pool.query(
+          `INSERT INTO conversations(tenant_id, preview, messages) VALUES($1, $2, $3::jsonb)`,
+          [req.tenantId, preview, JSON.stringify(result.messages ?? [])]
+        ).catch(() => {});
+      }
+
+      res.json(result);
     }
-
-    res.json(result);
   } catch (err) { next(err); }
 });
 
