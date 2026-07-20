@@ -374,15 +374,18 @@ class MistralProvider {
     return { message: msg, tool_calls: msg.tool_calls ?? [], content: msg.content ?? '' };
   }
 
-  async stream(messages, onToken) {
+  async stream(messages, onToken, { noTools = false } = {}) {
+    const body = {
+      model: this.model, messages, temperature: 0.2, stream: true,
+    };
+    if (!noTools) {
+      body.tools = TOOL_DEFS.map(t => ({ type: 'function', function: t }));
+      body.tool_choice = 'auto';
+    }
     const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.apiKey}` },
-      body: JSON.stringify({
-        model: this.model, messages,
-        tools: TOOL_DEFS.map(t => ({ type: 'function', function: t })),
-        tool_choice: 'auto', temperature: 0.2, stream: true,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`Mistral ${res.status}: ${await res.text()}`);
     return _parseOpenAIStream(res, onToken);
@@ -422,15 +425,18 @@ class OpenAIProvider {
     return { message: msg, tool_calls: msg.tool_calls ?? [], content: msg.content ?? '' };
   }
 
-  async stream(messages, onToken) {
+  async stream(messages, onToken, { noTools = false } = {}) {
+    const body = {
+      model: this.model, messages, temperature: 0.2, stream: true,
+    };
+    if (!noTools) {
+      body.tools = TOOL_DEFS.map(t => ({ type: 'function', function: t }));
+      body.tool_choice = 'auto';
+    }
     const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.apiKey}` },
-      body: JSON.stringify({
-        model: this.model, messages,
-        tools: TOOL_DEFS.map(t => ({ type: 'function', function: t })),
-        tool_choice: 'auto', temperature: 0.2, stream: true,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`);
     return _parseOpenAIStream(res, onToken);

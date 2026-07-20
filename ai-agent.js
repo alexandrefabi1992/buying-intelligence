@@ -1149,15 +1149,21 @@ Résolution du langage naturel :
     fullMessages.push(response.message);
 
     if (!response.tool_calls?.length) {
-      // Final response — re-issue as streaming call for token-by-token output
-      // Remove the last assistant message (non-streamed) and re-stream it
+      // Final response — re-issue as streaming call for token-by-token output.
+      // noTools=true prevents Mistral from switching to a tool call mid-stream.
       fullMessages.pop();
       let content = '';
       const streamResult = await provider.stream(fullMessages, text => {
         content += text;
         onEvent({ type: 'token', text });
-      });
-      fullMessages.push(streamResult.message);
+      }, { noTools: true });
+      // Fallback: if stream returned no text but tool calls, treat as text anyway
+      if (!content && streamResult.tool_calls?.length) {
+        const fallback = "Je n'ai pas pu générer une réponse textuelle. Reformulez votre question.";
+        onEvent({ type: 'token', text: fallback });
+        content = fallback;
+      }
+      fullMessages.push({ role: 'assistant', content: content || '', tool_calls: undefined });
       onEvent({ type: 'done', content, messages: fullMessages.slice(1) });
       return;
     }
