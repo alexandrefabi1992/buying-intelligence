@@ -1070,4 +1070,106 @@ Résolution du langage naturel :
   };
 }
 
-module.exports = { runAgentLoop };
+// ---------------------------------------------------------------------------
+// Tool name → human-readable label for streaming status messages
+// ---------------------------------------------------------------------------
+const TOOL_LABELS = {
+  get_budget_recommendations:   'Calcul des budgets recommandés',
+  get_sales_analysis:           'Analyse des ventes',
+  get_stock_levels:             'Consultation du stock',
+  get_plan_vs_recommended:      'Comparaison plan vs recommandé',
+  get_top_performers:           'Classement des marques',
+  get_sellthrough_by_size:      'Analyse des tailles',
+  get_transfer_recommendations: 'Recommandations de transferts',
+  get_matrix_info:              'Info produit / matrice',
+  get_categories:               'Récupération des catégories',
+};
+
+// ---------------------------------------------------------------------------
+// runAgentLoopStream — same logic as runAgentLoop but emits SSE events:
+//   onEvent({ type: 'tool_call', label })  — before each tool round
+//   onEvent({ type: 'token',     text  })  — each streamed token
+//   onEvent({ type: 'done',      messages, content }) — when complete
+// ---------------------------------------------------------------------------
+async function runAgentLoopStream(messages, ctx, onEvent) {
+  const provider = createProvider();
+
+  const now   = new Date();
+  const today = now.toISOString().slice(0, 10);
+
+  const seasons    = ctx.seasons ?? await ctx.getSeasonsConfig();
+  const shops      = ctx.shops   ?? [];
+  const shopNames  = shops.map(s => s.name).join(', ') || '(aucune boutique configurée)';
+
+  const activeSeason = seasons.find(s => today >= s.sell_from && today <= s.sell_to);
+  const prepSeason   = seasons.find(s => today >= s.reception_from && today < s.sell_from);
+  const nextSeason   = seasons.find(s => today < s.reception_from);
+
+  const seasonLines = [
+    activeSeason ? `- Saison en cours : ${activeSeason.code.toUpperCase()} — ${activeSeason.label}` : '- Aucune saison en cours',
+    prepSeason   ? `- Saison en préparation : ${prepSeason.code.toUpperCase()} — ${prepSeason.label}` : '',
+    nextSeason   ? `- Prochaine saison : ${nextSeason.code.toUpperCase()} — ${nextSeason.label}` : '',
+  ].filter(Boolean).join('\n');
+
+  const liveContext = `
+
+DATE ACTUELLE : ${today}
+RÈGLE ABSOLUE SUR LES DATES : utilise TOUJOURS le paramètre "period" pour les périodes relatives.
+Correspondances : "4y"=4 ans, "3y"=3 ans, "2y"=2 ans, "1y"=1 an, "6m"=6 mois, "3m"=3 mois, "10w"=10 semaines, "ytd"=cette année, "last_year"=l'an dernier.
+
+BOUTIQUES DISPONIBLES : ${shopNames}
+Quand l'utilisateur mentionne une boutique (même en abrégé), utilise le nom exact ci-dessus dans shop_id.
+"toutes les boutiques" ou "toutes" → ne pas filtrer par boutique (omettre shop_id).
+
+SAISONS :
+${seasonLines}
+Toutes les saisons configurées : ${seasons.map(s => s.code).join(', ')}
+Résolution du langage naturel :
+- "cette saison" / "la saison en cours" → ${activeSeason?.code ?? 'demander précision'}
+- "la saison en préparation" / "la prochaine commande" → ${prepSeason?.code ?? nextSeason?.code ?? 'demander précision'}
+- "l'an dernier" / "last year" → utiliser period="last_year"`;
+
+  const basePrompt    = ctx.tenantConfig ? buildSystemPrompt(ctx.tenantConfig) : SYSTEM_PROMPT;
+  const systemContent = basePrompt + liveContext;
+
+  const fullMessages = [{ role: 'system', content: systemContent }, ...messages];
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    // Check if this is the final round (no tool calls expected) — use streaming
+    // We always try non-streaming first to detect tool calls; only stream the final answer
+    const response = await provider.complete(fullMessages);
+    fullMessages.push(response.message);
+
+    if (!response.tool_calls?.length) {
+      // Final response — re-issue as streaming call for token-by-token output
+      // Remove the last assistant message (non-streamed) and re-stream it
+      fullMessages.pop();
+      let content = '';
+      const streamResult = await provider.stream(fullMessages, text => {
+        content += text;
+        onEvent({ type: 'token', text });
+      });
+      fullMessages.push(streamResult.message);
+      onEvent({ type: 'done', content, messages: fullMessages.slice(1) });
+      return;
+    }
+
+    // Tool call round — emit status label for each unique tool being called
+    const uniqueTools = [...new Set(response.tool_calls.map(tc => tc.function.name))];
+    const label = uniqueTools.map(n => TOOL_LABELS[n] ?? n).join(' + ');
+    onEvent({ type: 'tool_call', label });
+
+    const results = await Promise.all(
+      response.tool_calls.map(async tc => {
+        const args   = JSON.parse(tc.function.arguments ?? '{}');
+        const result = await executeTool(tc.function.name, args, ctx);
+        return { role: 'tool', tool_call_id: tc.id, name: tc.function.name, content: JSON.stringify(result) };
+      })
+    );
+    fullMessages.push(...results);
+  }
+
+  onEvent({ type: 'done', content: "Désolé, j'ai atteint la limite de traitement. Veuillez reformuler.", messages: fullMessages.slice(1) });
+}
+
+module.exports = { runAgentLoop, runAgentLoopStream };
