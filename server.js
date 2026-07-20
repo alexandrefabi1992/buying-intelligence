@@ -208,7 +208,7 @@ app.use('/api', (req, res, next) => {
   if (p === '/auth/login') return next();
   // Admin-only system routes (protected by X-Admin-Secret, not JWT)
   if (p.startsWith('/admin') ||
-      p === '/sync/run' || p === '/sync/reset' ||
+      p === '/sync/run' || p === '/sync/reset' || p === '/sync/full-history' ||
       p === '/logs' || p.startsWith('/test') || p.startsWith('/token')) return next();
   // All other /api/* routes (including /sync/checkpoints) require JWT
   requireAuth(req, res, next);
