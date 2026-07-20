@@ -52,7 +52,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_sales_analysis',
-    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les ventes brutes HT (prix de vente après escompte) et le coût des ventes. IMPORTANT: quand season est fourni, il filtre automatiquement par le tag de la saison (ex: p26) EN PLUS de définir les dates de vente — donc les résultats ne contiennent que les articles de cette saison. Pour les totaux compagnie (toutes marques), utilise total_only=true.',
+    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les ventes brutes HT (prix de vente après escompte) et le coût des ventes. IMPORTANT: quand season est fourni, il filtre par le tag de la saison ET définit les dates — résultats limités aux articles de cette saison. Pour une marque spécifique (ex: "Oui"), TOUJOURS passer manufacturer. Sans manufacturer, retourne le total de toutes les marques par boutique (chiffre global compagnie).',
     parameters: {
       type: 'object',
       properties: {
@@ -62,7 +62,6 @@ const TOOL_DEFS = [
         shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel). Ex: "Saint-Bruno", "Fan Club".' },
         tags:         { type: 'array', items: { type: 'string' }, description: 'Filtres supplémentaires par tag (optionnel)' },
         exclude_tags: { type: 'array', items: { type: 'string' }, description: 'Exclure ces tags (optionnel)' },
-        total_only:   { type: 'boolean', description: 'true UNIQUEMENT pour obtenir le total de TOUTES les marques par boutique (chiffre d\'affaires global compagnie). Ne pas utiliser si manufacturer est spécifié.' },
       },
       required: [],
     },
