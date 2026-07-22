@@ -20,6 +20,13 @@ const BASE_URL = `https://api.lightspeedapp.com/API/V3/Account/${process.env.LIG
 const TOKEN_URL = 'https://cloud.lightspeedapp.com/oauth/access_token.php';
 const LIMIT = 200;
 
+// Orphan rescue counters — reset at start of each runSync().
+// Tracked per-run so the numbers in sync_state always reflect the latest run.
+let _orphanRescuedCount = 0; // item fetched from Lightspeed API and inserted into products
+let _orphanStubCount    = 0; // item not found in API — minimal stub created
+let _orphanSkippedCount = 0; // rescue failed (shouldn't happen) — line still lost
+const _rescuedItemIds   = new Set(); // dedup: avoid re-fetching same item_id in one run
+
 // Steps whose data doesn't change daily — only re-sync if stale (> STATIC_SYNC_DAYS old).
 // Time-filtered steps (sales, orders, transfers) always re-run to pick up the daily delta.
 const STATIC_STEPS    = new Set(['shops', 'items', 'inventory']);
@@ -237,6 +244,15 @@ function numOrNull(v) {
 }
 
 // ---------------------------------------------------------------------------
+// Schema migrations — idempotent, run once at startup
+// ---------------------------------------------------------------------------
+async function ensureSchema() {
+  // stub_inferred_fields: lists which fields were guessed (not from Lightspeed API).
+  // NULL = real product. 'all' = full stub (item was deleted). 'tags,manufacturer' = partial.
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS stub_inferred_fields TEXT`);
+}
+
+// ---------------------------------------------------------------------------
 // Upsert helpers
 // ---------------------------------------------------------------------------
 async function upsertShops(tenantId, rows) {
@@ -284,7 +300,8 @@ async function upsertProducts(tenantId, rows) {
        ON CONFLICT(tenant_id, item_id) DO UPDATE
          SET matrix_id=$2, description=$3, ean=$4, upc=$5, manufacturer=$6, brand=$7,
              category=$8, department=$9, tags=$10, image_url=$11,
-             default_cost=$12, default_price=$13, archived=$14, raw=$15, synced_at=now()`,
+             default_cost=$12, default_price=$13, archived=$14, raw=$15,
+             stub_inferred_fields=NULL, synced_at=now()`,
       [
         item.itemID, item.itemMatrixID ?? null,
         item.description, item.ean ?? null, item.upc ?? null,
@@ -344,27 +361,47 @@ async function upsertSales(tenantId, rows) {
 }
 
 async function upsertSaleLines(tenantId, rows, completedTime) {
+  const sql = `INSERT INTO sale_lines(sale_line_id, sale_id, item_id, shop_id,
+      unit_price, unit_cost, qty, discount, tax, completed_time, raw, tenant_id)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+    ON CONFLICT(tenant_id, sale_line_id) DO UPDATE
+      SET item_id=$3, shop_id=$4, unit_price=$5, unit_cost=$6, qty=$7,
+          discount=$8, tax=$9, completed_time=$10, raw=$11, synced_at=now()`;
+
   for (const sl of rows) {
+    const params = [
+      sl.saleLineID, sl.saleID ?? null,
+      sl.itemID ?? null, sl.shopID ?? null,
+      numOrNull(sl.unitPrice), numOrNull(sl.unitCost),
+      numOrNull(sl.unitQuantity), numOrNull(sl.calcLineDiscount), numOrNull(sl.tax),
+      completedTime ?? null,
+      sl, tenantId,
+    ];
+
     try {
-      await pool.query(
-        `INSERT INTO sale_lines(sale_line_id, sale_id, item_id, shop_id,
-           unit_price, unit_cost, qty, discount, tax, completed_time, raw, tenant_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-         ON CONFLICT(tenant_id, sale_line_id) DO UPDATE
-           SET item_id=$3, shop_id=$4, unit_price=$5, unit_cost=$6, qty=$7,
-               discount=$8, tax=$9, completed_time=$10, raw=$11, synced_at=now()`,
-        [
-          sl.saleLineID, sl.saleID ?? null,
-          sl.itemID ?? null, sl.shopID ?? null,
-          numOrNull(sl.unitPrice), numOrNull(sl.unitCost),
-          numOrNull(sl.unitQuantity), numOrNull(sl.calcLineDiscount), numOrNull(sl.tax),
-          completedTime ?? null,
-          sl, tenantId,
-        ],
-      );
+      await pool.query(sql, params);
     } catch (err) {
-      if (err.code === '23503') continue;
-      throw err;
+      if (err.code !== '23503') throw err;
+
+      // FK violation: determine if it's the products constraint specifically.
+      // PostgreSQL detail says: Key (tenant_id, item_id)=(...) is not present in table "products".
+      const isProductFK = err.detail?.includes('"products"');
+
+      if (isProductFK && sl.itemID && sl.itemID !== '0') {
+        // item_id=0 = generic/manual line with no real product — skip silently.
+        // All other orphan item_ids: rescue (fetch from API or create stub), then retry.
+        await rescueOrphanProduct(tenantId, sl.itemID, sl);
+        try {
+          await pool.query(sql, params);
+        } catch (retryErr) {
+          // Should not happen — rescue always creates at least a stub.
+          _orphanSkippedCount++;
+          console.error(`[sync] [ORPHAN] ❌ retry échoué sale_line_id=${sl.saleLineID} item_id=${sl.itemID}: ${retryErr.message}`);
+        }
+      } else {
+        // Other FK (shop_id, sale_id) or item_id=0 — keep existing silent-skip behavior.
+        continue;
+      }
     }
   }
 }
@@ -436,6 +473,54 @@ async function upsertOrders(tenantId, rows) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Orphan rescue — called when upsertSaleLines gets a FK violation on products
+// ---------------------------------------------------------------------------
+async function rescueOrphanProduct(tenantId, itemId, slContext) {
+  const cacheKey = `${tenantId}:${itemId}`;
+  if (_rescuedItemIds.has(cacheKey)) return; // already handled this run — retry will work
+  _rescuedItemIds.add(cacheKey);
+
+  // 1. Try Lightspeed API (handles archived items; may also work for recently deleted)
+  try {
+    const token = await getAccessToken();
+    const rels  = encodeURIComponent(JSON.stringify(['Tags', 'Category', 'Manufacturer']));
+    const res   = await fetchWithRetry(
+      `${BASE_URL}/Item/${itemId}.json?load_relations=${rels}`,
+      { Authorization: `Bearer ${token}` },
+      3,
+    );
+    const item = res.data?.Item;
+    if (item) {
+      await upsertProducts(tenantId, [item]);
+      _orphanRescuedCount++;
+      console.log(`[sync] [ORPHAN] ✓ item_id=${itemId} récupéré via API Lightspeed`);
+      return;
+    }
+  } catch (apiErr) {
+    const status = apiErr.response?.status;
+    if (status !== 404) {
+      // Unexpected error — log but fall through to stub
+      console.warn(`[sync] [ORPHAN] ⚠ item_id=${itemId}: erreur API ${status ?? apiErr.message}`);
+    }
+    // 404 = genuinely deleted — fall through to stub
+  }
+
+  // 2. Fallback: minimal stub so the sale_line FK passes.
+  //    avgCost from the SaleLine raw is used as default_cost (best we have without the Item record).
+  //    Tags = '__stub__' only — no inferred season here. User will tag manually via audit query.
+  //    stub_inferred_fields = 'all' marks everything as unknown.
+  const avgCost = slContext?.avgCost ? numOrNull(slContext.avgCost) : null;
+  await pool.query(
+    `INSERT INTO products(item_id, description, manufacturer, tags, archived, default_cost, tenant_id, stub_inferred_fields)
+     VALUES ($1, $2, NULL, '__stub__', true, $3, $4, 'all')
+     ON CONFLICT(tenant_id, item_id) DO NOTHING`,
+    [itemId, `[supprimé-${itemId}]`, avgCost, tenantId],
+  );
+  _orphanStubCount++;
+  console.log(`[sync] [ORPHAN] ⚠ item_id=${itemId}: introuvable en API — stub créé (default_cost=${avgCost ?? 'N/A'})`);
+}
+
 async function refreshMaterializedView(viewName) {
   try {
     await pool.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${viewName}`);
@@ -457,6 +542,15 @@ const SYNC_STEPS = ['shops', 'items', 'inventory', 'sales', 'orders', 'transfers
 
 async function runSync({ forceDaysBack = null } = {}) {
   console.log(`[sync] Starting — ${new Date().toISOString()}`);
+
+  // Schema migration (idempotent)
+  await ensureSchema();
+
+  // Reset per-run orphan counters
+  _orphanRescuedCount = 0;
+  _orphanStubCount    = 0;
+  _orphanSkippedCount = 0;
+  _rescuedItemIds.clear();
 
   const tenantId = await getSyncTenantId();
   if (!tenantId) throw new Error('No tenant found — set SYNC_TENANT_ID env var or run onboarding first');
@@ -630,6 +724,36 @@ async function runSync({ forceDaysBack = null } = {}) {
         if (nextUrl && salesCount % 10_000 === 0) await saveCheckpoint('sales', nextUrl, salesCount);
       }
       await markStepCompleted('sales', salesCount);
+
+      // Orphan rescue summary — persisted in sync_state so it's visible after each run.
+      const totalOrphans = _orphanRescuedCount + _orphanStubCount + _orphanSkippedCount;
+      if (totalOrphans > 0) {
+        console.log(`[sync] [ORPHAN] Résumé: ${_orphanRescuedCount} récupérés via API, ${_orphanStubCount} stubs créés, ${_orphanSkippedCount} perdus`);
+        if (_orphanSkippedCount > 0) {
+          console.error(`[sync] [ORPHAN] ❌ ATTENTION: ${_orphanSkippedCount} lignes de vente irrécupérables — vérifier les logs ci-dessus`);
+        }
+      } else {
+        console.log('[sync] [ORPHAN] Aucun orphelin détecté dans ce batch');
+      }
+      // Persist counts to sync_state for monitoring
+      await pool.query(
+        `INSERT INTO sync_state(step, next_url, processed_count, updated_at)
+         VALUES ('orphan_rescued', 'COMPLETED', $1, now())
+         ON CONFLICT(step) DO UPDATE SET processed_count=$1, updated_at=now()`,
+        [_orphanRescuedCount],
+      );
+      await pool.query(
+        `INSERT INTO sync_state(step, next_url, processed_count, updated_at)
+         VALUES ('orphan_stubs', 'COMPLETED', $1, now())
+         ON CONFLICT(step) DO UPDATE SET processed_count=$1, updated_at=now()`,
+        [_orphanStubCount],
+      );
+      await pool.query(
+        `INSERT INTO sync_state(step, next_url, processed_count, updated_at)
+         VALUES ('orphan_skipped', 'COMPLETED', $1, now())
+         ON CONFLICT(step) DO UPDATE SET processed_count=$1, updated_at=now()`,
+        [_orphanSkippedCount],
+      );
     }
 
     // ── 6. Orders ─────────────────────────────────────────────────────────
