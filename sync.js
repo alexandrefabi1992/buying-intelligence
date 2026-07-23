@@ -27,6 +27,10 @@ let _orphanStubCount    = 0; // item not found in API — minimal stub created
 let _orphanSkippedCount = 0; // rescue failed (shouldn't happen) — line still lost
 const _rescuedItemIds   = new Set(); // dedup: avoid re-fetching same item_id in one run
 
+// Manufacturer resolution — populated by syncManufacturers() at start of each runSync().
+let _mfgMap = new Map(); // manufacturerID (string) → name
+let _unresolvedMfgCount = 0; // items upserted this run whose manufacturer couldn't be resolved
+
 // Steps whose data doesn't change daily — only re-sync if stale (> STATIC_SYNC_DAYS old).
 // Time-filtered steps (sales, orders, transfers) always re-run to pick up the daily delta.
 const STATIC_STEPS    = new Set(['shops', 'items', 'inventory']);
@@ -250,6 +254,69 @@ async function ensureSchema() {
   // stub_inferred_fields: lists which fields were guessed (not from Lightspeed API).
   // NULL = real product. 'all' = full stub (item was deleted). 'tags,manufacturer' = partial.
   await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS stub_inferred_fields TEXT`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS manufacturers (
+      tenant_id       TEXT NOT NULL,
+      manufacturer_id TEXT NOT NULL,
+      name            TEXT NOT NULL,
+      PRIMARY KEY (tenant_id, manufacturer_id)
+    )
+  `);
+}
+
+// ---------------------------------------------------------------------------
+// Manufacturer sync — fetches all Lightspeed manufacturers into a local table
+// so upsertProducts can resolve numeric IDs even when Manufacturer relation is null.
+// Always runs in full (tiny dataset, no checkpoint needed).
+// ---------------------------------------------------------------------------
+async function syncManufacturers(tenantId) {
+  const map = new Map();
+  let count = 0;
+  for await (const { items } of paginate(null, 'Manufacturer', {})) {
+    for (const m of items) {
+      const id   = String(m.manufacturerID ?? '');
+      const name = m.name ?? null;
+      if (!id || !name) continue;
+      map.set(id, name);
+      await pool.query(
+        `INSERT INTO manufacturers(tenant_id, manufacturer_id, name)
+         VALUES ($1, $2, $3)
+         ON CONFLICT(tenant_id, manufacturer_id) DO UPDATE SET name = $3`,
+        [tenantId, id, name],
+      );
+      count++;
+    }
+  }
+  _mfgMap = map;
+  console.log(`[sync] Manufacturers synced: ${count} (map size: ${map.size})`);
+}
+
+// ---------------------------------------------------------------------------
+// Backfill — resolves existing products that still have a numeric manufacturer_id
+// stored as text (artifact of the old fallback before manufacturers table existed).
+// Idempotent: only touches rows where manufacturer ~ '^[0-9]+$'.
+// ---------------------------------------------------------------------------
+async function backfillNumericManufacturers(tenantId) {
+  // Replace stored numeric IDs with real names from the manufacturers table.
+  const { rowCount: resolved } = await pool.query(
+    `UPDATE products p
+     SET manufacturer = m.name, synced_at = now()
+     FROM manufacturers m
+     WHERE p.tenant_id = $1
+       AND m.tenant_id = $1
+       AND m.manufacturer_id = p.manufacturer
+       AND p.manufacturer ~ '^[0-9]+$'`,
+    [tenantId],
+  );
+  // manufacturerID=0 is Lightspeed's "no manufacturer" sentinel — set to NULL.
+  const { rowCount: zeroed } = await pool.query(
+    `UPDATE products SET manufacturer = NULL, synced_at = now()
+     WHERE tenant_id = $1 AND manufacturer = '0'`,
+    [tenantId],
+  );
+  if (resolved > 0 || zeroed > 0) {
+    console.log(`[sync] Backfill manufacturers: ${resolved} IDs → name, ${zeroed} ID=0 → NULL`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -272,8 +339,14 @@ async function upsertProducts(tenantId, rows) {
     // Category: prefer fullPathName from loaded relation, fall back to raw ID
     const category = item.Category?.fullPathName ?? item.Category?.name ?? item.categoryID ?? null;
 
-    // Manufacturer = brand in clothing context
-    const manufacturer = item.Manufacturer?.name ?? item.manufacturerID ?? null;
+    // Manufacturer: prefer relation name, then local table lookup, then null.
+    // Never fall back to the raw numeric ID — store null and count as unresolved instead.
+    const manufacturer = item.Manufacturer?.name
+      ?? _mfgMap.get(String(item.manufacturerID ?? ''))
+      ?? null;
+    if (manufacturer === null && item.manufacturerID && String(item.manufacturerID) !== '0') {
+      _unresolvedMfgCount++;
+    }
 
     // Tags: Tags.tag is a CSV string ("NOS,A26") or false/absent when none
     const tagsRaw = item.Tags?.tag;
@@ -521,6 +594,76 @@ async function rescueOrphanProduct(tenantId, itemId, slContext) {
   console.log(`[sync] [ORPHAN] ⚠ item_id=${itemId}: introuvable en API — stub créé (default_cost=${avgCost ?? 'N/A'})`);
 }
 
+// ---------------------------------------------------------------------------
+// Quality audit — run after each sync to surface data health issues.
+// Results stored in sync_state so they're visible in monitoring/dashboard.
+// Window: items sold in the last 365 days (rolling, non-stubs only).
+// ---------------------------------------------------------------------------
+async function computeAndSaveQualityCounters(tenantId) {
+  const [r1, r2, r3] = await Promise.all([
+    // Detect items where a numeric manufacturer_id was stored as the name.
+    // Uses a JOIN on manufacturers so legitimate numeric brand names (e.g. "0909")
+    // are excluded — they exist as a name in the table, not as a manufacturer_id.
+    pool.query(
+      `SELECT COUNT(DISTINCT p.item_id) AS n
+       FROM products p
+       JOIN sale_lines sl ON sl.item_id = p.item_id AND sl.tenant_id = p.tenant_id
+       JOIN manufacturers m ON m.tenant_id = p.tenant_id AND m.manufacturer_id = p.manufacturer
+       WHERE p.tenant_id = $1
+         AND p.stub_inferred_fields IS NULL
+         AND sl.completed_time > now() - interval '365 days'`,
+      [tenantId],
+    ),
+    pool.query(
+      `SELECT COUNT(DISTINCT sl.item_id) AS n
+       FROM sale_lines sl
+       JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
+       WHERE sl.tenant_id = $1
+         AND p.tags IS NULL
+         AND p.stub_inferred_fields IS NULL
+         AND sl.completed_time > now() - interval '365 days'`,
+      [tenantId],
+    ),
+    pool.query(
+      `SELECT COUNT(DISTINCT sl.item_id) AS n
+       FROM sale_lines sl
+       JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
+       WHERE sl.tenant_id = $1
+         AND (p.default_cost IS NULL OR p.default_cost = 0)
+         AND p.stub_inferred_fields IS NULL
+         AND sl.completed_time > now() - interval '365 days'`,
+      [tenantId],
+    ),
+  ]);
+
+  const unresolvedMfg = Number(r1.rows[0].n);
+  const noTags        = Number(r2.rows[0].n);
+  const noCost        = Number(r3.rows[0].n);
+
+  console.log('[sync] ── Qualité données ─────────────────────────────────');
+  console.log(`[sync]   Manufacturier non résolu (vendus 365j) : ${unresolvedMfg} items`);
+  console.log(`[sync]   Vendus sans tags (365j)                : ${noTags} items`);
+  console.log(`[sync]   Vendus sans coût (365j)                : ${noCost} items`);
+  if (_unresolvedMfgCount > 0) {
+    console.log(`[sync]   Non résolus ce run                     : ${_unresolvedMfgCount} items`);
+  }
+  console.log('[sync] ─────────────────────────────────────────────────────');
+
+  for (const [step, value] of [
+    ['quality_unresolved_mfg',     unresolvedMfg],
+    ['quality_no_tags',            noTags],
+    ['quality_no_cost',            noCost],
+    ['quality_unresolved_mfg_run', _unresolvedMfgCount],
+  ]) {
+    await pool.query(
+      `INSERT INTO sync_state(step, next_url, processed_count, updated_at)
+       VALUES ($1, 'COMPLETED', $2, now())
+       ON CONFLICT(step) DO UPDATE SET processed_count = $2, updated_at = now()`,
+      [step, value],
+    );
+  }
+}
+
 async function refreshMaterializedView(viewName) {
   try {
     await pool.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${viewName}`);
@@ -546,11 +689,12 @@ async function runSync({ forceDaysBack = null } = {}) {
   // Schema migration (idempotent)
   await ensureSchema();
 
-  // Reset per-run orphan counters
-  _orphanRescuedCount = 0;
-  _orphanStubCount    = 0;
-  _orphanSkippedCount = 0;
+  // Reset per-run counters
+  _orphanRescuedCount  = 0;
+  _orphanStubCount     = 0;
+  _orphanSkippedCount  = 0;
   _rescuedItemIds.clear();
+  _unresolvedMfgCount  = 0;
 
   const tenantId = await getSyncTenantId();
   if (!tenantId) throw new Error('No tenant found — set SYNC_TENANT_ID env var or run onboarding first');
@@ -615,6 +759,11 @@ async function runSync({ forceDaysBack = null } = {}) {
     // Print checkpoint status summary
     const statusLine = SYNC_STEPS.map(s => `${s}=${cpLabel(cps[s])}`).join(', ');
     console.log(`[sync] Checkpoint status: ${statusLine}`);
+
+    // Sync manufacturer lookup table and backfill existing numeric IDs — always runs,
+    // outside SYNC_STEPS because it's small and requires no checkpointing.
+    await syncManufacturers(tenantId);
+    await backfillNumericManufacturers(tenantId);
 
     // ── 1. Shops ──────────────────────────────────────────────────────────
     if (cps.shops?.next_url === 'COMPLETED') {
@@ -794,6 +943,9 @@ async function runSync({ forceDaysBack = null } = {}) {
     console.log('[sync] Refreshing materialized views…');
     await refreshMaterializedView('mv_sales_velocity');
     await refreshMaterializedView('mv_inventory_stock');
+
+    // ── Quality audit ─────────────────────────────────────────────────────
+    await computeAndSaveQualityCounters(tenantId);
 
     console.log(`[sync] Done — ${new Date().toISOString()}`);
 
