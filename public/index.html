@@ -3174,7 +3174,7 @@ const InvHistory = (() => {
     });
 
     // Load timeline first (sets first_date + last_date → fills date input)
-    await loadTimeline({ granularity: 'day', shop_id: '', manufacturer: '' });
+    await loadTimeline(getFilters());
     // Then load snapshot for today/last available date
     const f = getFilters();
     if (f.date) await loadSnapshot(f);
