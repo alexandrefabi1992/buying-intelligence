@@ -142,7 +142,7 @@ function resolvePeriod(period) {
   return null;
 }
 
-async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, date_to, period, tags, exclude_tags, total_only = false }, { pool, getSeasonsConfig }) {
+async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, date_from, date_to, period, tags, exclude_tags, total_only = false }, { pool, getSeasonsConfig }) {
   shop_id = await resolveShopId(shop_id, pool);
   let from = date_from, to = date_to;
   let seasonTag = null;
@@ -167,6 +167,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
   const params     = [from, to ?? new Date().toISOString()];
 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
+  if (category)     { conditions.push(`p.category ILIKE $${params.length + 1}`);     params.push(`%${category}%`); }
   if (shop_id)      { conditions.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
 
   // Season tag filter: when season is provided, restrict to items tagged with that season
@@ -182,6 +183,41 @@ async function toolGetSalesAnalysis({ season, manufacturer, shop_id, date_from, 
   for (const t of normalizeTags(exclude_tags)) {
     conditions.push(`(p.tags NOT ILIKE $${params.length + 1} OR p.tags IS NULL)`);
     params.push(`%${t}%`);
+  }
+
+  // category without manufacturer → top brands in that category
+  if (category && !manufacturer) {
+    const { rows } = await pool.query(`
+      SELECT
+        p.manufacturer                       AS marque,
+        SUM(sl.qty)                          AS unites,
+        ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0)), 2)::numeric(12,2) AS ventes_brutes,
+        ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(12,2) AS cout_ventes
+      FROM sale_lines sl
+      JOIN products p  ON p.item_id  = sl.item_id
+      JOIN shops    sh ON sh.shop_id = sl.shop_id
+      WHERE ${conditions.join(' AND ')}
+        AND p.manufacturer IS NOT NULL
+      GROUP BY p.manufacturer
+      ORDER BY ventes_brutes DESC NULLS LAST
+      LIMIT 20
+    `, params);
+
+    const totVentes = rows.reduce((s, r) => s + parseFloat(r.ventes_brutes ?? 0), 0);
+    const totUnites = rows.reduce((s, r) => s + parseInt(r.unites          ?? 0), 0);
+
+    return {
+      categorie: category,
+      periode:   { de: from, a: to },
+      filtre:    { boutique: shop_id ?? 'toutes', saison: season ?? null },
+      marques:   rows.map(r => ({
+        marque:        r.marque,
+        unites:        Number(r.unites),
+        ventes_brutes: fmtMoney(r.ventes_brutes),
+        cout_ventes:   fmtMoney(r.cout_ventes),
+      })),
+      total: { unites: totUnites, ventes_brutes: fmtMoney(totVentes) },
+    };
   }
 
   // total_only = true → grand total toutes marques par boutique.

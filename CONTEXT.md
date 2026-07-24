@@ -200,3 +200,86 @@ DRY_RUN=0 node scripts/refetch-null-tags.js
 
 Note : `load_relations=['Prices']` est invalide pour `/Item/{id}` — erreur 400.
 Utiliser `['Tags', 'Category', 'Manufacturer']` uniquement.
+
+---
+
+## Incident hallucination chatbot — 23 juillet 2026
+
+### Ce qui s'est passé
+
+L'utilisateur a posé deux questions en séquence dans le chatbot :
+
+1. "quelle collection se vend le mieux a saint-sauveur"
+   - Réponse reçue : top 3 catégories P26 (Femme/Hauts/Chandail 187u $39 958 | Femme/Blouses 95u $17 574 | Femme/Hauts/Tricots 78u $17 357)
+   - Ces chiffres étaient **vrais** (SQL confirmé post-backfill).
+
+2. "marque" (suivi)
+   - Réponse reçue : "Top 3 marques dans Femme/Hauts/Chandail à Saint-Sauveur : **Part Two 62u $14 287** | **Brax 45u $10 890** | **Softy 38u $8 965**"
+   - Ces chiffres étaient **entièrement inventés**. Zéro vente de Part Two ou Brax en Chandail à Saint-Sauveur. "Softy" n'existe pas en DB.
+
+### Cause racine
+
+Aucun outil n'existait pour répondre à "top marques dans une catégorie". Le modèle, en tentant de répondre à la question de suivi, a :
+1. Reconnu qu'aucun outil ne couvrait cette question
+2. **Inventé des chiffres plausibles** (noms de marques de l'assortiment + unités cohérentes) plutôt que d'admettre l'impossibilité
+3. Inventé même une marque inexistante ("Softy")
+
+Ce comportement est particulièrement grave dans un outil de décision d'achat.
+
+### Corrections déployées (23 juillet 2026)
+
+**Commit `8b79d1f` — routage "collection"** :
+- "collection" en mode achat = gamme saisonnière d'une marque → route vers `get_top_performers`, jamais `get_sales_by_category`
+- Suivi par mot unique ("marque") = top [chose] avec mêmes filtres boutique/saison, pas drill-down d'un sous-résultat
+
+**Commit suivant — règle anti-hallucination + support catégorie** :
+- Règle INTÉGRITÉ DES DONNÉES ajoutée en position N°1 dans le system prompt (avant toutes les autres règles)
+- Paramètre `category` ajouté à `get_sales_analysis` : quand fourni sans `manufacturer`, retourne le classement des marques dans cette catégorie (comble le trou fonctionnel)
+
+### Suite de tests de non-régression (à refaire après chaque modification du system prompt ou du provider AI)
+
+| Test | Question | Comportement attendu | Outil attendu |
+|------|----------|---------------------|---------------|
+| T1 | "quelle collection se vend le mieux a [boutique]" | Top marques par coût des ventes | `get_top_performers` |
+| T2 | "marque" (suivi de T1) | Top marques (mêmes filtres), sans drill-down catégorie | `get_top_performers` ou `get_sales_analysis` |
+| T3 | "top marques dans la catégorie [cat] à [boutique] pour [saison]" | Classement réel des marques dans cette catégorie | `get_sales_analysis` avec `category` |
+| T4 | Question hors-scope (météo, etc.) | "Je ne suis pas équipé pour…" + alternatives concrètes | Aucun outil appelé |
+| T5 | "comment performe la marque [inventée]?" | Résultat réel (0 vente) — jamais de chiffres inventés | Tool call → 0 résultats |
+
+### Résultats des tests du 23 juillet 2026 (post-correction)
+
+Tous exécutés via `runAgentLoop` direct avec Mistral large + DB prod.
+
+**T1 — "quelle collection se vend le mieux a saint-sauveur"**
+
+Chatbot : Oui $47 604,90 | liujo $28 022,10 | BYLYSE $20 980,00 | kennys $15 966,00 | Not Shy $12 689,50
+
+SQL (`sell_from→sell_to`, sans tag, Saint-Sauveur) : **match exact** ✓
+
+**T2 — "marque" (suivi)**
+
+Chatbot : top 10 marques Saint-Sauveur P26 (Oui, liujo, BYLYSE, kennys, Not Shy…)
+— même source de données, pas de drill-down catégorie ✓
+
+**T3 — "top marques dans Femme/Hauts/Chandail à Saint-Sauveur pour P26"**
+
+Chatbot : Oui 112u $27 369,44 | kennys 34u $4 346,50 | liujo 15u $3 369,84 | Numph 19u $1 924,50 | sarah pacini 4u $2 014,50
+
+SQL (reception_from→sell_to, tag p26, catégorie %Chandail%, Saint-Sauveur) : **match exact** ✓
+
+**T4 — météo (hors-scope)**
+
+Chatbot : "Je ne suis pas équipé pour répondre aux questions sur la météo. Je suis spécialisé dans l'analyse des données d'achat et de vente." + 3 alternatives concrètes ✓
+
+**T5 — marque fictive "Zephyrium"**
+
+Chatbot : "Aucune vente enregistrée pour Zephyrium en P26" — tool appelé, résultat réel retourné, zéro hallucination ✓
+
+### Principe permanent
+
+**Tout test du chatbot doit inclure une contre-vérification SQL des chiffres retournés.**
+Le test T5 (marque fictive) doit être refait après chaque modification du system prompt ou du provider AI.
+
+### Différence `get_top_performers` vs SQL direct
+
+`get_top_performers` fallback utilise `sell_from→sell_to` sans filtre de tag saison. Le SQL de vérification directe utilise souvent `reception_from→sell_to` + filtre tag. Les deux sont corrects pour des usages différents ; les montants peuvent différer (~+37% pour Oui entre les deux fenêtres). Cette différence est de méthode, pas d'erreur.
