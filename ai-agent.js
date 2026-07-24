@@ -1180,6 +1180,134 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer }, { pool })
 }
 
 // ---------------------------------------------------------------------------
+// get_payment_terms_analysis — analyse des termes de paiement fournisseur
+// ---------------------------------------------------------------------------
+async function toolGetPaymentTermsAnalysis({ manufacturer }, { pool, tenantId }) {
+  const { rows: capRow } = await pool.query(
+    `SELECT value FROM app_settings WHERE tenant_id = $1 AND key = 'cost_of_capital'`,
+    [tenantId],
+  );
+  const costOfCapital = capRow[0] ? Number(capRow[0].value) : 8.0;
+
+  const mfrCond = manufacturer ? `AND bs.manufacturer ILIKE $2` : '';
+  const params  = manufacturer ? [tenantId, `%${manufacturer}%`] : [tenantId];
+
+  const { rows } = await pool.query(`
+    WITH
+    brand_sales AS (
+      SELECT p.manufacturer,
+        SUM(sl.qty * COALESCE(p.default_cost, 0)) AS cost_365
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
+      WHERE sl.tenant_id = $1
+        AND sl.completed_time > now() - interval '365 days'
+        AND p.manufacturer IS NOT NULL AND p.manufacturer != ''
+        AND p.stub_inferred_fields IS NULL
+      GROUP BY p.manufacturer
+    ),
+    brand_velocity AS (
+      SELECT p.manufacturer,
+        SUM(sl.qty)::float / 90 AS daily_units
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
+      WHERE sl.tenant_id = $1
+        AND sl.completed_time > now() - interval '90 days'
+        AND p.manufacturer IS NOT NULL AND p.manufacturer != ''
+        AND p.stub_inferred_fields IS NULL
+      GROUP BY p.manufacturer
+    ),
+    brand_stock AS (
+      SELECT p.manufacturer, SUM(i.qty_on_hand) AS stock_units
+      FROM inventory i
+      JOIN products p ON p.item_id = i.item_id AND p.tenant_id = i.tenant_id
+      WHERE i.tenant_id = $1 AND i.qty_on_hand > 0
+        AND p.manufacturer IS NOT NULL AND p.manufacturer != ''
+        AND p.archived = false
+      GROUP BY p.manufacturer
+    )
+    SELECT
+      bs.manufacturer,
+      ROUND(bs.cost_365::numeric, 0)          AS cost_365,
+      COALESCE(bst.stock_units, 0)            AS stock_units,
+      CASE WHEN bv.daily_units > 0 AND bst.stock_units > 0
+        THEN ROUND(bst.stock_units / bv.daily_units) ELSE NULL END AS velocity_days,
+      bt.discount_pct, bt.discount_days, bt.net_days, bt.notes
+    FROM brand_sales bs
+    LEFT JOIN brand_velocity bv ON bv.manufacturer = bs.manufacturer
+    LEFT JOIN brand_stock bst   ON bst.manufacturer = bs.manufacturer
+    LEFT JOIN brand_payment_terms bt
+           ON bt.manufacturer = bs.manufacturer AND bt.tenant_id = $1
+    ${mfrCond}
+    ORDER BY bs.cost_365 DESC
+  `, params);
+
+  if (!rows.length) {
+    return { erreur: `Aucune donnée de ventes trouvée${manufacturer ? ` pour "${manufacturer}"` : ''}.` };
+  }
+
+  const analyzed = rows.map(r => {
+    const disc    = r.discount_pct  != null ? Number(r.discount_pct)  : null;
+    const ddays   = r.discount_days != null ? Number(r.discount_days) : null;
+    const ndays   = r.net_days      != null ? Number(r.net_days)      : null;
+    const cost365 = Number(r.cost_365);
+    const vel     = r.velocity_days != null ? Number(r.velocity_days) : null;
+
+    if (ndays == null) {
+      return {
+        manufacturer: r.manufacturer,
+        termes_non_configures: true,
+        message: `Aucun terme de paiement saisi pour ${r.manufacturer}. Aller dans l'onglet Comptabilité pour les configurer.`,
+      };
+    }
+
+    let annualizedYield = null;
+    if (disc != null && ddays != null && ndays > ddays) {
+      annualizedYield = Math.round((disc / (1 - disc / 100)) * (365 / (ndays - ddays)) * 10) / 10;
+    }
+
+    let recommendation, flag = null;
+    if (disc == null) {
+      recommendation = 'full_term';
+    } else if (annualizedYield > costOfCapital) {
+      recommendation = 'take_discount';
+      if (vel != null && vel > ndays) {
+        flag = `stock lent (${vel}j) — le cash sort ${vel - ndays}j avant la vente`;
+      }
+    } else {
+      recommendation = 'full_term';
+    }
+
+    return {
+      manufacturer:      r.manufacturer,
+      termes:            disc != null ? `${disc}/${ddays} n/${ndays}` : `n/${ndays}`,
+      delai_paiement:    ndays,
+      escompte_pct:      disc,
+      jours_escompte:    ddays,
+      rendement_annualise: annualizedYield,
+      velocite_jours:    vel,
+      recommandation:    recommendation,
+      alerte:            flag,
+      economie_annuelle: disc != null && cost365 > 0 ? Math.round(cost365 * disc / 100) : 0,
+      achats_annuels:    cost365,
+      cout_du_capital:   costOfCapital,
+      notes:             r.notes ?? null,
+    };
+  });
+
+  if (manufacturer && analyzed.length === 1) return analyzed[0];
+
+  const discountBrands = analyzed.filter(b => !b.termes_non_configures && b.recommandation === 'take_discount');
+  const missingTerms   = analyzed.filter(b => b.termes_non_configures).length;
+  return {
+    cout_du_capital: costOfCapital,
+    nb_marques_analysees: analyzed.length,
+    nb_termes_manquants: missingTerms,
+    marques_prendre_escompte: discountBrands.sort((a, b) => b.economie_annuelle - a.economie_annuelle),
+    toutes_marques: analyzed,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Tool dispatcher
 // ---------------------------------------------------------------------------
 async function dispatchTool(name, args, ctx) {
@@ -1201,6 +1329,7 @@ async function dispatchTool(name, args, ctx) {
     case 'compare_seasons':                 return await toolCompareSeasons(args, ctx);
     case 'get_sales_by_category':           return await toolGetSalesByCategory(args, ctx);
     case 'get_inventory_at_date':           return await toolGetInventoryAtDate(args, ctx);
+    case 'get_payment_terms_analysis':      return await toolGetPaymentTermsAnalysis(args, ctx);
     default:                                return { erreur: `Outil inconnu: ${name}` };
   }
 }
