@@ -118,10 +118,11 @@ CREATE INDEX        IF NOT EXISTS idx_mv_velocity_week  ON mv_sales_velocity(wee
 -- Refreshed CONCURRENTLY after each sync alongside mv_sales_velocity.
 CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inventory_stock AS
 SELECT
-  item_id,
-  SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS current_stock_all
-FROM inventory
-GROUP BY item_id;
+  i.item_id,
+  SUM(COALESCE(i.qty_on_hand, 0) + COALESCE(i.qty_on_order, 0)) AS current_stock_all
+FROM inventory i
+JOIN shops sh ON sh.shop_id = i.shop_id
+GROUP BY i.item_id;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_inventory_stock ON mv_inventory_stock(item_id);
 
