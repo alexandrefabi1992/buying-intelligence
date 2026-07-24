@@ -5235,8 +5235,10 @@ app.get('/api/accounting/brands', requireAuth, async (req, res, next) => {
       }
 
       let recommendation, flag = null;
-      if (disc == null || ndays == null) {
+      if (ndays == null) {
         recommendation = 'terms_missing';
+      } else if (disc == null) {
+        recommendation = 'full_term';  // terms known but no discount offered
       } else if (annualizedYield > costOfCapital) {
         recommendation = 'take_discount';
         if (vel != null && ndays != null && vel > ndays) {
