@@ -4491,12 +4491,38 @@ app.get('/api/brand/:manufacturer/top-attributes', async (req, res, next) => {
       return { size, color };
     }
 
+    // Map extracted color strings to canonical color families.
+    // Split on spaces/dashes first so "BLEU-26" → words ["BLEU","26"].
+    // Priority order matters: MARINE checked before BLEU.
+    function normalizeColor(color) {
+      if (!color) return null;
+      const words = color.toUpperCase().split(/[\s\-_,/]+/).filter(Boolean);
+      const has  = (...kws) => kws.some(k => words.includes(k));
+      const hasP = (...kws) => kws.some(k => words.some(w => w.startsWith(k)));
+      if (hasP('MARINE', 'NAVY'))                                                              return 'Marine';
+      if (hasP('BLEU', 'BLUE', 'COBALT', 'INDIGO', 'DENIM', 'AZUR', 'TURQUOISE', 'CYAN'))    return 'Bleu';
+      if (hasP('NOIR', 'BLACK', 'EBENE', 'EBÈNE', 'ANTHRACIT', 'CARBONE'))                    return 'Noir';
+      if (hasP('GRIS', 'GREY', 'GRAY', 'PERLE', 'ARGENT', 'PLATINE'))                         return 'Gris';
+      if (hasP('BLANC', 'WHITE', 'CREME', 'CRÈME', 'ECRU', 'ÉCRU', 'IVOIRE', 'NATUREL'))      return 'Blanc/Crème';
+      if (hasP('ROUGE', 'RED', 'BORDEAUX', 'BOURGOGNE', 'FRAMBOISE', 'GRENAT', 'CERISE', 'CARMIN', 'CRAMOISI')) return 'Rouge';
+      if (hasP('VERT', 'GREEN', 'KAKI', 'OLIVE', 'SAUGE', 'MENTHE', 'MILITAIRE', 'EMERAUDE', 'ÉMERAUDE', 'BOUTEILLE')) return 'Vert';
+      if (hasP('BRUN', 'MARRON', 'BROWN', 'CAMEL', 'CARAMEL', 'NOISETTE', 'CHOCOLAT', 'COGNAC', 'TABAC', 'FAUVE', 'CANNELLE')) return 'Brun/Camel';
+      if (hasP('BEIGE', 'SABLE', 'TAUPE', 'NUDE', 'MASTIC', 'PIERRE') || has('LIN'))          return 'Beige';
+      if (hasP('CORAIL', 'ORANGE', 'ROUILLE', 'BRIQUE', 'TERRA', 'SAUMON', 'PECHE', 'PÊCHE', 'ABRICOT', 'MANDARINE')) return 'Orange/Corail';
+      if (hasP('ROSE', 'PINK', 'FUSCHIA', 'FUCHSIA', 'FRAISE'))                               return 'Rose';
+      if (hasP('VIOLET', 'MAUVE', 'PRUNE', 'AUBERGINE', 'LAVANDE', 'LILAS', 'PARME'))         return 'Violet';
+      if (hasP('JAUNE', 'YELLOW', 'CURRY', 'MOUTARDE', 'CITRON', 'DORE', 'DORÉ', 'SAFRAN', 'OCRE') || has('OR')) return 'Jaune';
+      // Unknown: normalize capitalization
+      return color.charAt(0).toUpperCase() + color.slice(1).toLowerCase();
+    }
+
     const sizeTotals  = {};
     const colorTotals = {};
     for (const r of rows) {
       const { size, color } = extractSizeColor(r.description);
-      if (size)  sizeTotals[size]   = (sizeTotals[size]   || 0) + r.units;
-      if (color) colorTotals[color] = (colorTotals[color] || 0) + r.units;
+      const normColor = normalizeColor(color);
+      if (size)      sizeTotals[size]           = (sizeTotals[size]           || 0) + r.units;
+      if (normColor) colorTotals[normColor]      = (colorTotals[normColor]    || 0) + r.units;
     }
 
     const rank = obj => Object.entries(obj)
