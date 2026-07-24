@@ -4424,6 +4424,90 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/brand/:manufacturer/top-attributes — top sizes & colors (12 weeks)
+// ---------------------------------------------------------------------------
+app.get('/api/brand/:manufacturer/top-attributes', async (req, res, next) => {
+  try {
+    const mfr      = decodeURIComponent(req.params.manufacturer);
+    const shopId   = req.query.shop_id ?? null;
+    const tenantId = req.tenantId;
+
+    const params   = [tenantId, mfr];
+    let   shopCond = '';
+    if (shopId) { params.push(shopId); shopCond = `AND sl.shop_id = $${params.length}`; }
+
+    const { rows } = await pool.query(`
+      SELECT p.description, SUM(sl.qty)::int AS units
+      FROM   sale_lines sl
+      JOIN   products   p  ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
+      WHERE  sl.tenant_id = $1
+        AND  p.manufacturer = $2
+        AND  sl.completed_time > now() - interval '12 weeks'
+        AND  p.matrix_id IS NOT NULL
+        ${shopCond}
+      GROUP  BY p.description
+      HAVING SUM(sl.qty) > 0
+    `, params);
+
+    function extractSizeColor(desc) {
+      if (!desc) return { size: null, color: null };
+
+      // Alpha sizes (longest alternatives first to avoid XL matching L)
+      const alphaRe = /(?:^| )(XXXL|XXL|XL|XS|L|M|S)(?= |$)/i;
+      // Numeric sizes: standalone 2-digit number 26-69 not surrounded by digits/dash/slash
+      const numRe   = /(?:^| )([2-6][0-9])(?= |$)/;
+
+      let size = null, sizePos = -1, sizeLen = 0;
+
+      const aM = desc.match(alphaRe);
+      const nM = desc.match(numRe);
+      if (aM) {
+        size    = aM[1].toUpperCase();
+        sizePos = aM.index + (aM[0][0] === ' ' ? 1 : 0);
+        sizeLen = aM[1].length;
+      } else if (nM) {
+        size    = nM[1];
+        sizePos = nM.index + (nM[0][0] === ' ' ? 1 : 0);
+        sizeLen = 2;
+      }
+
+      let color = null;
+      if (size !== null) {
+        const after = desc.slice(sizePos + sizeLen).trim();
+        if (after && /[A-Za-zÀ-ÿ]/.test(after)) {
+          color = after.toUpperCase();
+        } else {
+          // Look before the size: take last pure-alpha word (not a number code)
+          const before = desc.slice(0, sizePos).trim().split(/\s+/);
+          for (let i = before.length - 1; i >= 0; i--) {
+            const w = before[i];
+            if (/^[A-Za-zÀ-ÿé][A-Za-zÀ-ÿé\-']*$/.test(w) && w.length > 1) {
+              color = w.toUpperCase(); break;
+            }
+          }
+        }
+      }
+      return { size, color };
+    }
+
+    const sizeTotals  = {};
+    const colorTotals = {};
+    for (const r of rows) {
+      const { size, color } = extractSizeColor(r.description);
+      if (size)  sizeTotals[size]   = (sizeTotals[size]   || 0) + r.units;
+      if (color) colorTotals[color] = (colorTotals[color] || 0) + r.units;
+    }
+
+    const rank = obj => Object.entries(obj)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([value, units]) => ({ value, units }));
+
+    res.json({ top_sizes: rank(sizeTotals), top_colors: rank(colorTotals) });
+  } catch (err) { next(err); }
+});
+
 // Serve brand.html for /brand/:manufacturer (express.static won't match this path)
 app.get('/brand/:manufacturer', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'brand.html'));
