@@ -370,3 +370,194 @@ Le sync quotidien (sync.js) refreshe automatiquement `mv_sales_velocity` et `mv_
 2. **Vider le `budgetCache`** si besoin immédiat : PUT sur n'importe quel endpoint `/api/settings/*` le vide, ou redéployer.
 3. **La MV `mv_sales_velocity` ne bénéficie PAS directement** d'une correction de `products` (elle ne join pas products). Elle bénéficie d'une correction de `sale_lines`.
 4. **Endpoint admin** `POST /api/admin/refresh-view` force un REFRESH MATERIALIZED VIEW si nécessaire.
+
+---
+
+## Validation traçabilité budget/marque — 23 juillet 2026
+
+### Contexte
+
+Après les corrections du backfill, un audit de traçabilité a été conduit pour confirmer que `/api/budget/marque` produit des chiffres corrects et reconstituables depuis la DB.
+
+### Deux méthodes de calcul de "reçus"
+
+Le budget **n'utilise pas les bons de commande Lightspeed**. Il utilise un **proxy impliqué** :
+
+```
+implied_received = items vendus depuis reception_from + stock actuel taggé avec la saison
+```
+
+Ce proxy est intentionnel : les réceptions physiques dans Lightspeed sont souvent imprécises
+(écarts de bons de commande, retours fournisseur, ajustements). Le proxy ancre le budget à
+la demande réelle plutôt qu'aux achats déclarés.
+
+**Conséquence pour la réconciliation avec Lightspeed :**
+
+| Ce qu'on compare | Rapport Lightspeed équivalent |
+|---|---|
+| `units_sold` (ST numérateur) | "Ventes par ligne", filtre tag + manufacturer, dates `sell_from → sell_to` |
+| `units_received` (proxy) | **Pas d'équivalent direct.** ≠ "Stocks reçus" Lightspeed (qui compte les réceptions physiques) |
+
+### Requêtes exactes de /api/budget/marque
+
+Pour chaque saison de référence, 3 requêtes SQL :
+
+**Q1 — irSl (proxy réceptions, partie ventes) :**
+```sql
+SELECT SUM(qty), SUM(qty * default_cost)
+FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+WHERE sl.completed_time >= {reception_from}    -- ex: 2024-10-01 pour P25
+  AND p.tags ILIKE '%{tag}%'                  -- ex: '%p25%'
+  AND p.tags NOT ILIKE '%nos%'
+  AND p.category NOT ILIKE 'Alt%ration%'
+  AND p.description NOT ILIKE '%shopify%'
+-- PAS de filtre archived, PAS de cap sur sell_to, PAS de filtre default_cost > 0
+```
+
+**Q2 — irInv (proxy réceptions, partie stock) :**
+```sql
+SELECT SUM(qty_on_hand), SUM(qty_on_hand * default_cost)
+FROM products p JOIN inventory i ON i.item_id = p.item_id
+WHERE p.tags ILIKE '%{tag}%'
+  AND i.qty_on_hand > 0
+-- PAS de filtre archived (stock réel quelque soit le statut)
+```
+
+**Q3 — slRows (ST numérateur) :**
+```sql
+SELECT SUM(qty), SUM(qty * default_cost)
+FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+WHERE sl.completed_time BETWEEN {sell_from} AND {sell_to}
+  AND p.tags ILIKE '%{tag}%'
+-- Même filtres NOS/altération/shopify
+```
+
+`implied_received = Q1.qty + Q2.qty_on_hand`
+`ST = Q3.qty / implied_received`
+`budget_base = (Q1.cost + Q2.cost + Q3.cost) / 2`  ← blended, ancre la demande réelle
+
+### Projection pour les saisons en cours
+
+Quand une saison de référence est en cours, le serveur projette la fin via la
+**fenêtre historique équivalente** des saisons précédentes (même position dans le
+calendrier). Avec `nb_saisons_reference = 2` (P25, P24 pour P26) :
+
+```
+projection = moyenne(
+  ventes P25 entre [sell_from_P25 + elapsed_days] et sell_to_P25,
+  ventes P24 entre [sell_from_P24 + elapsed_days] et sell_to_P24
+)
+```
+
+### Résultats de la validation (Saint James P25 + Marc Cain P26)
+
+**Saint James P25 (saison complète) — 100% validé :**
+
+| Composante | Valeur SQL | Valeur API |
+|---|---|---|
+| irSl (ventes depuis 2024-10-01) | 459u / 43 630$ | — |
+| irInv (stock p25 aujourd'hui) | 10u / 918$ | — |
+| **implied_received** | **469u / 44 548$** | **469u ✓** |
+| units_sold (2025-02-01→2025-09-30) | 436u / 41 699$ | 436u ✓ |
+| ST | 93,0% | 93,0% ✓ |
+| received_cost (blended) | (44 548 + 41 699) / 2 = **43 123,50$** | 43 123,50$ ✓ |
+
+Note : 20u des 459u irSl ont été vendues APRÈS le sell_to (2025-09-30). Elles
+entrent dans `implied_received` mais pas dans `units_sold`. Effet : ST légèrement
+sous-estimé (93% vs ~97% sans ces unités tardives). Impact négligeable.
+
+**Marc Cain P26 (saison en cours, projection P24+P25) — 100% validé :**
+
+| Composante | Valeur SQL | Valeur API |
+|---|---|---|
+| irSl (ventes depuis 2025-10-01) | 330u / 59 225$ | — |
+| irInv (stock p26 aujourd'hui) | 229u / 42 708$ | — |
+| implied YTD | 559u / 101 932$ | — |
+| slRows YTD (2026-02-01→2026-07-24) | 279u / 50 222$ | — |
+| + projection P24 restante (2024-07-23→2024-09-30) | 67u / 10 013$ | — |
+| + projection P25 restante (2025-07-24→2025-09-30) | 33u / 6 291$ | — |
+| Moyenne P24+P25 | 50u / 8 152$ | — |
+| **implied_received projeté** | **609u / 110 084$** | **609u ✓** |
+| **units_sold projeté** | **329u** | **329u ✓** |
+| **received_cost (blended)** | **(110 084 + 58 374) / 2 = 84 229$** | **84 228,95$ ✓** |
+| ST projeté | 54,0% | 54,0% ✓ |
+
+Écart résiduel < 0,50$ — arrondi de dates UTC/EST du serveur Railway.
+
+### Conclusion
+
+Les chiffres du budget sont **100% reconstituables depuis les requêtes SQL brutes**.
+Toute divergence avec Lightspeed s'explique par la différence de méthode
+(proxy impliqué vs réceptions physiques), pas par une erreur de calcul.
+
+---
+
+## Historique inventaire (snapshots quotidiens) — déployé 24 juillet 2026
+
+### Décision d'architecture
+
+L'inventaire (`inventory` table) est un état qui s'écrase à chaque sync — aucun historique n'existait avant. Décision : snapshots **quotidiens** capturés en fin de chaque run de sync. Les mouvements intra-journée se reconstruisent via `sale_lines` au besoin.
+
+### Schéma
+
+**Table `inventory_snapshots`** — détail quotidien par item×boutique, TTL 400 jours :
+```sql
+(tenant_id TEXT, snapshot_date DATE, item_id TEXT, shop_id TEXT,
+ qty INT, unit_cost NUMERIC, unit_price NUMERIC,
+ PRIMARY KEY (tenant_id, snapshot_date, item_id, shop_id))
+```
+Index : `(tenant_id, snapshot_date)` et `(tenant_id, item_id)`.
+Lignes qty=0 non stockées (absence = stock zéro).
+
+**Table `inventory_snapshots_monthly`** — agrégat long terme, rétention illimitée :
+```sql
+(tenant_id TEXT, month DATE, shop_id TEXT, manufacturer TEXT NOT NULL DEFAULT '',
+ total_qty INT, total_cost_value NUMERIC, total_retail_value NUMERIC,
+ PRIMARY KEY (tenant_id, month, shop_id, manufacturer))
+```
+`manufacturer=''` représente les articles sans marque (évite NULL dans la PK).
+`total_qty/cost/retail` = **moyenne** des valeurs quotidiennes du mois.
+
+### Capture et rétention (sync.js — `snapshotInventory`)
+
+Appelé à la fin de chaque run de sync, après le refresh des MVs et l'audit qualité :
+
+1. **Agrégation mensuelle** : avant de purger, les mois complets > 400 jours sont agrégés dans `inventory_snapshots_monthly` (ON CONFLICT DO NOTHING — idempotent).
+2. **Purge** : `DELETE WHERE snapshot_date < current_date - 400 days`.
+3. **Capture** : `INSERT ... SELECT FROM inventory JOIN products WHERE qty_on_hand != 0 ON CONFLICT DO NOTHING`. Si le sync roule deux fois le même jour, le premier snapshot est conservé.
+
+`sync_state` : `snapshot_last_date` (date du dernier snapshot) + `snapshot_rows` (nb lignes insérées).
+
+### Valorisation
+
+`unit_cost` et `unit_price` sont figés au moment du snapshot depuis `products.default_cost` et `products.default_price`. Ils ne sont **pas recalculés** lors de la lecture — la valorisation historique est donc stable même si les coûts sont mis à jour ultérieurement.
+
+**Limite connue** : `default_cost` = coût unitaire courant au jour du snapshot, pas le coût d'acquisition FIFO réel. Précision suffisante pour le pilotage des achats, pas pour la comptabilité.
+
+### Premier snapshot
+
+- Date : **2026-07-24**
+- Lignes : **13 802** (items×boutique avec qty ≠ 0)
+- Unités : 15 966u — match exact avec `inventory` live ✓
+- Valeur coût : 1 639 813$ — match exact ✓
+- Valeur détail : 3 773 451$ — match exact ✓
+
+### Endpoints API
+
+- `GET /api/inventory-history?date=YYYY-MM-DD&shop_id=&manufacturer=`
+  — snapshot agrégé. Sans shop_id : breakdown par boutique (cliquable → drill par marque). Erreur 404 si date antérieure au premier snapshot.
+- `GET /api/inventory-history/timeline?from=&to=&shop_id=&manufacturer=&granularity=day|month`
+  — série temporelle pour graphique. Fallback automatique sur `first_date` si `from` < premier snapshot.
+
+### Outil chatbot `get_inventory_at_date`
+
+Questions du type "quel était le stock Brax le 15 août" → `get_inventory_at_date(date, shop_id?, manufacturer?)`.
+Si la date précède le premier snapshot : l'outil retourne `{ erreur: "Aucun snapshot avant le 2026-07-24" }`.
+Règle : le modèle **doit** communiquer cette erreur à l'utilisateur — jamais estimer ni inventer.
+
+### Suite de tests T6/T7
+
+| Test | Question | Comportement attendu |
+|------|----------|----------------------|
+| T6 | "quel était le stock Brax à Saint-Sauveur hier" | `get_inventory_at_date(date=hier, shop_id=Saint-Sauveur, manufacturer=Brax)` → chiffres réels vérifiables SQL |
+| T7 | "quel était le stock le 1er janvier 2020" | Outil retourne erreur "aucun snapshot avant 2026-07-24" → modèle le dit clairement, ne tente pas d'estimer |

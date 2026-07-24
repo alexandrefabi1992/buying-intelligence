@@ -4966,6 +4966,139 @@ app.delete('/api/conversations/:id', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/inventory-history — snapshot agrégé à une date donnée
+// Without shop_id: breakdown par boutique
+// With shop_id only: breakdown par marque dans cette boutique
+// With both: totaux seulement
+// ---------------------------------------------------------------------------
+app.get('/api/inventory-history', async (req, res, next) => {
+  try {
+    const { date, shop_id, manufacturer } = req.query;
+    if (!date) return res.status(400).json({ error: 'Paramètre date requis (YYYY-MM-DD)' });
+
+    const { rows: meta } = await pool.query(
+      `SELECT MIN(snapshot_date)::text AS first_date, MAX(snapshot_date)::text AS last_date
+       FROM inventory_snapshots WHERE tenant_id = $1`,
+      [req.tenantId],
+    );
+    const firstDate = meta[0]?.first_date ?? null;
+    if (!firstDate) {
+      return res.status(404).json({ error: 'Aucun snapshot disponible. Le premier snapshot sera capturé lors du prochain sync.' });
+    }
+    if (date < firstDate) {
+      return res.status(404).json({ error: `Aucun snapshot avant le ${firstDate}.`, first_date: firstDate });
+    }
+
+    const { rows: dateCheck } = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM inventory_snapshots WHERE tenant_id = $1 AND snapshot_date = $2`,
+      [req.tenantId, date],
+    );
+    if (!dateCheck[0].n) {
+      return res.status(404).json({ error: `Aucun snapshot pour le ${date}.`, first_date: firstDate, last_date: meta[0].last_date });
+    }
+
+    const params = [req.tenantId, date];
+    const shopCond = shop_id ? `AND s.shop_id = $${params.push(shop_id)}` : '';
+    const mfrCond  = manufacturer ? `AND p.manufacturer ILIKE $${params.push('%' + manufacturer + '%')}` : '';
+
+    // Aggregation dimension: by boutique (no shop), by marque (shop given), or totals only (both given)
+    let selectDim, groupDim;
+    if (!shop_id) {
+      selectDim = `sh.name AS dimension, sh.shop_id AS dim_id`;
+      groupDim  = `sh.name, sh.shop_id`;
+    } else if (!manufacturer) {
+      selectDim = `COALESCE(p.manufacturer, 'Sans marque') AS dimension, NULL::text AS dim_id`;
+      groupDim  = `COALESCE(p.manufacturer, 'Sans marque')`;
+    } else {
+      selectDim = `'total' AS dimension, NULL::text AS dim_id`;
+      groupDim  = `'total'`;
+    }
+
+    const { rows: breakdown } = await pool.query(`
+      SELECT
+        ${selectDim},
+        SUM(s.qty)::int                                         AS units,
+        ROUND(SUM(s.qty * COALESCE(s.unit_cost,0))::numeric,2) AS cost_value,
+        ROUND(SUM(s.qty * COALESCE(s.unit_price,0))::numeric,2) AS retail_value
+      FROM inventory_snapshots s
+      JOIN products p ON p.item_id = s.item_id AND p.tenant_id = s.tenant_id
+      JOIN shops sh   ON sh.shop_id = s.shop_id AND sh.tenant_id = s.tenant_id
+      WHERE s.tenant_id = $1 AND s.snapshot_date = $2
+        ${shopCond} ${mfrCond}
+      GROUP BY ${groupDim}
+      ORDER BY units DESC
+    `, params);
+
+    const totals = breakdown.reduce((acc, r) => ({
+      units:        (acc.units        ?? 0) + r.units,
+      cost_value:   (acc.cost_value   ?? 0) + parseFloat(r.cost_value),
+      retail_value: (acc.retail_value ?? 0) + parseFloat(r.retail_value),
+    }), {});
+
+    res.json({
+      date,
+      first_date:   firstDate,
+      last_date:    meta[0].last_date,
+      filter:       { shop_id: shop_id ?? null, manufacturer: manufacturer ?? null },
+      totals:       { units: totals.units ?? 0, cost_value: Math.round((totals.cost_value ?? 0) * 100) / 100, retail_value: Math.round((totals.retail_value ?? 0) * 100) / 100 },
+      breakdown,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/inventory-history/timeline — série temporelle pour graphique
+// granularity: day (défaut) | month
+// ---------------------------------------------------------------------------
+app.get('/api/inventory-history/timeline', async (req, res, next) => {
+  try {
+    const { from, to, shop_id, manufacturer, granularity = 'day' } = req.query;
+
+    const { rows: meta } = await pool.query(
+      `SELECT MIN(snapshot_date)::text AS first_date, MAX(snapshot_date)::text AS last_date
+       FROM inventory_snapshots WHERE tenant_id = $1`,
+      [req.tenantId],
+    );
+    const firstDate = meta[0]?.first_date ?? null;
+    if (!firstDate) {
+      return res.status(404).json({ error: 'Aucun snapshot disponible.', first_date: null });
+    }
+
+    const rangeFrom = from && from >= firstDate ? from : firstDate;
+    const rangeTo   = to ?? meta[0].last_date;
+
+    if (rangeFrom < firstDate) {
+      return res.status(404).json({ error: `Aucun snapshot avant le ${firstDate}.`, first_date: firstDate });
+    }
+
+    const params = [req.tenantId, rangeFrom, rangeTo];
+    const shopCond = shop_id      ? `AND s.shop_id = $${params.push(shop_id)}` : '';
+    const mfrCond  = manufacturer ? `AND p.manufacturer ILIKE $${params.push('%' + manufacturer + '%')}` : '';
+
+    const dateTrunc = granularity === 'month'
+      ? `date_trunc('month', s.snapshot_date)::date`
+      : `s.snapshot_date`;
+
+    const { rows: series } = await pool.query(`
+      SELECT
+        ${dateTrunc}                                               AS date,
+        ${granularity === 'month' ? 'ROUND(AVG(s.qty))::int' : 'SUM(s.qty)::int'} AS units,
+        ROUND(${granularity === 'month' ? 'AVG' : 'SUM'}(s.qty * COALESCE(s.unit_cost,0))::numeric,2)   AS cost_value,
+        ROUND(${granularity === 'month' ? 'AVG' : 'SUM'}(s.qty * COALESCE(s.unit_price,0))::numeric,2) AS retail_value
+      FROM inventory_snapshots s
+      JOIN products p ON p.item_id = s.item_id AND p.tenant_id = s.tenant_id
+      WHERE s.tenant_id = $1
+        AND s.snapshot_date BETWEEN $2::date AND $3::date
+        ${shopCond} ${mfrCond}
+      GROUP BY ${dateTrunc}
+      ORDER BY 1
+    `, params);
+
+    res.json({ first_date: firstDate, last_date: meta[0].last_date, from: rangeFrom, to: rangeTo, granularity, series });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // Error handler
 // ---------------------------------------------------------------------------
 app.use((err, req, res, _next) => {

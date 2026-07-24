@@ -254,6 +254,19 @@ const TOOL_DEFS = [
       required: [],
     },
   },
+  {
+    name: 'get_inventory_at_date',
+    description: 'Obtenir le stock (unités, valeur coût, valeur détail) à une date précise dans le passé. Utiliser pour les questions du type "quel était le stock le [date]", "combien d\'unités Brax avions-nous le [date]", "quelle était la valeur d\'inventaire au [date]". IMPORTANT: si la date demandée est antérieure au premier snapshot disponible, l\'outil retourne une erreur explicite — ne jamais estimer ni inventer de chiffre dans ce cas.',
+    parameters: {
+      type: 'object',
+      properties: {
+        date:         { type: 'string', description: 'Date ISO (YYYY-MM-DD). Obligatoire.' },
+        shop_id:      { type: 'string', description: 'Nom ou ID de la boutique (optionnel)' },
+        manufacturer: { type: 'string', description: 'Nom de la marque (optionnel)' },
+      },
+      required: ['date'],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -325,6 +338,7 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
 - COLLECTIONS/MARQUES : en mode achat, "collection" désigne la gamme saisonnière d'une marque, PAS une catégorie de produit. "quelle collection se vend le mieux" = "quelle marque performe le mieux cette saison" → utiliser get_top_performers (metric="sold_cost") ou get_sales_analysis sans manufacturer. NE JAMAIS appeler get_sales_by_category pour une question qui contient le mot "collection".
 - SUIVI PAR MOT UNIQUE : si l'utilisateur répond avec un seul mot comme "marque", "catégorie", "boutique", "saison" après une réponse précédente, interpréter comme "donne-moi le top [mot] avec les mêmes filtres boutique/saison/période que la question précédente" — appeler l'outil approprié avec ces filtres. NE PAS creuser dans un sous-résultat de la réponse précédente (ex: ne pas filtrer par la catégorie affichée dans la réponse d'avant).
 - TRANSFERTS : pour toute question sur le stock dormant, les transferts recommandés ou "quoi bouger", utiliser get_transfer_recommendations — JAMAIS inventer une réponse
+- HISTORIQUE STOCK : pour toute question sur le stock À UNE DATE PASSÉE ("quel était le stock le [date]", "combien d'unités [marque] avions-nous en [date]", "valeur d'inventaire au [date]"), utiliser get_inventory_at_date(date, shop_id?, manufacturer?). Si l'outil retourne une erreur indiquant qu'aucun snapshot n'existe avant une certaine date, le dire EXPLICITEMENT à l'utilisateur — JAMAIS estimer ou inventer le chiffre.
 - LECTURE DES TRANSFERTS DANS LE SELL-THROUGH : le champ "stock_actuel" est EXCLUSIF des transferts sortants (les unités transférées ont déjà quitté la boutique et sont déduites de l'inventaire). Ne JAMAIS dire que le stock "inclut" des unités transférées. La formule est : reçu_fournisseur = vendu + stock_actuel + transferts_sortants − transferts_entrants. Présenter les transferts comme une ligne séparée, pas comme faisant partie du stock.
 - MATRICES / TAILLES : pour voir toutes les tailles d'un modèle ou le stock par taille, utiliser get_matrix_info avec le code modèle (ex: "A45118") dans description_search
 - TAGS : "tags" (tableau, max 10) filtre les produits qui ont TOUS les tags listés — logique AND. Ex: tags=["p26","consigne"] → uniquement les produits avec les deux tags. "exclude_tags" (tableau, max 10) exclut les produits ayant N'IMPORTE LEQUEL de ces tags. Ex: exclude_tags=["nos","solde"] → aucun NOS ni solde. Les deux paramètres sont combinables simultanément.
