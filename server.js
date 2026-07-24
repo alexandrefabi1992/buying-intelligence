@@ -5075,22 +5075,41 @@ app.get('/api/inventory-history/timeline', async (req, res, next) => {
     const shopCond = shop_id      ? `AND s.shop_id = $${params.push(shop_id)}` : '';
     const mfrCond  = manufacturer ? `AND p.manufacturer ILIKE $${params.push('%' + manufacturer + '%')}` : '';
 
-    const dateTrunc = granularity === 'month'
-      ? `date_trunc('month', s.snapshot_date)::date`
-      : `s.snapshot_date`;
-
-    const { rows: series } = await pool.query(`
+    // For monthly granularity: first sum per day, then average across days in the month.
+    // Direct AVG(qty) across rows would yield avg units-per-reference (~1.1), not total stock.
+    const { rows: series } = await pool.query(granularity === 'month' ? `
       SELECT
-        ${dateTrunc}                                               AS date,
-        ${granularity === 'month' ? 'ROUND(AVG(s.qty))::int' : 'SUM(s.qty)::int'} AS units,
-        ROUND(${granularity === 'month' ? 'AVG' : 'SUM'}(s.qty * COALESCE(s.unit_cost,0))::numeric,2)   AS cost_value,
-        ROUND(${granularity === 'month' ? 'AVG' : 'SUM'}(s.qty * COALESCE(s.unit_price,0))::numeric,2) AS retail_value
+        date_trunc('month', day_date)::date                       AS date,
+        ROUND(AVG(day_units))::int                                AS units,
+        ROUND(AVG(day_cost)::numeric, 2)                          AS cost_value,
+        ROUND(AVG(day_retail)::numeric, 2)                        AS retail_value
+      FROM (
+        SELECT
+          s.snapshot_date                                         AS day_date,
+          SUM(s.qty)::float8                                      AS day_units,
+          SUM(s.qty * COALESCE(s.unit_cost,0))::float8            AS day_cost,
+          SUM(s.qty * COALESCE(s.unit_price,0))::float8           AS day_retail
+        FROM inventory_snapshots s
+        JOIN products p ON p.item_id = s.item_id AND p.tenant_id = s.tenant_id
+        WHERE s.tenant_id = $1
+          AND s.snapshot_date BETWEEN $2::date AND $3::date
+          ${shopCond} ${mfrCond}
+        GROUP BY s.snapshot_date
+      ) daily
+      GROUP BY date_trunc('month', day_date)::date
+      ORDER BY 1
+    ` : `
+      SELECT
+        s.snapshot_date                                            AS date,
+        SUM(s.qty)::int                                           AS units,
+        ROUND(SUM(s.qty * COALESCE(s.unit_cost,0))::numeric,2)   AS cost_value,
+        ROUND(SUM(s.qty * COALESCE(s.unit_price,0))::numeric,2)  AS retail_value
       FROM inventory_snapshots s
       JOIN products p ON p.item_id = s.item_id AND p.tenant_id = s.tenant_id
       WHERE s.tenant_id = $1
         AND s.snapshot_date BETWEEN $2::date AND $3::date
         ${shopCond} ${mfrCond}
-      GROUP BY ${dateTrunc}
+      GROUP BY s.snapshot_date
       ORDER BY 1
     `, params);
 
