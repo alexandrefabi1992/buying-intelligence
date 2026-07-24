@@ -4333,34 +4333,38 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         LIMIT 10
       `, p),
 
-      // Q5 — Sales + stock by category
-      // When a season is selected, restrict to products tagged with that season.
+      // Q5 — Sales + stock by category.
+      // Date scope: last 12 weeks when no season selected; all-time when season active
+      // (matches units_sold_tag in Q1 so the totals align).
+      // Archived filter: kept only for items_count + stock, not for sales
+      // (archived items were still sold — same convention as Q1).
       (() => {
         const p5        = allTime ? p : [...p, seasonTag];
         const tagCondP5 = allTime ? '' : `AND p.tags ILIKE $${p5.length}`;
+        const sDateCond = allTime
+          ? "sl.completed_time >= now() - INTERVAL '12 weeks' AND sl.completed_time IS NOT NULL"
+          : 'sl.completed_time IS NOT NULL';
         return pool.query(`
           WITH s AS (
             SELECT sl.item_id,
                    SUM(sl.qty)                 AS units,
                    SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS rev
             FROM sale_lines sl
-            WHERE sl.completed_time >= now() - INTERVAL '12 weeks'
-              AND sl.completed_time IS NOT NULL
+            WHERE ${sDateCond}
               ${slS}
             GROUP BY sl.item_id
           ),
           ${stCTE}
           SELECT
             COALESCE(p.category, 'Sans catégorie')       AS category,
-            COUNT(DISTINCT p.item_id) FILTER (WHERE COALESCE(s.units,0) > 0 OR COALESCE(st.stock,0) > 0)::int AS items_count,
+            COUNT(DISTINCT p.item_id) FILTER (WHERE p.archived = false AND (COALESCE(s.units,0) > 0 OR COALESCE(st.stock,0) > 0))::int AS items_count,
             ROUND(SUM(COALESCE(s.units, 0)), 0)::float8  AS units_sold_12w,
             ROUND(SUM(COALESCE(s.rev,   0)), 2)::float8  AS revenue_12w,
-            ROUND(SUM(COALESCE(st.stock,0)), 0)::float8  AS stock_units
+            ROUND(SUM(CASE WHEN p.archived = false THEN COALESCE(st.stock,0) ELSE 0 END), 0)::float8 AS stock_units
           FROM products p
           LEFT JOIN s  ON s.item_id  = p.item_id
           LEFT JOIN st ON st.item_id = p.item_id
           WHERE p.manufacturer ILIKE $1
-            AND p.archived = false
             ${tenantCondP}
             ${tagCondP5}
           GROUP BY p.category
