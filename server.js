@@ -856,6 +856,21 @@ async function runMigrations() {
     }
   }
 
+  // brand_payment_terms — supplier discount / net terms per brand
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS brand_payment_terms (
+      tenant_id           TEXT NOT NULL REFERENCES tenants(id),
+      manufacturer        TEXT NOT NULL,
+      discount_pct        NUMERIC,
+      discount_days       INT,
+      net_days            INT,
+      margin_override_pct NUMERIC,
+      notes               TEXT,
+      updated_at          TIMESTAMPTZ DEFAULT now(),
+      PRIMARY KEY (tenant_id, manufacturer)
+    )
+  `);
+
   console.log('[migration] Schema up to date');
 }
 
@@ -5114,6 +5129,194 @@ app.get('/api/inventory-history/timeline', async (req, res, next) => {
     `, params);
 
     res.json({ first_date: firstDate, last_date: meta[0].last_date, from: rangeFrom, to: rangeTo, granularity, series });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// GET  /api/accounting/brands          — payment terms analysis per brand
+// PUT  /api/accounting/brands/:mfr     — save terms for a brand
+// GET  /api/settings/cost-of-capital   — global cost of capital %
+// PUT  /api/settings/cost-of-capital   — save cost of capital
+// ---------------------------------------------------------------------------
+app.get('/api/accounting/brands', requireAuth, async (req, res, next) => {
+  try {
+    const tid = req.tenantId;
+
+    const { rows: capRow } = await pool.query(
+      `SELECT value FROM app_settings WHERE tenant_id = $1 AND key = 'cost_of_capital'`,
+      [tid],
+    );
+    const costOfCapital = capRow[0] ? Number(capRow[0].value) : 8.0;
+
+    const { rows } = await pool.query(`
+      WITH
+      brand_sales AS (
+        SELECT
+          p.manufacturer,
+          SUM(sl.qty)                                        AS units_365,
+          SUM(sl.qty * COALESCE(p.default_cost,  0))        AS cost_365,
+          SUM(sl.qty * COALESCE(p.default_price, 0))        AS retail_365
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
+        WHERE sl.tenant_id = $1
+          AND sl.completed_time > now() - interval '365 days'
+          AND p.manufacturer IS NOT NULL AND p.manufacturer != ''
+          AND p.stub_inferred_fields IS NULL
+        GROUP BY p.manufacturer
+      ),
+      brand_velocity AS (
+        SELECT
+          p.manufacturer,
+          SUM(sl.qty)::float / 90 AS daily_units
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
+        WHERE sl.tenant_id = $1
+          AND sl.completed_time > now() - interval '90 days'
+          AND p.manufacturer IS NOT NULL AND p.manufacturer != ''
+          AND p.stub_inferred_fields IS NULL
+        GROUP BY p.manufacturer
+      ),
+      brand_stock AS (
+        SELECT
+          p.manufacturer,
+          SUM(i.qty_on_hand) AS stock_units
+        FROM inventory i
+        JOIN products p ON p.item_id = i.item_id AND p.tenant_id = i.tenant_id
+        WHERE i.tenant_id = $1
+          AND i.qty_on_hand > 0
+          AND p.manufacturer IS NOT NULL AND p.manufacturer != ''
+          AND p.archived = false
+        GROUP BY p.manufacturer
+      ),
+      brand_terms AS (
+        SELECT manufacturer, discount_pct, discount_days, net_days, margin_override_pct, notes
+        FROM brand_payment_terms WHERE tenant_id = $1
+      )
+      SELECT
+        bs.manufacturer,
+        bs.units_365,
+        ROUND(bs.cost_365::numeric,   2)  AS cost_365,
+        ROUND(bs.retail_365::numeric, 2)  AS retail_365,
+        CASE WHEN bs.retail_365 > 0
+          THEN ROUND(((bs.retail_365 - bs.cost_365) / bs.retail_365 * 100)::numeric, 1)
+          ELSE NULL END                   AS margin_pct,
+        bv.daily_units,
+        COALESCE(bst.stock_units, 0)      AS stock_units,
+        CASE WHEN bv.daily_units > 0 AND bst.stock_units > 0
+          THEN ROUND(bst.stock_units / bv.daily_units)
+          ELSE NULL END                   AS velocity_days,
+        bt.discount_pct,
+        bt.discount_days,
+        bt.net_days,
+        bt.margin_override_pct,
+        bt.notes
+      FROM brand_sales bs
+      LEFT JOIN brand_velocity bv  ON bv.manufacturer  = bs.manufacturer
+      LEFT JOIN brand_stock    bst ON bst.manufacturer = bs.manufacturer
+      LEFT JOIN brand_terms    bt  ON bt.manufacturer  = bs.manufacturer
+      ORDER BY bs.cost_365 DESC
+    `, [tid]);
+
+    const brands = rows.map(r => {
+      const disc    = r.discount_pct   != null ? Number(r.discount_pct)   : null;
+      const ddays   = r.discount_days  != null ? Number(r.discount_days)  : null;
+      const ndays   = r.net_days       != null ? Number(r.net_days)       : null;
+      const margin  = r.margin_override_pct != null
+        ? Number(r.margin_override_pct)
+        : (r.margin_pct != null ? Number(r.margin_pct) : null);
+      const vel     = r.velocity_days != null ? Number(r.velocity_days) : null;
+      const cost365 = Number(r.cost_365);
+
+      let annualizedYield = null;
+      if (disc != null && ddays != null && ndays != null && ndays > ddays) {
+        annualizedYield = Math.round(
+          (disc / (1 - disc / 100)) * (365 / (ndays - ddays)) * 10
+        ) / 10;
+      }
+
+      let recommendation, flag = null;
+      if (disc == null || ndays == null) {
+        recommendation = 'terms_missing';
+      } else if (annualizedYield > costOfCapital) {
+        recommendation = 'take_discount';
+        if (vel != null && ndays != null && vel > ndays) {
+          flag = `⚠ stock lent (${vel}j) — l'escompte sort le cash ${vel - ndays}j avant la vente`;
+        }
+      } else {
+        recommendation = 'full_term';
+      }
+
+      const annualSavings = (disc != null && cost365 > 0)
+        ? Math.round(cost365 * disc / 100)
+        : 0;
+
+      return {
+        manufacturer:        r.manufacturer,
+        units_365:           Number(r.units_365),
+        cost_365:            cost365,
+        retail_365:          Number(r.retail_365),
+        margin_pct:          r.margin_pct != null ? Number(r.margin_pct) : null,
+        margin_override_pct: r.margin_override_pct != null ? Number(r.margin_override_pct) : null,
+        effective_margin:    margin,
+        stock_units:         Number(r.stock_units),
+        velocity_days:       vel,
+        discount_pct:        disc,
+        discount_days:       ddays,
+        net_days:            ndays,
+        notes:               r.notes ?? null,
+        annualized_yield:    annualizedYield,
+        financing_delay:     (ndays != null && vel != null) ? ndays - vel : null,
+        recommendation,
+        flag,
+        annual_savings:      annualSavings,
+      };
+    });
+
+    res.json({ cost_of_capital: costOfCapital, brands });
+  } catch (err) { next(err); }
+});
+
+app.put('/api/accounting/brands/:manufacturer', requireAuth, async (req, res, next) => {
+  try {
+    const mfr = decodeURIComponent(req.params.manufacturer);
+    const { discount_pct, discount_days, net_days, margin_override_pct, notes } = req.body;
+    await pool.query(`
+      INSERT INTO brand_payment_terms
+        (tenant_id, manufacturer, discount_pct, discount_days, net_days, margin_override_pct, notes, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,now())
+      ON CONFLICT (tenant_id, manufacturer) DO UPDATE SET
+        discount_pct        = EXCLUDED.discount_pct,
+        discount_days       = EXCLUDED.discount_days,
+        net_days            = EXCLUDED.net_days,
+        margin_override_pct = EXCLUDED.margin_override_pct,
+        notes               = EXCLUDED.notes,
+        updated_at          = now()
+    `, [req.tenantId, mfr, discount_pct ?? null, discount_days ?? null, net_days ?? null,
+        margin_override_pct ?? null, notes ?? null]);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+app.get('/api/settings/cost-of-capital', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT value FROM app_settings WHERE tenant_id = $1 AND key = 'cost_of_capital'`,
+      [req.tenantId],
+    );
+    res.json({ cost_of_capital: rows[0] ? Number(rows[0].value) : 8.0 });
+  } catch (err) { next(err); }
+});
+
+app.put('/api/settings/cost-of-capital', requireAuth, async (req, res, next) => {
+  try {
+    const pct = Number(req.body.cost_of_capital);
+    if (isNaN(pct) || pct < 0 || pct > 100) return res.status(400).json({ error: 'Valeur invalide (0–100)' });
+    await pool.query(`
+      INSERT INTO app_settings(tenant_id, key, value, updated_at)
+      VALUES ($1,'cost_of_capital',$2::jsonb,now())
+      ON CONFLICT(tenant_id, key) DO UPDATE SET value=$2::jsonb, updated_at=now()
+    `, [req.tenantId, String(pct)]);
+    res.json({ ok: true, cost_of_capital: pct });
   } catch (err) { next(err); }
 });
 
