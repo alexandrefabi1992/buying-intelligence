@@ -206,6 +206,34 @@ const HELP = {
     ],
   },
 
+  accounting: {
+    title: 'Comptabilité fournisseurs',
+    icon: '💰',
+    summary: "Aide à la décision escompte vs terme complet pour chaque fournisseur, basée sur le rendement annualisé de l'escompte et le coût du capital.",
+    sections: [
+      {
+        heading: 'La décision escompte vs terme complet',
+        body: "La plupart des fournisseurs offrent un **escompte de paiement rapide** : par exemple « 2/10 n/60 » signifie 2% de réduction si on paie en 10 jours plutôt qu'en 60 jours.\n\nLa question est : vaut-il mieux prendre cet escompte (payer tôt et économiser 2%) ou garder l'argent 50 jours de plus (et le placer ou l'utiliser ailleurs) ?\n\nLa réponse dépend du **rendement annualisé** de l'escompte comparé au **coût du capital** de l'entreprise.",
+      },
+      {
+        heading: 'Formule du rendement annualisé',
+        body: "**Formule :**\n\n`Rendement = (escompte% ÷ (1 − escompte%)) × (365 ÷ (net_jours − escompte_jours))`\n\n**Exemple : 2/10 n/60**\n- Escompte = 2%\n- Jours gagnés = 60 − 10 = 50 jours\n- Rendement = (2 ÷ 98) × (365 ÷ 50) = **14,9% par an**\n\nSi le coût du capital est à 8%/an : **prendre l'escompte** (14,9% > 8%).\nSi le coût du capital est à 20%/an : **terme complet** (14,9% < 20%).\n\nNote : la division par `(1 − escompte%)` reflète que l'escompte est calculé sur le montant brut — sans cette correction, le rendement serait légèrement sous-estimé.",
+      },
+      {
+        heading: 'Vélocité et délai de financement',
+        body: "La **vélocité** (jours pour écouler le stock au rythme des 90 derniers jours) sert à qualifier la recommandation :\n\n- Si `net_days > vélocité` → le fournisseur finance la vente (tu vends avant d'avoir à payer). C'est la situation idéale.\n- Si `net_days < vélocité` → tu dois payer avant d'avoir vendu. L'escompte sort encore plus tôt le cash d'un stock qui tarde à se vendre — un avertissement ⚠ est affiché.\n\nLa vélocité n'inverse pas la recommandation (si le rendement > coût du capital, prendre l'escompte reste rentable) mais elle signale une contrainte de trésorerie à surveiller.",
+      },
+      {
+        heading: 'Saisir les termes fournisseur',
+        body: "Cliquer sur la colonne **Termes fournisseur** d'une marque pour ouvrir le panneau de saisie. Formats acceptés :\n\n- `2/10 n/60` — escompte 2% si payé en 10 jours, net à 60 jours\n- `2% 10 jours net 60` — même chose, format long\n- `n/30` ou `net 30` — pas d'escompte, terme de 30 jours\n\nUn **override de marge** peut être saisi si la marge calculée depuis les ventes ne reflète pas la réalité (ex: marge négociée contractuellement différente).",
+      },
+      {
+        heading: 'Coût du capital',
+        body: "Le coût du capital est le paramètre central de la comparaison. Il représente ce que vaut l'argent pour l'entreprise — soit le taux d'emprunt si on est en découvert, soit le rendement alternatif de la trésorerie.\n\n**Défaut : 8%/an.** À modifier dans l'en-tête de la page selon la situation financière réelle. La valeur est sauvegardée et s'applique à toutes les marques.",
+      },
+    ],
+  },
+
   'inv-history': {
     title: 'Historique stock',
     icon: '📦',

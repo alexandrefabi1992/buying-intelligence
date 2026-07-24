@@ -114,6 +114,7 @@
   <button class="tab py-3 tab-inactive" data-tab="transfers" data-i18n="tab_transfers">Transferts / Actions</button>
   <button class="tab py-3 tab-inactive" data-tab="plan"        data-i18n="tab_plan">Création de budget</button>
   <button class="tab py-3 tab-inactive" data-tab="inv-history">Historique stock</button>
+  <button class="tab py-3 tab-inactive" data-tab="accounting">Comptabilité</button>
   <button class="tab py-3 tab-inactive" data-tab="params"      data-i18n="tab_params">Paramètres</button>
   <a href="/velocity" class="py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors" data-i18n="tab_velocity">Vélocité →</a>
   <a href="/onboarding.html" class="ml-2 py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">⚙ Configuration</a>
@@ -679,6 +680,80 @@
       <div class="spinner"></div>
     </div>
     <div id="invHistError" class="hidden p-4 bg-red-50 rounded-xl text-sm text-red-700"></div>
+
+  </section>
+
+  <!-- ── COMPTABILITÉ FOURNISSEURS ────────────────────────────────── -->
+  <section id="tab-accounting" class="hidden">
+
+    <!-- Header bar -->
+    <div class="flex flex-wrap items-center gap-4 mb-4 bg-gray-50 border border-gray-200 rounded-xl px-5 py-3">
+      <div class="flex items-center gap-2">
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Coût du capital</label>
+        <input id="acctCapital" type="number" min="0" max="100" step="0.5"
+               class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
+               value="8">
+        <span class="text-sm text-gray-500">%/an</span>
+        <button id="acctCapitalSave" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors">Sauvegarder</button>
+      </div>
+      <div class="text-gray-300">|</div>
+      <div class="text-xs text-gray-500">
+        Économies potentielles si toutes les recommandations « Escompte » sont suivies :
+        <span id="acctTotalSavings" class="font-bold text-emerald-700 ml-1">—</span>
+      </div>
+      <div class="ml-auto">
+        <div id="acctSpinner" class="hidden"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+      <table class="min-w-full text-xs text-gray-700">
+        <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+          <tr>
+            <th class="px-4 py-2 text-left">Marque</th>
+            <th class="px-4 py-2 text-right cursor-pointer select-none" title="Marge calculée depuis ventes 365j (prix−coût)/prix. Modifiable via override.">Marge %</th>
+            <th class="px-4 py-2 text-center" title="Format : 2/10 n/60 (escompte 2% si payé en 10 jours, net à 60j)">Termes fournisseur</th>
+            <th class="px-4 py-2 text-right" title="Rendement annualisé = escompte% ÷ (1−escompte%) × 365 ÷ (net−escompte_jours)">Rendement annualisé</th>
+            <th class="px-4 py-2 text-right" title="Jours pour écouler le stock au rythme des 90 derniers jours">Vélocité (j)</th>
+            <th class="px-4 py-2 text-center">Recommandation</th>
+            <th class="px-4 py-2 text-right" title="Achats annuels × escompte%">Économie/an</th>
+          </tr>
+        </thead>
+        <tbody id="acctBody">
+          <tr><td colspan="7" class="text-center py-10 text-gray-400">Chargement…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Edit modal -->
+    <div id="acctModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+      <div class="bg-white rounded-2xl shadow-2xl p-6 w-96 max-w-[95vw]">
+        <h3 id="acctModalTitle" class="text-sm font-bold text-gray-800 mb-4"></h3>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Termes fournisseur</label>
+            <input id="acctModalTerms" type="text" placeholder="ex: 2/10 n/60  ou  n/30"
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <p id="acctModalTermsPreview" class="text-[11px] text-blue-600 mt-1 h-4"></p>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Override marge % <span class="text-gray-400">(laisser vide = calculée)</span></label>
+            <input id="acctModalMargin" type="number" min="0" max="100" step="0.1" placeholder="ex: 55.0"
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">Notes</label>
+            <input id="acctModalNotes" type="text" placeholder="ex: Conditions négociées mars 2026"
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          </div>
+        </div>
+        <div class="flex gap-2 mt-5">
+          <button id="acctModalSave" class="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors">Sauvegarder</button>
+          <button id="acctModalCancel" class="flex-1 border border-gray-300 text-gray-600 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors">Annuler</button>
+        </div>
+      </div>
+    </div>
 
   </section>
 
@@ -1294,6 +1369,7 @@ function loadTab(id) {
   if (id === 'transfers') TransfersTab.load();
   if (id === 'plan')        PlanTab.load();
   if (id === 'inv-history') InvHistory.init();
+  if (id === 'accounting')  AccountingTab.init();
   if (id === 'params')      ParamsTab.init();
 }
 
@@ -2992,6 +3068,162 @@ function populateShopFilter(items, selectId) {
 function showLoader(key, show) { const el = document.getElementById(`${key}Loader`); if (el) el.classList.toggle('hidden', !show); }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AccountingTab — Comptabilité fournisseurs (tab-accounting)
+// ---------------------------------------------------------------------------
+const AccountingTab = (() => {
+  let _data = null;
+  let _editingMfr = null;
+
+  const fmtC  = n => n == null ? '—' : '$ ' + Number(n).toLocaleString('fr-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const fmtPct = n => n == null ? '—' : Number(n).toFixed(1) + ' %';
+
+  // Parse "2/10 n/60", "2% 10 jours net 60", "n/30", "net30"  → {disc, ddays, ndays}
+  function parseTerms(raw) {
+    if (!raw || !raw.trim()) return null;
+    const s = raw.trim().toLowerCase();
+    // Full: 2/10 n/60 or 2/10 net/60 or 2/10 net 60
+    let m = s.match(/^(\d+(?:\.\d+)?)\s*[\/\s%]\s*(\d+)\s+(?:n(?:et)?[\/\s]?)(\d+)$/);
+    if (m) return { disc: parseFloat(m[1]), ddays: parseInt(m[2]), ndays: parseInt(m[3]) };
+    // "2% 10 jours net 60"
+    m = s.match(/(\d+(?:\.\d+)?)\s*%?\s+(\d+)\s+j(?:ours?)?\s+net\s+(\d+)/);
+    if (m) return { disc: parseFloat(m[1]), ddays: parseInt(m[2]), ndays: parseInt(m[3]) };
+    // Net only: n/30, net 30, net30
+    m = s.match(/^n(?:et)?[\/\s]?(\d+)$/);
+    if (m) return { disc: null, ddays: null, ndays: parseInt(m[1]) };
+    return null;
+  }
+
+  function termsPreview(parsed) {
+    if (!parsed) return '';
+    if (parsed.disc != null)
+      return `Escompte ${parsed.disc}% si payé sous ${parsed.ddays}j — net à ${parsed.ndays}j`;
+    return `Net à ${parsed.ndays}j (pas d'escompte)`;
+  }
+
+  function recoBadge(b) {
+    if (b.recommendation === 'terms_missing')
+      return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-gray-100 text-gray-500">Termes à saisir</span>`;
+    if (b.recommendation === 'take_discount')
+      return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-semibold">✓ Prendre l'escompte</span>`;
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-700">Terme complet</span>`;
+  }
+
+  function render() {
+    if (!_data) return;
+    const cap = _data.cost_of_capital;
+    document.getElementById('acctCapital').value = cap;
+
+    const totalSavings = _data.brands
+      .filter(b => b.recommendation === 'take_discount')
+      .reduce((s, b) => s + (b.annual_savings ?? 0), 0);
+    document.getElementById('acctTotalSavings').textContent = fmtC(totalSavings);
+
+    const sorted = [..._data.brands].sort((a, b) => (b.annual_savings ?? 0) - (a.annual_savings ?? 0));
+
+    document.getElementById('acctBody').innerHTML = sorted.map(b => {
+      const yieldColor = b.annualized_yield == null ? 'text-gray-400'
+        : b.annualized_yield > cap ? 'text-emerald-700 font-semibold' : 'text-gray-600';
+      const flagHtml = b.flag
+        ? `<div class="text-[10px] text-amber-600 mt-0.5">${b.flag}</div>` : '';
+      const termsDisplay = b.discount_pct != null
+        ? `${b.discount_pct}/${b.discount_days} n/${b.net_days}`
+        : b.net_days != null ? `n/${b.net_days}` : '—';
+      const marginDisplay = b.margin_override_pct != null
+        ? `<span class="text-indigo-700 font-semibold">${b.margin_override_pct.toFixed(1)}%</span><span class="text-[10px] text-gray-400 ml-1">override</span>`
+        : (b.margin_pct != null ? `${b.margin_pct.toFixed(1)}%` : '—');
+      const savingsDisplay = b.recommendation === 'take_discount' && b.annual_savings > 0
+        ? `<span class="text-emerald-700 font-semibold">${fmtC(b.annual_savings)}</span>` : '—';
+
+      return `<tr class="border-t border-gray-100 hover:bg-blue-50/30">
+        <td class="px-4 py-2.5 font-medium text-gray-800">${b.manufacturer}</td>
+        <td class="px-4 py-2.5 text-right text-gray-600">${marginDisplay}</td>
+        <td class="px-4 py-2.5 text-center">
+          <button class="acct-edit-terms text-xs text-blue-600 hover:underline" data-mfr="${b.manufacturer}">
+            ${termsDisplay === '—' ? '<span class="text-gray-400 italic">Saisir →</span>' : termsDisplay}
+          </button>
+        </td>
+        <td class="px-4 py-2.5 text-right ${yieldColor}">${b.annualized_yield != null ? b.annualized_yield.toFixed(1) + '%' : '—'}</td>
+        <td class="px-4 py-2.5 text-right text-gray-600">${b.velocity_days != null ? b.velocity_days + 'j' : '—'}</td>
+        <td class="px-4 py-2.5 text-center">${recoBadge(b)}${flagHtml}</td>
+        <td class="px-4 py-2.5 text-right">${savingsDisplay}</td>
+      </tr>`;
+    }).join('');
+
+    // Bind click handlers for edit buttons
+    document.querySelectorAll('.acct-edit-terms').forEach(btn => {
+      btn.addEventListener('click', () => openModal(btn.dataset.mfr));
+    });
+  }
+
+  function openModal(mfr) {
+    _editingMfr = mfr;
+    const b = _data.brands.find(x => x.manufacturer === mfr);
+    document.getElementById('acctModalTitle').textContent = `Termes fournisseur — ${mfr}`;
+    // Pre-fill terms
+    const termsStr = b?.discount_pct != null
+      ? `${b.discount_pct}/${b.discount_days} n/${b.net_days}`
+      : b?.net_days != null ? `n/${b.net_days}` : '';
+    document.getElementById('acctModalTerms').value  = termsStr;
+    document.getElementById('acctModalMargin').value = b?.margin_override_pct ?? '';
+    document.getElementById('acctModalNotes').value  = b?.notes ?? '';
+    document.getElementById('acctModalTermsPreview').textContent = termsPreview(parseTerms(termsStr));
+    document.getElementById('acctModal').classList.remove('hidden');
+  }
+
+  async function saveModal() {
+    const termsRaw = document.getElementById('acctModalTerms').value;
+    const parsed   = parseTerms(termsRaw);
+    const margin   = document.getElementById('acctModalMargin').value;
+    const notes    = document.getElementById('acctModalNotes').value;
+    const body = {
+      discount_pct:        parsed?.disc  ?? null,
+      discount_days:       parsed?.ddays ?? null,
+      net_days:            parsed?.ndays ?? null,
+      margin_override_pct: margin !== '' ? parseFloat(margin) : null,
+      notes:               notes || null,
+    };
+    const r = await apiFetch(`${BASE}/api/accounting/brands/${encodeURIComponent(_editingMfr)}`,
+      { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (r.ok) {
+      document.getElementById('acctModal').classList.add('hidden');
+      await load();
+    }
+  }
+
+  async function load() {
+    document.getElementById('acctSpinner').classList.remove('hidden');
+    try {
+      const r = await apiFetch(`${BASE}/api/accounting/brands`);
+      _data = await r.json();
+      render();
+    } finally {
+      document.getElementById('acctSpinner').classList.add('hidden');
+    }
+  }
+
+  return {
+    init() {
+      // Terms live preview in modal
+      document.getElementById('acctModalTerms').addEventListener('input', e => {
+        const p = parseTerms(e.target.value);
+        document.getElementById('acctModalTermsPreview').textContent = p ? termsPreview(p) : '';
+      });
+      document.getElementById('acctModalSave').addEventListener('click', saveModal);
+      document.getElementById('acctModalCancel').addEventListener('click', () => {
+        document.getElementById('acctModal').classList.add('hidden');
+      });
+      document.getElementById('acctCapitalSave').addEventListener('click', async () => {
+        const pct = parseFloat(document.getElementById('acctCapital').value);
+        if (isNaN(pct)) return;
+        await apiFetch(`${BASE}/api/settings/cost-of-capital`,
+          { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cost_of_capital: pct }) });
+        await load();
+      });
+      load();
+    },
+  };
+})();
+
 // InvHistory — Historique inventaire (tab-inv-history)
 // ─────────────────────────────────────────────────────────────────────────────
 const InvHistory = (() => {
@@ -3761,7 +3993,7 @@ const HelpPanel = (() => {
   let helpData = null;
   let currentKey = 'quickstart';
   let isFullscreen = false;
-  const TAB_TO_SECTION = { budget:'budget', nos:'nos', sizes:'sizes', transfers:'transfers', plan:'plan', params:'params', 'inv-history':'inv-history' };
+  const TAB_TO_SECTION = { budget:'budget', nos:'nos', sizes:'sizes', transfers:'transfers', plan:'plan', params:'params', 'inv-history':'inv-history', accounting:'accounting' };
 
   function md(text) {
     // Bold
