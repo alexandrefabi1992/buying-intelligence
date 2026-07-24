@@ -97,7 +97,7 @@
            data-tip="qty_on_hand + qty_on_order&#10;Toutes boutiques (ou boutique sélectionnée)">
         <p class="text-xs text-gray-400 mb-1">Stock en main</p>
         <p id="kpiStock" class="text-2xl font-bold text-gray-900">—</p>
-        <p class="text-xs text-gray-400 mt-0.5">qté dispo + en commande</p>
+        <p id="kpiStockSub" class="text-xs text-gray-400 mt-0.5">qté dispo + en commande</p>
       </div>
       <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
            data-tip="Tag : articles taggés saison (toutes dates)&#10;Tag+Période : articles taggés ET vendus pendant la saison">
@@ -290,7 +290,13 @@
     // Static KPIs (mode-independent)
     document.getElementById('kpiVelo').textContent   = fmt(p.weekly_velocity) + ' u.';
     document.getElementById('kpiMargin').textContent = fmtP(p.avg_margin_pct);
-    document.getElementById('kpiStock').textContent  = fmt(p.current_stock)  + ' u.';
+    if (d.season_code) {
+      document.getElementById('kpiStock').textContent    = fmt(p.current_stock_tag) + ' u.';
+      document.getElementById('kpiStockSub').textContent = `taggé ${d.season_code.toUpperCase()} · total ${fmt(p.current_stock)} u.`;
+    } else {
+      document.getElementById('kpiStock').textContent    = fmt(p.current_stock) + ' u.';
+      document.getElementById('kpiStockSub').textContent = 'qté dispo + en commande';
+    }
 
     document.getElementById('kpiRevLabel').textContent =
       d.season_code ? `12 sem. ${seasonLabel}` : '12 sem.';
