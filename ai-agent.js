@@ -1112,10 +1112,16 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer }, { pool })
      FROM inventory_snapshots`,
   );
   const firstDate = meta[0]?.first_date ?? null;
+  const lastDate  = meta[0]?.last_date  ?? null;
   if (!firstDate) {
     return { erreur: "Aucun snapshot d'inventaire disponible. L'historique sera capturé à partir du prochain sync." };
   }
-  if (!date || date < firstDate) {
+
+  // "aujourd'hui" ou date future sans snapshot → utiliser le dernier snapshot disponible
+  const today = new Date().toISOString().slice(0, 10);
+  if (!date || date >= today) date = lastDate;
+
+  if (date < firstDate) {
     return {
       erreur: `Aucun snapshot avant le ${firstDate}. L'historique commence le ${firstDate}.`,
       premier_snapshot: firstDate,
