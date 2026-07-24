@@ -634,7 +634,7 @@ async function rescueOrphanProduct(tenantId, itemId, slContext) {
 // Window: items sold in the last 365 days (rolling, non-stubs only).
 // ---------------------------------------------------------------------------
 async function computeAndSaveQualityCounters(tenantId) {
-  const [r1, r2, r3] = await Promise.all([
+  const [r1, r2, r3, r4] = await Promise.all([
     // Detect items where a numeric manufacturer_id was stored as the name.
     // Uses a JOIN on manufacturers so legitimate numeric brand names (e.g. "0909")
     // are excluded — they exist as a name in the table, not as a manufacturer_id.
@@ -668,26 +668,44 @@ async function computeAndSaveQualityCounters(tenantId) {
          AND sl.completed_time > now() - interval '365 days'`,
       [tenantId],
     ),
+    // Count units sitting in shop_ids not present in the shops table ("phantom shops").
+    // In Lightspeed R-Series, shop_id=0 is a virtual location (HQ / items in transit /
+    // unallocated). Lightspeed's own "Inventory Assets by Location" report excludes it.
+    // This counter tracks how much value is invisible to our snapshot and to Lightspeed.
+    pool.query(
+      `SELECT COALESCE(SUM(i.qty_on_hand), 0)::int AS n
+       FROM inventory i
+       WHERE i.tenant_id = $1
+         AND i.qty_on_hand > 0
+         AND NOT EXISTS (
+           SELECT 1 FROM shops sh
+           WHERE sh.shop_id = i.shop_id AND sh.tenant_id = i.tenant_id
+         )`,
+      [tenantId],
+    ),
   ]);
 
-  const unresolvedMfg = Number(r1.rows[0].n);
-  const noTags        = Number(r2.rows[0].n);
-  const noCost        = Number(r3.rows[0].n);
+  const unresolvedMfg  = Number(r1.rows[0].n);
+  const noTags         = Number(r2.rows[0].n);
+  const noCost         = Number(r3.rows[0].n);
+  const phantomUnits   = Number(r4.rows[0].n);
 
   console.log('[sync] ── Qualité données ─────────────────────────────────');
   console.log(`[sync]   Manufacturier non résolu (vendus 365j) : ${unresolvedMfg} items`);
   console.log(`[sync]   Vendus sans tags (365j)                : ${noTags} items`);
   console.log(`[sync]   Vendus sans coût (365j)                : ${noCost} items`);
+  console.log(`[sync]   Unités boutique fantôme (shop non mappé): ${phantomUnits} u`);
   if (_unresolvedMfgCount > 0) {
     console.log(`[sync]   Non résolus ce run                     : ${_unresolvedMfgCount} items`);
   }
   console.log('[sync] ─────────────────────────────────────────────────────');
 
   for (const [step, value] of [
-    ['quality_unresolved_mfg',     unresolvedMfg],
-    ['quality_no_tags',            noTags],
-    ['quality_no_cost',            noCost],
-    ['quality_unresolved_mfg_run', _unresolvedMfgCount],
+    ['quality_unresolved_mfg',      unresolvedMfg],
+    ['quality_no_tags',             noTags],
+    ['quality_no_cost',             noCost],
+    ['quality_phantom_shop_units',  phantomUnits],
+    ['quality_unresolved_mfg_run',  _unresolvedMfgCount],
   ]) {
     await pool.query(
       `INSERT INTO sync_state(step, next_url, processed_count, updated_at)

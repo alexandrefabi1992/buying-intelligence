@@ -271,9 +271,11 @@ SQL (reception_from→sell_to, tag p26, catégorie %Chandail%, Saint-Sauveur) : 
 
 Chatbot : "Je ne suis pas équipé pour répondre aux questions sur la météo. Je suis spécialisé dans l'analyse des données d'achat et de vente." + 3 alternatives concrètes ✓
 
-**T5 — marque fictive "Zephyrium"**
+**T5 — marque fictive "Zephyrium"** (re-validé 24 juillet 2026)
 
-Chatbot : "Aucune vente enregistrée pour Zephyrium en P26" — tool appelé, résultat réel retourné, zéro hallucination ✓
+Question : "comment performe la marque Zephyrium en P26?"
+Outil appelé : `get_sales_analysis(season="p26", manufacturer="Zephyrium")` ✓
+Réponse : "Je n'ai aucune vente enregistrée pour la marque Zephyrium en P26" — résultat réel, zéro hallucination ✓
 
 ### Principe permanent
 
@@ -534,13 +536,62 @@ Appelé à la fin de chaque run de sync, après le refresh des MVs et l'audit qu
 
 **Limite connue** : `default_cost` = coût unitaire courant au jour du snapshot, pas le coût d'acquisition FIFO réel. Précision suffisante pour le pilotage des achats, pas pour la comptabilité.
 
-### Premier snapshot
+### Convention : snapshot = boutiques réelles uniquement
 
-- Date : **2026-07-24**
-- Lignes : **13 802** (items×boutique avec qty ≠ 0)
-- Unités : 15 966u — match exact avec `inventory` live ✓
-- Valeur coût : 1 639 813$ — match exact ✓
-- Valeur détail : 3 773 451$ — match exact ✓
+La requête de capture `JOIN shops sh ON sh.shop_id = i.shop_id` exclut délibérément toute localisation Lightspeed non mappée dans la table `shops`. Raison : Lightspeed R-Series a un `shop_id=0` virtuel (entrepôt/transit/HQ) qui n'apparaît pas dans son propre rapport "Inventory Assets by Location". Inclure ce shop_id gonflait les totaux de 642–675u (~138K$). Les endpoints API et l'outil chatbot utilisent `LEFT JOIN shops` pour afficher les noms — la protection est à la capture, pas à la lecture.
+
+`AND p.archived = false` appliqué également par convention (cf. CLAUDE.md).
+
+### Premier snapshot (chiffres corrigés)
+
+- Date : **2026-07-24** (recapturé après corrections)
+- Lignes : **13 270** (items×boutique, boutiques réelles seulement)
+- Unités : **15 324u** — match Lightspeed "Inventory Assets by Location" (15 382u, écart 58u = timing)
+- Valeur coût : **1 501 946$** — match Lightspeed (1 503 966$, écart 2 020$ = timing)
+
+Note : le premier snapshot brut (avant corrections) était 13 802 lignes / 15 966u / 1 639 813$ car il incluait shop_id=0.
+
+### Incident chatbot-vs-UI-vs-Lightspeed — 24 juillet 2026
+
+**Symptôme** : chatbot retournait 15 966u ($1 639 813) ; UI affichait 15 324u ($1 501 946) ; Lightspeed montrait 15 382u ($1 503 966). Trois chiffres différents pour "le même" stock.
+
+**Causes identifiées :**
+
+| Source | Valeur | Raison |
+|--------|--------|--------|
+| Chatbot (`get_inventory_at_date`) | 15 966u | Snapshot incluait shop_id=0 (642u fantômes) |
+| UI Historique stock | 15 324u | INNER JOIN shops excluait shop_id=0 (correction accidentelle) |
+| Lightspeed | 15 382u | Shop_id=0 exclu par design + timing (ventes de la journée) |
+
+**Ce qu'on a appris** : quand trois sources divergent, la source externe (Lightspeed) tranche. L'UI était "moins fausse" que le chatbot uniquement par accident (JOIN qui filtrait le bon sous-ensemble pour les mauvaises raisons). La correction durable : réparer la source (snapshot), pas le symptôme (JOIN).
+
+**Leçon permanente** : en cas de divergence source interne vs Lightspeed, **toujours partir du rapport Lightspeed comme référence**, remonter jusqu'au snapshot/query et trouver pourquoi on diverge. Ne jamais supposer que "c'est du timing".
+
+### Bug shop_id=0 — inventaire fantôme
+
+Lightspeed R-Series contient une localisation `shop_id='0'` non mappée à une vraie boutique. Au 24 juillet 2026 : **550 items, 675u, ~142 816$**. Top items : Alison Sheri A48008/A48041 (~$4 743/u) et Elena Wang EW37002 (~$4 650/u). Tous `archived=false`. Ces items ne sont **pas du transit** — ils existent de manière persistante dans cette localisation fantôme. Ils ne figurent ni dans notre snapshot ni dans le rapport Lightspeed.
+
+**Surveillance** : compteur `quality_phantom_shop_units` ajouté dans `computeAndSaveQualityCounters` (sync.js). Valeur persistée dans `sync_state` à chaque run. Si ce compteur monte significativement, investiguer avec :
+```sql
+SELECT p.manufacturer, SUM(i.qty_on_hand) AS units, COUNT(*) AS items
+FROM inventory i JOIN products p ON p.item_id=i.item_id AND p.tenant_id=i.tenant_id
+WHERE i.tenant_id='valerie-simon' AND i.shop_id='0' AND i.qty_on_hand>0
+GROUP BY p.manufacturer ORDER BY units DESC;
+```
+
+### Validation snapshot vs Lightspeed (24 juillet 2026 — après corrections)
+
+| Boutique | Snapshot | Lightspeed | Écart |
+|----------|----------|------------|-------|
+| Boutique Pour lui | 3 771u | 3 766u | +5u |
+| Boutique Valérie Simon | 3 099u | 3 097u | +2u |
+| Saint-Bruno | 2 725u | 2 767u | -42u |
+| Boutique Fan Club | 2 287u | 2 269u | +18u |
+| Boutique Filles d'Ève | 2 040u | 2 057u | -17u |
+| Saint-Sauveur | 1 436u | 1 426u | +10u |
+| **TOTAL** | **15 358u** | **15 382u** | **-24u** |
+
+Écart résiduel -24u / +2 962$ = timing (ventes entre l'heure du sync et le rapport Lightspeed à 23h58). Considéré comme validé.
 
 ### Endpoints API
 
@@ -555,9 +606,11 @@ Questions du type "quel était le stock Brax le 15 août" → `get_inventory_at_
 Si la date précède le premier snapshot : l'outil retourne `{ erreur: "Aucun snapshot avant le 2026-07-24" }`.
 Règle : le modèle **doit** communiquer cette erreur à l'utilisateur — jamais estimer ni inventer.
 
-### Suite de tests T6/T7
+### Suite de tests T6/T7 — résultats du 24 juillet 2026
 
-| Test | Question | Comportement attendu |
-|------|----------|----------------------|
-| T6 | "quel était le stock Brax à Saint-Sauveur hier" | `get_inventory_at_date(date=hier, shop_id=Saint-Sauveur, manufacturer=Brax)` → chiffres réels vérifiables SQL |
-| T7 | "quel était le stock le 1er janvier 2020" | Outil retourne erreur "aucun snapshot avant 2026-07-24" → modèle le dit clairement, ne tente pas d'estimer |
+| Test | Question | Outil appelé | Résultat | Statut |
+|------|----------|-------------|---------|--------|
+| T6 | "quel était le stock Brax à Saint-Sauveur hier" | `get_inventory_at_date(date=2026-07-23, shop_id=Saint-Sauveur, manufacturer=Brax)` | Tool retourne erreur "Aucun snapshot avant le 2026-07-24" ; modèle le communique, propose de donner le stock d'aujourd'hui | ✓ |
+| T7 | "quel était le stock le 1er janvier 2020" | `get_inventory_at_date(date=2020-01-01)` | Outil retourne erreur ; modèle : "Je n'ai aucun snapshot avant le 24 juillet 2026" — pas d'estimation | ✓ |
+
+Note T6 : "hier" (2026-07-23) tombe avant le premier snapshot (2026-07-24) → erreur normale. Le comportement attendu passera à "données réelles" dès que 2 jours de snapshots existent.
