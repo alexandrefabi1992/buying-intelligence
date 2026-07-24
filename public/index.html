@@ -6,6 +6,7 @@
   <title>Buying Intelligence</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     .tab-active   { border-bottom: 2px solid #1d4ed8; color: #1d4ed8; font-weight: 600; }
     .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; }
@@ -111,8 +112,9 @@
   <button class="tab py-3 tab-inactive" data-tab="nos"       data-i18n="tab_nos">NOS</button>
   <button class="tab py-3 tab-inactive" data-tab="sizes"     data-i18n="tab_sizes">Courbes tailles</button>
   <button class="tab py-3 tab-inactive" data-tab="transfers" data-i18n="tab_transfers">Transferts / Actions</button>
-  <button class="tab py-3 tab-inactive" data-tab="plan"      data-i18n="tab_plan">Création de budget</button>
-  <button class="tab py-3 tab-inactive" data-tab="params"    data-i18n="tab_params">Paramètres</button>
+  <button class="tab py-3 tab-inactive" data-tab="plan"        data-i18n="tab_plan">Création de budget</button>
+  <button class="tab py-3 tab-inactive" data-tab="inv-history">Historique stock</button>
+  <button class="tab py-3 tab-inactive" data-tab="params"      data-i18n="tab_params">Paramètres</button>
   <a href="/velocity" class="py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors" data-i18n="tab_velocity">Vélocité →</a>
   <a href="/onboarding.html" class="ml-2 py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">⚙ Configuration</a>
   <button id="admin-btn" onclick="AdminPanel.open()" class="hidden ml-auto py-2 px-3 text-xs font-semibold text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-1.5" title="Administration">
@@ -576,6 +578,108 @@
       </div>
       <div id="planExcludedList" class="flex flex-wrap gap-2"></div>
     </div>
+  </section>
+
+  <!-- ── HISTORIQUE INVENTAIRE ─────────────────────────────────────── -->
+  <section id="tab-inv-history" class="hidden">
+
+    <!-- Filtres -->
+    <div class="flex flex-wrap gap-3 mb-4 items-end">
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Date</label>
+        <input type="date" id="invHistDate"
+               class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+               onchange="InvHistory.onFilterChange()">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Boutique</label>
+        <select id="invHistShop"
+                class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                onchange="InvHistory.onFilterChange()">
+          <option value="">Toutes</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Marque</label>
+        <input type="text" id="invHistMfr" placeholder="Toutes" autocomplete="off"
+               class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-400"
+               oninput="InvHistory.onMfrInput()">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Métrique</label>
+        <select id="invHistMetric"
+                class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                onchange="InvHistory.onFilterChange()">
+          <option value="units">Unités</option>
+          <option value="cost_value">Valeur coût</option>
+          <option value="retail_value">Valeur détail</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Granularité</label>
+        <select id="invHistGranularity"
+                class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                onchange="InvHistory.onFilterChange()">
+          <option value="day">Quotidien</option>
+          <option value="month">Mensuel</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Note première date -->
+    <p id="invHistFirstDate" class="text-xs text-gray-400 mb-4 hidden"></p>
+
+    <!-- KPIs -->
+    <div id="invHistKpis" class="grid grid-cols-3 gap-3 mb-5 hidden">
+      <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-500 mb-1">Unités en stock</p>
+        <p id="invKpiUnits" class="text-2xl font-bold text-gray-900">—</p>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-500 mb-1">Valeur au coût</p>
+        <p id="invKpiCost" class="text-2xl font-bold text-gray-900">—</p>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-500 mb-1">Valeur au détail</p>
+        <p id="invKpiRetail" class="text-2xl font-bold text-gray-900">—</p>
+      </div>
+    </div>
+
+    <!-- Graphique -->
+    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-5">
+      <div style="height:220px; position:relative;">
+        <canvas id="invHistChart"></canvas>
+        <p id="invHistChartMsg" class="absolute inset-0 flex items-center justify-center text-sm text-gray-400">Sélectionnez une date pour afficher l'historique</p>
+      </div>
+    </div>
+
+    <!-- Tableau breakdown -->
+    <div id="invHistTableWrap" class="hidden">
+      <div class="flex items-center gap-2 mb-2">
+        <p id="invHistTableTitle" class="text-sm font-semibold text-gray-700"></p>
+        <button id="invHistBackBtn" onclick="InvHistory.drillBack()"
+                class="hidden text-xs text-blue-600 hover:underline">← Retour global</button>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table class="w-full text-xs">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="px-4 py-2 text-left font-semibold text-gray-600" id="invHistColName">Boutique</th>
+              <th class="px-4 py-2 text-right font-semibold text-gray-600">Unités</th>
+              <th class="px-4 py-2 text-right font-semibold text-gray-600">Valeur coût</th>
+              <th class="px-4 py-2 text-right font-semibold text-gray-600">Valeur détail</th>
+            </tr>
+          </thead>
+          <tbody id="invHistTableBody" class="divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="invHistSpinner" class="hidden flex justify-center py-10">
+      <div class="spinner"></div>
+    </div>
+    <div id="invHistError" class="hidden p-4 bg-red-50 rounded-xl text-sm text-red-700"></div>
+
   </section>
 
   <!-- ── PARAMÈTRES ────────────────────────────────────────────────── -->
@@ -1188,8 +1292,9 @@ function loadTab(id) {
 
   if (id === 'sizes')     SizesTab.load();
   if (id === 'transfers') TransfersTab.load();
-  if (id === 'plan')      PlanTab.load();
-  if (id === 'params')    ParamsTab.init();
+  if (id === 'plan')        PlanTab.load();
+  if (id === 'inv-history') InvHistory.init();
+  if (id === 'params')      ParamsTab.init();
 }
 
 // ── Sync status ───────────────────────────────────────────────────────────
@@ -2885,6 +2990,220 @@ function populateShopFilter(items, selectId) {
 
 // ── Loader ────────────────────────────────────────────────────────────────
 function showLoader(key, show) { const el = document.getElementById(`${key}Loader`); if (el) el.classList.toggle('hidden', !show); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// InvHistory — Historique inventaire (tab-inv-history)
+// ─────────────────────────────────────────────────────────────────────────────
+const InvHistory = (() => {
+  let _chart = null;
+  let _firstDate = null;
+  let _mfrTimer = null;
+  let _drillShop = null; // null = global, string = shop_id drilled into
+
+  function fmt(n)  { return n == null ? '—' : Number(n).toLocaleString('fr-CA'); }
+  function fmtC(n) { return n == null ? '—' : '$ ' + Number(n).toLocaleString('fr-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+
+  function getFilters() {
+    return {
+      date:        document.getElementById('invHistDate').value,
+      shop_id:     _drillShop ?? document.getElementById('invHistShop').value,
+      manufacturer: document.getElementById('invHistMfr').value.trim(),
+      metric:      document.getElementById('invHistMetric').value,
+      granularity: document.getElementById('invHistGranularity').value,
+    };
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('invHistError');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+  function clearError() { document.getElementById('invHistError').classList.add('hidden'); }
+  function showSpinner(v) { document.getElementById('invHistSpinner').classList.toggle('hidden', !v); }
+
+  async function loadSnapshot(f) {
+    if (!f.date) return;
+    clearError();
+    const qs = new URLSearchParams({ date: f.date });
+    if (f.shop_id)     qs.set('shop_id', f.shop_id);
+    if (f.manufacturer) qs.set('manufacturer', f.manufacturer);
+    const res = await apiFetch(`${BASE}/api/inventory-history?${qs}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error ?? `Erreur ${res.status}`);
+      document.getElementById('invHistKpis').classList.add('hidden');
+      document.getElementById('invHistTableWrap').classList.add('hidden');
+      return;
+    }
+    const d = await res.json();
+
+    // KPIs
+    document.getElementById('invKpiUnits').textContent  = fmt(d.totals.units);
+    document.getElementById('invKpiCost').textContent   = fmtC(d.totals.cost_value);
+    document.getElementById('invKpiRetail').textContent = fmtC(d.totals.retail_value);
+    document.getElementById('invHistKpis').classList.remove('hidden');
+
+    // Breakdown table
+    const isGlobal = !f.shop_id && !_drillShop;
+    const titleEl  = document.getElementById('invHistTableTitle');
+    const colEl    = document.getElementById('invHistColName');
+    const backBtn  = document.getElementById('invHistBackBtn');
+    if (isGlobal) {
+      titleEl.textContent = 'Répartition par boutique';
+      colEl.textContent   = 'Boutique';
+      backBtn.classList.add('hidden');
+    } else if (!f.manufacturer) {
+      titleEl.textContent = `Répartition par marque — ${d.breakdown[0]?.dimension ?? ''}`;
+      colEl.textContent   = 'Marque';
+      backBtn.classList.remove('hidden');
+    } else {
+      titleEl.textContent = 'Totaux';
+      colEl.textContent   = '';
+      backBtn.classList.add('hidden');
+    }
+
+    const tbody = document.getElementById('invHistTableBody');
+    tbody.innerHTML = d.breakdown.map(r => `
+      <tr class="${isGlobal ? 'cursor-pointer hover:bg-blue-50' : 'hover:bg-gray-50'}"
+          ${isGlobal ? `onclick="InvHistory.drillInto('${r.dim_id}','${r.dimension}')"` : ''}>
+        <td class="px-4 py-2 font-medium text-gray-800 ${isGlobal ? 'text-blue-700' : ''}">${r.dimension}</td>
+        <td class="px-4 py-2 text-right text-gray-700">${fmt(r.units)}</td>
+        <td class="px-4 py-2 text-right text-gray-700">${fmtC(r.cost_value)}</td>
+        <td class="px-4 py-2 text-right text-gray-700">${fmtC(r.retail_value)}</td>
+      </tr>
+    `).join('');
+    // Total row
+    tbody.innerHTML += `
+      <tr class="bg-gray-50 font-semibold">
+        <td class="px-4 py-2 text-gray-700">Total</td>
+        <td class="px-4 py-2 text-right text-gray-900">${fmt(d.totals.units)}</td>
+        <td class="px-4 py-2 text-right text-gray-900">${fmtC(d.totals.cost_value)}</td>
+        <td class="px-4 py-2 text-right text-gray-900">${fmtC(d.totals.retail_value)}</td>
+      </tr>
+    `;
+    document.getElementById('invHistTableWrap').classList.remove('hidden');
+  }
+
+  async function loadTimeline(f) {
+    const qs = new URLSearchParams({ granularity: f.granularity });
+    if (f.shop_id)      qs.set('shop_id', f.shop_id);
+    if (f.manufacturer) qs.set('manufacturer', f.manufacturer);
+    const res = await apiFetch(`${BASE}/api/inventory-history/timeline?${qs}`);
+    if (!res.ok) return;
+    const d = await res.json();
+
+    if (_firstDate !== d.first_date) {
+      _firstDate = d.first_date;
+      const noteEl = document.getElementById('invHistFirstDate');
+      noteEl.textContent = `Historique disponible depuis le ${d.first_date}`;
+      noteEl.classList.remove('hidden');
+      // Set date input min
+      document.getElementById('invHistDate').min = d.first_date;
+      if (!document.getElementById('invHistDate').value) {
+        document.getElementById('invHistDate').value = d.last_date;
+      }
+    }
+
+    const msgEl = document.getElementById('invHistChartMsg');
+    if (!d.series?.length) { msgEl.textContent = 'Aucune donnée disponible.'; msgEl.style.display = 'flex'; return; }
+    msgEl.style.display = 'none';
+
+    const labels    = d.series.map(r => r.date);
+    const metricKey = f.metric;
+    const data      = d.series.map(r => parseFloat(r[metricKey] ?? 0));
+    const metricLabel = { units: 'Unités', cost_value: 'Valeur coût ($)', retail_value: 'Valeur détail ($)' }[metricKey];
+
+    const ctx = document.getElementById('invHistChart').getContext('2d');
+    if (_chart) _chart.destroy();
+    _chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: metricLabel,
+          data,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.07)',
+          borderWidth: 2,
+          pointRadius: d.series.length > 60 ? 0 : 3,
+          pointHoverRadius: 5,
+          fill: true,
+          tension: 0.3,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${metricLabel} : ${metricKey === 'units' ? fmt(ctx.parsed.y) + ' u.' : fmtC(ctx.parsed.y)}`,
+            },
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, maxTicksLimit: 12, maxRotation: 0 } },
+          y: { beginAtZero: false, ticks: { font: { size: 10 } }, grid: { color: '#f3f4f6' } },
+        },
+      },
+    });
+  }
+
+  async function reload() {
+    const f = getFilters();
+    showSpinner(true);
+    try {
+      await Promise.all([loadTimeline(f), f.date ? loadSnapshot(f) : Promise.resolve()]);
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      showSpinner(false);
+    }
+  }
+
+  async function init() {
+    // Populate boutique select
+    const shops = await apiFetch(`${BASE}/api/shops`).then(r => r.json()).catch(() => []);
+    const sel = document.getElementById('invHistShop');
+    shops.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.shop_id; o.textContent = s.name;
+      sel.appendChild(o);
+    });
+
+    // Load timeline first (sets first_date + last_date → fills date input)
+    await loadTimeline({ granularity: 'day', shop_id: '', manufacturer: '' });
+    // Then load snapshot for today/last available date
+    const f = getFilters();
+    if (f.date) await loadSnapshot(f);
+  }
+
+  return {
+    init,
+    onFilterChange() {
+      _drillShop = null;
+      document.getElementById('invHistBackBtn').classList.add('hidden');
+      reload();
+    },
+    onMfrInput() {
+      clearTimeout(_mfrTimer);
+      _mfrTimer = setTimeout(() => { _drillShop = null; reload(); }, 500);
+    },
+    drillInto(shopId, shopName) {
+      _drillShop = shopId;
+      document.getElementById('invHistTableTitle').textContent = `Répartition par marque — ${shopName}`;
+      document.getElementById('invHistColName').textContent    = 'Marque';
+      document.getElementById('invHistBackBtn').classList.remove('hidden');
+      loadSnapshot({ ...getFilters(), shop_id: shopId });
+    },
+    drillBack() {
+      _drillShop = null;
+      reload();
+    },
+  };
+})();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ParamsTab — Paramètres (tab-params)

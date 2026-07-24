@@ -1101,6 +1101,79 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
 }
 
 // ---------------------------------------------------------------------------
+// get_inventory_at_date — snapshot d'inventaire à une date donnée
+// Retourne une erreur explicite si la date est antérieure au premier snapshot.
+// ---------------------------------------------------------------------------
+async function toolGetInventoryAtDate({ date, shop_id, manufacturer }, { pool }) {
+  shop_id = await resolveShopId(shop_id, pool);
+
+  const { rows: meta } = await pool.query(
+    `SELECT MIN(snapshot_date)::text AS first_date, MAX(snapshot_date)::text AS last_date
+     FROM inventory_snapshots`,
+  );
+  const firstDate = meta[0]?.first_date ?? null;
+  if (!firstDate) {
+    return { erreur: "Aucun snapshot d'inventaire disponible. L'historique sera capturé à partir du prochain sync." };
+  }
+  if (!date || date < firstDate) {
+    return {
+      erreur: `Aucun snapshot avant le ${firstDate}. L'historique commence le ${firstDate}.`,
+      premier_snapshot: firstDate,
+    };
+  }
+
+  const params = [date];
+  const shopCond = shop_id      ? `AND s.shop_id = $${params.push(shop_id)}`                         : '';
+  const mfrCond  = manufacturer ? `AND p.manufacturer ILIKE $${params.push('%' + manufacturer + '%')}` : '';
+
+  const { rows: totals } = await pool.query(`
+    SELECT
+      COUNT(DISTINCT s.item_id)::int                                   AS nb_articles,
+      SUM(s.qty)::int                                                  AS unites,
+      ROUND(SUM(s.qty * COALESCE(s.unit_cost,0))::numeric, 2)         AS valeur_cout,
+      ROUND(SUM(s.qty * COALESCE(s.unit_price,0))::numeric, 2)        AS valeur_detail
+    FROM inventory_snapshots s
+    JOIN products p ON p.item_id = s.item_id
+    WHERE s.snapshot_date = $1 ${shopCond} ${mfrCond}
+  `, params);
+
+  if (!totals[0]?.unites) {
+    return { erreur: `Aucune donnée d'inventaire pour le ${date} avec ces filtres.`, premier_snapshot: firstDate };
+  }
+
+  const { rows: breakdown } = await pool.query(`
+    SELECT
+      ${shop_id ? "COALESCE(p.manufacturer,'Sans marque') AS dimension" : "sh.name AS dimension"},
+      SUM(s.qty)::int                                         AS unites,
+      ROUND(SUM(s.qty * COALESCE(s.unit_cost,0))::numeric,2) AS valeur_cout
+    FROM inventory_snapshots s
+    JOIN products p  ON p.item_id  = s.item_id
+    JOIN shops    sh ON sh.shop_id = s.shop_id
+    WHERE s.snapshot_date = $1 ${shopCond} ${mfrCond}
+    GROUP BY 1
+    ORDER BY unites DESC
+    LIMIT 15
+  `, params);
+
+  return {
+    date,
+    premier_snapshot: firstDate,
+    filtre: { boutique: shop_id ?? 'toutes', marque: manufacturer ?? 'toutes' },
+    totaux: {
+      nb_articles: totals[0].nb_articles,
+      unites:      totals[0].unites,
+      valeur_cout: totals[0].valeur_cout,
+      valeur_detail: totals[0].valeur_detail,
+    },
+    breakdown: breakdown.map(r => ({
+      [shop_id ? 'marque' : 'boutique']: r.dimension,
+      unites: r.unites,
+      valeur_cout: r.valeur_cout,
+    })),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Tool dispatcher
 // ---------------------------------------------------------------------------
 async function dispatchTool(name, args, ctx) {
@@ -1121,6 +1194,7 @@ async function dispatchTool(name, args, ctx) {
     case 'get_matrix_info':                 return await toolGetMatrixInfo(args, ctx);
     case 'compare_seasons':                 return await toolCompareSeasons(args, ctx);
     case 'get_sales_by_category':           return await toolGetSalesByCategory(args, ctx);
+    case 'get_inventory_at_date':           return await toolGetInventoryAtDate(args, ctx);
     default:                                return { erreur: `Outil inconnu: ${name}` };
   }
 }
