@@ -206,6 +206,38 @@ const HELP = {
     ],
   },
 
+  'inv-history': {
+    title: 'Historique stock',
+    icon: '📦',
+    summary: "Suivi de l'évolution du stock dans le temps — unités, valeur au coût et valeur au détail — par boutique et par marque.",
+    sections: [
+      {
+        heading: "Comment ça fonctionne",
+        body: "Chaque nuit, lors de la synchronisation Lightspeed, un **snapshot** (photo) du stock est pris et enregistré. Ce snapshot capture exactement le nombre d'unités et la valeur de chaque article dans chaque boutique à ce moment précis.\n\nL'historique débute à la date du **premier snapshot** (24 juillet 2026). Il n'est pas possible de consulter le stock avant cette date — les données n'existent pas rétroactivement.\n\nLes snapshots couvrent une fenêtre glissante de **400 jours** en détail quotidien. Au-delà, les données sont consolidées en moyennes mensuelles et conservées indéfiniment.",
+      },
+      {
+        heading: "Les trois métriques",
+        body: "| Métrique | Ce qu'elle mesure |\n|---|---|\n| **Unités en stock** | Nombre total d'articles physiquement en boutique à la date sélectionnée. |\n| **Valeur au coût** | Unités × coût d'achat unitaire (prix payé au fournisseur). Utile pour évaluer l'immobilisation de capital. |\n| **Valeur au détail** | Unités × prix de vente. Indique le chiffre d'affaires potentiel si tout était vendu au plein tarif. |\n\nLa valeur est calculée au coût unitaire **du jour du snapshot** — elle ne change pas si les prix sont modifiés ultérieurement. C'est une photo figée, pas une valorisation comptable.",
+      },
+      {
+        heading: "Filtres disponibles",
+        body: "- **Date** : sélectionner n'importe quel jour depuis le premier snapshot. Les KPI et le tableau de répartition se mettent à jour.\n- **Boutique** : filtrer sur une seule boutique. Par défaut, toutes les boutiques sont incluses.\n- **Marque** : filtrer sur une marque précise (ex. « Brax »). Combinable avec le filtre boutique.\n- **Métrique** : choisir ce que le graphique affiche (unités, valeur coût ou valeur détail).\n- **Granularité** : Quotidien (une point par jour) ou Mensuel (moyenne des jours du mois).",
+      },
+      {
+        heading: "Le tableau de répartition",
+        body: "Sans filtre boutique : le tableau affiche la **répartition par boutique**. Cliquer sur une boutique ouvre le détail **par marque** pour cette boutique (bouton ← pour revenir).\n\nAvec un filtre boutique : le tableau affiche directement la répartition **par marque** dans cette boutique.\n\nAvec un filtre marque : les totaux de la marque uniquement sont affichés.",
+      },
+      {
+        heading: "Chiffres vs rapport Lightspeed",
+        body: "Les totaux de l'application correspondent au rapport **Inventory Assets by Location** de Lightspeed, avec un écart résiduel de ±50 unités dû au décalage entre l'heure du snapshot (synchronisation nocturne) et l'heure à laquelle le rapport Lightspeed est consulté.\n\n**Note importante** : Lightspeed contient une localisation interne (`shop_id 0`) qui n'est pas une boutique réelle — elle n'est pas incluse dans notre calcul, exactement comme Lightspeed l'exclut de ses propres rapports de localisation.",
+      },
+      {
+        heading: "Questions à l'assistant IA",
+        body: "L'assistant IA peut interroger l'historique directement. Exemples :\n\n- *« Quels sont les stocks de la compagnie en ce moment ? »*\n- *« Quelle est la valeur du stock Brax à Saint-Sauveur aujourd'hui ? »*\n- *« Donne-moi le stock de Fan Club au 1er août »*\n\nL'assistant utilise le snapshot le plus récent disponible. Si tu demandes une date avant le 24 juillet 2026, il t'indiquera qu'aucun historique n'existe pour cette période.",
+      },
+    ],
+  },
+
 };
 
 module.exports = HELP;
