@@ -582,6 +582,29 @@ async function runMigrations() {
     );
   }
 
+  // One-time migration: recreate mv_inventory_stock with JOIN shops to exclude phantom shop_id='0'
+  const { rows: mvInvVer } = await pool.query(
+    "SELECT 1 FROM sync_state WHERE step = 'mv_inventory_v2'"
+  );
+  if (!mvInvVer.length) {
+    console.log('[migration] Recreating mv_inventory_stock with JOIN shops to exclude phantom locations…');
+    await pool.query('DROP MATERIALIZED VIEW IF EXISTS mv_inventory_stock CASCADE');
+    await pool.query(`
+      CREATE MATERIALIZED VIEW mv_inventory_stock AS
+      SELECT
+        i.item_id,
+        SUM(COALESCE(i.qty_on_hand, 0) + COALESCE(i.qty_on_order, 0)) AS current_stock_all
+      FROM inventory i
+      JOIN shops sh ON sh.shop_id = i.shop_id
+      GROUP BY i.item_id
+    `);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_inventory_stock ON mv_inventory_stock(item_id)`);
+    await pool.query(
+      "INSERT INTO sync_state(step, next_url) VALUES ('mv_inventory_v2', 'COMPLETED') ON CONFLICT(step) DO NOTHING"
+    );
+    console.log('[migration] mv_inventory_stock recreated.');
+  }
+
   // Migration: add drop_id to budget_plans + budget_plan_drops table
   // Each step is idempotent — checks actual DB state, never deletes rows.
   await pool.query(`ALTER TABLE budget_plans ADD COLUMN IF NOT EXISTS drop_id TEXT NOT NULL DEFAULT 'drop_1'`);
@@ -4049,11 +4072,12 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     const invJ   = hasShop ? 'AND i.shop_id  = $2'     : '';
     const stCTE  = `
       st AS (
-        SELECT item_id,
-               SUM(COALESCE(qty_on_hand,0) + COALESCE(qty_on_order,0)) AS stock
-        FROM   inventory
-        WHERE  1=1 ${hasShop ? 'AND shop_id = $2' : ''}
-        GROUP  BY item_id
+        SELECT i.item_id,
+               SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)) AS stock
+        FROM   inventory i
+        JOIN   shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = $${tIdx}
+        WHERE  1=1 ${hasShop ? 'AND i.shop_id = $2' : ''}
+        GROUP  BY i.item_id
       )`;
 
     // Resolve season for sell-through
@@ -4324,7 +4348,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         ${stCTE}
         SELECT
           COALESCE(p.category, 'Sans catégorie')       AS category,
-          COUNT(DISTINCT p.item_id)::int               AS items_count,
+          COUNT(DISTINCT p.item_id) FILTER (WHERE COALESCE(s.units,0) > 0 OR COALESCE(st.stock,0) > 0)::int AS items_count,
           ROUND(SUM(COALESCE(s.units, 0)), 0)::float8  AS units_sold_12w,
           ROUND(SUM(COALESCE(s.rev,   0)), 2)::float8  AS revenue_12w,
           ROUND(SUM(COALESCE(st.stock,0)), 0)::float8  AS stock_units
@@ -4431,10 +4455,11 @@ app.get('/api/matrix/:matrixId', async (req, res, next) => {
         GROUP BY sl.item_id
       ),
       inv AS (
-        SELECT item_id, SUM(COALESCE(qty_on_hand,0) + COALESCE(qty_on_order,0)) AS stock
-        FROM inventory
-        WHERE 1=1 ${shopInv}
-        GROUP BY item_id
+        SELECT i.item_id, SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)) AS stock
+        FROM inventory i
+        JOIN shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = $${tIdx}
+        WHERE 1=1 ${hasShop ? 'AND i.shop_id = $2' : ''}
+        GROUP BY i.item_id
       ),
       mname AS (
         SELECT NULLIF(regexp_replace(
@@ -4503,7 +4528,7 @@ function velocityAction(weeksElapsed, st_s4, st_s7, st_s10, residual_pct, season
 }
 
 // Shared CTE builder — items tagged with season + their sales within the window
-function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam, tenantCond = '') {
+function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam, tenantCond = '', shopJoin = '') {
   return `
     season_items AS (
       SELECT item_id, manufacturer, category, default_price, default_cost,
@@ -4550,11 +4575,12 @@ function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam, t
       GROUP BY item_id
     ),
     current_stk AS (
-      SELECT item_id,
-             SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS stock
-      FROM inventory
-      WHERE 1=1 ${shopCondInv}
-      GROUP BY item_id
+      SELECT i.item_id,
+             SUM(COALESCE(i.qty_on_hand, 0) + COALESCE(i.qty_on_order, 0)) AS stock
+      FROM inventory i
+      ${shopJoin}
+      WHERE 1=1 ${shopCondInv.replace('AND shop_id', 'AND i.shop_id')}
+      GROUP BY i.item_id
     ),
     item_full AS (
       SELECT
@@ -4612,9 +4638,10 @@ app.get('/api/velocity/brands', async (req, res, next) => {
 
     const safeTenantId = (req.tenantId ?? '').replace(/[^a-zA-Z0-9_-]/g, '');
     const tenantCond = safeTenantId ? `AND tenant_id = '${safeTenantId}'` : '';
+    const shopJoin   = hasShop ? '' : (safeTenantId ? `JOIN shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = '${safeTenantId}'` : `JOIN shops sh ON sh.shop_id = i.shop_id`);
 
     const { rows } = await pool.query(`
-      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'", tenantCond)}
+      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'", tenantCond, shopJoin)}
       SELECT
         manufacturer,
         COUNT(DISTINCT item_id)::int                                            AS items_count,
@@ -4661,9 +4688,10 @@ app.get('/api/velocity/matrices', async (req, res, next) => {
 
     const safeTenantId = (req.tenantId ?? '').replace(/[^a-zA-Z0-9_-]/g, '');
     const tenantCond = safeTenantId ? `AND tenant_id = '${safeTenantId}'` : '';
+    const shopJoin   = hasShop ? '' : (safeTenantId ? `JOIN shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = '${safeTenantId}'` : `JOIN shops sh ON sh.shop_id = i.shop_id`);
 
     const { rows } = await pool.query(`
-      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'", tenantCond)}
+      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'", tenantCond, shopJoin)}
       SELECT
         matrix_key,
         -- Matrix name: strip size/colour from a non-self-referencing variant
@@ -4769,9 +4797,10 @@ app.get('/api/velocity/articles', async (req, res, next) => {
         GROUP BY item_id
       ),
       current_stk AS (
-        SELECT item_id, SUM(COALESCE(qty_on_hand, 0) + COALESCE(qty_on_order, 0)) AS stock
-        FROM inventory
-        WHERE item_id = ANY($1) ${shopCondInv}
+        SELECT i.item_id, SUM(COALESCE(i.qty_on_hand, 0) + COALESCE(i.qty_on_order, 0)) AS stock
+        FROM inventory i
+        JOIN shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = $2
+        WHERE i.item_id = ANY($1) ${shopCondInv.replace('AND shop_id', 'AND i.shop_id')}
         GROUP BY item_id
       )
       SELECT
@@ -5181,6 +5210,7 @@ app.get('/api/accounting/brands', requireAuth, async (req, res, next) => {
           p.manufacturer,
           SUM(i.qty_on_hand) AS stock_units
         FROM inventory i
+        JOIN shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = i.tenant_id
         JOIN products p ON p.item_id = i.item_id AND p.tenant_id = i.tenant_id
         WHERE i.tenant_id = $1
           AND i.qty_on_hand > 0
