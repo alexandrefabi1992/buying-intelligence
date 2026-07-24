@@ -79,6 +79,16 @@
   </div>
 
   <script>
+  function authFetch(url, opts = {}) {
+    const token = localStorage.getItem('auth_token');
+    if (!token) { location.href = '/'; return Promise.reject(new Error('Non connecté')); }
+    const headers = { ...(opts.headers ?? {}), 'Authorization': `Bearer ${token}` };
+    return fetch(url, { ...opts, headers }).then(r => {
+      if (r.status === 401) { location.href = '/'; throw new Error('Session expirée'); }
+      return r;
+    });
+  }
+
   const params      = new URLSearchParams(location.search);
   const matrixId    = decodeURIComponent(location.pathname.replace(/^\/matrix\//, ''));
   const manufacturer = params.get('manufacturer') ?? '';
@@ -108,7 +118,7 @@
   async function load() {
     try {
       const qs = shopId ? `?shop_id=${encodeURIComponent(shopId)}` : '';
-      const d  = await fetch(`/api/matrix/${encodeURIComponent(matrixId)}${qs}`).then(r => r.json());
+      const d  = await authFetch(`/api/matrix/${encodeURIComponent(matrixId)}${qs}`).then(r => r.json());
 
       const par  = d.parent;
       const vars = d.variants;
