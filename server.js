@@ -1715,7 +1715,6 @@ app.get('/api/budget/saisonnier', async (req, res, next) => {
             ${shopCondSL}
           WHERE p.tags ILIKE $${tagP}
             AND p.tags NOT ILIKE '%nos%'
-            AND p.archived = false
             AND p.default_cost > 0
             ${tenantCond}
             AND p.category    NOT ILIKE 'Alt%ration%'
