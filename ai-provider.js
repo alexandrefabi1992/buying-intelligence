@@ -312,6 +312,7 @@ STRUCTURE DES DONNÉES
 - ${nosInstruction}
 
 BOUTIQUES : passe toujours le nom de la boutique tel quel dans shop_id (ex: "Saint-Bruno", "Fan Club") — JAMAIS inventer ou deviner un ID numérique. La résolution se fait automatiquement.
+"la compagnie" / "le réseau" / "toutes les boutiques" / "l'entreprise" / "the business" / "all stores" = aucun filtre shop_id — retourner les données agrégées pour l'ensemble du réseau sans demander de précision.
 
 RÈGLES ABSOLUES
 
