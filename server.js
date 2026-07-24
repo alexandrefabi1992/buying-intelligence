@@ -4334,33 +4334,39 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       `, p),
 
       // Q5 — Sales + stock by category
-      pool.query(`
-        WITH s AS (
-          SELECT sl.item_id,
-                 SUM(sl.qty)                 AS units,
-                 SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS rev
-          FROM sale_lines sl
-          WHERE sl.completed_time >= now() - INTERVAL '12 weeks'
-            AND sl.completed_time IS NOT NULL
-            ${slS}
-          GROUP BY sl.item_id
-        ),
-        ${stCTE}
-        SELECT
-          COALESCE(p.category, 'Sans catégorie')       AS category,
-          COUNT(DISTINCT p.item_id) FILTER (WHERE COALESCE(s.units,0) > 0 OR COALESCE(st.stock,0) > 0)::int AS items_count,
-          ROUND(SUM(COALESCE(s.units, 0)), 0)::float8  AS units_sold_12w,
-          ROUND(SUM(COALESCE(s.rev,   0)), 2)::float8  AS revenue_12w,
-          ROUND(SUM(COALESCE(st.stock,0)), 0)::float8  AS stock_units
-        FROM products p
-        LEFT JOIN s  ON s.item_id  = p.item_id
-        LEFT JOIN st ON st.item_id = p.item_id
-        WHERE p.manufacturer ILIKE $1
-          AND p.archived = false
-          ${tenantCondP}
-        GROUP BY p.category
-        ORDER BY units_sold_12w DESC NULLS LAST
-      `, p),
+      // When a season is selected, restrict to products tagged with that season.
+      (() => {
+        const p5        = allTime ? p : [...p, seasonTag];
+        const tagCondP5 = allTime ? '' : `AND p.tags ILIKE $${p5.length}`;
+        return pool.query(`
+          WITH s AS (
+            SELECT sl.item_id,
+                   SUM(sl.qty)                 AS units,
+                   SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS rev
+            FROM sale_lines sl
+            WHERE sl.completed_time >= now() - INTERVAL '12 weeks'
+              AND sl.completed_time IS NOT NULL
+              ${slS}
+            GROUP BY sl.item_id
+          ),
+          ${stCTE}
+          SELECT
+            COALESCE(p.category, 'Sans catégorie')       AS category,
+            COUNT(DISTINCT p.item_id) FILTER (WHERE COALESCE(s.units,0) > 0 OR COALESCE(st.stock,0) > 0)::int AS items_count,
+            ROUND(SUM(COALESCE(s.units, 0)), 0)::float8  AS units_sold_12w,
+            ROUND(SUM(COALESCE(s.rev,   0)), 2)::float8  AS revenue_12w,
+            ROUND(SUM(COALESCE(st.stock,0)), 0)::float8  AS stock_units
+          FROM products p
+          LEFT JOIN s  ON s.item_id  = p.item_id
+          LEFT JOIN st ON st.item_id = p.item_id
+          WHERE p.manufacturer ILIKE $1
+            AND p.archived = false
+            ${tenantCondP}
+            ${tagCondP5}
+          GROUP BY p.category
+          ORDER BY units_sold_12w DESC NULLS LAST
+        `, p5);
+      })(),
 
       q6Promise,
     ]);
