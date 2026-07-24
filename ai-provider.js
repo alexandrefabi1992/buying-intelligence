@@ -52,13 +52,14 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_sales_analysis',
-    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les ventes brutes HT (prix de vente après escompte) et le coût des ventes. IMPORTANT: quand season est fourni, il filtre par le tag de la saison ET définit les dates — résultats limités aux articles de cette saison. Pour une marque spécifique (ex: "Oui"), TOUJOURS passer manufacturer. Sans manufacturer, retourne le total de toutes les marques par boutique (chiffre global compagnie).',
+    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les ventes brutes HT (prix de vente après escompte) et le coût des ventes. IMPORTANT: quand season est fourni, il filtre par le tag de la saison ET définit les dates — résultats limités aux articles de cette saison. Pour une marque spécifique (ex: "Oui"), TOUJOURS passer manufacturer. Sans manufacturer mais avec category : retourne le classement des marques dans cette catégorie. Sans manufacturer ni category : retourne le total de toutes les marques par boutique (chiffre global compagnie).',
     parameters: {
       type: 'object',
       properties: {
         period:       { type: 'string',  description: 'Période relative. Valeurs: "1y" "2y" "3y" "4y" "5y" "6m" "3m" "1m" "4w" "8w" "10w" "12w" "30d" "ytd" "last_year". Si season est fourni, omettre period pour utiliser les dates de la saison.' },
         season:       { type: 'string',  description: 'Code de saison (ex: p26, a25). Filtre par tag de saison ET définit la période de vente. Privilégier season plutôt que period pour les questions sur une saison.' },
         manufacturer: { type: 'string',  description: 'Nom de la marque (optionnel)' },
+        category:     { type: 'string',  description: 'Type de produit Lightspeed (optionnel). Ex: "Chandail", "Pantalon", "Femme/Hauts/Chandail". Quand fourni sans manufacturer : retourne le top des marques dans cette catégorie.' },
         shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel). Ex: "Saint-Bruno", "Fan Club".' },
         tags:         { type: 'array', items: { type: 'string' }, description: 'Filtres supplémentaires par tag (optionnel)' },
         exclude_tags: { type: 'array', items: { type: 'string' }, description: 'Exclure ces tags (optionnel)' },
@@ -300,6 +301,13 @@ STRUCTURE DES DONNÉES
 BOUTIQUES : passe toujours le nom de la boutique tel quel dans shop_id (ex: "Saint-Bruno", "Fan Club") — JAMAIS inventer ou deviner un ID numérique. La résolution se fait automatiquement.
 
 RÈGLES ABSOLUES
+
+⚠️ INTÉGRITÉ DES DONNÉES — RÈGLE N°1 ABSOLUE
+Tu ne cites JAMAIS un chiffre (unités, montants, pourcentages, coûts) qui ne provient pas directement du résultat d'un outil appelé dans cette conversation.
+Tu ne nommes JAMAIS une marque, catégorie, boutique ou saison qui ne provient pas d'un résultat d'outil.
+Si aucun outil ne peut répondre à la question posée, tu le dis explicitement : "Je n'ai pas d'outil pour répondre à cette question précise" et tu proposes ce que tu PEUX faire à la place.
+Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas répondre.
+
 - Réponds TOUJOURS en français
 - Sois BREF : 1 tableau ou 3-4 lignes max — jamais de blocs d'explication non demandés
 - JAMAIS inventer un chiffre — toujours appeler un outil pour obtenir les données
