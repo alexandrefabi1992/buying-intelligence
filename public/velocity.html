@@ -149,6 +149,16 @@
 </div>
 
 <script>
+function authFetch(url, opts = {}) {
+  const token = localStorage.getItem('auth_token');
+  if (!token) { location.href = '/'; return Promise.reject(new Error('Non connecté')); }
+  const headers = { ...(opts.headers ?? {}), 'Authorization': `Bearer ${token}` };
+  return fetch(url, { ...opts, headers }).then(r => {
+    if (r.status === 401) { location.href = '/'; throw new Error('Session expirée'); }
+    return r;
+  });
+}
+
 const fmt  = n => n == null ? '—' : new Intl.NumberFormat('fr-CA', { maximumFractionDigits: 0 }).format(n);
 const fmtP = n => n == null ? '—' : (n * 100).toFixed(0) + '%';
 const fmtD = s => s ? new Date(s).toLocaleDateString('fr-CA', { month: 'short', day: 'numeric' }) : '—';
@@ -190,7 +200,7 @@ async function loadBrands() {
   showLoader();
   const qs = new URLSearchParams({ season: state.season });
   if (state.shopId) qs.set('shop_id', state.shopId);
-  const d = await fetch(`/api/velocity/brands?${qs}`).then(r => r.json());
+  const d = await authFetch(`/api/velocity/brands?${qs}`).then(r => r.json());
   state.weeksElapsed  = d.weeks_elapsed;
   state.seasonActive  = d.season_active;
 
@@ -231,7 +241,7 @@ async function drillManufacturer(mfrEnc) {
   showLoader();
   const qs = new URLSearchParams({ season: state.season, manufacturer: mfr });
   if (state.shopId) qs.set('shop_id', state.shopId);
-  const d = await fetch(`/api/velocity/matrices?${qs}`).then(r => r.json());
+  const d = await authFetch(`/api/velocity/matrices?${qs}`).then(r => r.json());
 
   document.getElementById('matrixTitle').textContent = mfr;
 
@@ -278,7 +288,7 @@ async function drillMatrix(matrixId, nameEnc) {
   showLoader();
   const qs = new URLSearchParams({ season: state.season, matrix_id: matrixId });
   if (state.shopId) qs.set('shop_id', state.shopId);
-  const d = await fetch(`/api/velocity/articles?${qs}`).then(r => r.json());
+  const d = await authFetch(`/api/velocity/articles?${qs}`).then(r => r.json());
 
   document.getElementById('articleTitle').textContent = name;
   document.getElementById('backToMatrices').textContent = `← ${state.manufacturer}`;
@@ -325,7 +335,7 @@ function hideLoader() { document.getElementById('loader').classList.add('hidden'
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async () => {
   try {
-    const shops = await fetch('/api/shops').then(r => r.json());
+    const shops = await authFetch('/api/shops').then(r => r.json());
     const sel = document.getElementById('shopFilter');
     for (const s of shops) {
       const o = document.createElement('option');

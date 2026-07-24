@@ -405,6 +405,17 @@
     location.href = `/matrix/${encodeURIComponent(itemId)}?${params.toString()}`;
   }
 
+  // ── Auth helper ───────────────────────────────────────────────────────────
+  function authFetch(url, opts = {}) {
+    const token = localStorage.getItem('auth_token');
+    if (!token) { location.href = '/'; return Promise.reject(new Error('Non connecté')); }
+    const headers = { ...(opts.headers ?? {}), 'Authorization': `Bearer ${token}` };
+    return fetch(url, { ...opts, headers }).then(r => {
+      if (r.status === 401) { location.href = '/'; throw new Error('Session expirée'); }
+      return r;
+    });
+  }
+
   // ── Load data ─────────────────────────────────────────────────────────────
   function currentFilters() {
     return {
@@ -423,7 +434,7 @@
       if (shopId) params.set('shop_id', shopId);
       if (season) params.set('season', season);
       const qs   = params.toString() ? '?' + params.toString() : '';
-      const data = await fetch(`/api/brand/${encodeURIComponent(mfr)}${qs}`).then(r => r.json());
+      const data = await authFetch(`/api/brand/${encodeURIComponent(mfr)}${qs}`).then(r => r.json());
       if (seq !== loadSeq) return; // a newer request is in flight — discard this stale response
       render(data);
     } catch (e) {
@@ -442,7 +453,7 @@
 
   (async () => {
     try {
-      const shops = await fetch('/api/shops').then(r => r.json());
+      const shops = await authFetch('/api/shops').then(r => r.json());
       const sel   = document.getElementById('shopFilter');
       for (const s of shops) {
         const o = document.createElement('option');

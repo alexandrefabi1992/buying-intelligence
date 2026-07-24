@@ -614,3 +614,40 @@ Règle : le modèle **doit** communiquer cette erreur à l'utilisateur — jamai
 | T7 | "quel était le stock le 1er janvier 2020" | `get_inventory_at_date(date=2020-01-01)` | Outil retourne erreur ; modèle : "Je n'ai aucun snapshot avant le 24 juillet 2026" — pas d'estimation | ✓ |
 
 Note T6 : "hier" (2026-07-23) tombe avant le premier snapshot (2026-07-24) → erreur normale. Le comportement attendu passera à "données réelles" dès que 2 jours de snapshots existent.
+
+---
+
+## Régression : brand.html / matrix.html / velocity.html — page vide (juillet 2026)
+
+### Symptôme
+Onglet Budget → clic sur une marque → page brand.html complètement vide. Idem pour matrix.html (tailles d'un modèle) et velocity.html.
+
+### Cause racine
+Le commit `977be90` (multi-tenant auth Phase 1+2+6) a ajouté un middleware global :
+```javascript
+app.use('/api', (req, res, next) => {
+  // Toutes les routes /api/* sauf /auth/login et /admin/* exigent un JWT
+  requireAuth(req, res, next);
+});
+```
+`requireAuth` retourne 401 si aucun header `Authorization: Bearer <token>` n'est présent.
+
+Les pages secondaires (`brand.html`, `matrix.html`, `velocity.html`) utilisaient `fetch()` brut sans header auth. Résultat : réponse `{error:'Unauthorized'}` au lieu des données → page vide sans message d'erreur visible.
+
+### Correction (commit `xxxxxxx`, 24 juillet 2026)
+Ajout d'un helper `authFetch()` dans chaque page secondaire :
+```javascript
+function authFetch(url, opts = {}) {
+  const token = localStorage.getItem('auth_token');
+  if (!token) { location.href = '/'; return Promise.reject(new Error('Non connecté')); }
+  const headers = { ...(opts.headers ?? {}), 'Authorization': `Bearer ${token}` };
+  return fetch(url, { ...opts, headers }).then(r => {
+    if (r.status === 401) { location.href = '/'; throw new Error('Session expirée'); }
+    return r;
+  });
+}
+```
+Tous les `fetch(...)` remplacés par `authFetch(...)` dans brand.html, matrix.html, velocity.html.
+
+### Leçon
+Toute nouvelle page HTML secondaire qui appelle `/api/*` doit inclure `authFetch`. Le token est stocké sous la clé `auth_token` dans localStorage (même clé que index.html).
