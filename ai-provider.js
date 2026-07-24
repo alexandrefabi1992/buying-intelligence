@@ -267,6 +267,17 @@ const TOOL_DEFS = [
       required: [],
     },
   },
+  {
+    name: 'get_payment_terms_analysis',
+    description: 'Analyser les termes de paiement fournisseur et recommander si prendre l\'escompte ou payer à terme. UTILISER pour toute question sur : escomptes, termes de paiement, "devrais-je payer [marque] rapidement", "est-ce rentable de payer sous X jours", "quels escomptes prendre", rendement annualisé. RÈGLES ABSOLUES : (1) ne JAMAIS citer un escompte ou un taux sans avoir appelé cet outil — même pour une marque bien connue. (2) Si termes_non_configures=true : DIRE EXPLICITEMENT que les termes ne sont pas configurés dans l\'application — JAMAIS supposer des termes standards. (3) Le champ "recommandation" est "take_discount" ou "full_term" — toujours citer ce champ pour conclure.',
+    parameters: {
+      type: 'object',
+      properties: {
+        manufacturer: { type: 'string', description: 'Nom de la marque (optionnel). Sans ce paramètre : retourne l\'analyse de toutes les marques avec le top des escomptes à prendre.' },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -345,6 +356,7 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
 - TAGS : "tags" (tableau, max 10) filtre les produits qui ont TOUS les tags listés — logique AND. Ex: tags=["p26","consigne"] → uniquement les produits avec les deux tags. "exclude_tags" (tableau, max 10) exclut les produits ayant N'IMPORTE LEQUEL de ces tags. Ex: exclude_tags=["nos","solde"] → aucun NOS ni solde. Les deux paramètres sont combinables simultanément.
 - PARSING DES TAGS : quand l'utilisateur dit "tager X", "tagé X", "tagué X", "avec le tag X", "avec la balise X", "tagged X", "with tag X", "labelled X", "étiquetté X" — extraire X comme tag et NE JAMAIS l'inclure dans le nom de la marque. Ex: "Part Two tager p26" → manufacturer="Part Two", tags=["p26"]. Ex: "Eton tagged p25 slim" → manufacturer="Eton", tags=["p25"], description_search="slim".
 - QUESTIONS DE CLARIFICATION : UNE SEULE question, UNIQUEMENT si l'info manquante est BLOQUANTE. JAMAIS demander la couleur, la boutique ou la période.
+- TERMES DE PAIEMENT / ESCOMPTES : pour toute question sur les escomptes fournisseur, les termes de paiement, "devrais-je payer [marque] rapidement", "est-ce rentable de prendre l'escompte", "quel est le rendement de l'escompte", "quelle marque a les meilleurs termes" → utiliser get_payment_terms_analysis. Si le résultat contient termes_non_configures=true : le DIRE explicitement — JAMAIS inventer un escompte ou supposer que les termes sont standard.
 
 GUIDE DES SECTIONS DE L’APPLICATION
 ${Object.values(HELP).map(s =>

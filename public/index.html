@@ -731,12 +731,37 @@
       <div class="bg-white rounded-2xl shadow-2xl p-6 w-96 max-w-[95vw]">
         <h3 id="acctModalTitle" class="text-sm font-bold text-gray-800 mb-4"></h3>
         <div class="space-y-3">
+
+          <!-- Net days (required for any recommendation) -->
           <div>
-            <label class="text-xs text-gray-500 block mb-1">Termes fournisseur</label>
-            <input id="acctModalTerms" type="text" placeholder="ex: 2/10 n/60  ou  n/30"
-                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-            <p id="acctModalTermsPreview" class="text-[11px] text-blue-600 mt-1 h-4"></p>
+            <label class="text-xs font-semibold text-gray-600 block mb-1">Délai de paiement (net)</label>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500">n/</span>
+              <input id="acctModalNetDays" type="number" min="0" max="365" step="1" placeholder="60"
+                     class="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <span class="text-xs text-gray-500">jours</span>
+            </div>
           </div>
+
+          <!-- Optional discount -->
+          <div class="border-t border-gray-100 pt-3">
+            <label class="text-xs font-semibold text-gray-600 block mb-2">Escompte (optionnel)</label>
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-1">
+                <input id="acctModalDisc" type="number" min="0" max="100" step="0.1" placeholder="2"
+                       class="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <span class="text-xs text-gray-500">%</span>
+              </div>
+              <span class="text-xs text-gray-400">si payé sous</span>
+              <div class="flex items-center gap-1">
+                <input id="acctModalDiscDays" type="number" min="0" max="365" step="1" placeholder="10"
+                       class="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <span class="text-xs text-gray-500">j</span>
+              </div>
+            </div>
+            <p id="acctModalPreview" class="text-[11px] text-blue-600 mt-2 min-h-[16px]"></p>
+          </div>
+
           <div>
             <label class="text-xs text-gray-500 block mb-1">Override marge % <span class="text-gray-400">(laisser vide = calculée)</span></label>
             <input id="acctModalMargin" type="number" min="0" max="100" step="0.1" placeholder="ex: 55.0"
@@ -3073,31 +3098,23 @@ function showLoader(key, show) { const el = document.getElementById(`${key}Loade
 const AccountingTab = (() => {
   let _data = null;
   let _editingMfr = null;
+  let _initialized = false;
 
   const fmtC  = n => n == null ? '—' : '$ ' + Number(n).toLocaleString('fr-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const fmtPct = n => n == null ? '—' : Number(n).toFixed(1) + ' %';
 
-  // Parse "2/10 n/60", "2% 10 jours net 60", "n/30", "net30"  → {disc, ddays, ndays}
-  function parseTerms(raw) {
-    if (!raw || !raw.trim()) return null;
-    const s = raw.trim().toLowerCase();
-    // Full: 2/10 n/60 or 2/10 net/60 or 2/10 net 60
-    let m = s.match(/^(\d+(?:\.\d+)?)\s*[\/\s%]\s*(\d+)\s+(?:n(?:et)?[\/\s]?)(\d+)$/);
-    if (m) return { disc: parseFloat(m[1]), ddays: parseInt(m[2]), ndays: parseInt(m[3]) };
-    // "2% 10 jours net 60"
-    m = s.match(/(\d+(?:\.\d+)?)\s*%?\s+(\d+)\s+j(?:ours?)?\s+net\s+(\d+)/);
-    if (m) return { disc: parseFloat(m[1]), ddays: parseInt(m[2]), ndays: parseInt(m[3]) };
-    // Net only: n/30, net 30, net30
-    m = s.match(/^n(?:et)?[\/\s]?(\d+)$/);
-    if (m) return { disc: null, ddays: null, ndays: parseInt(m[1]) };
-    return null;
-  }
-
-  function termsPreview(parsed) {
-    if (!parsed) return '';
-    if (parsed.disc != null)
-      return `Escompte ${parsed.disc}% si payé sous ${parsed.ddays}j — net à ${parsed.ndays}j`;
-    return `Net à ${parsed.ndays}j (pas d'escompte)`;
+  function updatePreview() {
+    const ndays = parseInt(document.getElementById('acctModalNetDays').value) || null;
+    const disc  = parseFloat(document.getElementById('acctModalDisc').value)  || null;
+    const ddays = parseInt(document.getElementById('acctModalDiscDays').value) || null;
+    let text = '';
+    if (ndays) {
+      if (disc != null && ddays != null)
+        text = `Escompte ${disc}% si payé sous ${ddays}j — net à ${ndays}j`;
+      else
+        text = `Net à ${ndays}j (pas d'escompte)`;
+    }
+    document.getElementById('acctModalPreview').textContent = text;
   }
 
   function recoBadge(b) {
@@ -3159,26 +3176,25 @@ const AccountingTab = (() => {
     _editingMfr = mfr;
     const b = _data.brands.find(x => x.manufacturer === mfr);
     document.getElementById('acctModalTitle').textContent = `Termes fournisseur — ${mfr}`;
-    // Pre-fill terms
-    const termsStr = b?.discount_pct != null
-      ? `${b.discount_pct}/${b.discount_days} n/${b.net_days}`
-      : b?.net_days != null ? `n/${b.net_days}` : '';
-    document.getElementById('acctModalTerms').value  = termsStr;
-    document.getElementById('acctModalMargin').value = b?.margin_override_pct ?? '';
-    document.getElementById('acctModalNotes').value  = b?.notes ?? '';
-    document.getElementById('acctModalTermsPreview').textContent = termsPreview(parseTerms(termsStr));
+    document.getElementById('acctModalNetDays').value  = b?.net_days       ?? '';
+    document.getElementById('acctModalDisc').value     = b?.discount_pct   ?? '';
+    document.getElementById('acctModalDiscDays').value = b?.discount_days  ?? '';
+    document.getElementById('acctModalMargin').value   = b?.margin_override_pct ?? '';
+    document.getElementById('acctModalNotes').value    = b?.notes ?? '';
+    updatePreview();
     document.getElementById('acctModal').classList.remove('hidden');
   }
 
   async function saveModal() {
-    const termsRaw = document.getElementById('acctModalTerms').value;
-    const parsed   = parseTerms(termsRaw);
-    const margin   = document.getElementById('acctModalMargin').value;
-    const notes    = document.getElementById('acctModalNotes').value;
+    const ndays  = parseInt(document.getElementById('acctModalNetDays').value)  || null;
+    const disc   = parseFloat(document.getElementById('acctModalDisc').value)   || null;
+    const ddays  = parseInt(document.getElementById('acctModalDiscDays').value) || null;
+    const margin = document.getElementById('acctModalMargin').value;
+    const notes  = document.getElementById('acctModalNotes').value;
     const body = {
-      discount_pct:        parsed?.disc  ?? null,
-      discount_days:       parsed?.ddays ?? null,
-      net_days:            parsed?.ndays ?? null,
+      discount_pct:        disc,
+      discount_days:       disc != null ? ddays : null,
+      net_days:            ndays,
       margin_override_pct: margin !== '' ? parseFloat(margin) : null,
       notes:               notes || null,
     };
@@ -3203,22 +3219,23 @@ const AccountingTab = (() => {
 
   return {
     init() {
-      // Terms live preview in modal
-      document.getElementById('acctModalTerms').addEventListener('input', e => {
-        const p = parseTerms(e.target.value);
-        document.getElementById('acctModalTermsPreview').textContent = p ? termsPreview(p) : '';
-      });
-      document.getElementById('acctModalSave').addEventListener('click', saveModal);
-      document.getElementById('acctModalCancel').addEventListener('click', () => {
-        document.getElementById('acctModal').classList.add('hidden');
-      });
-      document.getElementById('acctCapitalSave').addEventListener('click', async () => {
-        const pct = parseFloat(document.getElementById('acctCapital').value);
-        if (isNaN(pct)) return;
-        await apiFetch(`${BASE}/api/settings/cost-of-capital`,
-          { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cost_of_capital: pct }) });
-        await load();
-      });
+      if (!_initialized) {
+        _initialized = true;
+        ['acctModalNetDays', 'acctModalDisc', 'acctModalDiscDays'].forEach(id => {
+          document.getElementById(id).addEventListener('input', updatePreview);
+        });
+        document.getElementById('acctModalSave').addEventListener('click', saveModal);
+        document.getElementById('acctModalCancel').addEventListener('click', () => {
+          document.getElementById('acctModal').classList.add('hidden');
+        });
+        document.getElementById('acctCapitalSave').addEventListener('click', async () => {
+          const pct = parseFloat(document.getElementById('acctCapital').value);
+          if (isNaN(pct)) return;
+          await apiFetch(`${BASE}/api/settings/cost-of-capital`,
+            { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cost_of_capital: pct }) });
+          await load();
+        });
+      }
       load();
     },
   };
