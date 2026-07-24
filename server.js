@@ -5004,8 +5004,8 @@ app.get('/api/inventory-history', async (req, res, next) => {
     // Aggregation dimension: by boutique (no shop), by marque (shop given), or totals only (both given)
     let selectDim, groupDim;
     if (!shop_id) {
-      selectDim = `sh.name AS dimension, sh.shop_id AS dim_id`;
-      groupDim  = `sh.name, sh.shop_id`;
+      selectDim = `COALESCE(sh.name, s.shop_id::text) AS dimension, s.shop_id::text AS dim_id`;
+      groupDim  = `COALESCE(sh.name, s.shop_id::text), s.shop_id`;
     } else if (!manufacturer) {
       selectDim = `COALESCE(p.manufacturer, 'Sans marque') AS dimension, NULL::text AS dim_id`;
       groupDim  = `COALESCE(p.manufacturer, 'Sans marque')`;
@@ -5022,7 +5022,7 @@ app.get('/api/inventory-history', async (req, res, next) => {
         ROUND(SUM(s.qty * COALESCE(s.unit_price,0))::numeric,2) AS retail_value
       FROM inventory_snapshots s
       JOIN products p ON p.item_id = s.item_id AND p.tenant_id = s.tenant_id
-      JOIN shops sh   ON sh.shop_id = s.shop_id AND sh.tenant_id = s.tenant_id
+      LEFT JOIN shops sh ON sh.shop_id = s.shop_id AND sh.tenant_id = s.tenant_id
       WHERE s.tenant_id = $1 AND s.snapshot_date = $2
         ${shopCond} ${mfrCond}
       GROUP BY ${groupDim}
