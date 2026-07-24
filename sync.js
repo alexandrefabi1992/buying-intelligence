@@ -262,6 +262,40 @@ async function ensureSchema() {
       PRIMARY KEY (tenant_id, manufacturer_id)
     )
   `);
+
+  // Inventory snapshots — daily EOD stock per item×shop.
+  // unit_cost/unit_price are frozen at snapshot time (not recalculated from current products).
+  // Rows with qty=0 are not stored (absence of row implies zero stock).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS inventory_snapshots (
+      tenant_id     TEXT    NOT NULL,
+      snapshot_date DATE    NOT NULL,
+      item_id       TEXT    NOT NULL,
+      shop_id       TEXT    NOT NULL,
+      qty           INT     NOT NULL,
+      unit_cost     NUMERIC,
+      unit_price    NUMERIC,
+      PRIMARY KEY (tenant_id, snapshot_date, item_id, shop_id)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_inv_snap_date ON inventory_snapshots (tenant_id, snapshot_date)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_inv_snap_item ON inventory_snapshots (tenant_id, item_id)`);
+
+  // Monthly aggregate — long-term retention after 400-day detail window expires.
+  // manufacturer='' represents items with no manufacturer (avoids NULL in PK).
+  // total_qty = average daily qty over the month; cost/retail = average daily value.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS inventory_snapshots_monthly (
+      tenant_id          TEXT    NOT NULL,
+      month              DATE    NOT NULL,
+      shop_id            TEXT    NOT NULL,
+      manufacturer       TEXT    NOT NULL DEFAULT '',
+      total_qty          INT     NOT NULL,
+      total_cost_value   NUMERIC NOT NULL,
+      total_retail_value NUMERIC NOT NULL,
+      PRIMARY KEY (tenant_id, month, shop_id, manufacturer)
+    )
+  `);
 }
 
 // ---------------------------------------------------------------------------
@@ -664,6 +698,83 @@ async function computeAndSaveQualityCounters(tenantId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Inventory snapshot — daily EOD capture of stock state.
+// Called once per sync run, after MV refresh. ON CONFLICT DO NOTHING ensures
+// that if the sync runs twice on the same day, the first snapshot is kept.
+//
+// Retention: detail rows live 400 days (year-over-year comparisons).
+// Before purging, complete months older than 400 days are aggregated into
+// inventory_snapshots_monthly (average daily qty/value per shop×manufacturer).
+// ---------------------------------------------------------------------------
+async function snapshotInventory(tenantId) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // ── 1. Aggregate complete months about to be purged ──────────────────────
+  // A "complete month" is one where every day is older than 400 days, i.e.
+  // the month ended before (today − 400 days). We aggregate before purging.
+  const cutoffMonth = new Date();
+  cutoffMonth.setDate(cutoffMonth.getDate() - 400);
+  const cutoffMonthStr = cutoffMonth.toISOString().slice(0, 7) + '-01';
+
+  await pool.query(`
+    INSERT INTO inventory_snapshots_monthly
+      (tenant_id, month, shop_id, manufacturer, total_qty, total_cost_value, total_retail_value)
+    SELECT
+      s.tenant_id,
+      date_trunc('month', s.snapshot_date)::date                               AS month,
+      s.shop_id,
+      COALESCE(p.manufacturer, '')                                              AS manufacturer,
+      ROUND(AVG(s.qty))::int                                                    AS total_qty,
+      ROUND(AVG(s.qty * COALESCE(s.unit_cost, 0))::numeric, 2)                 AS total_cost_value,
+      ROUND(AVG(s.qty * COALESCE(s.unit_price, 0))::numeric, 2)                AS total_retail_value
+    FROM inventory_snapshots s
+    JOIN products p ON p.item_id = s.item_id AND p.tenant_id = s.tenant_id
+    WHERE s.tenant_id = $1
+      AND s.snapshot_date < $2::date
+    GROUP BY s.tenant_id, date_trunc('month', s.snapshot_date)::date, s.shop_id, COALESCE(p.manufacturer, '')
+    ON CONFLICT (tenant_id, month, shop_id, manufacturer) DO NOTHING
+  `, [tenantId, cutoffMonthStr]);
+
+  // ── 2. Purge detail rows older than 400 days ─────────────────────────────
+  const { rowCount: purged } = await pool.query(`
+    DELETE FROM inventory_snapshots
+    WHERE tenant_id = $1 AND snapshot_date < current_date - interval '400 days'
+  `, [tenantId]);
+  if (purged > 0) console.log(`[sync] Snapshot inventaire : ${purged} lignes purgées (>400j)`);
+
+  // ── 3. Capture today's snapshot ──────────────────────────────────────────
+  const { rowCount } = await pool.query(`
+    INSERT INTO inventory_snapshots (tenant_id, snapshot_date, item_id, shop_id, qty, unit_cost, unit_price)
+    SELECT
+      i.tenant_id,
+      $1::date,
+      i.item_id,
+      i.shop_id,
+      i.qty_on_hand::int,
+      p.default_cost,
+      p.default_price
+    FROM inventory i
+    JOIN products p ON p.item_id = i.item_id AND p.tenant_id = i.tenant_id
+    WHERE i.tenant_id = $2
+      AND i.qty_on_hand != 0
+    ON CONFLICT DO NOTHING
+  `, [today, tenantId]);
+
+  console.log(`[sync] Snapshot inventaire : ${rowCount} lignes pour ${today}`);
+
+  for (const [step, val] of [
+    ['snapshot_last_date', today],
+    ['snapshot_rows',      String(rowCount)],
+  ]) {
+    await pool.query(`
+      INSERT INTO sync_state(step, next_url, processed_count, updated_at)
+      VALUES ($1, $2, $3, now())
+      ON CONFLICT(step) DO UPDATE SET next_url = $2, processed_count = $3, updated_at = now()
+    `, [step, val, rowCount]);
+  }
+}
+
 async function refreshMaterializedView(viewName) {
   try {
     await pool.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY ${viewName}`);
@@ -946,6 +1057,9 @@ async function runSync({ forceDaysBack = null } = {}) {
 
     // ── Quality audit ─────────────────────────────────────────────────────
     await computeAndSaveQualityCounters(tenantId);
+
+    // ── Inventory snapshot ────────────────────────────────────────────────
+    await snapshotInventory(tenantId);
 
     console.log(`[sync] Done — ${new Date().toISOString()}`);
 
