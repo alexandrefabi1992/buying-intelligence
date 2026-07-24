@@ -4303,7 +4303,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           ROUND(s.rev, 2)::float8       AS revenue_12w,
           COALESCE(sm.stock, 0)::float8 AS current_stock
         FROM s
-        JOIN products par ON par.item_id = s.matrix_item_id AND par.archived = false ${tenantCondP}
+        JOIN products par ON par.item_id = s.matrix_item_id AND par.archived = false AND par.tenant_id = $${tIdx}
         LEFT JOIN st_matrix sm ON sm.matrix_item_id = s.matrix_item_id
         ORDER BY s.units DESC
         LIMIT 10
