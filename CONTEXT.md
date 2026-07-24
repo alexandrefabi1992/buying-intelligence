@@ -283,3 +283,90 @@ Le test T5 (marque fictive) doit être refait après chaque modification du syst
 ### Différence `get_top_performers` vs SQL direct
 
 `get_top_performers` fallback utilise `sell_from→sell_to` sans filtre de tag saison. Le SQL de vérification directe utilise souvent `reception_from→sell_to` + filtre tag. Les deux sont corrects pour des usages différents ; les montants peuvent différer (~+37% pour Oui entre les deux fenêtres). Cette différence est de méthode, pas d'erreur.
+
+---
+
+## Audit propagation post-backfill — 23 juillet 2026
+
+### Contexte
+
+Le backfill du 23 juillet 2026 a corrigé trois choses :
+1. **16 194 produits orphelins** insérés dans `products` (items présents dans `sale_lines` mais absents de `products` — invisibles à tous les JOINs)
+2. **3 750 items avec manufacturer numérique** corrigés (ex: '40' → 'Brax', '0' → NULL)
+3. **88 items refetchés** avec tags récupérés
+
+Ces corrections changent les données historiques visibles par l'application. Cet audit vérifie que chaque onglet utilise bien les données corrigées.
+
+### Données dérivées — carte complète
+
+| Élément | Type | Ce qu'il stocke | Refresh / TTL | Besoin de refresh manuel? |
+|---|---|---|---|---|
+| `mv_sales_velocity` | Materialized view | Ventes hebdo par item+boutique depuis `sale_lines` SANS JOIN products | sync.js ligne 944 — chaque fin de cycle sync | Non — déjà à jour |
+| `mv_inventory_stock` | Materialized view | Stock total par item depuis `inventory` SANS JOIN products | sync.js ligne 945 — chaque fin de cycle sync | Non — déjà à jour |
+| `budget_plans` | Table DB | Montants planifiés acheteur (données utilisateur) | Manuel via UI | N/A — non calculé |
+| `budget_plan_drops` | Table DB | Définitions de drops | Manuel via UI | N/A — non calculé |
+| `budget_recommendations` | Cache in-memory (`budgetCache`) | Résultats calculés à la volée (TTL court) | Vidé à chaque déploiement ou PUT settings | N/A — vidé au deploy |
+| Toutes les requêtes budget live | Requêtes directes SQL | Calculé à la volée au moment de la requête | Immédiat | Non — live |
+
+Note importante : `mv_sales_velocity` ne fait pas de JOIN avec `products` — il agrège directement depuis `sale_lines`. Les items orphelins étaient DÉJÀ inclus dans la MV avant le backfill. La MV n'a pas besoin d'être refreshée pour bénéficier du backfill.
+
+### Audit par onglet — statut post-backfill
+
+| Onglet | Endpoint | Source données | Filtre archived (ventes) | Statut |
+|---|---|---|---|---|
+| Budget par marque | `/api/budget/marque` | `sale_lines JOIN products` | Aucun | ✓ POST-backfill |
+| Brand detail (ventes) | `/api/brand/:manufacturer` Q1 | `sale_lines JOIN products` | Aucun | ✓ POST-backfill |
+| Budget saisonnier | `/api/budget/saisonnier` | Sale_lines ref saisons | `archived=false` ligne 1718 — **BUG CORRIGÉ** | ✓ Corrigé |
+| NOS liste / budget NOS | `/api/nos`, `/api/budget/nos` | `mv_sales_velocity JOIN products` | `archived=false` (voulu) | ✓ Correct par design |
+| Transferts | `/api/transfers` | `sale_lines JOIN products`, matrice | `archived=false` (voulu) | ✓ Correct par design |
+| Velocity / Sell-through | `/api/velocity/*` | `velocityCTEs → products` | `archived=false` ligne 4499 | ⚠️ Ventes passées légèrement sous-estimées |
+| Size curves | `/api/sizes`, `/api/sizes/brands` | `products + inventory` | `archived=false` (voulu) | ✓ Correct (courbes tailles actuelles) |
+| Budget plan (saisie) | `/api/budget-plan` | `budget_plans` table | N/A | ✓ N/A |
+| Chatbot | `/api/ai/chat` | Requêtes via ai-agent.js | Pas de filtre uniforme | ✓ POST-backfill |
+
+**Bug corrigé** : `server.js` ligne 1718 — `AND p.archived = false` retiré de la requête de ventes des saisons de référence dans `/api/budget/saisonnier`. Avant : Marc Cain et Saint James avaient >90% de leurs ventes P24 invisibles dans cet onglet.
+
+### Pérennité
+
+Le sync quotidien (sync.js) refreshe automatiquement `mv_sales_velocity` et `mv_inventory_stock` à chaque fin de cycle (lignes 944-945). Toute future correction de `sale_lines` ou `products` se propage automatiquement aux calculs live. Aucun refresh manuel n'est nécessaire en conditions normales.
+
+### Impact mesuré — comparaison avant/après backfill (sell window, tag saison)
+
+**P25 (fév→sep 2025)**
+
+| Marque | Avant backfill | Après | Δ unités | Δ coût |
+|---|---|---|---|---|
+| Brax | 373u | 601u | **+228u (+61%)** | +$22 994 |
+| Part Two | 461u | 592u | **+131u (+28%)** | +$9 234 |
+| Marc Cain | 260u | 260u | 0 | $0 |
+| Saint James | 257u | 436u | **+179u (+70%)** | +$15 694 |
+| Alison Sheri | 453u | 453u | 0 | $0 |
+
+**P24 (fév→sep 2024)**
+
+| Marque | Avant | Après | Δ unités | Δ coût |
+|---|---|---|---|---|
+| Brax | 209u | 504u | **+295u (+141%)** | +$27 256 |
+| Part Two | 320u | 527u | **+207u (+65%)** | +$14 194 |
+| Marc Cain | 38u | 380u | **+342u (+900%)** | +$51 962 |
+| Saint James | 45u | 472u | **+427u (+948%)** | +$39 901 |
+| Alison Sheri | 363u | 429u | **+66u (+18%)** | +$3 213 |
+
+⚠️ **Marc Cain et Saint James avaient >90% de leurs ventes P24 invisibles avant le backfill.** Les budgets calculés pour ces deux marques étaient basés sur presque rien. Après correction, les recommandations P27 seront significativement plus élevées.
+
+**Proxy impact budget P27** (Δ coût cumulé P24+P25+P26 = base de calcul du budget)
+
+| Marque | Δ P24 | Δ P25 | Δ coût total 3 saisons |
+|---|---|---|---|
+| Saint James | +427u | +179u | +$55 595 |
+| Marc Cain | +342u | 0u | +$51 962 |
+| Brax | +295u | +228u | +$50 357 |
+| Part Two | +207u | +131u | +$23 474 |
+| Alison Sheri | +66u | 0u | +$3 213 |
+
+### Quoi rafraîchir lors d'une future correction de données
+
+1. **Rien de manuel requis** si la correction passe par `products` ou `sale_lines` : le sync quotidien refreshe les MVs, et tous les calculs sont live.
+2. **Vider le `budgetCache`** si besoin immédiat : PUT sur n'importe quel endpoint `/api/settings/*` le vide, ou redéployer.
+3. **La MV `mv_sales_velocity` ne bénéficie PAS directement** d'une correction de `products` (elle ne join pas products). Elle bénéficie d'une correction de `sale_lines`.
+4. **Endpoint admin** `POST /api/admin/refresh-view` force un REFRESH MATERIALIZED VIEW si nécessaire.
