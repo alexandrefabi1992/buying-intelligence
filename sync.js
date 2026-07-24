@@ -755,9 +755,11 @@ async function snapshotInventory(tenantId) {
       p.default_cost,
       p.default_price
     FROM inventory i
-    JOIN products p ON p.item_id = i.item_id AND p.tenant_id = i.tenant_id
+    JOIN products p  ON p.item_id  = i.item_id  AND p.tenant_id = i.tenant_id
+    JOIN shops    sh ON sh.shop_id = i.shop_id   AND sh.tenant_id = i.tenant_id
     WHERE i.tenant_id = $2
       AND i.qty_on_hand != 0
+      AND p.archived = false
     ON CONFLICT DO NOTHING
   `, [today, tenantId]);
 
