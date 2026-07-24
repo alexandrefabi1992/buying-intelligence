@@ -3191,6 +3191,7 @@ const AccountingTab = (() => {
     const ddays  = parseInt(document.getElementById('acctModalDiscDays').value) || null;
     const margin = document.getElementById('acctModalMargin').value;
     const notes  = document.getElementById('acctModalNotes').value;
+    const btn    = document.getElementById('acctModalSave');
     const body = {
       discount_pct:        disc,
       discount_days:       disc != null ? ddays : null,
@@ -3198,11 +3199,23 @@ const AccountingTab = (() => {
       margin_override_pct: margin !== '' ? parseFloat(margin) : null,
       notes:               notes || null,
     };
-    const r = await apiFetch(`${BASE}/api/accounting/brands/${encodeURIComponent(_editingMfr)}`,
-      { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (r.ok) {
-      document.getElementById('acctModal').classList.add('hidden');
-      await load();
+    btn.disabled = true;
+    btn.textContent = 'Sauvegarde…';
+    try {
+      const r = await apiFetch(`${BASE}/api/accounting/brands/${encodeURIComponent(_editingMfr)}`,
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (r.ok) {
+        document.getElementById('acctModal').classList.add('hidden');
+        await load();
+      } else {
+        const err = await r.json().catch(() => ({}));
+        alert(`Erreur sauvegarde : ${err.error ?? r.status}`);
+      }
+    } catch (e) {
+      alert(`Erreur réseau : ${e.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sauvegarder';
     }
   }
 
