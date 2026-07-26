@@ -136,8 +136,8 @@
     <!-- Combined total banner -->
     <div id="budgetBanner" class="hidden mb-4 p-4 bg-gray-900 rounded-xl flex items-center justify-between">
       <div>
-        <div class="text-sm text-gray-300 mb-0.5">Budget d'achat total — Saisonnier</div>
-        <div class="text-xs text-gray-500">Ajuster le % de croissance par marque ci-dessous</div>
+        <div class="text-sm text-gray-300 mb-0.5" data-i18n="banner_total_lbl">Budget d'achat total — Saisonnier</div>
+        <div class="text-xs text-gray-500" data-i18n="banner_adjust_hint">Ajuster le % de croissance par marque ci-dessous</div>
       </div>
       <div class="flex flex-col items-end gap-1">
         <div id="budgetBaseTotal" class="text-2xl font-bold text-white"></div>
@@ -155,10 +155,10 @@
           </span>
           <div class="flex items-center gap-3 flex-wrap">
             <div class="flex items-center gap-2">
-              <label class="text-xs text-gray-500">Boutique :</label>
+              <label class="text-xs text-gray-500" data-i18n="lbl_boutique">Boutique</label>
               <select id="budgetShopSel"
                 class="border border-gray-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-blue-400">
-                <option value="">Toutes les boutiques</option>
+                <option value="" data-i18n="opt_all_stores">Toutes les boutiques</option>
               </select>
             </div>
             <div class="flex items-center gap-2">
@@ -465,7 +465,7 @@
       <span id="planBalanceWrap" class="hidden">
         <span class="text-gray-300 mr-6">|</span>
         <span>
-          <span class="text-[10px] text-gray-400 uppercase font-semibold block leading-none mb-0.5">Solde</span>
+          <span class="text-[10px] text-gray-400 uppercase font-semibold block leading-none mb-0.5" data-i18n="plan_balance_lbl">Solde</span>
           <span class="font-semibold" id="planTotalBalance">—</span>
         </span>
       </span>
@@ -558,42 +558,42 @@
     <!-- Filtres -->
     <div class="flex flex-wrap gap-3 mb-4 items-end">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Date</label>
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_date">Date</label>
         <input type="date" id="invHistDate"
                class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                onchange="InvHistory.onFilterChange()">
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Boutique</label>
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_boutique">Boutique</label>
         <select id="invHistShop"
                 class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 onchange="InvHistory.onFilterChange()">
-          <option value="">Toutes</option>
+          <option value="" data-i18n="opt_all">Toutes</option>
         </select>
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Marque</label>
-        <input type="text" id="invHistMfr" placeholder="Toutes" autocomplete="off"
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="col_brand">Marque</label>
+        <input type="text" id="invHistMfr" data-i18n-ph="opt_all" placeholder="Toutes" autocomplete="off"
                class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-400"
                oninput="InvHistory.onMfrInput()">
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Métrique</label>
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_metric">Métrique</label>
         <select id="invHistMetric"
                 class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 onchange="InvHistory.onDisplayChange()">
-          <option value="units">Unités</option>
-          <option value="cost_value">Valeur coût</option>
-          <option value="retail_value">Valeur détail</option>
+          <option value="units" data-i18n="opt_metric_units">Unités</option>
+          <option value="cost_value" data-i18n="opt_metric_cost">Valeur coût</option>
+          <option value="retail_value" data-i18n="opt_metric_retail">Valeur détail</option>
         </select>
       </div>
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Granularité</label>
+        <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_granularity">Granularité</label>
         <select id="invHistGranularity"
                 class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 onchange="InvHistory.onDisplayChange()">
-          <option value="day">Quotidien</option>
-          <option value="month">Mensuel</option>
+          <option value="day" data-i18n="opt_granularity_day">Quotidien</option>
+          <option value="month" data-i18n="opt_granularity_month">Mensuel</option>
         </select>
       </div>
     </div>
@@ -604,15 +604,15 @@
     <!-- KPIs -->
     <div id="invHistKpis" class="grid grid-cols-3 gap-3 mb-5 hidden">
       <div class="bg-white rounded-xl border border-gray-200 p-4">
-        <p class="text-xs text-gray-500 mb-1">Unités en stock</p>
+        <p class="text-xs text-gray-500 mb-1" data-i18n="kpi_units_in_stock">Unités en stock</p>
         <p id="invKpiUnits" class="text-2xl font-bold text-gray-900">—</p>
       </div>
       <div class="bg-white rounded-xl border border-gray-200 p-4">
-        <p class="text-xs text-gray-500 mb-1">Valeur au coût</p>
+        <p class="text-xs text-gray-500 mb-1" data-i18n="kpi_cost_value">Valeur au coût</p>
         <p id="invKpiCost" class="text-2xl font-bold text-gray-900">—</p>
       </div>
       <div class="bg-white rounded-xl border border-gray-200 p-4">
-        <p class="text-xs text-gray-500 mb-1">Valeur au détail</p>
+        <p class="text-xs text-gray-500 mb-1" data-i18n="kpi_retail_value">Valeur au détail</p>
         <p id="invKpiRetail" class="text-2xl font-bold text-gray-900">—</p>
       </div>
     </div>
@@ -621,7 +621,7 @@
     <div class="bg-white rounded-xl border border-gray-200 p-4 mb-5">
       <div style="height:220px; position:relative;">
         <canvas id="invHistChart"></canvas>
-        <p id="invHistChartMsg" class="absolute inset-0 flex items-center justify-center text-sm text-gray-400">Sélectionnez une date pour afficher l'historique</p>
+        <p id="invHistChartMsg" class="absolute inset-0 flex items-center justify-center text-sm text-gray-400" data-i18n="inv_hist_placeholder">Sélectionnez une date pour afficher l'historique</p>
       </div>
     </div>
 
@@ -630,16 +630,16 @@
       <div class="flex items-center gap-2 mb-2">
         <p id="invHistTableTitle" class="text-sm font-semibold text-gray-700"></p>
         <button id="invHistBackBtn" onclick="InvHistory.drillBack()"
-                class="hidden text-xs text-blue-600 hover:underline">← Retour global</button>
+                class="hidden text-xs text-blue-600 hover:underline" data-i18n="btn_back_global">← Retour global</button>
       </div>
       <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table class="w-full text-xs">
           <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th class="px-4 py-2 text-left font-semibold text-gray-600" id="invHistColName">Boutique</th>
-              <th class="px-4 py-2 text-right font-semibold text-gray-600">Unités</th>
-              <th class="px-4 py-2 text-right font-semibold text-gray-600">Valeur coût</th>
-              <th class="px-4 py-2 text-right font-semibold text-gray-600">Valeur détail</th>
+              <th class="px-4 py-2 text-left font-semibold text-gray-600" id="invHistColName" data-i18n="lbl_boutique">Boutique</th>
+              <th class="px-4 py-2 text-right font-semibold text-gray-600" data-i18n="col_units">Unités</th>
+              <th class="px-4 py-2 text-right font-semibold text-gray-600" data-i18n="col_cost_value">Valeur coût</th>
+              <th class="px-4 py-2 text-right font-semibold text-gray-600" data-i18n="col_retail_value">Valeur détail</th>
             </tr>
           </thead>
           <tbody id="invHistTableBody" class="divide-y divide-gray-100"></tbody>
@@ -660,16 +660,16 @@
     <!-- Header bar -->
     <div class="flex flex-wrap items-center gap-4 mb-4 bg-gray-50 border border-gray-200 rounded-xl px-5 py-3">
       <div class="flex items-center gap-2">
-        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Coût du capital</label>
+        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap" data-i18n="acct_cost_of_capital">Coût du capital</label>
         <input id="acctCapital" type="number" min="0" max="100" step="0.5"
                class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
                value="8">
-        <span class="text-sm text-gray-500">%/an</span>
-        <button id="acctCapitalSave" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors">Sauvegarder</button>
+        <span class="text-sm text-gray-500" data-i18n="acct_pct_per_year">%/an</span>
+        <button id="acctCapitalSave" class="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors" data-i18n="btn_save">Sauvegarder</button>
       </div>
       <div class="text-gray-300">|</div>
       <div class="text-xs text-gray-500">
-        Économies potentielles si toutes les recommandations « Escompte » sont suivies :
+        <span data-i18n="acct_savings_hint">Économies potentielles si toutes les recommandations « Escompte » sont suivies :</span>
         <span id="acctTotalSavings" class="font-bold text-emerald-700 ml-1">—</span>
       </div>
       <div class="ml-auto">
@@ -682,17 +682,17 @@
       <table class="min-w-full text-xs text-gray-700">
         <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
           <tr>
-            <th class="px-4 py-2 text-left">Marque</th>
-            <th class="px-4 py-2 text-right cursor-pointer select-none" title="Marge calculée depuis ventes 365j (prix−coût)/prix. Modifiable via override.">Marge %</th>
-            <th class="px-4 py-2 text-center" title="Format : 2/10 n/60 (escompte 2% si payé en 10 jours, net à 60j)">Termes fournisseur</th>
-            <th class="px-4 py-2 text-right" title="Rendement annualisé = escompte% ÷ (1−escompte%) × 365 ÷ (net−escompte_jours)">Rendement annualisé</th>
-            <th class="px-4 py-2 text-right" title="Jours pour écouler le stock au rythme des 90 derniers jours">Vélocité (j)</th>
-            <th class="px-4 py-2 text-center">Recommandation</th>
-            <th class="px-4 py-2 text-right" title="Achats annuels × escompte%">Économie/an</th>
+            <th class="px-4 py-2 text-left" data-i18n="col_brand">Marque</th>
+            <th class="px-4 py-2 text-right cursor-pointer select-none" data-i18n="acct_col_margin" data-i18n-tip="acct_tip_margin" title="Marge calculée depuis ventes 365j (prix−coût)/prix. Modifiable via override.">Marge %</th>
+            <th class="px-4 py-2 text-center" data-i18n="acct_col_terms" data-i18n-tip="acct_tip_terms" title="Format : 2/10 n/60 (escompte 2% si payé en 10 jours, net à 60j)">Termes fournisseur</th>
+            <th class="px-4 py-2 text-right" data-i18n="acct_col_yield" data-i18n-tip="acct_tip_yield" title="Rendement annualisé = escompte% ÷ (1−escompte%) × 365 ÷ (net−escompte_jours)">Rendement annualisé</th>
+            <th class="px-4 py-2 text-right" data-i18n="acct_col_velocity" data-i18n-tip="acct_tip_velocity" title="Jours pour écouler le stock au rythme des 90 derniers jours">Vélocité (j)</th>
+            <th class="px-4 py-2 text-center" data-i18n="acct_col_recommendation">Recommandation</th>
+            <th class="px-4 py-2 text-right" data-i18n="acct_col_savings" data-i18n-tip="acct_tip_savings" title="Achats annuels × escompte%">Économie/an</th>
           </tr>
         </thead>
         <tbody id="acctBody">
-          <tr><td colspan="7" class="text-center py-10 text-gray-400">Chargement…</td></tr>
+          <tr><td colspan="7" class="text-center py-10 text-gray-400" data-i18n="loading">Chargement…</td></tr>
         </tbody>
       </table>
     </div>
@@ -705,48 +705,48 @@
 
           <!-- Net days (required for any recommendation) -->
           <div>
-            <label class="text-xs font-semibold text-gray-600 block mb-1">Délai de paiement (net)</label>
+            <label class="text-xs font-semibold text-gray-600 block mb-1" data-i18n="acct_net_days_lbl">Délai de paiement (net)</label>
             <div class="flex items-center gap-2">
-              <span class="text-xs text-gray-500">n/</span>
+              <span class="text-xs text-gray-500" data-i18n="acct_prefix_n">n/</span>
               <input id="acctModalNetDays" type="number" min="0" max="365" step="1" placeholder="60"
                      class="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-400">
-              <span class="text-xs text-gray-500">jours</span>
+              <span class="text-xs text-gray-500" data-i18n="lbl_days">jours</span>
             </div>
           </div>
 
           <!-- Optional discount -->
           <div class="border-t border-gray-100 pt-3">
-            <label class="text-xs font-semibold text-gray-600 block mb-2">Escompte (optionnel)</label>
+            <label class="text-xs font-semibold text-gray-600 block mb-2" data-i18n="acct_discount_lbl">Escompte (optionnel)</label>
             <div class="flex items-center gap-3">
               <div class="flex items-center gap-1">
                 <input id="acctModalDisc" type="number" min="0" max="100" step="0.1" placeholder="2"
                        class="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-400">
                 <span class="text-xs text-gray-500">%</span>
               </div>
-              <span class="text-xs text-gray-400">si payé sous</span>
+              <span class="text-xs text-gray-400" data-i18n="acct_if_paid_within">si payé sous</span>
               <div class="flex items-center gap-1">
                 <input id="acctModalDiscDays" type="number" min="0" max="365" step="1" placeholder="10"
                        class="w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <span class="text-xs text-gray-500">j</span>
+                <span class="text-xs text-gray-500" data-i18n="lbl_days_short">j</span>
               </div>
             </div>
             <p id="acctModalPreview" class="text-[11px] text-blue-600 mt-2 min-h-[16px]"></p>
           </div>
 
           <div>
-            <label class="text-xs text-gray-500 block mb-1">Override marge % <span class="text-gray-400">(laisser vide = calculée)</span></label>
+            <label class="text-xs text-gray-500 block mb-1"><span data-i18n="acct_margin_lbl">Override marge %</span> <span class="text-gray-400" data-i18n="acct_margin_hint">(laisser vide = calculée)</span></label>
             <input id="acctModalMargin" type="number" min="0" max="100" step="0.1" placeholder="ex: 55.0"
                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
           </div>
           <div>
-            <label class="text-xs text-gray-500 block mb-1">Notes</label>
-            <input id="acctModalNotes" type="text" placeholder="ex: Conditions négociées mars 2026"
+            <label class="text-xs text-gray-500 block mb-1" data-i18n="lbl_notes">Notes</label>
+            <input id="acctModalNotes" type="text" data-i18n-ph="acct_notes_ph" placeholder="ex: Conditions négociées mars 2026"
                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
           </div>
         </div>
         <div class="flex gap-2 mt-5">
-          <button id="acctModalSave" class="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors">Sauvegarder</button>
-          <button id="acctModalCancel" class="flex-1 border border-gray-300 text-gray-600 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors">Annuler</button>
+          <button id="acctModalSave" class="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 transition-colors" data-i18n="btn_save">Sauvegarder</button>
+          <button id="acctModalCancel" class="flex-1 border border-gray-300 text-gray-600 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors" data-i18n="btn_cancel">Annuler</button>
         </div>
       </div>
     </div>
@@ -1032,6 +1032,63 @@ const TRANSLATIONS = {
     params_lead_times_saved:'Délais sauvegardés.',
     btn_boutique_lbl:'Boutique :', lbl_choose:'— Choisir —',
     params_recency_direction:'récent→ancien',
+    // Budget banner
+    banner_total_lbl:"Budget d'achat total — Saisonnier", banner_adjust_hint:"Ajuster le % de croissance par marque ci-dessous",
+    // Sync status
+    sync_in_progress:'Sync en cours…', sync_never:'Aucun sync effectué', sync_unavailable:'Sync : non disponible',
+    // Plan
+    plan_balance_lbl:'Solde',
+    // Inv-history HTML
+    lbl_date:'Date', lbl_metric:'Métrique',
+    opt_metric_units:'Unités', opt_metric_cost:'Valeur coût', opt_metric_retail:'Valeur détail',
+    lbl_granularity:'Granularité', opt_granularity_day:'Quotidien', opt_granularity_month:'Mensuel',
+    kpi_units_in_stock:'Unités en stock', kpi_cost_value:'Valeur au coût', kpi_retail_value:'Valeur au détail',
+    inv_hist_placeholder:"Sélectionnez une date pour afficher l'historique",
+    btn_back_global:'← Retour global', btn_back_brands:'← Retour marques',
+    col_units:'Unités', col_cost_value:'Valeur coût', col_retail_value:'Valeur détail',
+    // Inv-history JS
+    inv_hist_by_shop:'Répartition par boutique',
+    inv_hist_by_brand: shop => `Répartition par marque — ${shop}`,
+    inv_hist_history: mfr => `Historique — ${mfr}`,
+    lbl_totals:'Totaux', lbl_total:'Total',
+    inv_hist_since: date => `Historique disponible depuis le ${date}`,
+    no_data_available:'Aucune donnée disponible.',
+    opt_metric_units_chart:'Unités', opt_metric_cost_chart:'Valeur coût ($)', opt_metric_retail_chart:'Valeur détail ($)',
+    // Accounting HTML
+    acct_cost_of_capital:'Coût du capital', acct_pct_per_year:'%/an',
+    btn_save:'Sauvegarder', btn_saving:'Sauvegarde…',
+    acct_savings_hint:'Économies potentielles si toutes les recommandations « Escompte » sont suivies :',
+    acct_col_margin:'Marge %', acct_tip_margin:'Marge calculée depuis ventes 365j (prix−coût)/prix. Modifiable via override.',
+    acct_col_terms:'Termes fournisseur', acct_tip_terms:'Format : 2/10 n/60 (escompte 2% si payé en 10 jours, net à 60j)',
+    acct_col_yield:'Rendement annualisé', acct_tip_yield:'Rendement annualisé = escompte% ÷ (1−escompte%) × 365 ÷ (net−escompte_jours)',
+    acct_col_velocity:'Vélocité (j)', acct_tip_velocity:'Jours pour écouler le stock au rythme des 90 derniers jours',
+    acct_col_recommendation:'Recommandation', acct_col_savings:'Économie/an', acct_tip_savings:'Achats annuels × escompte%',
+    acct_enter_terms:'Saisir →',
+    // Accounting modal
+    acct_net_days_lbl:'Délai de paiement (net)', acct_prefix_n:'n/',
+    acct_discount_lbl:'Escompte (optionnel)', acct_if_paid_within:'si payé sous',
+    lbl_days_short:'j',
+    acct_margin_lbl:'Override marge %', acct_margin_hint:'(laisser vide = calculée)',
+    lbl_notes:'Notes', acct_notes_ph:'ex: Conditions négociées mars 2026',
+    acct_modal_title_prefix:'Termes fournisseur — ',
+    acct_preview_full: (disc, ddays, ndays) => `Escompte ${disc}% si payé sous ${ddays}j — net à ${ndays}j`,
+    acct_preview_net_only: ndays => `Net à ${ndays}j (pas d'escompte)`,
+    acct_terms_missing:'Termes à saisir',
+    acct_take_discount:"✓ Prendre l'escompte",
+    acct_full_term:'Terme complet',
+    acct_error_save:'Erreur sauvegarde : ', acct_error_network:'Erreur réseau : ',
+    // Sizes JS
+    lbl_sold_out:'Épuisé',
+    sizes_brand_count: n => `${n} marque${n > 1 ? 's' : ''}`,
+    sizes_cat_count: n => `${n} catégorie${n > 1 ? 's' : ''}`,
+    sizes_size_count: n => `${n} taille${n > 1 ? 's' : ''}`,
+    lbl_size:'Taille', lbl_pct_sales:'% Ventes', lbl_st:'ST', lbl_alignment:'Alignement',
+    lbl_alignment_tip:"Alignement : ✓ = % stock ≈ % ventes (écart < 8 pts) · ↑ surplus = part du stock > part des ventes · ↓ déficit = part du stock < part des ventes. Le chiffre en gris indique l'écart en points de %.",
+    // Transfers JS
+    transfers_never:'Jamais (90j+)',
+    transfers_size_plus: n => `+${n} taille${n > 1 ? 's' : ''}`,
+    transfers_unit: qty => `${qty} unité${qty > 1 ? 's' : ''}`,
+    transfers_models_count: (g, v) => `${g} modèle${g > 1 ? 's' : ''} recommandé${g > 1 ? 's' : ''} (${v} variante${v > 1 ? 's' : ''})`,
   },
   en: {
     loading:'Loading…', lastSync:'Last sync',
@@ -1179,6 +1236,63 @@ const TRANSLATIONS = {
     params_lead_times_saved:'Lead times saved.',
     btn_boutique_lbl:'Store:', lbl_choose:'— Select —',
     params_recency_direction:'recent→oldest',
+    // Budget banner
+    banner_total_lbl:'Total Buying Budget — Seasonal', banner_adjust_hint:'Adjust the growth % per brand below',
+    // Sync status
+    sync_in_progress:'Sync in progress…', sync_never:'No sync performed', sync_unavailable:'Sync: unavailable',
+    // Plan
+    plan_balance_lbl:'Balance',
+    // Inv-history HTML
+    lbl_date:'Date', lbl_metric:'Metric',
+    opt_metric_units:'Units', opt_metric_cost:'Cost value', opt_metric_retail:'Retail value',
+    lbl_granularity:'Granularity', opt_granularity_day:'Daily', opt_granularity_month:'Monthly',
+    kpi_units_in_stock:'Units in stock', kpi_cost_value:'Cost value', kpi_retail_value:'Retail value',
+    inv_hist_placeholder:'Select a date to display history',
+    btn_back_global:'← Back to global', btn_back_brands:'← Back to brands',
+    col_units:'Units', col_cost_value:'Cost value', col_retail_value:'Retail value',
+    // Inv-history JS
+    inv_hist_by_shop:'Breakdown by store',
+    inv_hist_by_brand: shop => `Breakdown by brand — ${shop}`,
+    inv_hist_history: mfr => `History — ${mfr}`,
+    lbl_totals:'Totals', lbl_total:'Total',
+    inv_hist_since: date => `History available since ${date}`,
+    no_data_available:'No data available.',
+    opt_metric_units_chart:'Units', opt_metric_cost_chart:'Cost value ($)', opt_metric_retail_chart:'Retail value ($)',
+    // Accounting HTML
+    acct_cost_of_capital:'Cost of capital', acct_pct_per_year:'%/yr',
+    btn_save:'Save', btn_saving:'Saving…',
+    acct_savings_hint:'Potential savings if all "Discount" recommendations are followed:',
+    acct_col_margin:'Margin %', acct_tip_margin:'Margin calculated from 365d sales (price−cost)/price. Editable via override.',
+    acct_col_terms:'Supplier terms', acct_tip_terms:'Format: 2/10 n/60 (2% discount if paid in 10 days, net 60d)',
+    acct_col_yield:'Annualized yield', acct_tip_yield:'Annualized yield = discount% ÷ (1−discount%) × 365 ÷ (net−discount_days)',
+    acct_col_velocity:'Velocity (d)', acct_tip_velocity:"Days to sell through stock at the last 90 days' pace",
+    acct_col_recommendation:'Recommendation', acct_col_savings:'Savings/yr', acct_tip_savings:'Annual purchases × discount%',
+    acct_enter_terms:'Enter →',
+    // Accounting modal
+    acct_net_days_lbl:'Payment terms (net)', acct_prefix_n:'n/',
+    acct_discount_lbl:'Discount (optional)', acct_if_paid_within:'if paid within',
+    lbl_days_short:'d',
+    acct_margin_lbl:'Margin % override', acct_margin_hint:'(leave blank = calculated)',
+    lbl_notes:'Notes', acct_notes_ph:'e.g. Terms negotiated March 2026',
+    acct_modal_title_prefix:'Supplier terms — ',
+    acct_preview_full: (disc, ddays, ndays) => `Discount ${disc}% if paid within ${ddays}d — net ${ndays}d`,
+    acct_preview_net_only: ndays => `Net ${ndays}d (no discount)`,
+    acct_terms_missing:'Terms to enter',
+    acct_take_discount:'✓ Take the discount',
+    acct_full_term:'Full term',
+    acct_error_save:'Save error: ', acct_error_network:'Network error: ',
+    // Sizes JS
+    lbl_sold_out:'Sold out',
+    sizes_brand_count: n => `${n} brand${n > 1 ? 's' : ''}`,
+    sizes_cat_count: n => `${n} categor${n > 1 ? 'ies' : 'y'}`,
+    sizes_size_count: n => `${n} size${n > 1 ? 's' : ''}`,
+    lbl_size:'Size', lbl_pct_sales:'% Sales', lbl_st:'ST', lbl_alignment:'Alignment',
+    lbl_alignment_tip:'Alignment: ✓ = % stock ≈ % sales (gap < 8 pts) · ↑ surplus = stock share > sales share · ↓ deficit = stock share < sales share. Grey number = gap in percentage points.',
+    // Transfers JS
+    transfers_never:'Never (90d+)',
+    transfers_size_plus: n => `+${n} size${n > 1 ? 's' : ''}`,
+    transfers_unit: qty => `${qty} unit${qty > 1 ? 's' : ''}`,
+    transfers_models_count: (g, v) => `${g} style${g > 1 ? 's' : ''} recommended (${v} variant${v > 1 ? 's' : ''})`,
   },
 };
 
@@ -1511,13 +1625,13 @@ async function loadSyncStatus() {
       const dt = new Date(completed[0].updated_at).toLocaleString(locale, { dateStyle:'short', timeStyle:'short' });
       el.textContent = `${t('lastSync')} : ${dt}`;
     } else if (inProgress) {
-      el.textContent = 'Sync en cours…';
+      el.textContent = t('sync_in_progress');
     } else {
-      el.textContent = 'Aucun sync effectué';
+      el.textContent = t('sync_never');
     }
   } catch (err) {
     console.warn('[syncStatus]', err);
-    el.textContent = 'Sync : non disponible';
+    el.textContent = t('sync_unavailable');
   }
 }
 
@@ -2130,7 +2244,7 @@ var SizesTab = (function() {
     return '<span class="text-green-600 font-bold">✓</span>';
   }
   function imbalanceBadge(noStock, imbalances) {
-    if (noStock)        return '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500">Épuisé</span>';
+    if (noStock)        return '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500">' + t('lbl_sold_out') + '</span>';
     if (imbalances > 0) return '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">' + imbalances + ' ⚠</span>';
     return '<span class="text-green-600 text-xs">✓</span>';
   }
@@ -2162,7 +2276,7 @@ var SizesTab = (function() {
     var empty  = document.getElementById('sizesEmpty');
     var brands = buildBrands();
 
-    document.getElementById('sizesCount').textContent = brands.length + ' marque' + (brands.length !== 1 ? 's' : '');
+    document.getElementById('sizesCount').textContent = t('sizes_brand_count')(brands.length);
     updateSortIcons();
     updateSummary(brands);
 
@@ -2177,7 +2291,7 @@ var SizesTab = (function() {
       html += '<tr class="cursor-pointer hover:bg-gray-50 transition-colors sizes-brand-row" data-brand="' + escHtml(b.manufacturer) + '">';
       html += '<td class="px-3 py-2 text-gray-400 text-center">' + (brandOpen ? '▾' : '▸') + '</td>';
       html += '<td class="px-3 py-2 font-semibold text-gray-800">' + escHtml(b.manufacturer) + '</td>';
-      html += '<td class="px-3 py-2 text-gray-400 text-[10px]">' + b.cats.length + ' catégorie' + (b.cats.length > 1 ? 's' : '') + '</td>';
+      html += '<td class="px-3 py-2 text-gray-400 text-[10px]">' + t('sizes_cat_count')(b.cats.length) + '</td>';
       html += '<td class="px-3 py-2 text-right">' + fmt(b._totalSold) + '</td>';
       html += '<td class="px-3 py-2 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ' + stBadgeClass(b._stGlobal) + '">' + b._stGlobal + '%</span></td>';
       html += '<td class="px-3 py-2 text-center">' + imbalanceBadge(b._noStock, b._imbalances) + '</td>';
@@ -2194,7 +2308,7 @@ var SizesTab = (function() {
         html += '<tr class="cursor-pointer hover:bg-blue-50/50 transition-colors bg-gray-50/40 sizes-cat-row" data-cat-key="' + escHtml(catKey) + '">';
         html += '<td></td>';
         html += '<td class="px-3 py-1.5 pl-8 text-gray-700">' + (catOpen ? '▾' : '▸') + ' <span class="font-medium">' + escHtml(cat.category) + '</span></td>';
-        html += '<td class="px-3 py-1.5 text-gray-400 text-[10px]">' + c.sizesSorted.length + ' taille' + (c.sizesSorted.length > 1 ? 's' : '') + '</td>';
+        html += '<td class="px-3 py-1.5 text-gray-400 text-[10px]">' + t('sizes_size_count')(c.sizesSorted.length) + '</td>';
         html += '<td class="px-3 py-1.5 text-right text-gray-600">' + fmt(c.totalSold) + '</td>';
         html += '<td class="px-3 py-1.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ' + stBadgeClass(c.stGlobal) + '">' + c.stGlobal + '%</span></td>';
         html += '<td class="px-3 py-1.5 text-center">' + imbalanceBadge(c.noStock, c.imbalances) + '</td>';
@@ -2204,10 +2318,10 @@ var SizesTab = (function() {
 
         // ── Niveau 3 : En-tête tailles ──
         html += '<tr class="bg-blue-50 text-[10px] text-gray-500 uppercase tracking-wide">';
-        html += '<td></td><td colspan="2" class="px-3 py-1 pl-14">Taille</td>';
-        html += '<td class="px-3 py-1 text-right">% Ventes</td>';
-        html += '<td class="px-3 py-1 text-right">ST</td>';
-        html += '<td class="px-3 py-1 text-center" title="Alignement : ✓ = % stock ≈ % ventes (écart &lt; 8 pts) · ↑ surplus = part du stock &gt; part des ventes · ↓ déficit = part du stock &lt; part des ventes. Le chiffre en gris indique l\'écart en points de %.">Alignement</td>';
+        html += '<td></td><td colspan="2" class="px-3 py-1 pl-14">' + t('lbl_size') + '</td>';
+        html += '<td class="px-3 py-1 text-right">' + t('lbl_pct_sales') + '</td>';
+        html += '<td class="px-3 py-1 text-right">' + t('lbl_st') + '</td>';
+        html += '<td class="px-3 py-1 text-center" title="' + t('lbl_alignment_tip') + '">' + t('lbl_alignment') + '</td>';
         html += '</tr>';
 
         c.sizesSorted.forEach(function(s) {
@@ -2307,7 +2421,7 @@ var TransfersTab = (function() {
   var shopLoaded = false;
 
   function dormantLabel(days) {
-    if (days == null) return '<span class="text-gray-400 italic">Jamais (90j+)</span>';
+    if (days == null) return '<span class="text-gray-400 italic">' + t('transfers_never') + '</span>';
     return '<span class="text-red-600 font-semibold">' + days + 'j</span>';
   }
 
@@ -2357,7 +2471,7 @@ var TransfersTab = (function() {
       html += '<tr class="tr-group cursor-pointer hover:bg-amber-50 transition-colors" data-key="' + g.key + '">' +
         '<td class="px-3 py-2 text-gray-400 text-center">' + (isOpen ? '▾' : '▸') + '</td>' +
         '<td class="px-3 py-2 font-medium max-w-[320px] truncate" title="' + modelName + '">' + modelName +
-          (nTailles > 1 ? ' <span class="text-gray-400 font-normal">+' + (nTailles - 1) + ' taille' + (nTailles > 2 ? 's' : '') + '</span>' : '') + '</td>' +
+          (nTailles > 1 ? ' <span class="text-gray-400 font-normal">' + t('transfers_size_plus')(nTailles - 1) + '</span>' : '') + '</td>' +
         '<td class="px-3 py-2 text-gray-600">' + escHtml(g.manufacturer) + '</td>' +
         '<td class="px-3 py-2 text-gray-500 max-w-[130px] truncate" title="' + escHtml(g.category) + '">' + escHtml(g.category) + '</td>' +
         '<td class="px-3 py-2 text-amber-700 font-medium">' + escHtml(g.dormant_shop) + '</td>' +
@@ -2374,7 +2488,7 @@ var TransfersTab = (function() {
             '<td></td>' +
             '<td class="px-3 py-1.5 pl-8 max-w-[320px] truncate" title="' + escHtml(item.description) + '">' + sizeLabel + escHtml(item.description) + '</td>' +
             '<td colspan="4"></td>' +
-            '<td class="px-3 py-1.5 text-right font-semibold text-gray-700">' + item.qty + ' unité' + (item.qty > 1 ? 's' : '') + '</td>' +
+            '<td class="px-3 py-1.5 text-right font-semibold text-gray-700">' + t('transfers_unit')(item.qty) + '</td>' +
             '<td colspan="2"></td>' +
             '</tr>';
         });
@@ -2441,7 +2555,7 @@ var TransfersTab = (function() {
 
       var groups = groupData(filtered);
       document.getElementById('transfersCount').textContent =
-        groups.length > 0 ? groups.length + ' modèle' + (groups.length > 1 ? 's' : '') + ' recommandé' + (groups.length > 1 ? 's' : '') + ' (' + filtered.length + ' variante' + (filtered.length > 1 ? 's' : '') + ')' : '';
+        groups.length > 0 ? t('transfers_models_count')(groups.length, filtered.length) : '';
       render(groups);
     } catch (e) {
       document.getElementById('transfersBody').innerHTML =
@@ -2460,7 +2574,7 @@ var TransfersTab = (function() {
         : transfersData;
       var groups = groupData(filtered);
       document.getElementById('transfersCount').textContent =
-        groups.length > 0 ? groups.length + ' modèle' + (groups.length > 1 ? 's' : '') + ' recommandé' + (groups.length > 1 ? 's' : '') + ' (' + filtered.length + ' variante' + (filtered.length > 1 ? 's' : '') + ')' : '';
+        groups.length > 0 ? t('transfers_models_count')(groups.length, filtered.length) : '';
       expandedGroups.clear();
       render(groups);
     });
@@ -3224,19 +3338,19 @@ const AccountingTab = (() => {
     let text = '';
     if (ndays) {
       if (disc != null && ddays != null)
-        text = `Escompte ${disc}% si payé sous ${ddays}j — net à ${ndays}j`;
+        text = t('acct_preview_full')(disc, ddays, ndays);
       else
-        text = `Net à ${ndays}j (pas d'escompte)`;
+        text = t('acct_preview_net_only')(ndays);
     }
     document.getElementById('acctModalPreview').textContent = text;
   }
 
   function recoBadge(b) {
     if (b.recommendation === 'terms_missing')
-      return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-gray-100 text-gray-500">Termes à saisir</span>`;
+      return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-gray-100 text-gray-500">${t('acct_terms_missing')}</span>`;
     if (b.recommendation === 'take_discount')
-      return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-semibold">✓ Prendre l'escompte</span>`;
-    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-700">Terme complet</span>`;
+      return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-semibold">${t('acct_take_discount')}</span>`;
+    return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] bg-blue-50 text-blue-700">${t('acct_full_term')}</span>`;
   }
 
   function render() {
@@ -3270,11 +3384,11 @@ const AccountingTab = (() => {
         <td class="px-4 py-2.5 text-right text-gray-600">${marginDisplay}</td>
         <td class="px-4 py-2.5 text-center">
           <button class="acct-edit-terms text-xs text-blue-600 hover:underline" data-mfr="${b.manufacturer}">
-            ${termsDisplay === '—' ? '<span class="text-gray-400 italic">Saisir →</span>' : termsDisplay}
+            ${termsDisplay === '—' ? `<span class="text-gray-400 italic">${t('acct_enter_terms')}</span>` : termsDisplay}
           </button>
         </td>
         <td class="px-4 py-2.5 text-right ${yieldColor}">${b.annualized_yield != null ? b.annualized_yield.toFixed(1) + '%' : '—'}</td>
-        <td class="px-4 py-2.5 text-right text-gray-600">${b.velocity_days != null ? b.velocity_days + 'j' : '—'}</td>
+        <td class="px-4 py-2.5 text-right text-gray-600">${b.velocity_days != null ? b.velocity_days + t('lbl_days_short') : '—'}</td>
         <td class="px-4 py-2.5 text-center">${recoBadge(b)}${flagHtml}</td>
         <td class="px-4 py-2.5 text-right">${savingsDisplay}</td>
       </tr>`;
@@ -3289,7 +3403,7 @@ const AccountingTab = (() => {
   function openModal(mfr) {
     _editingMfr = mfr;
     const b = _data.brands.find(x => x.manufacturer === mfr);
-    document.getElementById('acctModalTitle').textContent = `Termes fournisseur — ${mfr}`;
+    document.getElementById('acctModalTitle').textContent = t('acct_modal_title_prefix') + mfr;
     document.getElementById('acctModalNetDays').value  = b?.net_days       ?? '';
     document.getElementById('acctModalDisc').value     = b?.discount_pct   ?? '';
     document.getElementById('acctModalDiscDays').value = b?.discount_days  ?? '';
@@ -3314,7 +3428,7 @@ const AccountingTab = (() => {
       notes:               notes || null,
     };
     btn.disabled = true;
-    btn.textContent = 'Sauvegarde…';
+    btn.textContent = t('btn_saving');
     try {
       const r = await apiFetch(`${BASE}/api/accounting/brands/${encodeURIComponent(_editingMfr)}`,
         { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -3323,13 +3437,13 @@ const AccountingTab = (() => {
         await load();
       } else {
         const err = await r.json().catch(() => ({}));
-        alert(`Erreur sauvegarde : ${err.error ?? r.status}`);
+        alert(t('acct_error_save') + (err.error ?? r.status));
       }
     } catch (e) {
-      alert(`Erreur réseau : ${e.message}`);
+      alert(t('acct_error_network') + e.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Sauvegarder';
+      btn.textContent = t('btn_save');
     }
   }
 
@@ -3428,21 +3542,21 @@ const InvHistory = (() => {
     const colEl    = document.getElementById('invHistColName');
     const backBtn  = document.getElementById('invHistBackBtn');
     if (isGlobal) {
-      titleEl.textContent = 'Répartition par boutique';
-      colEl.textContent   = 'Boutique';
+      titleEl.textContent = t('inv_hist_by_shop');
+      colEl.textContent   = t('lbl_boutique');
       backBtn.classList.add('hidden');
     } else if (isBrandList) {
-      titleEl.textContent = `Répartition par marque — ${d.breakdown[0]?.dimension ?? ''}`;
-      colEl.textContent   = 'Marque';
-      backBtn.textContent = '← Retour global';
+      titleEl.textContent = t('inv_hist_by_brand')(d.breakdown[0]?.dimension ?? '');
+      colEl.textContent   = t('col_brand');
+      backBtn.textContent = t('btn_back_global');
       backBtn.classList.remove('hidden');
     } else if (isBrandDrilled) {
-      titleEl.textContent = `Historique — ${f.manufacturer}`;
-      colEl.textContent   = 'Marque';
-      backBtn.textContent = '← Retour marques';
+      titleEl.textContent = t('inv_hist_history')(f.manufacturer);
+      colEl.textContent   = t('col_brand');
+      backBtn.textContent = t('btn_back_brands');
       backBtn.classList.remove('hidden');
     } else {
-      titleEl.textContent = 'Totaux';
+      titleEl.textContent = t('lbl_totals');
       colEl.textContent   = '';
       backBtn.classList.add('hidden');
     }
@@ -3464,7 +3578,7 @@ const InvHistory = (() => {
     // Total row
     tbody.innerHTML += `
       <tr class="bg-gray-50 font-semibold">
-        <td class="px-4 py-2 text-gray-700">Total</td>
+        <td class="px-4 py-2 text-gray-700">${t('lbl_total')}</td>
         <td class="px-4 py-2 text-right text-gray-900">${fmt(d.totals.units)}</td>
         <td class="px-4 py-2 text-right text-gray-900">${fmtC(d.totals.cost_value)}</td>
         <td class="px-4 py-2 text-right text-gray-900">${fmtC(d.totals.retail_value)}</td>
@@ -3484,7 +3598,7 @@ const InvHistory = (() => {
     if (_firstDate !== d.first_date) {
       _firstDate = d.first_date;
       const noteEl = document.getElementById('invHistFirstDate');
-      noteEl.textContent = `Historique disponible depuis le ${d.first_date}`;
+      noteEl.textContent = t('inv_hist_since')(d.first_date);
       noteEl.classList.remove('hidden');
       // Set date input min
       document.getElementById('invHistDate').min = d.first_date;
@@ -3494,13 +3608,13 @@ const InvHistory = (() => {
     }
 
     const msgEl = document.getElementById('invHistChartMsg');
-    if (!d.series?.length) { msgEl.textContent = 'Aucune donnée disponible.'; msgEl.style.display = 'flex'; return; }
+    if (!d.series?.length) { msgEl.textContent = t('no_data_available'); msgEl.style.display = 'flex'; return; }
     msgEl.style.display = 'none';
 
     const labels    = d.series.map(r => r.date);
     const metricKey = f.metric;
     const data      = d.series.map(r => parseFloat(r[metricKey] ?? 0));
-    const metricLabel = { units: 'Unités', cost_value: 'Valeur coût ($)', retail_value: 'Valeur détail ($)' }[metricKey];
+    const metricLabel = { units: t('opt_metric_units_chart'), cost_value: t('opt_metric_cost_chart'), retail_value: t('opt_metric_retail_chart') }[metricKey];
 
     const ctx = document.getElementById('invHistChart').getContext('2d');
     if (_chart) _chart.destroy();
