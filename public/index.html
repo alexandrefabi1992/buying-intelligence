@@ -610,7 +610,7 @@
         <label class="block text-xs text-gray-500 mb-1">Métrique</label>
         <select id="invHistMetric"
                 class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                onchange="InvHistory.onFilterChange()">
+                onchange="InvHistory.onDisplayChange()">
           <option value="units">Unités</option>
           <option value="cost_value">Valeur coût</option>
           <option value="retail_value">Valeur détail</option>
@@ -620,7 +620,7 @@
         <label class="block text-xs text-gray-500 mb-1">Granularité</label>
         <select id="invHistGranularity"
                 class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                onchange="InvHistory.onFilterChange()">
+                onchange="InvHistory.onDisplayChange()">
           <option value="day">Quotidien</option>
           <option value="month">Mensuel</option>
         </select>
@@ -3462,6 +3462,9 @@ const InvHistory = (() => {
       _drillMfr  = false;
       document.getElementById('invHistMfr').value = '';
       document.getElementById('invHistBackBtn').classList.add('hidden');
+      reload();
+    },
+    onDisplayChange() {
       reload();
     },
     onMfrInput() {

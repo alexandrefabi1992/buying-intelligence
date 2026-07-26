@@ -5177,7 +5177,7 @@ app.get('/api/inventory-history', async (req, res, next) => {
       groupDim  = `COALESCE(p.manufacturer, 'Sans marque')`;
     } else {
       selectDim = `'total' AS dimension, NULL::text AS dim_id`;
-      groupDim  = `'total'`;
+      groupDim  = null; // single aggregate row — no GROUP BY needed
     }
 
     const { rows: breakdown } = await pool.query(`
@@ -5191,7 +5191,7 @@ app.get('/api/inventory-history', async (req, res, next) => {
       LEFT JOIN shops sh ON sh.shop_id = s.shop_id AND sh.tenant_id = s.tenant_id
       WHERE s.tenant_id = $1 AND s.snapshot_date = $2
         ${shopCond} ${mfrCond}
-      GROUP BY ${groupDim}
+      ${groupDim ? `GROUP BY ${groupDim}` : ''}
       ORDER BY units DESC
     `, params);
 
