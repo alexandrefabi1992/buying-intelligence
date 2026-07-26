@@ -3009,9 +3009,9 @@ const PlanTab = (() => {
       const html = data.docs && data.docs.length
         ? data.docs.map(doc => `
             <div class="flex items-center gap-2 py-0.5">
-              <a href="${BASE}/api/budget-plan/document/${doc.id}" target="_blank"
-                 class="text-[10px] text-indigo-500 hover:underline max-w-xs truncate"
-                 title="${escHtml(doc.filename)}">📄 ${escHtml(doc.filename)}</a>
+              <button class="plan-doc-open text-[10px] text-indigo-500 hover:underline max-w-xs truncate text-left"
+                 data-doc-id="${doc.id}" data-filename="${escHtml(doc.filename)}" data-ct="${escHtml(doc.content_type || '')}"
+                 title="${escHtml(doc.filename)}">📄 ${escHtml(doc.filename)}</button>
               <span class="text-[10px] text-gray-300">${fmtFileSize(doc.file_size)}</span>
               <button class="plan-doc-delete text-gray-300 hover:text-red-400 text-[10px]"
                 data-doc-id="${doc.id}" data-mfr="${escHtml(mfr)}" data-drop="${escHtml(dropId)}" title="Supprimer">✕</button>
@@ -3276,6 +3276,30 @@ const PlanTab = (() => {
         loadDocs(mfr, drop);
       };
       reader.readAsDataURL(file);
+    });
+
+    // Open document (fetch with auth → blob URL to avoid Unauthorized on direct <a href>)
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('.plan-doc-open');
+      if (!btn) return;
+      const docId = btn.dataset.docId, filename = btn.dataset.filename, ct = btn.dataset.ct || '';
+      try {
+        btn.style.opacity = '0.5';
+        const resp = await apiFetch(`${BASE}/api/budget-plan/document/${docId}`);
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        if (ct.includes('pdf') || ct.startsWith('image/')) {
+          window.open(url, '_blank');
+        } else {
+          const a = document.createElement('a');
+          a.href = url; a.download = filename; a.click();
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      } catch (err) {
+        console.error('[plan-doc-open]', err);
+      } finally {
+        btn.style.opacity = '';
+      }
     });
 
     // Delete document
