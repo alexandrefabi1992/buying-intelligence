@@ -216,7 +216,7 @@
                     data-tip="Direction des réceptions d'une saison à l'autre.&#10;&#10;Hausse : saison la plus récente &gt; saison la plus ancienne de +10%&#10;Baisse : saison la plus récente &lt; saison la plus ancienne de -10%&#10;Stable : variation &lt; 10%"
                     ><span data-i18n="col_trend">Tendance</span></th>
                 <th class="px-3 py-2 text-center col-tip" data-i18n-tip="tip_multiplier"
-                    data-tip="Facteur appliqué aux réceptions moyennes historiques.&#10;&#10;Basé sur le TM moyen via les paliers configurés dans l'onglet Paramètres.&#10;&#10;Exemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper."
+                    data-tip="Facteur appliqué aux réceptions moyennes historiques.&#10;&#10;Basé sur le ST moyen pondéré (sell-through) via les paliers configurés dans l'onglet Paramètres.&#10;&#10;Exemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper."
                     ><span data-i18n="col_multiplier">Multiplicateur</span></th>
                 <th class="px-3 py-2 text-right col-tip sort-col cursor-pointer select-none" data-sort="adjusted_budget" data-i18n-tip="tip_adj_budget"
                     data-tip="Réceptions moy. × multiplicateur.&#10;&#10;Budget cible avant déduction du carryover.&#10;&#10;Formule : réceptions_moy × multiplicateur"
@@ -893,7 +893,7 @@ const TRANSLATIONS = {
     season_p25:'P25 — Printemps 2025', season_a24:'A24 — Automne 2024',
     season_p24:'P24 — Printemps 2024',
     col_brand:'Marque', col_recent_recv:'Reçu actuel', col_avg_recv:'Réceptions moy.',
-    col_range:'Fourchette', col_avg_st:'TM moyen', col_trend:'Tendance',
+    col_range:'Fourchette', col_avg_st:'ST moyen', col_trend:'Tendance',
     col_multiplier:'Multiplicateur', col_adj_budget:'Budget ajusté', col_net_budget:'Budget net',
     col_description:'Description', col_boutique:'Boutique', col_category:'Catégorie',
     col_stock_short:'Stock', col_qty_suggested:'Qté suggérée',
@@ -902,7 +902,7 @@ const TRANSLATIONS = {
     tip_range:"Étendue des réceptions selon les saisons historiques disponibles.\n\nMin $ – Max $ observés sur les saisons de référence (P25, P24, P23 + P26 projeté si disponible).\n\nUtile pour voir la variabilité d'une saison à l'autre.",
     tip_avg_st:"Taux de vente moyen (sell-through) sur les saisons historiques.\n\nCalcul : unités vendues ÷ unités reçues via transfert, moyenné sur P25, P24, P23.\n\n100% = tout vendu · 50% = la moitié vendue · 0% = rien vendu.\nSeuil cible : ≥ 60% (vert).\n\n«n/d» = données insuffisantes (moins de 5 unités reçues via transfert — la marque est principalement approvisionnée par commandes directes).",
     tip_trend:"Direction du TM (sell-through) d'une saison à l'autre.\n\nHausse : TM récent > TM ancien de +10 pts (ex : 55% → 65%)\nBaisse : TM récent < TM ancien de -10 pts (ex : 65% → 55%)\nStable : variation < 10 pts\n\nIndique si la marque se vend mieux ou moins bien au fil des saisons.",
-    tip_multiplier:"Facteur appliqué aux réceptions moyennes historiques.\n\nBasé sur le TM moyen via les paliers configurés dans l'onglet Paramètres.\n\nExemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper.",
+    tip_multiplier:"Facteur appliqué aux réceptions moyennes historiques.\n\nBasé sur le ST moyen pondéré (sell-through) via les paliers configurés dans l'onglet Paramètres.\n\nExemples : ×1.25 Augmenter, ×1.00 Reconduire, ×0.50 Couper.",
     tip_adj_budget:"Réceptions moy. × multiplicateur.\n\nBudget cible avant déduction du carryover.\n\nFormule : réceptions_moy × multiplicateur",
     tip_net_budget:"Budget net = Budget ajusté − (carryover × taux déduction).\n\nCarryover = MAX(0, stock − ventes_ytd × (jours_restants ÷ jours_écoulés))\n\nLe taux de déduction (défaut 50%) est configurable dans Paramètres.\n\nUn tiret (—) indique que le carryover couvre le budget ajusté.",
     total_seasonal:'Saisonnier', total_brands:'marques',
@@ -926,7 +926,7 @@ const TRANSLATIONS = {
     redistributed_tip:'Montant redistribué des marques masquées (absentes de la saison récente)',
     params_nb_saisons_tip:'Nombre de saisons passées équivalentes utilisées pour calculer la moyenne historique (ex : 3 = P25, P24, P23 pour P26).',
     params_carryover_tip:'Détermine combien du stock restant (carryover) vient réduire ton budget d\'achat.\n\n100% → le stock restant est entièrement déduit (tu n\'achètes pas ce que tu as déjà).\n50%  → la moitié est déduite (garde une marge : l\'ancien stock ne se vendra pas tout seul).\n0%   → le carryover est ignoré, budget complet conservé.\n\nFormule : budget net = budget ajusté − (carryover × taux)',
-    st_ytd_lbl:'YTD', st_ytd_tip:'TM actuel à date (ventes YTD ÷ reçus YTD)', st_projected_tip:'TM projeté fin de saison (saison en cours)', st_avg_tip:'TM moyen pondéré sur les saisons de référence — détermine le multiplicateur',
+    st_ytd_lbl:'YTD', st_ytd_tip:'ST actuel à date (ventes YTD ÷ reçus YTD)', st_projected_tip:'ST projeté fin de saison (saison en cours)', st_avg_tip:'ST moyen pondéré sur les saisons de référence — détermine le multiplicateur',
     trend_hausse:'hausse', trend_stable:'stable', trend_baisse:'baisse',
     st_nd:'n/d', st_na_title:"Données insuffisantes : moins de 5 unités reçues via transfert — ratio non représentatif",
     nos_badge:'NOS — Budget par marque', nos_coverage:'Couverture cible :', nos_weeks:'semaines',
@@ -985,7 +985,7 @@ const TRANSLATIONS = {
     tip_range:"Range of receivings across available historical seasons.\n\nMin $ – Max $ observed on reference seasons (P25, P24, P23 + P26 projected if available).\n\nUseful to see season-to-season variability.",
     tip_avg_st:"Average sell-through rate across historical seasons.\n\nCalculation: units sold ÷ units received via transfer, averaged over P25, P24, P23.\n\n100% = all sold · 50% = half sold · 0% = nothing sold.\nTarget threshold: ≥ 60% (green).\n\n\"n/a\" = insufficient data (less than 5 units received via transfer — brand is primarily supplied by direct orders).",
     tip_trend:"Direction of sell-through (ST) from one season to the next.\n\nRising: recent ST > oldest ST by +10 pts (e.g. 55% → 65%)\nFalling: recent ST < oldest ST by -10 pts (e.g. 65% → 55%)\nStable: variation < 10 pts\n\nIndicates whether the brand is selling better or worse over time.",
-    tip_multiplier:"Factor applied to average historical receivings.\n\nBased on average ST through tiers configured in the Settings tab.\n\nExamples: ×1.25 Grow, ×1.00 Renew, ×0.50 Cut.",
+    tip_multiplier:"Factor applied to average historical receivings.\n\nBased on the weighted average sell-through (ST) via tiers configured in the Settings tab.\n\nExamples: ×1.25 Grow, ×1.00 Renew, ×0.50 Cut.",
     tip_adj_budget:"Avg. Receivings × Multiplier.\n\nTarget budget before carryover deduction.\n\nFormula: avg_receivings × multiplier",
     tip_net_budget:"Net Budget = Adjusted Budget − (carryover × deduction rate).\n\nCarryover = MAX(0, stock − ytd_sales × (remaining_days ÷ elapsed_days))\n\nThe deduction rate (default 50%) is configurable in Settings.\n\nA dash (—) means carryover covers the adjusted budget.",
     total_seasonal:'Seasonal', total_brands:'brands',
