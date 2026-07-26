@@ -484,11 +484,15 @@
             <th class="px-4 py-2 text-left cursor-pointer select-none hover:text-gray-700 plan-sort-th" data-sort="name">
               <span data-i18n="col_brand">Marque</span> <span class="plan-sort-icon text-gray-400" data-icon="name"></span>
             </th>
-            <th class="px-4 py-2 text-right" data-i18n="plan_col_suggested">Budget suggéré</th>
+            <th class="px-4 py-2 text-right cursor-pointer select-none hover:text-gray-700 plan-sort-th" data-sort="suggested">
+              <span data-i18n="plan_col_suggested">Budget suggéré</span> <span class="plan-sort-icon text-gray-400" data-icon="suggested"></span>
+            </th>
             <th class="px-4 py-2 text-right cursor-pointer select-none hover:text-gray-700 plan-sort-th" data-sort="planned">
               <span data-i18n="plan_col_planned">Total planifié</span> <span class="plan-sort-icon text-gray-400" data-icon="planned"></span>
             </th>
-            <th class="px-4 py-2 text-right" data-i18n="plan_col_diff">Écart</th>
+            <th class="px-4 py-2 text-right cursor-pointer select-none hover:text-gray-700 plan-sort-th" data-sort="diff">
+              <span data-i18n="plan_col_diff">Écart</span> <span class="plan-sort-icon text-gray-400" data-icon="diff"></span>
+            </th>
             <th class="px-4 py-2"></th>
           </tr>
         </thead>
@@ -2459,6 +2463,19 @@ const PlanTab = (() => {
         .map(mfr => ({ manufacturer: mfr, net_budget: 0, _manual: true })),
     ];
 
+    const excludedBudget = planState.budget
+      .filter(m => planState.excluded.has(m.manufacturer))
+      .reduce((s, m) => s + (m.net_budget ?? 0), 0);
+    const visibleTotal = visibleBrands.reduce((s, m) => s + (m.net_budget ?? 0), 0);
+
+    const suggestedFor = m => {
+      if (m._manual) return 0;
+      const base  = m.net_budget ?? 0;
+      const share = visibleTotal > 0 ? base / visibleTotal : (visibleBrands.length ? 1 / visibleBrands.length : 0);
+      const calc  = Math.round((base + excludedBudget * share) * 100) / 100;
+      return planState.overrides[m.manufacturer] !== undefined ? planState.overrides[m.manufacturer] : calc;
+    };
+
     if (planState.sort.col === 'name') {
       visibleBrands.sort((a, b) => {
         const cmp = a.manufacturer.localeCompare(b.manufacturer, 'fr');
@@ -2469,17 +2486,23 @@ const PlanTab = (() => {
         const diff = totalForMfr(a.manufacturer) - totalForMfr(b.manufacturer);
         return planState.sort.dir === 'asc' ? diff : -diff;
       });
+    } else if (planState.sort.col === 'suggested') {
+      visibleBrands.sort((a, b) => {
+        const diff = suggestedFor(a) - suggestedFor(b);
+        return planState.sort.dir === 'asc' ? diff : -diff;
+      });
+    } else if (planState.sort.col === 'diff') {
+      visibleBrands.sort((a, b) => {
+        const da = totalForMfr(a.manufacturer) - suggestedFor(a);
+        const db = totalForMfr(b.manufacturer) - suggestedFor(b);
+        return planState.sort.dir === 'asc' ? da - db : db - da;
+      });
     }
 
     document.querySelectorAll('.plan-sort-icon').forEach(el => {
       const col = el.dataset.icon;
       el.textContent = planState.sort.col === col ? (planState.sort.dir === 'asc' ? '↑' : '↓') : '';
     });
-
-    const excludedBudget = planState.budget
-      .filter(m => planState.excluded.has(m.manufacturer))
-      .reduce((s, m) => s + (m.net_budget ?? 0), 0);
-    const visibleTotal = visibleBrands.reduce((s, m) => s + (m.net_budget ?? 0), 0);
 
     const rows = [];
     let totalCalcSuggested = 0, totalSuggested = 0, totalPlanned = 0;
