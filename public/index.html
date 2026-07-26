@@ -161,23 +161,6 @@
           <div id="collButtons" class="flex flex-col gap-1.5"></div>
         </div>
 
-        <!-- Grandeurs -->
-        <div>
-          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2" data-i18n="filter_sizes">Grandeurs</div>
-          <div class="text-[10px] text-gray-400 mb-1.5" data-i18n="filter_letters">Lettres</div>
-          <div id="letterSizeButtons" class="flex flex-wrap gap-1 mb-3"></div>
-          <div class="text-[10px] text-gray-400 mb-1.5" data-i18n="filter_numeric">Numériques</div>
-          <div id="numSizeButtons" class="flex flex-wrap gap-1"></div>
-        </div>
-
-        <!-- Marque -->
-        <div>
-          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2" data-i18n="filter_brand">Marque</div>
-          <input id="budgetMfrSearch" type="text" placeholder="ex: Brax, Eton…"
-            data-i18n-ph="filter_brand_ph"
-            class="border border-gray-300 rounded px-2 py-1 text-xs w-36">
-        </div>
-
         <!-- Actions -->
         <div class="ml-auto self-end flex flex-col items-end gap-2">
           <div id="filterBadge" class="text-xs text-blue-600 font-medium hidden"></div>
@@ -924,8 +907,6 @@ const TRANSLATIONS = {
     plan_col_suggested:'Budget suggéré', plan_col_planned:'Total planifié', plan_col_diff:'Écart', plan_col_actions:'',
     plan_by_shop:'Par boutique', plan_suggested_lbl:'Suggéré :',
     filter_boutiques:'Boutiques', filter_collections:'Collections',
-    filter_sizes:'Grandeurs', filter_letters:'Lettres', filter_numeric:'Numériques',
-    filter_brand:'Marque', filter_brand_ph:'ex: Brax, Eton…',
     btn_apply:'Appliquer', btn_reset:'Réinitialiser',
     btn_apply_recalc:'Appliquer & Recalculer', btn_reset_defaults:'Réinitialiser les défauts',
     btn_prev:'← Précédent', btn_next:'Suivant →',
@@ -1009,8 +990,6 @@ const TRANSLATIONS = {
     plan_col_suggested:'Suggested Budget', plan_col_planned:'Total Planned', plan_col_diff:'Variance', plan_col_actions:'',
     plan_by_shop:'By Store', plan_suggested_lbl:'Suggested:',
     filter_boutiques:'Boutiques', filter_collections:'Collections',
-    filter_sizes:'Sizes', filter_letters:'Letters', filter_numeric:'Numeric',
-    filter_brand:'Brand', filter_brand_ph:'e.g. Brax, Eton…',
     btn_apply:'Apply', btn_reset:'Reset',
     btn_apply_recalc:'Apply & Recalculate', btn_reset_defaults:'Reset Defaults',
     btn_prev:'← Previous', btn_next:'Next →',
@@ -1438,8 +1417,6 @@ const COLLECTIONS = [
   { code: 'p24', label: 'P24 — Printemps 2024' },
   { code: 'a24', label: 'A24 — Automne 2024' },
 ];
-const LETTER_SIZES  = ['XS','S','M','L','XL','XXL'];
-const NUMERIC_SIZES = [34,36,38,40,42,44,46,48,50,52,54,56];
 
 function buildFilterBar() {
   // Boutiques — checkboxes (DOM API to avoid innerHTML parsing edge cases)
@@ -1469,28 +1446,6 @@ function buildFilterBar() {
     collDiv.appendChild(btn);
   });
 
-  // Letter sizes — toggle buttons
-  const lsDiv = document.getElementById('letterSizeButtons');
-  LETTER_SIZES.forEach(sz => {
-    const btn = document.createElement('button');
-    btn.className = 'tog-btn px-2.5 py-1 rounded text-xs border border-gray-200 text-gray-600';
-    btn.dataset.val = sz;
-    btn.dataset.group = 'size';
-    btn.textContent = sz;
-    lsDiv.appendChild(btn);
-  });
-
-  // Numeric sizes — toggle buttons
-  const nsDiv = document.getElementById('numSizeButtons');
-  NUMERIC_SIZES.forEach(sz => {
-    const btn = document.createElement('button');
-    btn.className = 'tog-btn px-2.5 py-1 rounded text-xs border border-gray-200 text-gray-600';
-    btn.dataset.val = sz;
-    btn.dataset.group = 'size';
-    btn.textContent = sz;
-    nsDiv.appendChild(btn);
-  });
-
   // Toggle button click → add/remove active class
   document.querySelectorAll('.tog-btn').forEach(btn => {
     btn.addEventListener('click', () => btn.classList.toggle('active'));
@@ -1500,23 +1455,21 @@ function buildFilterBar() {
 function readFilterSelections() {
   const shops = [...document.querySelectorAll('.shop-cb:checked')].map(el => el.value);
   const colls = [...document.querySelectorAll('.tog-btn[data-group="coll"].active')].map(el => el.dataset.val);
-  const sizes = [...document.querySelectorAll('.tog-btn[data-group="size"].active')].map(el => el.dataset.val);
-  return { shops, colls, sizes };
+  return { shops, colls };
 }
 
 function buildQuerySuffix(extraParams = {}) {
-  const { shops, colls, sizes } = readFilterSelections();
+  const { shops, colls } = readFilterSelections();
   const p = { ...extraParams };
   if (shops.length) p.shops       = shops.join(',');
   if (colls.length) p.collections = colls.join(',');
-  if (sizes.length) p.sizes       = sizes.join(',');
   const qs = new URLSearchParams(p).toString();
   return qs ? '?' + qs : '';
 }
 
 function updateFilterBadge() {
-  const { shops, colls, sizes } = readFilterSelections();
-  const count = shops.length + colls.length + sizes.length;
+  const { shops, colls } = readFilterSelections();
+  const count = shops.length + colls.length;
   const badge = document.getElementById('filterBadge');
   if (count > 0) {
     badge.textContent = t('filter_active')(count);
@@ -1531,7 +1484,7 @@ function updateFilterBadge() {
 // ─────────────────────────────────────────────────────────────────────────────
 const BudgetTab = (() => {
   const CFG = {
-    budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:'budgetMfrSearch', totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS',        cols:7, hasHyp:false },
+    budgetNos:  { refField:'reference_units_12w',  color:'text-blue-700',  catBg:'#eff6ff', bodyId:'budgetNosBody',  searchId:null, totalId:'budgetNosTotal',  loaderId:'budgetNosLoader',  label:'NOS',        cols:7, hasHyp:false },
     budgetSeas: { refField:'avg_received_cost',    color:'text-amber-700', catBg:'#fffbeb', bodyId:'budgetSeasBody', searchId:'seasBudgetSearch', totalId:'budgetSeasTotal', loaderId:'budgetSeasLoader', label:'Saisonnier', cols:9,  hasHyp:false },
   };
 
@@ -1845,7 +1798,6 @@ const BudgetTab = (() => {
     document.getElementById('budgetReset').addEventListener('click', () => {
       document.querySelectorAll('.shop-cb').forEach(cb => cb.checked = false);
       document.querySelectorAll('.tog-btn').forEach(btn => btn.classList.remove('active'));
-      document.getElementById('budgetMfrSearch').value = '';
       document.getElementById('filterBadge').classList.add('hidden');
       load();
     });
