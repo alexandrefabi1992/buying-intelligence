@@ -3339,7 +3339,7 @@ const InvHistory = (() => {
           ${isGlobal
             ? `onclick="InvHistory.drillInto('${r.dim_id}','${r.dimension}')"`
             : isBrandList
-              ? `onclick="InvHistory.drillMfr(${JSON.stringify(r.dimension)})"`
+              ? `onclick="InvHistory.drillMfr('${r.dimension}')"`
               : ''}>
         <td class="px-4 py-2 font-medium ${isGlobal ? 'text-blue-700' : isBrandList ? 'text-violet-700' : 'text-gray-800'}">${r.dimension}</td>
         <td class="px-4 py-2 text-right text-gray-700">${fmt(r.units)}</td>
