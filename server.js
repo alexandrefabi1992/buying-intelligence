@@ -3747,6 +3747,17 @@ app.delete('/api/budget-plan/drop', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+app.delete('/api/budget-plan/brand', async (req, res, next) => {
+  try {
+    const { season_code, manufacturer } = req.query;
+    if (!season_code || !manufacturer) return res.status(400).json({ error: 'season_code and manufacturer required' });
+    const sc = season_code.toLowerCase();
+    await pool.query(`DELETE FROM budget_plans      WHERE season_code = $1 AND manufacturer = $2 AND tenant_id = $3`, [sc, manufacturer, req.tenantId]);
+    await pool.query(`DELETE FROM budget_plan_drops WHERE season_code = $1 AND manufacturer = $2 AND tenant_id = $3`, [sc, manufacturer, req.tenantId]);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 // ---------------------------------------------------------------------------
 // Budget document routes — binary file storage per (season, manufacturer, drop)
 // ---------------------------------------------------------------------------

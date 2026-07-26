@@ -481,9 +481,13 @@
       <table class="min-w-full text-xs text-gray-700">
         <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
           <tr>
-            <th class="px-4 py-2 text-left" data-i18n="col_brand">Marque</th>
+            <th class="px-4 py-2 text-left cursor-pointer select-none hover:text-gray-700 plan-sort-th" data-sort="name">
+              <span data-i18n="col_brand">Marque</span> <span class="plan-sort-icon text-gray-400" data-icon="name"></span>
+            </th>
             <th class="px-4 py-2 text-right" data-i18n="plan_col_suggested">Budget suggéré</th>
-            <th class="px-4 py-2 text-right" data-i18n="plan_col_planned">Total planifié</th>
+            <th class="px-4 py-2 text-right cursor-pointer select-none hover:text-gray-700 plan-sort-th" data-sort="planned">
+              <span data-i18n="plan_col_planned">Total planifié</span> <span class="plan-sort-icon text-gray-400" data-icon="planned"></span>
+            </th>
             <th class="px-4 py-2 text-right" data-i18n="plan_col_diff">Écart</th>
             <th class="px-4 py-2"></th>
           </tr>
@@ -2331,6 +2335,7 @@ const PlanTab = (() => {
     excluded:  new Set(),
     overrides: {},
     allMfrs: [],
+    sort: { col: null, dir: null },
   };
 
   function shopExcludeKey() {
@@ -2454,6 +2459,23 @@ const PlanTab = (() => {
         .map(mfr => ({ manufacturer: mfr, net_budget: 0, _manual: true })),
     ];
 
+    if (planState.sort.col === 'name') {
+      visibleBrands.sort((a, b) => {
+        const cmp = a.manufacturer.localeCompare(b.manufacturer, 'fr');
+        return planState.sort.dir === 'asc' ? cmp : -cmp;
+      });
+    } else if (planState.sort.col === 'planned') {
+      visibleBrands.sort((a, b) => {
+        const diff = totalForMfr(a.manufacturer) - totalForMfr(b.manufacturer);
+        return planState.sort.dir === 'asc' ? diff : -diff;
+      });
+    }
+
+    document.querySelectorAll('.plan-sort-icon').forEach(el => {
+      const col = el.dataset.icon;
+      el.textContent = planState.sort.col === col ? (planState.sort.dir === 'asc' ? '↑' : '↓') : '';
+    });
+
     const excludedBudget = planState.budget
       .filter(m => planState.excluded.has(m.manufacturer))
       .reduce((s, m) => s + (m.net_budget ?? 0), 0);
@@ -2515,7 +2537,10 @@ const PlanTab = (() => {
           <td class="px-4 py-2.5 text-right font-semibold text-indigo-700">${totalPlan > 0 ? fmtC(totalPlan) : '<span class="text-gray-300">—</span>'}</td>
           <td class="px-4 py-2.5 text-right">${diffHtml}</td>
           <td class="px-4 py-2.5 text-right">
-            <button class="plan-exclude-btn text-gray-300 hover:text-red-400 text-xs px-1" title="Retirer du plan" data-mfr="${escHtml(mfr)}">✕</button>
+            ${m._manual
+              ? `<button class="plan-delete-brand-btn text-gray-300 hover:text-red-500 text-xs px-1" title="Supprimer cette collection du plan" data-mfr="${escHtml(mfr)}">🗑</button>`
+              : `<button class="plan-exclude-btn text-gray-300 hover:text-red-400 text-xs px-1" title="Retirer du plan" data-mfr="${escHtml(mfr)}">✕</button>`
+            }
           </td>
         </tr>
         <tr class="plan-detail hidden" data-mfr="${escHtml(mfr)}">
@@ -2707,6 +2732,20 @@ const PlanTab = (() => {
   }
 
   function init() {
+    // Sort column headers
+    document.querySelectorAll('.plan-sort-th').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.sort;
+        if (planState.sort.col === col) {
+          planState.sort.dir = planState.sort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          planState.sort.col = col;
+          planState.sort.dir = col === 'name' ? 'asc' : 'desc';
+        }
+        renderTable();
+      });
+    });
+
     // Auto-save shop amount inputs
     document.addEventListener('change', async e => {
       const input = e.target.closest('.plan-shop-input');
@@ -2832,6 +2871,22 @@ const PlanTab = (() => {
       const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
       if (detail) detail.classList.add('hidden');
       renderTable();
+    });
+
+    // Delete manual brand entirely
+    document.addEventListener('click', async e => {
+      const btn = e.target.closest('.plan-delete-brand-btn');
+      if (!btn) return;
+      e.stopPropagation();
+      const mfr    = btn.dataset.mfr;
+      const season = planState.season;
+      delete planState.plan[mfr];
+      delete planState.drops[mfr];
+      planState.budget = planState.budget.filter(b => b.manufacturer !== mfr);
+      renderTable();
+      try {
+        await apiFetch(`${BASE}/api/budget-plan/brand?season_code=${encodeURIComponent(season)}&manufacturer=${encodeURIComponent(mfr)}`, { method: 'DELETE' });
+      } catch {}
     });
 
     // Restore single excluded brand
