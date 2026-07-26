@@ -103,7 +103,7 @@
       <button id="lang-fr" onclick="setLanguage('fr')" class="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 border-r border-gray-200">FR</button>
       <button id="lang-en" onclick="setLanguage('en')" class="text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600">EN</button>
     </div>
-    <button onclick="handleLogout()" class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded hover:bg-gray-100 transition-colors">Déconnexion</button>
+    <button onclick="handleLogout()" class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded hover:bg-gray-100 transition-colors" data-i18n="btn_logout">Déconnexion</button>
   </div>
 </header>
 
@@ -113,11 +113,11 @@
   <button class="tab py-3 tab-inactive" data-tab="sizes"     data-i18n="tab_sizes">Courbes tailles</button>
   <button class="tab py-3 tab-inactive" data-tab="transfers" data-i18n="tab_transfers">Transferts / Actions</button>
   <button class="tab py-3 tab-inactive" data-tab="plan"        data-i18n="tab_plan">Création de budget</button>
-  <button class="tab py-3 tab-inactive" data-tab="inv-history">Historique stock</button>
-  <button class="tab py-3 tab-inactive" data-tab="accounting">Comptabilité</button>
+  <button class="tab py-3 tab-inactive" data-tab="inv-history" data-i18n="tab_inv_history">Historique stock</button>
+  <button class="tab py-3 tab-inactive" data-tab="accounting" data-i18n="tab_accounting">Comptabilité</button>
   <button class="tab py-3 tab-inactive" data-tab="params"      data-i18n="tab_params">Paramètres</button>
   <a href="/velocity" class="py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors" data-i18n="tab_velocity">Vélocité →</a>
-  <a href="/onboarding.html" class="ml-2 py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">⚙ Configuration</a>
+  <a href="/onboarding.html" class="ml-2 py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" data-i18n="tab_config">⚙ Configuration</a>
   <button id="admin-btn" onclick="AdminPanel.open()" class="hidden ml-auto py-2 px-3 text-xs font-semibold text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-1.5" title="Administration">
     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
     Admin
@@ -240,31 +240,32 @@
 
     <!-- Filtres -->
     <div class="flex flex-wrap items-center gap-3 mb-4">
-      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800" data-i18n="nos_urgent_badge">
         NOS — À commander
       </span>
       <!-- Brand search with native datalist autocomplete -->
       <div class="relative">
         <input id="nosSearchBrand" type="text" placeholder="Rechercher une marque…"
           list="nosSearchBrandList" autocomplete="off"
+          data-i18n-ph="seas_search_ph"
           class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs w-52 focus:outline-none focus:ring-2 focus:ring-blue-300">
         <datalist id="nosSearchBrandList"></datalist>
       </div>
       <select id="nosUrgentShop" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-        <option value="">Toutes les boutiques</option>
+        <option value="" data-i18n="opt_all_stores">Toutes les boutiques</option>
       </select>
       <div class="flex items-center gap-3 ml-1">
         <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
-          <input type="checkbox" id="nosFilterCritique" checked class="accent-red-600"> <span class="text-red-600 font-semibold">⛔ Critique</span>
+          <input type="checkbox" id="nosFilterCritique" checked class="accent-red-600"> <span class="text-red-600 font-semibold" data-i18n="nos_urgency_critique">⛔ Critique</span>
         </label>
         <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
-          <input type="checkbox" id="nosFilterUrgent" checked class="accent-orange-500"> <span class="text-orange-600 font-semibold">⚠ Urgent</span>
+          <input type="checkbox" id="nosFilterUrgent" checked class="accent-orange-500"> <span class="text-orange-600 font-semibold" data-i18n="nos_urgency_urgent">⚠ Urgent</span>
         </label>
         <label class="flex items-center gap-1.5 text-xs cursor-pointer select-none">
-          <input type="checkbox" id="nosFilterAttention" checked class="accent-yellow-500"> <span class="text-yellow-600 font-semibold">◉ Attention</span>
+          <input type="checkbox" id="nosFilterAttention" checked class="accent-yellow-500"> <span class="text-yellow-600 font-semibold" data-i18n="nos_urgency_attention">◉ Attention</span>
         </label>
       </div>
-      <button id="nosApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Appliquer</button>
+      <button id="nosApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors" data-i18n="btn_apply">Appliquer</button>
       <span id="nosUrgentTotal" class="text-xs font-semibold text-gray-600 ml-auto"></span>
     </div>
 
@@ -274,26 +275,26 @@
         <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
           <tr>
             <th class="px-3 py-2 w-6"></th>
-            <th class="px-3 py-2 text-left">Marque</th>
-            <th class="px-3 py-2 text-center">Critique</th>
-            <th class="px-3 py-2 text-center">Urgent</th>
-            <th class="px-3 py-2 text-center">Attention</th>
-            <th class="px-3 py-2 text-right">Qté totale</th>
-            <th class="px-3 py-2 text-right">Budget estimé</th>
+            <th class="px-3 py-2 text-left" data-i18n="col_brand_th">Marque</th>
+            <th class="px-3 py-2 text-center" data-i18n="col_critique">Critique</th>
+            <th class="px-3 py-2 text-center" data-i18n="col_urgent">Urgent</th>
+            <th class="px-3 py-2 text-center" data-i18n="col_attention">Attention</th>
+            <th class="px-3 py-2 text-right" data-i18n="col_qty_total">Qté totale</th>
+            <th class="px-3 py-2 text-right" data-i18n="col_budget_est">Budget estimé</th>
             <th class="px-3 py-2 w-8"></th>
           </tr>
         </thead>
         <tbody id="nosAccordionBody" class="divide-y divide-gray-100"></tbody>
       </table>
       <div id="nosUrgentLoader" class="hidden flex justify-center py-8"><div class="spinner"></div></div>
-      <div id="nosUrgentEmpty" class="hidden text-center py-8 text-xs text-gray-400">Aucun article urgent — tout est bien approvisionné ✓</div>
+      <div id="nosUrgentEmpty" class="hidden text-center py-8 text-xs text-gray-400" data-i18n="nos_empty">Aucun article urgent — tout est bien approvisionné ✓</div>
     </div>
 
     <!-- Articles exclus du rapport NOS -->
     <div id="nosExcludedSection" class="hidden mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-semibold text-amber-700">Articles exclus du rapport NOS</span>
-        <button id="nosRestoreAllBtn" class="text-xs text-amber-600 hover:text-amber-800 underline">Restaurer tout</button>
+        <span class="text-xs font-semibold text-amber-700" data-i18n="nos_excluded_title">Articles exclus du rapport NOS</span>
+        <button id="nosRestoreAllBtn" class="text-xs text-amber-600 hover:text-amber-800 underline" data-i18n="btn_restore_all">Restaurer tout</button>
       </div>
       <div id="nosExcludedList" class="flex flex-col gap-1"></div>
     </div>
@@ -305,12 +306,12 @@
   <section id="tab-sizes" class="hidden">
     <!-- Filtres ligne 1 -->
     <div class="flex flex-wrap items-center gap-3 mb-2">
-      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">Courbes tailles — par marque</span>
+      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800" data-i18n="sizes_badge">Courbes tailles — par marque</span>
       <div class="flex rounded-lg border border-gray-300 overflow-hidden text-xs">
-        <button class="sizes-season-btn px-3 py-1.5 bg-blue-600 text-white font-semibold" data-season="">Tout</button>
-        <button class="sizes-season-btn px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 border-l border-gray-300" data-season="p">Printemps</button>
-        <button class="sizes-season-btn px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 border-l border-gray-300" data-season="a">Automne</button>
-        <button class="sizes-season-btn px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 border-l border-gray-300" data-season="custom">Période</button>
+        <button class="sizes-season-btn px-3 py-1.5 bg-blue-600 text-white font-semibold" data-season="" data-i18n="btn_all">Tout</button>
+        <button class="sizes-season-btn px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 border-l border-gray-300" data-season="p" data-i18n="season_spring">Printemps</button>
+        <button class="sizes-season-btn px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 border-l border-gray-300" data-season="a" data-i18n="season_fall">Automne</button>
+        <button class="sizes-season-btn px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 border-l border-gray-300" data-season="custom" data-i18n="season_custom">Période</button>
       </div>
       <!-- Date range (visible only when Période active) -->
       <div id="sizesDateRange" class="hidden items-center gap-2 text-xs">
@@ -319,23 +320,23 @@
         <input type="date" id="sizesDateTo" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300">
       </div>
       <select id="sizesCatFilter" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-        <option value="">Toutes les catégories</option>
+        <option value="" data-i18n="opt_all_cat">Toutes les catégories</option>
       </select>
       <select id="sizesShop" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-        <option value="">Toutes les boutiques</option>
+        <option value="" data-i18n="opt_all_stores">Toutes les boutiques</option>
       </select>
       <input id="sizesBrandSearch" type="text" placeholder="Rechercher une marque…"
         class="border border-gray-300 rounded-lg px-3 py-1.5 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-blue-300">
-      <button id="sizesApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Appliquer</button>
-      <button id="sizesHideUnnamedBtn" class="px-2 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">Masquer sans marque</button>
+      <button id="sizesApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700" data-i18n="btn_apply">Appliquer</button>
+      <button id="sizesHideUnnamedBtn" class="px-2 py-1.5 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50" data-i18n="btn_hide_unnamed">Masquer sans marque</button>
       <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
         <input type="checkbox" id="sizesExcludeNos" class="rounded">
-        Exclure NOS
+        <span data-i18n="sizes_exclude_nos">Exclure NOS</span>
       </label>
       <label class="flex items-center gap-1.5 text-xs text-gray-600 select-none" title="Filtre le stock actuel aux seuls articles taggés avec cette saison. Donne un ST basé uniquement sur les achats de la saison choisie.">
-        Stock :
+        <span data-i18n="lbl_stock">Stock :</span>
         <select id="sizesStockTag" class="border border-gray-300 rounded-lg px-2 py-1 text-xs ml-0.5">
-          <option value="">Tout le stock</option>
+          <option value="" data-i18n="opt_all_stock">Tout le stock</option>
         </select>
       </label>
       <span id="sizesCount" class="text-xs text-gray-500 ml-auto"></span>
@@ -343,23 +344,23 @@
     <!-- Chip filtre actif sans marque -->
     <div id="sizesUnnamedChip" class="hidden mb-2">
       <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">
-        Sans marque masqués
+        <span data-i18n="sizes_unnamed_hidden">Sans marque masqués</span>
         <button id="sizesShowUnnamedBtn" class="ml-1 text-blue-500 hover:text-blue-700 font-bold leading-none">✕</button>
       </span>
     </div>
     <!-- Légende -->
     <div class="flex flex-wrap gap-4 mb-3 text-[10px] text-gray-500">
-      <span><span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span>ST ≥ 70%</span>
-      <span><span class="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1"></span>ST 40–70%</span>
-      <span><span class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1"></span>ST &lt; 40%</span>
-      <span class="ml-2" title="Alignement : compare la part de chaque taille dans les ventes vs dans le stock actuel. ✓ = équilibré (écart &lt; 8 pts). ↑ surplus = trop de stock pour cette taille. ↓ déficit = manque de stock vs la demande.">Alignement stock : <span class="text-green-600 font-semibold">✓</span> ok · <span class="text-amber-600 font-semibold">↑</span> surplus · <span class="text-red-600 font-semibold">↓</span> déficit (&gt; ±8 pts)</span>
+      <span><span class="inline-block w-2 h-2 rounded-full bg-green-500 mr-1"></span><span data-i18n="sizes_legend_high">ST ≥ 70%</span></span>
+      <span><span class="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1"></span><span data-i18n="sizes_legend_mid">ST 40–70%</span></span>
+      <span><span class="inline-block w-2 h-2 rounded-full bg-red-500 mr-1"></span><span data-i18n="sizes_legend_low">ST &lt; 40%</span></span>
+      <span class="ml-2" data-i18n="sizes_legend_align" title="Alignement : compare la part de chaque taille dans les ventes vs dans le stock actuel. ✓ = équilibré (écart &lt; 8 pts). ↑ surplus = trop de stock pour cette taille. ↓ déficit = manque de stock vs la demande.">Alignement stock : <span class="text-green-600 font-semibold">✓</span> ok · <span class="text-amber-600 font-semibold">↑</span> surplus · <span class="text-red-600 font-semibold">↓</span> déficit (&gt; ±8 pts)</span>
     </div>
     <!-- Barre de résumé -->
     <div id="sizesSummaryBar" class="hidden mb-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex flex-wrap gap-6 text-xs text-blue-800">
-      <span>Marques visibles : <strong id="sumBrands">—</strong></span>
-      <span>Total vendu : <strong id="sumTotalSold">—</strong></span>
-      <span>ST moyen pondéré : <strong id="sumST">—</strong></span>
-      <span title="Nombre total de tailles avec un déséquilibre significatif (écart &gt; ±8 pts entre % ventes et % stock)">Déséquilibres : <strong id="sumImbalances">—</strong></span>
+      <span><span data-i18n="lbl_visible_brands">Marques visibles :</span> <strong id="sumBrands">—</strong></span>
+      <span><span data-i18n="lbl_total_sold">Total vendu :</span> <strong id="sumTotalSold">—</strong></span>
+      <span><span data-i18n="lbl_avg_st">ST moyen pondéré :</span> <strong id="sumST">—</strong></span>
+      <span title="Nombre total de tailles avec un déséquilibre significatif (écart &gt; ±8 pts entre % ventes et % stock)"><span data-i18n="lbl_imbalances">Déséquilibres :</span> <strong id="sumImbalances">—</strong></span>
     </div>
     <!-- Accordéon -->
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -367,17 +368,17 @@
         <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide select-none">
           <tr>
             <th class="px-3 py-2 w-6"></th>
-            <th class="px-3 py-2 text-left cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="manufacturer">Marque <span class="sizes-sort-icon" data-col="manufacturer"></span></th>
-            <th class="px-3 py-2 text-left">Catégorie</th>
-            <th class="px-3 py-2 text-right cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="totalSold">Total vendu <span class="sizes-sort-icon" data-col="totalSold"></span></th>
-            <th class="px-3 py-2 text-right cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="stGlobal" title="Sell-through : unités vendues ÷ (vendues + stock actuel). Indique quelle proportion de la marchandise reçue a été vendue.">Sell-through <span class="sizes-sort-icon" data-col="stGlobal"></span></th>
-            <th class="px-3 py-2 text-center cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="imbalances" title="Nombre de tailles où l'écart entre la part des ventes et la part du stock dépasse ±8 points de %. Un chiffre élevé indique que le stock n'est pas réparti selon la demande réelle.">Déséquilibres <span class="sizes-sort-icon" data-col="imbalances"></span></th>
+            <th class="px-3 py-2 text-left cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="manufacturer"><span data-i18n="col_brand_th">Marque</span> <span class="sizes-sort-icon" data-col="manufacturer"></span></th>
+            <th class="px-3 py-2 text-left" data-i18n="col_category">Catégorie</th>
+            <th class="px-3 py-2 text-right cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="totalSold"><span data-i18n="col_total_sold">Total vendu</span> <span class="sizes-sort-icon" data-col="totalSold"></span></th>
+            <th class="px-3 py-2 text-right cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="stGlobal" title="Sell-through : unités vendues ÷ (vendues + stock actuel). Indique quelle proportion de la marchandise reçue a été vendue."><span data-i18n="col_sell_through">Sell-through</span> <span class="sizes-sort-icon" data-col="stGlobal"></span></th>
+            <th class="px-3 py-2 text-center cursor-pointer hover:text-gray-800 sizes-sort-th" data-sort-col="imbalances" title="Nombre de tailles où l'écart entre la part des ventes et la part du stock dépasse ±8 points de %. Un chiffre élevé indique que le stock n'est pas réparti selon la demande réelle."><span data-i18n="col_imbalances">Déséquilibres</span> <span class="sizes-sort-icon" data-col="imbalances"></span></th>
           </tr>
         </thead>
         <tbody id="sizesAccordionBody" class="divide-y divide-gray-100"></tbody>
       </table>
       <div id="sizesLoader" class="hidden flex justify-center py-8"><div class="spinner"></div></div>
-      <div id="sizesEmpty" class="hidden text-center py-8 text-xs text-gray-400">Aucune donnée de taille disponible</div>
+      <div id="sizesEmpty" class="hidden text-center py-8 text-xs text-gray-400" data-i18n="sizes_empty">Aucune donnée de taille disponible</div>
     </div>
   </section>
 
@@ -386,27 +387,27 @@
     <!-- Paramètres -->
     <div class="flex flex-wrap items-center gap-3 mb-4">
       <label class="flex items-center gap-1.5 text-xs text-gray-600" title="Aucune vente sur le modèle complet (toutes tailles) depuis N jours dans la boutique = stock dormant">
-        Inactif depuis
+        <span data-i18n="transfers_dormant_lbl">Inactif depuis</span>
         <input id="transfersDays" type="number" min="1" max="365" value="14"
           class="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-center">
-        jours
+        <span data-i18n="lbl_days">jours</span>
       </label>
       <label class="flex items-center gap-1.5 text-xs text-gray-600" title="Nombre minimum d'unités en stock pour déclencher une recommandation">
-        Stock min.
+        <span data-i18n="transfers_min_stock_lbl">Stock min.</span>
         <input id="transfersMinStock" type="number" min="1" max="99" value="1"
           class="w-14 border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-center">
-        unité(s)
+        <span data-i18n="transfers_units">unité(s)</span>
       </label>
       <select id="transfersShopFilter" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-        <option value="">Toutes les boutiques</option>
+        <option value="" data-i18n="opt_all_stores">Toutes les boutiques</option>
       </select>
       <select id="transfersCatFilter" class="border border-gray-300 rounded-lg px-2 py-1.5 text-xs">
-        <option value="">Toutes les catégories</option>
+        <option value="" data-i18n="opt_all_cat">Toutes les catégories</option>
       </select>
       <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-        <input type="checkbox" id="transfersExcludeNos" class="rounded"> Exclure NOS
+        <input type="checkbox" id="transfersExcludeNos" class="rounded"> <span data-i18n="transfers_exclude_nos">Exclure NOS</span>
       </label>
-      <button id="transfersApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Appliquer</button>
+      <button id="transfersApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700" data-i18n="btn_apply">Appliquer</button>
       <span id="transfersCount" class="text-xs text-gray-500 ml-auto"></span>
     </div>
     <!-- Tableau accordéon -->
@@ -416,21 +417,21 @@
           <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide select-none">
             <tr>
               <th class="px-3 py-2 w-6"></th>
-              <th class="px-3 py-2 text-left">Modèle</th>
-              <th class="px-3 py-2 text-left">Marque</th>
-              <th class="px-3 py-2 text-left">Catégorie</th>
-              <th class="px-3 py-2 text-left" title="Boutique avec stock dormant — n'a pas vendu ce modèle depuis X jours">Stock dort chez</th>
-              <th class="px-3 py-2 text-right" title="Total des unités disponibles à transférer">Qté</th>
-              <th class="px-3 py-2 text-right" title="Jours sans vente sur ce modèle dans la boutique dormante. «Jamais» = aucune vente dans les 90 derniers jours.">Inactif depuis</th>
-              <th class="px-3 py-2 text-left" title="Boutique qui a vendu ce modèle dans les X derniers jours">Actif chez</th>
-              <th class="px-3 py-2 text-right" title="Unités vendues dans les 30 derniers jours dans la boutique active">Vendu (30j)</th>
+              <th class="px-3 py-2 text-left" data-i18n="col_model">Modèle</th>
+              <th class="px-3 py-2 text-left" data-i18n="col_brand_th">Marque</th>
+              <th class="px-3 py-2 text-left" data-i18n="col_category">Catégorie</th>
+              <th class="px-3 py-2 text-left" title="Boutique avec stock dormant — n'a pas vendu ce modèle depuis X jours" data-i18n="col_dormant_at">Stock dort chez</th>
+              <th class="px-3 py-2 text-right" title="Total des unités disponibles à transférer" data-i18n="col_qty">Qté</th>
+              <th class="px-3 py-2 text-right" title="Jours sans vente sur ce modèle dans la boutique dormante. «Jamais» = aucune vente dans les 90 derniers jours." data-i18n="col_dormant_since">Inactif depuis</th>
+              <th class="px-3 py-2 text-left" title="Boutique qui a vendu ce modèle dans les X derniers jours" data-i18n="col_active_at">Actif chez</th>
+              <th class="px-3 py-2 text-right" title="Unités vendues dans les 30 derniers jours dans la boutique active" data-i18n="col_sold_30d">Vendu (30j)</th>
             </tr>
           </thead>
           <tbody id="transfersBody" class="divide-y divide-gray-100"></tbody>
         </table>
       </div>
       <div id="transfersLoader" class="flex justify-center py-8"><div class="spinner"></div></div>
-      <div id="transfersEmpty" class="hidden text-center text-gray-400 py-12">
+      <div id="transfersEmpty" class="hidden text-center text-gray-400 py-12" data-i18n="transfers_empty">
         Aucun transfert recommandé avec ces paramètres.
       </div>
     </div>
@@ -445,15 +446,15 @@
     </div>
     <!-- Shop filter -->
     <div class="bg-white border border-gray-200 rounded-xl px-4 py-3 mb-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-      <label class="text-xs text-gray-500">Boutique :</label>
+      <label class="text-xs text-gray-500" data-i18n="plan_shop_lbl">Boutique :</label>
       <select id="planShopSel" class="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
-        <option value="">Toutes les boutiques</option>
+        <option value="" data-i18n="opt_all_boutiques">Toutes les boutiques</option>
       </select>
     </div>
     <!-- Totals bar -->
     <div class="flex gap-6 mb-4 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-5 py-3 flex-wrap items-center">
       <span>
-        <span class="text-[10px] text-gray-400 uppercase font-semibold block leading-none mb-0.5">Recommandé</span>
+        <span class="text-[10px] text-gray-400 uppercase font-semibold block leading-none mb-0.5" data-i18n="plan_recommended_lbl">Recommandé</span>
         <span class="font-semibold text-gray-600" id="planTotalRecommended">—</span>
       </span>
       <span class="text-gray-300">|</span>
@@ -505,33 +506,36 @@
     <!-- Add brand panel -->
     <div class="mt-3 flex items-center gap-3">
       <button id="planShowAddBrand"
-        class="flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-medium px-3 py-1.5 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
-        <span class="text-base leading-none">+</span> Ajouter une collection
+        class="flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-medium px-3 py-1.5 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+        data-i18n="btn_add_collection">
+        + Ajouter une collection
       </button>
     </div>
     <div id="planAddBrandPanel" class="hidden mt-3 bg-white border border-gray-200 rounded-xl px-5 py-4 max-w-xl">
-      <p class="text-xs font-semibold text-gray-700 mb-3">Ajouter une collection au budget</p>
+      <p class="text-xs font-semibold text-gray-700 mb-3" data-i18n="plan_add_collection_title">Ajouter une collection au budget</p>
       <div class="flex flex-wrap gap-4 items-end">
         <div>
-          <label class="text-[10px] font-semibold text-gray-400 uppercase block mb-1">Collection existante</label>
+          <label class="text-[10px] font-semibold text-gray-400 uppercase block mb-1" data-i18n="plan_lbl_existing">Collection existante</label>
           <select id="planAddExistingBrand"
             class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs w-52 text-gray-700 bg-white focus:border-indigo-400 focus:outline-none">
-            <option value="">— Choisir —</option>
+            <option value="" data-i18n="lbl_choose">— Choisir —</option>
           </select>
         </div>
-        <span class="text-xs text-gray-300 pb-1">ou</span>
+        <span class="text-xs text-gray-300 pb-1" data-i18n="plan_lbl_or">ou</span>
         <div>
-          <label class="text-[10px] font-semibold text-gray-400 uppercase block mb-1">Nouvelle collection</label>
-          <input type="text" id="planAddNewBrand" placeholder="Nom de la marque…"
+          <label class="text-[10px] font-semibold text-gray-400 uppercase block mb-1" data-i18n="plan_lbl_new">Nouvelle collection</label>
+          <input type="text" id="planAddNewBrand" placeholder="Nom de la marque…" data-i18n-ph="plan_add_brand_ph"
             class="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs w-44 focus:border-indigo-400 focus:outline-none">
         </div>
         <div class="flex gap-2">
           <button id="planConfirmAddBrand"
-            class="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+            class="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+            data-i18n="btn_add">
             Ajouter
           </button>
           <button id="planCancelAddBrand"
-            class="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            class="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            data-i18n="btn_cancel">
             Annuler
           </button>
         </div>
@@ -541,8 +545,8 @@
     <!-- Excluded brands panel -->
     <div id="planExcludedPanel" class="hidden mt-4 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
       <div class="flex items-center justify-between mb-3">
-        <span class="text-xs font-semibold text-amber-800">Marques retirées du plan</span>
-        <button id="planRestoreAllBtn" class="text-xs text-amber-700 hover:text-amber-900 underline">Tout réintégrer</button>
+        <span class="text-xs font-semibold text-amber-800" data-i18n="plan_excluded_title">Marques retirées du plan</span>
+        <button id="planRestoreAllBtn" class="text-xs text-amber-700 hover:text-amber-900 underline" data-i18n="btn_restore_all_plan">Tout réintégrer</button>
       </div>
       <div id="planExcludedList" class="flex flex-wrap gap-2"></div>
     </div>
@@ -853,20 +857,21 @@
 
       <!-- Délais fournisseur NOS -->
       <div class="mt-6 border-t border-gray-200 pt-5">
-        <h3 class="text-xs font-semibold text-gray-700 mb-1">Délais fournisseur NOS (semaines)</h3>
-        <p class="text-xs text-gray-400 mb-3">Délai entre la commande et la réception. Utilisé pour déterminer les articles urgents à commander.</p>
+        <h3 class="text-xs font-semibold text-gray-700 mb-1" data-i18n="params_lead_times_title">Délais fournisseur NOS (semaines)</h3>
+        <p class="text-xs text-gray-400 mb-3" data-i18n="params_lead_times_desc">Délai entre la commande et la réception. Utilisé pour déterminer les articles urgents à commander.</p>
         <div id="leadTimesContainer" class="flex flex-col gap-2 mb-3 max-h-64 overflow-y-auto pr-1"></div>
         <div class="flex items-center gap-2 mt-2">
-          <span class="text-xs text-gray-500">Délai par défaut si non configuré :</span>
+          <span class="text-xs text-gray-500" data-i18n="params_lead_default_lbl">Délai par défaut si non configuré :</span>
           <input id="leadTimeDefault" type="number" min="1" max="52" value="8"
             class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
-          <span class="text-xs text-gray-400">sem.</span>
+          <span class="text-xs text-gray-400" data-i18n="lbl_weeks_short">sem.</span>
         </div>
         <button id="leadTimesApply"
-          class="mt-3 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+          class="mt-3 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+          data-i18n="btn_save_lead_times">
           Sauvegarder les délais
         </button>
-        <div id="leadTimesNote" class="mt-2 text-xs text-emerald-700 font-semibold hidden">Délais sauvegardés.</div>
+        <div id="leadTimesNote" class="mt-2 text-xs text-emerald-700 font-semibold hidden" data-i18n="params_lead_times_saved">Délais sauvegardés.</div>
       </div>
     </div>
   </section>
@@ -963,6 +968,67 @@ const TRANSLATIONS = {
     filter_active: n => `${n} filtre${n>1?'s':''} actif${n>1?'s':''}`,
     tier_Augmenter:'Augmenter', 'tier_Légère hausse':'Légère hausse',
     tier_Reconduire:'Reconduire', 'tier_Réduire':'Réduire', tier_Couper:'Couper',
+    btn_logout:'Déconnexion',
+    tab_inv_history:'Historique stock', tab_accounting:'Comptabilité', tab_config:'⚙ Configuration',
+    nos_urgent_badge:'NOS — À commander',
+    nos_filter_lbl:'Filtrer :',
+    nos_urgency_critique:'⛔ Critique', nos_urgency_urgent:'⚠ Urgent', nos_urgency_attention:'◉ Attention',
+    col_brand_th:'Marque', col_critique:'Critique', col_urgent:'Urgent', col_attention:'Attention',
+    col_qty_total:'Qté totale', col_budget_est:'Budget estimé',
+    nos_empty:'Aucun article urgent — tout est bien approvisionné ✓',
+    nos_excluded_title:'Articles exclus du rapport NOS',
+    btn_restore_all:'Restaurer tout',
+    nos_restore_collection:'Restaurer la collection', nos_restore:'Restaurer',
+    nos_detail_desc:'Description', nos_detail_shop:'Boutique', nos_detail_stock:'Stock',
+    nos_detail_on_order:'En cmd', nos_detail_coverage:'Couverture', nos_detail_lead:'Délai fourn.',
+    nos_detail_velocity:'Vit./sem.', nos_detail_qty_order:'Qté à cmd',
+    nos_error_retry:'Réessayer',
+    sizes_badge:'Courbes tailles — par marque',
+    btn_all:'Tout', season_spring:'Printemps', season_fall:'Automne', season_custom:'Période',
+    opt_all_cat:'Toutes les catégories', opt_all_stores:'Toutes les boutiques',
+    btn_hide_unnamed:'Masquer sans marque', sizes_exclude_nos:'Exclure NOS',
+    lbl_stock:'Stock :', opt_all_stock:'Tout le stock',
+    sizes_unnamed_hidden:'Sans marque masqués',
+    sizes_legend_high:'ST ≥ 70%', sizes_legend_mid:'ST 40–70%', sizes_legend_low:'ST < 40%',
+    sizes_legend_align:'Alignement stock : ✓ ok · ↑ surplus · ↓ déficit (> ±8 pts)',
+    lbl_visible_brands:'Marques visibles :', lbl_total_sold:'Total vendu :',
+    lbl_avg_st:'ST moyen pondéré :', lbl_imbalances:'Déséquilibres :',
+    col_total_sold:'Total vendu', col_sell_through:'Sell-through', col_imbalances:'Déséquilibres',
+    sizes_empty:'Aucune donnée de taille disponible',
+    transfers_dormant_lbl:'Inactif depuis', lbl_days:'jours',
+    transfers_min_stock_lbl:'Stock min.', transfers_units:'unité(s)',
+    transfers_exclude_nos:'Exclure NOS',
+    col_model:'Modèle', col_dormant_at:'Stock dort chez', col_qty:'Qté',
+    col_dormant_since:'Inactif depuis', col_active_at:'Actif chez', col_sold_30d:'Vendu (30j)',
+    plan_shop_lbl:'Boutique :', opt_all_boutiques:'Toutes les boutiques',
+    plan_recommended_lbl:'Recommandé',
+    btn_add_collection:'+ Ajouter une collection',
+    plan_add_collection_title:'Ajouter une collection au budget',
+    plan_lbl_existing:'Collection existante', plan_lbl_or:'ou', plan_lbl_new:'Nouvelle collection',
+    plan_add_brand_ph:'Nom de la marque…',
+    btn_add:'Ajouter', btn_cancel:'Annuler',
+    plan_excluded_title:'Marques retirées du plan', btn_restore_all_plan:'Tout réintégrer',
+    plan_no_shop:'Aucune boutique sélectionnée', plan_add_drop:'+ Ajouter une livraison',
+    plan_add_doc:'Ajouter un document', plan_no_docs:'Aucun document',
+    plan_drop_delete_confirm:'Supprimer cette livraison et ses montants ?',
+    plan_doc_delete_confirm:'Supprimer ce document ?',
+    plan_brand_required:'Veuillez choisir ou saisir un nom de collection.',
+    plan_uploading:'Envoi en cours…', plan_new_lbl:'nouvelle',
+    plan_all_excluded:'Toutes les marques ont été retirées — ',
+    plan_restore_link:'Tout réintégrer',
+    plan_delete_brand_confirm:'Supprimer cette collection du plan ?',
+    plan_suggested_total_lbl:'Suggéré total :',
+    plan_reset_tip_prefix:'Réinitialiser au montant recommandé',
+    plan_delete_drop_title:'Supprimer la livraison',
+    plan_exclude_brand_title:'Retirer du plan',
+    plan_delete_brand_title:'Supprimer cette collection du plan',
+    params_lead_times_title:'Délais fournisseur NOS (semaines)',
+    params_lead_times_desc:'Délai entre la commande et la réception. Utilisé pour déterminer les articles urgents à commander.',
+    params_lead_default_lbl:'Délai par défaut si non configuré :',
+    lbl_weeks_short:'sem.', btn_save_lead_times:'Sauvegarder les délais',
+    params_lead_times_saved:'Délais sauvegardés.',
+    btn_boutique_lbl:'Boutique :', lbl_choose:'— Choisir —',
+    params_recency_direction:'récent→ancien',
   },
   en: {
     loading:'Loading…', lastSync:'Last sync',
@@ -1046,6 +1112,67 @@ const TRANSLATIONS = {
     filter_active: n => `${n} active filter${n>1?'s':''}`,
     tier_Augmenter:'Grow', 'tier_Légère hausse':'Slight Growth',
     tier_Reconduire:'Renew', 'tier_Réduire':'Reduce', tier_Couper:'Cut',
+    btn_logout:'Log out',
+    tab_inv_history:'Stock History', tab_accounting:'Accounting', tab_config:'⚙ Configuration',
+    nos_urgent_badge:'NOS — To Order',
+    nos_filter_lbl:'Filter:',
+    nos_urgency_critique:'⛔ Critical', nos_urgency_urgent:'⚠ Urgent', nos_urgency_attention:'◉ Attention',
+    col_brand_th:'Brand', col_critique:'Critical', col_urgent:'Urgent', col_attention:'Attention',
+    col_qty_total:'Total Qty', col_budget_est:'Est. Budget',
+    nos_empty:'No urgent items — everything is well stocked ✓',
+    nos_excluded_title:'Items excluded from NOS report',
+    btn_restore_all:'Restore all',
+    nos_restore_collection:'Restore collection', nos_restore:'Restore',
+    nos_detail_desc:'Description', nos_detail_shop:'Store', nos_detail_stock:'Stock',
+    nos_detail_on_order:'On order', nos_detail_coverage:'Coverage', nos_detail_lead:'Lead time',
+    nos_detail_velocity:'Vel./wk.', nos_detail_qty_order:'Qty to order',
+    nos_error_retry:'Retry',
+    sizes_badge:'Size Curves — by Brand',
+    btn_all:'All', season_spring:'Spring', season_fall:'Fall', season_custom:'Period',
+    opt_all_cat:'All categories', opt_all_stores:'All stores',
+    btn_hide_unnamed:'Hide unbranded', sizes_exclude_nos:'Exclude NOS',
+    lbl_stock:'Stock:', opt_all_stock:'All stock',
+    sizes_unnamed_hidden:'Unbranded hidden',
+    sizes_legend_high:'ST ≥ 70%', sizes_legend_mid:'ST 40–70%', sizes_legend_low:'ST < 40%',
+    sizes_legend_align:'Stock alignment: ✓ ok · ↑ surplus · ↓ deficit (> ±8 pts)',
+    lbl_visible_brands:'Visible brands:', lbl_total_sold:'Total sold:',
+    lbl_avg_st:'Weighted avg ST:', lbl_imbalances:'Imbalances:',
+    col_total_sold:'Total sold', col_sell_through:'Sell-through', col_imbalances:'Imbalances',
+    sizes_empty:'No size data available',
+    transfers_dormant_lbl:'Dormant since', lbl_days:'days',
+    transfers_min_stock_lbl:'Min stock', transfers_units:'unit(s)',
+    transfers_exclude_nos:'Exclude NOS',
+    col_model:'Style', col_dormant_at:'Dormant at', col_qty:'Qty',
+    col_dormant_since:'Dormant since', col_active_at:'Active at', col_sold_30d:'Sold (30d)',
+    plan_shop_lbl:'Store:', opt_all_boutiques:'All stores',
+    plan_recommended_lbl:'Recommended',
+    btn_add_collection:'+ Add collection',
+    plan_add_collection_title:'Add a collection to the budget',
+    plan_lbl_existing:'Existing collection', plan_lbl_or:'or', plan_lbl_new:'New collection',
+    plan_add_brand_ph:'Brand name…',
+    btn_add:'Add', btn_cancel:'Cancel',
+    plan_excluded_title:'Brands removed from plan', btn_restore_all_plan:'Restore all',
+    plan_no_shop:'No store selected', plan_add_drop:'+ Add delivery',
+    plan_add_doc:'Add document', plan_no_docs:'No documents',
+    plan_drop_delete_confirm:'Delete this delivery and its amounts?',
+    plan_doc_delete_confirm:'Delete this document?',
+    plan_brand_required:'Please choose or enter a collection name.',
+    plan_uploading:'Uploading…', plan_new_lbl:'new',
+    plan_all_excluded:'All brands have been removed — ',
+    plan_restore_link:'Restore all',
+    plan_delete_brand_confirm:'Remove this collection from the plan?',
+    plan_suggested_total_lbl:'Total suggested:',
+    plan_reset_tip_prefix:'Reset to recommended amount',
+    plan_delete_drop_title:'Delete delivery',
+    plan_exclude_brand_title:'Remove from plan',
+    plan_delete_brand_title:'Remove collection from plan',
+    params_lead_times_title:'NOS Supplier Lead Times (weeks)',
+    params_lead_times_desc:'Time between order and receipt. Used to determine urgent items to reorder.',
+    params_lead_default_lbl:'Default lead time if not set:',
+    lbl_weeks_short:'wks.', btn_save_lead_times:'Save lead times',
+    params_lead_times_saved:'Lead times saved.',
+    btn_boutique_lbl:'Store:', lbl_choose:'— Select —',
+    params_recency_direction:'recent→oldest',
   },
 };
 
@@ -2550,14 +2677,14 @@ const PlanTab = (() => {
 
       const resetBtn = isOverridden
         ? `<button class="plan-suggested-reset shrink-0 text-indigo-300 hover:text-indigo-600 text-sm leading-none"
-             title="Réinitialiser au montant recommandé (${fmtC(calcSuggested)})"
+             title="${t('plan_reset_tip_prefix')} (${fmtC(calcSuggested)})"
              data-mfr="${escHtml(mfr)}" data-calc="${calcSuggested}">↺</button>`
         : '';
       const calcRef = isOverridden
         ? `<div class="text-[9px] text-gray-400 text-right mt-0.5">rec. ${fmtC(calcSuggested)}</div>`
         : '';
       const suggestedCell = m._manual
-        ? `<span class="text-gray-300 italic text-[10px]">nouvelle</span>`
+        ? `<span class="text-gray-300 italic text-[10px]">${t('plan_new_lbl')}</span>`
         : `<div class="text-right">
              <div class="flex items-center justify-end gap-1">
                ${resetBtn}
@@ -2584,8 +2711,8 @@ const PlanTab = (() => {
           <td class="px-4 py-2.5 text-right">${diffHtml}</td>
           <td class="px-4 py-2.5 text-right">
             ${m._manual
-              ? `<button class="plan-delete-brand-btn text-gray-300 hover:text-red-500 text-xs px-1" title="Supprimer cette collection du plan" data-mfr="${escHtml(mfr)}">🗑</button>`
-              : `<button class="plan-exclude-btn text-gray-300 hover:text-red-400 text-xs px-1" title="Retirer du plan" data-mfr="${escHtml(mfr)}">✕</button>`
+              ? `<button class="plan-delete-brand-btn text-gray-300 hover:text-red-500 text-xs px-1" title="${t('plan_delete_brand_title')}" data-mfr="${escHtml(mfr)}">🗑</button>`
+              : `<button class="plan-exclude-btn text-gray-300 hover:text-red-400 text-xs px-1" title="${t('plan_exclude_brand_title')}" data-mfr="${escHtml(mfr)}">✕</button>`
             }
           </td>
         </tr>
@@ -2599,7 +2726,7 @@ const PlanTab = (() => {
     if (rows.length) {
       tbody.innerHTML = rows.join('');
     } else if (planState.excluded.size > 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-gray-400 text-xs">Toutes les marques ont été retirées — <button onclick="document.getElementById('planRestoreAllBtn').click()" class="underline text-amber-600 hover:text-amber-800">Tout réintégrer</button></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-gray-400 text-xs">${t('plan_all_excluded')}<button onclick="document.getElementById('planRestoreAllBtn').click()" class="underline text-amber-600 hover:text-amber-800">${t('plan_restore_link')}</button></td></tr>`;
     } else {
       tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-gray-400">${t('no_data')}</td></tr>`;
     }
@@ -2689,7 +2816,7 @@ const PlanTab = (() => {
       }).join('');
 
       const deleteBtn = isDrop1 ? '' :
-        `<button class="plan-drop-delete ml-2 text-gray-300 hover:text-red-400 text-xs" title="Supprimer la livraison"
+        `<button class="plan-drop-delete ml-2 text-gray-300 hover:text-red-400 text-xs" title="${t('plan_delete_drop_title')}"
            data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">✕</button>`;
 
       const docsSection = `
@@ -2700,7 +2827,7 @@ const PlanTab = (() => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
             </svg>
-            Ajouter un document
+            ${t('plan_add_doc')}
             <input type="file" class="plan-doc-upload sr-only"
               data-mfr="${escHtml(mfr)}" data-drop="${drop_id}"
               accept=".pdf,.xlsx,.xls,.docx,.doc,.csv,.txt,.jpg,.jpeg,.png">
@@ -2717,7 +2844,7 @@ const PlanTab = (() => {
             ${deleteBtn}
             ${dropTotal > 0 ? `<span class="text-xs text-indigo-600 font-semibold ml-2">${fmtC(dropTotal)}</span>` : ''}
           </div>
-          ${visibleShops.length ? shopRows : '<span class="text-xs text-gray-300">Aucune boutique sélectionnée</span>'}
+          ${visibleShops.length ? shopRows : `<span class="text-xs text-gray-300">${t('plan_no_shop')}</span>`}
           ${docsSection}
         </div>`;
     }).join('<div class="border-t border-gray-200 my-3"></div>');
@@ -2725,11 +2852,11 @@ const PlanTab = (() => {
     return `
       <div class="flex gap-8 flex-wrap">
         <div class="min-w-72">
-          <div class="text-xs text-gray-400 mb-3">Suggéré total : <span class="font-semibold text-gray-600">${fmtC(suggested)}</span></div>
+          <div class="text-xs text-gray-400 mb-3">${t('plan_suggested_total_lbl')} <span class="font-semibold text-gray-600">${fmtC(suggested)}</span></div>
           ${dropBlocks}
           <button class="plan-add-drop mt-3 flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-medium"
             data-mfr="${escHtml(mfr)}">
-            <span class="text-base leading-none">+</span> Ajouter une livraison
+            ${t('plan_add_drop')}
           </button>
         </div>
       </div>`;
@@ -2765,7 +2892,7 @@ const PlanTab = (() => {
               <button class="plan-doc-delete text-gray-300 hover:text-red-400 text-[10px]"
                 data-doc-id="${doc.id}" data-mfr="${escHtml(mfr)}" data-drop="${escHtml(dropId)}" title="Supprimer">✕</button>
             </div>`).join('')
-        : '<span class="text-[10px] text-gray-300 italic">Aucun document</span>';
+        : `<span class="text-[10px] text-gray-300 italic">${t('plan_no_docs')}</span>`;
       containers.forEach(c => c.innerHTML = html);
     } catch {
       containers.forEach(c => c.innerHTML = '<span class="text-[10px] text-red-400">Erreur</span>');
@@ -2889,7 +3016,7 @@ const PlanTab = (() => {
       if (!btn) return;
       const mfr    = btn.dataset.mfr;
       const dropId = btn.dataset.drop;
-      if (!confirm('Supprimer cette livraison et ses montants ?')) return;
+      if (!confirm(t('plan_drop_delete_confirm'))) return;
       try {
         await apiFetch(`${BASE}/api/budget-plan/drop`, {
           method: 'DELETE', headers: { 'Content-Type': 'application/json' },
@@ -2988,7 +3115,7 @@ const PlanTab = (() => {
       const txtEl = document.getElementById('planAddNewBrand');
       const msgEl = document.getElementById('planAddBrandMsg');
       const mfr   = (txtEl.value.trim() || selEl.value || '').trim();
-      if (!mfr) { msgEl.textContent = 'Veuillez choisir ou saisir un nom de collection.'; msgEl.classList.remove('hidden'); return; }
+      if (!mfr) { msgEl.textContent = t('plan_brand_required'); msgEl.classList.remove('hidden'); return; }
       if (planState.excluded.has(mfr)) { planState.excluded.delete(mfr); saveExcluded(); }
       if (!planState.budget.find(b => b.manufacturer === mfr)) planState.budget.push({ manufacturer: mfr, net_budget: 0, _manual: true });
       if (!planState.drops[mfr]) planState.drops[mfr] = [{ drop_id: 'drop_1', drop_name: 'Drop 1', drop_order: 1 }];
@@ -3007,7 +3134,7 @@ const PlanTab = (() => {
       const mfr  = input.dataset.mfr;
       const drop = input.dataset.drop;
       const containers = document.querySelectorAll(`.plan-docs-list[data-mfr="${CSS.escape(mfr)}"][data-drop="${CSS.escape(drop)}"]`);
-      containers.forEach(c => c.innerHTML = '<span class="text-[10px] text-gray-400 animate-pulse">Envoi en cours…</span>');
+      containers.forEach(c => c.innerHTML = `<span class="text-[10px] text-gray-400 animate-pulse">${t('plan_uploading')}</span>`);
       const reader = new FileReader();
       reader.onload = async evt => {
         const base64 = evt.target.result.split(',')[1];
@@ -3032,7 +3159,7 @@ const PlanTab = (() => {
       const btn = e.target.closest('.plan-doc-delete');
       if (!btn) return;
       const docId = btn.dataset.docId, mfr = btn.dataset.mfr, drop = btn.dataset.drop;
-      if (!confirm('Supprimer ce document ?')) return;
+      if (!confirm(t('plan_doc_delete_confirm'))) return;
       try {
         await apiFetch(`${BASE}/api/budget-plan/document/${docId}`, { method: 'DELETE' });
         loadDocs(mfr, drop);
@@ -3564,7 +3691,7 @@ const ParamsTab = (() => {
     const weights = Array.from({ length: n }, (_, i) => Math.pow(rf, n - 1 - i));
     const total   = weights.reduce((s, w) => s + w, 0);
     const pcts    = weights.map(w => Math.round(w / total * 100) + '%');
-    previewEl.textContent = `→ ${pcts.join(' / ')} (récent→ancien)`;
+    previewEl.textContent = `→ ${pcts.join(' / ')} (${t('params_recency_direction')})`;
   }
 
   async function init() {
@@ -3677,7 +3804,7 @@ const NosTab = (() => {
       console.error('[NOS] Erreur de chargement:', err);
       loader?.classList.add('hidden');
       document.getElementById('nosAccordionBody').innerHTML =
-        '<tr><td colspan="7" class="text-center py-6 text-xs text-red-400">Erreur: ' + (err?.message ?? err) + ' — <button onclick="NosTab.load()" class="underline hover:text-red-600">Réessayer</button></td></tr>';
+        '<tr><td colspan="7" class="text-center py-6 text-xs text-red-400">Erreur: ' + (err?.message ?? err) + ' — <button onclick="NosTab.load()" class="underline hover:text-red-600">' + t('nos_error_retry') + '</button></td></tr>';
     }
   }
 
@@ -3731,14 +3858,14 @@ const NosTab = (() => {
       var header  = '<div class="nos-excl-brand-row flex items-center gap-2 py-1.5 cursor-pointer hover:bg-amber-100 rounded px-1 -mx-1 select-none" data-brand="' + encodeURIComponent(brand) + '">'
         + '<span class="text-amber-400 text-[10px]">' + arrow + '</span>'
         + '<span class="text-amber-700 font-semibold text-xs flex-1">' + brand + ' <span class="text-amber-400 font-normal">(' + items.length + ' article' + (items.length > 1 ? 's' : '') + ')</span></span>'
-        + '<button class="nos-restore-brand-btn text-amber-500 hover:text-amber-700 text-xs underline" data-item-ids="' + encodeURIComponent(JSON.stringify(itemIds)) + '">Restaurer la collection</button>'
+        + '<button class="nos-restore-brand-btn text-amber-500 hover:text-amber-700 text-xs underline" data-item-ids="' + encodeURIComponent(JSON.stringify(itemIds)) + '">' + t('nos_restore_collection') + '</button>'
         + '</div>';
       var itemsList = isOpen
         ? '<div class="pl-4 pb-1">'
           + items.map(function(it) {
             return '<div class="flex items-center justify-between text-[11px] py-0.5">'
               + '<span class="text-amber-700">' + it.description + '</span>'
-              + '<button class="nos-restore-btn text-amber-400 hover:text-amber-600 ml-4 underline" data-item-id="' + it.item_id + '">Restaurer</button>'
+              + '<button class="nos-restore-btn text-amber-400 hover:text-amber-600 ml-4 underline" data-item-id="' + it.item_id + '">' + t('nos_restore') + '</button>'
               + '</div>';
           }).join('')
           + '</div>'
@@ -3795,7 +3922,7 @@ const NosTab = (() => {
     });
 
     var totalCost = filtered.reduce(function(acc, it) { return acc + it.suggested_qty * it.unit_cost; }, 0);
-    total.textContent = filtered.length + ' article' + (filtered.length > 1 ? 's' : '') + ' — Budget estimé : ' + fmt(totalCost);
+    total.textContent = t('nos_count')(filtered.length) + ' — ' + t('col_budget_est') + ' : ' + fmt(totalCost);
 
     var rows = [];
     Object.entries(byBrand).sort(function(a, b) { return a[0].localeCompare(b[0]); }).forEach(function(entry) {
@@ -3833,14 +3960,14 @@ const NosTab = (() => {
         rows.push('<tr class="nos-detail-row" data-brand="' + encodeURIComponent(brand) + '"><td colspan="8" class="p-0 bg-gray-50">'
           + '<table class="w-full text-xs"><thead><tr class="text-gray-400 uppercase text-[9px] tracking-wide border-b border-gray-200">'
           + '<th class="px-5 py-1.5 w-6"></th>'
-          + '<th class="px-4 py-1.5 text-left">Description</th>'
-          + '<th class="px-4 py-1.5 text-left">Boutique</th>'
-          + '<th class="px-4 py-1.5 text-right">Stock</th>'
-          + '<th class="px-4 py-1.5 text-right">En cmd</th>'
-          + '<th class="px-4 py-1.5 text-right">Couverture</th>'
-          + '<th class="px-4 py-1.5 text-right">Délai fourn.</th>'
-          + '<th class="px-4 py-1.5 text-right">Vit./sem.</th>'
-          + '<th class="px-4 py-1.5 text-right">Qté à cmd</th>'
+          + '<th class="px-4 py-1.5 text-left">' + t('nos_detail_desc') + '</th>'
+          + '<th class="px-4 py-1.5 text-left">' + t('nos_detail_shop') + '</th>'
+          + '<th class="px-4 py-1.5 text-right">' + t('nos_detail_stock') + '</th>'
+          + '<th class="px-4 py-1.5 text-right">' + t('nos_detail_on_order') + '</th>'
+          + '<th class="px-4 py-1.5 text-right">' + t('nos_detail_coverage') + '</th>'
+          + '<th class="px-4 py-1.5 text-right">' + t('nos_detail_lead') + '</th>'
+          + '<th class="px-4 py-1.5 text-right">' + t('nos_detail_velocity') + '</th>'
+          + '<th class="px-4 py-1.5 text-right">' + t('nos_detail_qty_order') + '</th>'
           + '<th class="px-4 py-1.5 w-8"></th>'
           + '</tr></thead><tbody class="divide-y divide-gray-100">'
           + allItems.map(detailRowHtml).join('')
