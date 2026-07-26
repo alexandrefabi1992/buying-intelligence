@@ -3442,7 +3442,8 @@ app.get('/api/budget/marque', async (req, res, next) => {
         COALESCE(p.manufacturer, 'Sans marque')                                  AS manufacturer,
         SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8   AS stock_at_cost
       FROM products p
-      JOIN inventory i ON i.item_id = p.item_id
+      JOIN inventory i  ON i.item_id  = p.item_id
+      JOIN shops     sh ON sh.shop_id = i.shop_id AND sh.tenant_id = p.tenant_id
       WHERE p.tags ILIKE $${coInvTagIdx}
         AND p.tags NOT ILIKE '%nos%'
         AND p.default_cost > 0
@@ -3522,7 +3523,8 @@ app.get('/api/budget/marque', async (req, res, next) => {
           SUM(COALESCE(i.qty_on_hand, 0))::float8                                   AS qty_on_hand,
           SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8    AS stock_cost
         FROM products p
-        JOIN inventory i ON i.item_id = p.item_id
+        JOIN inventory i  ON i.item_id  = p.item_id
+        JOIN shops     sh ON sh.shop_id = i.shop_id AND sh.tenant_id = p.tenant_id
         WHERE p.tags ILIKE $${irInvTagIdx}
           AND p.tags NOT ILIKE '%nos%'
           ${tenantCond}
