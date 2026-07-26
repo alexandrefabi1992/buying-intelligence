@@ -280,6 +280,7 @@
             <th class="px-3 py-2 text-center">Attention</th>
             <th class="px-3 py-2 text-right">Qté totale</th>
             <th class="px-3 py-2 text-right">Budget estimé</th>
+            <th class="px-3 py-2 w-8"></th>
           </tr>
         </thead>
         <tbody id="nosAccordionBody" class="divide-y divide-gray-100"></tbody>
@@ -3713,12 +3714,31 @@ const NosTab = (() => {
       seen.add(it.item_id); return true;
     });
 
-    list.innerHTML = unique.map(function(it) {
-      return '<div class="flex items-center justify-between text-xs py-0.5">'
-        + '<span class="text-amber-800">' + it.description + ' <span class="text-amber-400">— ' + it.manufacturer + '</span></span>'
-        + '<button class="nos-restore-btn text-amber-500 hover:text-amber-700 ml-4 underline" data-item-id="' + it.item_id + '">Restaurer</button>'
+    // Group by manufacturer
+    var byBrand = {};
+    unique.forEach(function(it) {
+      if (!byBrand[it.manufacturer]) byBrand[it.manufacturer] = [];
+      byBrand[it.manufacturer].push(it);
+    });
+
+    var html = Object.entries(byBrand).sort(function(a, b) { return a[0].localeCompare(b[0]); }).map(function(entry) {
+      var brand = entry[0];
+      var items = entry[1];
+      var itemIds = items.map(function(it) { return it.item_id; });
+      var header = '<div class="flex items-center justify-between py-1">'
+        + '<span class="text-amber-700 font-semibold text-xs">' + brand + ' <span class="text-amber-400 font-normal">(' + items.length + ' article' + (items.length > 1 ? 's' : '') + ')</span></span>'
+        + '<button class="nos-restore-brand-btn text-amber-500 hover:text-amber-700 text-xs underline ml-4" data-item-ids="' + encodeURIComponent(JSON.stringify(itemIds)) + '">Restaurer la collection</button>'
         + '</div>';
-    }).join('');
+      var itemsList = items.map(function(it) {
+        return '<div class="flex items-center justify-between text-[11px] py-0.5 pl-3">'
+          + '<span class="text-amber-700">' + it.description + '</span>'
+          + '<button class="nos-restore-btn text-amber-400 hover:text-amber-600 ml-4 underline" data-item-id="' + it.item_id + '">Restaurer</button>'
+          + '</div>';
+      }).join('');
+      return header + itemsList;
+    }).join('<div class="border-t border-amber-200 my-1"></div>');
+
+    list.innerHTML = html;
     section.classList.remove('hidden');
   }
 
@@ -3779,6 +3799,7 @@ const NosTab = (() => {
         ? '<span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-700">' + groups.attention.length + '</span>'
         : '<span class="text-gray-300">—</span>';
 
+      var brandItemIds = allItems.map(function(it) { return String(it.item_id); });
       rows.push('<tr class="nos-brand-row hover:bg-blue-50 cursor-pointer select-none border-b border-gray-100" data-brand="' + encodeURIComponent(brand) + '">'
         + '<td class="px-3 py-2.5 text-gray-400 text-center text-sm">' + arrow + '</td>'
         + '<td class="px-3 py-2.5 font-semibold text-gray-800">' + brand + '</td>'
@@ -3787,10 +3808,11 @@ const NosTab = (() => {
         + '<td class="px-3 py-2.5 text-center">' + attnBadge + '</td>'
         + '<td class="px-3 py-2.5 text-right text-gray-700">' + brandQty + '</td>'
         + '<td class="px-3 py-2.5 text-right font-semibold text-indigo-700">' + fmt(brandCost) + '</td>'
+        + '<td class="px-3 py-2.5 text-center"><button class="nos-brand-exclude-btn text-gray-300 hover:text-red-500 text-xs font-bold px-1 py-0.5 rounded hover:bg-red-50" data-brand="' + encodeURIComponent(brand) + '" data-items="' + encodeURIComponent(JSON.stringify(brandItemIds)) + '" title="Exclure toute la collection">✕</button></td>'
         + '</tr>');
 
       if (isOpen) {
-        rows.push('<tr class="nos-detail-row" data-brand="' + encodeURIComponent(brand) + '"><td colspan="7" class="p-0 bg-gray-50">'
+        rows.push('<tr class="nos-detail-row" data-brand="' + encodeURIComponent(brand) + '"><td colspan="8" class="p-0 bg-gray-50">'
           + '<table class="w-full text-xs"><thead><tr class="text-gray-400 uppercase text-[9px] tracking-wide border-b border-gray-200">'
           + '<th class="px-5 py-1.5 w-6"></th>'
           + '<th class="px-4 py-1.5 text-left">Description</th>'
@@ -3828,9 +3850,28 @@ const NosTab = (() => {
       });
     });
 
+    body.querySelectorAll('.nos-brand-exclude-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var ids = JSON.parse(decodeURIComponent(btn.dataset.items));
+        ids.forEach(function(id) { excludedItems.add(id); });
+        saveExcluded();
+        renderAccordion();
+      });
+    });
+
     document.getElementById('nosExcludedList')?.querySelectorAll('.nos-restore-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         excludedItems.delete(String(btn.dataset.itemId));
+        saveExcluded();
+        renderAccordion();
+      });
+    });
+
+    document.getElementById('nosExcludedList')?.querySelectorAll('.nos-restore-brand-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var ids = JSON.parse(decodeURIComponent(btn.dataset.itemIds));
+        ids.forEach(function(id) { excludedItems.delete(String(id)); });
         saveExcluded();
         renderAccordion();
       });
