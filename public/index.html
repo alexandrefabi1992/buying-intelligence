@@ -3261,6 +3261,7 @@ const InvHistory = (() => {
   let _firstDate = null;
   let _mfrTimer = null;
   let _drillShop = null; // null = global, string = shop_id drilled into
+  let _drillMfr  = false; // true when brand was drilled into via click (vs typed)
 
   function fmt(n)  { return n == null ? '—' : Number(n).toLocaleString('fr-CA'); }
   function fmtC(n) { return n == null ? '—' : '$ ' + Number(n).toLocaleString('fr-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
@@ -3306,7 +3307,9 @@ const InvHistory = (() => {
     document.getElementById('invHistKpis').classList.remove('hidden');
 
     // Breakdown table
-    const isGlobal = !f.shop_id && !_drillShop;
+    const isGlobal       = !f.shop_id && !_drillShop;
+    const isBrandList    = !isGlobal && !f.manufacturer;  // showing brands, not drilled into one
+    const isBrandDrilled = !isGlobal && !!f.manufacturer && _drillMfr;
     const titleEl  = document.getElementById('invHistTableTitle');
     const colEl    = document.getElementById('invHistColName');
     const backBtn  = document.getElementById('invHistBackBtn');
@@ -3314,9 +3317,15 @@ const InvHistory = (() => {
       titleEl.textContent = 'Répartition par boutique';
       colEl.textContent   = 'Boutique';
       backBtn.classList.add('hidden');
-    } else if (!f.manufacturer) {
+    } else if (isBrandList) {
       titleEl.textContent = `Répartition par marque — ${d.breakdown[0]?.dimension ?? ''}`;
       colEl.textContent   = 'Marque';
+      backBtn.textContent = '← Retour global';
+      backBtn.classList.remove('hidden');
+    } else if (isBrandDrilled) {
+      titleEl.textContent = `Historique — ${f.manufacturer}`;
+      colEl.textContent   = 'Marque';
+      backBtn.textContent = '← Retour marques';
       backBtn.classList.remove('hidden');
     } else {
       titleEl.textContent = 'Totaux';
@@ -3326,9 +3335,13 @@ const InvHistory = (() => {
 
     const tbody = document.getElementById('invHistTableBody');
     tbody.innerHTML = d.breakdown.map(r => `
-      <tr class="${isGlobal ? 'cursor-pointer hover:bg-blue-50' : 'hover:bg-gray-50'}"
-          ${isGlobal ? `onclick="InvHistory.drillInto('${r.dim_id}','${r.dimension}')"` : ''}>
-        <td class="px-4 py-2 font-medium text-gray-800 ${isGlobal ? 'text-blue-700' : ''}">${r.dimension}</td>
+      <tr class="${isGlobal ? 'cursor-pointer hover:bg-blue-50' : isBrandList ? 'cursor-pointer hover:bg-violet-50' : 'hover:bg-gray-50'}"
+          ${isGlobal
+            ? `onclick="InvHistory.drillInto('${r.dim_id}','${r.dimension}')"`
+            : isBrandList
+              ? `onclick="InvHistory.drillMfr(${JSON.stringify(r.dimension)})"`
+              : ''}>
+        <td class="px-4 py-2 font-medium ${isGlobal ? 'text-blue-700' : isBrandList ? 'text-violet-700' : 'text-gray-800'}">${r.dimension}</td>
         <td class="px-4 py-2 text-right text-gray-700">${fmt(r.units)}</td>
         <td class="px-4 py-2 text-right text-gray-700">${fmtC(r.cost_value)}</td>
         <td class="px-4 py-2 text-right text-gray-700">${fmtC(r.retail_value)}</td>
@@ -3446,22 +3459,37 @@ const InvHistory = (() => {
     init,
     onFilterChange() {
       _drillShop = null;
+      _drillMfr  = false;
+      document.getElementById('invHistMfr').value = '';
       document.getElementById('invHistBackBtn').classList.add('hidden');
       reload();
     },
     onMfrInput() {
+      _drillMfr = false;
       clearTimeout(_mfrTimer);
       _mfrTimer = setTimeout(() => { _drillShop = null; reload(); }, 500);
     },
     drillInto(shopId, shopName) {
       _drillShop = shopId;
-      document.getElementById('invHistTableTitle').textContent = `Répartition par marque — ${shopName}`;
-      document.getElementById('invHistColName').textContent    = 'Marque';
-      document.getElementById('invHistBackBtn').classList.remove('hidden');
+      _drillMfr  = false;
+      document.getElementById('invHistMfr').value = '';
       loadSnapshot({ ...getFilters(), shop_id: shopId });
+      loadTimeline({ ...getFilters(), shop_id: shopId });
+    },
+    drillMfr(mfrName) {
+      _drillMfr = true;
+      document.getElementById('invHistMfr').value = mfrName;
+      reload();
     },
     drillBack() {
-      _drillShop = null;
+      if (_drillMfr) {
+        // Back from brand drill → return to brand list for this shop
+        _drillMfr = false;
+        document.getElementById('invHistMfr').value = '';
+      } else {
+        // Back from shop drill → return to global
+        _drillShop = null;
+      }
       reload();
     },
   };
