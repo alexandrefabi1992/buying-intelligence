@@ -3675,7 +3675,6 @@ app.get('/api/budget-plan', async (req, res, next) => {
 app.put('/api/budget-plan', async (req, res, next) => {
   try {
     const { season_code, manufacturer, drop_id = 'drop_1', shop_id = '__all__', planned_amount } = req.body;
-    console.log('[budget-plan PUT]', { season_code, manufacturer, drop_id, shop_id, planned_amount, body: req.body });
     if (!season_code || !manufacturer) return res.status(400).json({ error: 'season_code and manufacturer are required' });
     const amount = Math.max(0, parseFloat(planned_amount ?? 0));
     const sc = season_code.toLowerCase();

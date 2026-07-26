@@ -2359,11 +2359,11 @@ const PlanTab = (() => {
   }
   function loadOverrides() {
     try {
-      planState.overrides = JSON.parse(localStorage.getItem(`plan_overrides_${planState.season}`) || '{}');
+      planState.overrides = JSON.parse(localStorage.getItem(`plan_overrides_${planState.season}_${shopExcludeKey()}`) || '{}');
     } catch { planState.overrides = {}; }
   }
   function saveOverrides() {
-    localStorage.setItem(`plan_overrides_${planState.season}`, JSON.stringify(planState.overrides));
+    localStorage.setItem(`plan_overrides_${planState.season}_${shopExcludeKey()}`, JSON.stringify(planState.overrides));
   }
 
   function buildShopFilter() {
@@ -2380,6 +2380,7 @@ const PlanTab = (() => {
       const val = sel.value;
       planState.selectedShops = val ? new Set([val]) : new Set(SHOPS.map(s => s.id));
       loadExcluded();
+      loadOverrides();
       fetchAndRender();
     });
   }
@@ -2451,7 +2452,29 @@ const PlanTab = (() => {
     return total;
   }
 
+  function flushPlanInputs() {
+    document.querySelectorAll('.plan-shop-input').forEach(input => {
+      const mfr    = input.dataset.mfr;
+      const dropId = input.dataset.drop ?? 'drop_1';
+      const shopId = input.dataset.shop;
+      const amount = parseFloat(input.value) || 0;
+      if (!mfr || !shopId) return;
+      const prev = ((planState.plan[mfr] ?? {})[dropId] ?? {})[shopId] ?? 0;
+      if (!planState.plan[mfr]) planState.plan[mfr] = {};
+      if (!planState.plan[mfr][dropId]) planState.plan[mfr][dropId] = {};
+      planState.plan[mfr][dropId][shopId] = amount;
+      if (amount !== prev) {
+        apiFetch(`${BASE}/api/budget-plan`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ season_code: planState.season, manufacturer: mfr, drop_id: dropId, shop_id: shopId, planned_amount: amount }),
+        }).then(() => flashSaved()).catch(() => {});
+      }
+    });
+  }
+
   function renderTable() {
+    flushPlanInputs();
     const tbody = document.getElementById('planBody');
     if (!tbody) return;
 
@@ -2646,7 +2669,6 @@ const PlanTab = (() => {
     const dropBlocks = drops.map(drop => {
       const { drop_id, drop_name } = drop;
       const shopMap  = (planState.plan[mfr] ?? {})[drop_id] ?? {};
-      console.log('[plan-debug] renderDropsBlock mfr=%s drop=%s shopMap=%s', mfr, drop_id, JSON.stringify(shopMap));
       const dropTotal = visibleShops.reduce((s, sh) => s + (shopMap[sh.id] ?? 0), 0);
       const isDrop1  = drop_id === 'drop_1';
 
@@ -2782,8 +2804,6 @@ const PlanTab = (() => {
       if (!planState.plan[mfr]) planState.plan[mfr] = {};
       if (!planState.plan[mfr][dropId]) planState.plan[mfr][dropId] = {};
       planState.plan[mfr][dropId][shopId] = amount;
-      console.log('[plan-debug] mfr=%s drop=%s shop=%s amount=%s | planState.plan[mfr]=%s | selectedShops=%s',
-        mfr, dropId, shopId, amount, JSON.stringify(planState.plan[mfr]), JSON.stringify([...planState.selectedShops]));
 
       if (!planState.drops[mfr]) planState.drops[mfr] = [];
       if (!planState.drops[mfr].find(d => d.drop_id === dropId)) {
