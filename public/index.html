@@ -145,36 +145,6 @@
       </div>
     </div>
 
-    <!-- ── Filter bar ── -->
-    <div class="bg-white border border-gray-200 rounded-xl p-4 mb-5">
-      <div class="flex flex-wrap gap-x-8 gap-y-4 items-start">
-
-        <!-- Boutiques -->
-        <div>
-          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2" data-i18n="filter_boutiques">Boutiques</div>
-          <div id="shopCheckboxes" class="flex flex-col gap-1"></div>
-        </div>
-
-
-
-        <!-- Actions -->
-        <div class="ml-auto self-end flex flex-col items-end gap-2">
-          <div id="filterBadge" class="text-xs text-blue-600 font-medium hidden"></div>
-          <button id="budgetApply"
-            class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
-            data-i18n="btn_apply">
-            Appliquer
-          </button>
-          <button id="budgetReset"
-            class="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs rounded-lg transition-colors"
-            data-i18n="btn_reset">
-            Réinitialiser
-          </button>
-        </div>
-
-      </div>
-    </div>
-
     <!-- Saisonnier panel -->
     <div>
       <div class="flex flex-wrap items-end gap-4 mb-3">
@@ -183,7 +153,14 @@
                 data-i18n="seas_badge">
             Saisonnier — Budget basé sur vélocité P26 + réceptions historiques
           </span>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3 flex-wrap">
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-500">Boutique :</label>
+              <select id="budgetShopSel"
+                class="border border-gray-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-blue-400">
+                <option value="">Toutes les boutiques</option>
+              </select>
+            </div>
             <div class="flex items-center gap-2">
               <label class="text-xs text-gray-500" data-i18n="seas_season_lbl">Saison d'achat :</label>
               <select id="budgetSeasSeason"
@@ -1407,27 +1384,18 @@ const SHOPS = [
 ];
 
 function buildFilterBar() {
-  // Boutiques — checkboxes (DOM API to avoid innerHTML parsing edge cases)
-  const shopDiv = document.getElementById('shopCheckboxes');
+  const sel = document.getElementById('budgetShopSel');
   SHOPS.forEach(({ id, name }) => {
-    const lbl = document.createElement('label');
-    lbl.className = 'flex items-center gap-1.5 text-xs cursor-pointer select-none';
-    const cb = document.createElement('input');
-    cb.type      = 'checkbox';
-    cb.className = 'shop-cb accent-blue-600';
-    cb.value     = id;
-    const txt = document.createElement('span');
-    txt.textContent = name;
-    lbl.appendChild(cb);
-    lbl.appendChild(txt);
-    shopDiv.appendChild(lbl);
+    const opt = document.createElement('option');
+    opt.value       = id;
+    opt.textContent = name;
+    sel.appendChild(opt);
   });
-
 }
 
 function readFilterSelections() {
-  const shops = [...document.querySelectorAll('.shop-cb:checked')].map(el => el.value);
-  return { shops };
+  const shopVal = document.getElementById('budgetShopSel')?.value ?? '';
+  return { shops: shopVal ? [shopVal] : [] };
 }
 
 function buildQuerySuffix(extraParams = {}) {
@@ -1436,18 +1404,6 @@ function buildQuerySuffix(extraParams = {}) {
   if (shops.length) p.shops = shops.join(',');
   const qs = new URLSearchParams(p).toString();
   return qs ? '?' + qs : '';
-}
-
-function updateFilterBadge() {
-  const { shops } = readFilterSelections();
-  const count = shops.length;
-  const badge = document.getElementById('filterBadge');
-  if (count > 0) {
-    badge.textContent = t('filter_active')(count);
-    badge.classList.remove('hidden');
-  } else {
-    badge.classList.add('hidden');
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1761,16 +1717,8 @@ const BudgetTab = (() => {
   }
 
   function init() {
-    // Filter bar
-    document.getElementById('budgetApply').addEventListener('click', () => {
-      updateFilterBadge();
-      load();
-    });
-    document.getElementById('budgetReset').addEventListener('click', () => {
-      document.querySelectorAll('.shop-cb').forEach(cb => cb.checked = false);
-      document.getElementById('filterBadge').classList.add('hidden');
-      load();
-    });
+    // Shop dropdown — auto-apply on change
+    document.getElementById('budgetShopSel').addEventListener('change', () => load());
     // Season dropdown
     document.getElementById('budgetSeasSeason').addEventListener('change', async () => {
       const season = document.getElementById('budgetSeasSeason').value;
