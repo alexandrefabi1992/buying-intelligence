@@ -155,11 +155,7 @@
           <div id="shopCheckboxes" class="flex flex-col gap-1"></div>
         </div>
 
-        <!-- Collections -->
-        <div>
-          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2" data-i18n="filter_collections">Collections</div>
-          <div id="collButtons" class="flex flex-col gap-1.5"></div>
-        </div>
+
 
         <!-- Actions -->
         <div class="ml-auto self-end flex flex-col items-end gap-2">
@@ -906,7 +902,7 @@ const TRANSLATIONS = {
     plan_total_suggested:'budget suggéré', plan_total_planned:'planifié', plan_total_diff:'écart',
     plan_col_suggested:'Budget suggéré', plan_col_planned:'Total planifié', plan_col_diff:'Écart', plan_col_actions:'',
     plan_by_shop:'Par boutique', plan_suggested_lbl:'Suggéré :',
-    filter_boutiques:'Boutiques', filter_collections:'Collections',
+    filter_boutiques:'Boutiques',
     btn_apply:'Appliquer', btn_reset:'Réinitialiser',
     btn_apply_recalc:'Appliquer & Recalculer', btn_reset_defaults:'Réinitialiser les défauts',
     btn_prev:'← Précédent', btn_next:'Suivant →',
@@ -989,7 +985,7 @@ const TRANSLATIONS = {
     plan_total_suggested:'suggested budget', plan_total_planned:'planned', plan_total_diff:'variance',
     plan_col_suggested:'Suggested Budget', plan_col_planned:'Total Planned', plan_col_diff:'Variance', plan_col_actions:'',
     plan_by_shop:'By Store', plan_suggested_lbl:'Suggested:',
-    filter_boutiques:'Boutiques', filter_collections:'Collections',
+    filter_boutiques:'Boutiques',
     btn_apply:'Apply', btn_reset:'Reset',
     btn_apply_recalc:'Apply & Recalculate', btn_reset_defaults:'Reset Defaults',
     btn_prev:'← Previous', btn_next:'Next →',
@@ -1409,14 +1405,6 @@ const SHOPS = [
   { id: '6', name: 'Saint-Bruno' },
   { id: '9', name: 'Saint-Sauveur' },
 ];
-const COLLECTIONS = [
-  { code: 'p26', label: 'P26 — Printemps 2026' },
-  { code: 'a26', label: 'A26 — Automne 2026' },
-  { code: 'p25', label: 'P25 — Printemps 2025' },
-  { code: 'a25', label: 'A25 — Automne 2025' },
-  { code: 'p24', label: 'P24 — Printemps 2024' },
-  { code: 'a24', label: 'A24 — Automne 2024' },
-];
 
 function buildFilterBar() {
   // Boutiques — checkboxes (DOM API to avoid innerHTML parsing edge cases)
@@ -1435,41 +1423,24 @@ function buildFilterBar() {
     shopDiv.appendChild(lbl);
   });
 
-  // Collections — toggle buttons
-  const collDiv = document.getElementById('collButtons');
-  COLLECTIONS.forEach(({ code, label }) => {
-    const btn = document.createElement('button');
-    btn.className = 'tog-btn text-left px-3 py-1 rounded text-xs border border-gray-200 text-gray-600';
-    btn.dataset.val = code;
-    btn.dataset.group = 'coll';
-    btn.textContent = label;
-    collDiv.appendChild(btn);
-  });
-
-  // Toggle button click → add/remove active class
-  document.querySelectorAll('.tog-btn').forEach(btn => {
-    btn.addEventListener('click', () => btn.classList.toggle('active'));
-  });
 }
 
 function readFilterSelections() {
   const shops = [...document.querySelectorAll('.shop-cb:checked')].map(el => el.value);
-  const colls = [...document.querySelectorAll('.tog-btn[data-group="coll"].active')].map(el => el.dataset.val);
-  return { shops, colls };
+  return { shops };
 }
 
 function buildQuerySuffix(extraParams = {}) {
-  const { shops, colls } = readFilterSelections();
+  const { shops } = readFilterSelections();
   const p = { ...extraParams };
-  if (shops.length) p.shops       = shops.join(',');
-  if (colls.length) p.collections = colls.join(',');
+  if (shops.length) p.shops = shops.join(',');
   const qs = new URLSearchParams(p).toString();
   return qs ? '?' + qs : '';
 }
 
 function updateFilterBadge() {
-  const { shops, colls } = readFilterSelections();
-  const count = shops.length + colls.length;
+  const { shops } = readFilterSelections();
+  const count = shops.length;
   const badge = document.getElementById('filterBadge');
   if (count > 0) {
     badge.textContent = t('filter_active')(count);
@@ -1797,7 +1768,6 @@ const BudgetTab = (() => {
     });
     document.getElementById('budgetReset').addEventListener('click', () => {
       document.querySelectorAll('.shop-cb').forEach(cb => cb.checked = false);
-      document.querySelectorAll('.tog-btn').forEach(btn => btn.classList.remove('active'));
       document.getElementById('filterBadge').classList.add('hidden');
       load();
     });
