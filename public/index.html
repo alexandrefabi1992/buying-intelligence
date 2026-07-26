@@ -444,8 +444,10 @@
     </div>
     <!-- Shop filter -->
     <div class="bg-white border border-gray-200 rounded-xl px-4 py-3 mb-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-      <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider" data-i18n="filter_boutiques">Boutiques</span>
-      <div id="planShopFilter" class="flex flex-wrap gap-x-4 gap-y-1.5"></div>
+      <label class="text-xs text-gray-500">Boutique :</label>
+      <select id="planShopSel" class="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
+        <option value="">Toutes les boutiques</option>
+      </select>
     </div>
     <!-- Totals bar -->
     <div class="flex gap-6 mb-4 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-5 py-3 flex-wrap items-center">
@@ -2365,23 +2367,20 @@ const PlanTab = (() => {
   }
 
   function buildShopFilter() {
-    const container = document.getElementById('planShopFilter');
-    if (!container || container.dataset.built) return;
-    container.dataset.built = '1';
+    const sel = document.getElementById('planShopSel');
+    if (!sel || sel.dataset.built) return;
+    sel.dataset.built = '1';
     SHOPS.forEach(({ id, name }) => {
-      const lbl = document.createElement('label');
-      lbl.className = 'flex items-center gap-1.5 text-xs cursor-pointer select-none';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.value = id; cb.checked = true;
-      cb.className = 'plan-shop-cb accent-indigo-600';
-      cb.addEventListener('change', () => {
-        if (cb.checked) planState.selectedShops.add(id);
-        else planState.selectedShops.delete(id);
-        loadExcluded();
-        fetchAndRender();
-      });
-      lbl.append(cb, document.createTextNode(' ' + name));
-      container.appendChild(lbl);
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = name;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', () => {
+      const val = sel.value;
+      planState.selectedShops = val ? new Set([val]) : new Set(SHOPS.map(s => s.id));
+      loadExcluded();
+      fetchAndRender();
     });
   }
 
