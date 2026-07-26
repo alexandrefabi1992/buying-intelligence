@@ -2438,7 +2438,8 @@ const PlanTab = (() => {
     const dropMap = planState.plan[mfr] ?? {};
     let total = 0;
     for (const shopMap of Object.values(dropMap))
-      for (const amt of Object.values(shopMap)) total += amt;
+      for (const [shopId, amt] of Object.entries(shopMap))
+        if (planState.selectedShops.has(shopId)) total += amt;
     return total;
   }
 
