@@ -2333,14 +2333,18 @@ const PlanTab = (() => {
     allMfrs: [],
   };
 
+  function shopExcludeKey() {
+    const shops = [...planState.selectedShops].sort();
+    return shops.length === SHOPS.length ? '__all__' : shops.join(',');
+  }
   function loadExcluded() {
     try {
-      const stored = JSON.parse(localStorage.getItem(`plan_excluded_${planState.season}`) || '[]');
+      const stored = JSON.parse(localStorage.getItem(`plan_excluded_${planState.season}_${shopExcludeKey()}`) || '[]');
       planState.excluded = new Set(stored);
     } catch { planState.excluded = new Set(); }
   }
   function saveExcluded() {
-    localStorage.setItem(`plan_excluded_${planState.season}`, JSON.stringify([...planState.excluded]));
+    localStorage.setItem(`plan_excluded_${planState.season}_${shopExcludeKey()}`, JSON.stringify([...planState.excluded]));
   }
   function loadOverrides() {
     try {
@@ -2364,6 +2368,7 @@ const PlanTab = (() => {
       cb.addEventListener('change', () => {
         if (cb.checked) planState.selectedShops.add(id);
         else planState.selectedShops.delete(id);
+        loadExcluded();
         fetchAndRender();
       });
       lbl.append(cb, document.createTextNode(' ' + name));
