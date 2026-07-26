@@ -4773,7 +4773,8 @@ app.post('/api/admin/refresh-view', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 // GET /api/help — app section guide (used by UI + AI)
 app.get('/api/help', requireAuth, (req, res) => {
-  res.json(HELP);
+  const lang = (req.query.lang === 'en') ? 'en' : 'fr';
+  res.json(HELP[lang] ?? HELP.fr);
 });
 
 // POST /api/ai/chat — AI agent endpoint

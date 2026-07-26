@@ -1,5 +1,5 @@
 'use strict';
-const HELP = require('./help-content');
+const HELP_CONTENT = require('./help-content');
 // ---------------------------------------------------------------------------
 // AI Provider Abstraction Layer
 //
@@ -358,8 +358,8 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
 - QUESTIONS DE CLARIFICATION : UNE SEULE question, UNIQUEMENT si l'info manquante est BLOQUANTE. JAMAIS demander la couleur, la boutique ou la période.
 - TERMES DE PAIEMENT / ESCOMPTES : pour toute question sur les escomptes fournisseur, les termes de paiement, "devrais-je payer [marque] rapidement", "est-ce rentable de prendre l'escompte", "quel est le rendement de l'escompte", "quelle marque a les meilleurs termes" → utiliser get_payment_terms_analysis. Si le résultat contient termes_non_configures=true : le DIRE explicitement — JAMAIS inventer un escompte ou supposer que les termes sont standard.
 
-GUIDE DES SECTIONS DE L’APPLICATION
-${Object.values(HELP).map(s =>
+GUIDE DES SECTIONS DE L'APPLICATION
+${Object.values(HELP_CONTENT.fr).map(s =>
   `### ${s.icon} ${s.title}\n${s.summary}\n${s.sections.map(sec => `**${sec.heading}**\n${sec.body}`).join('\\n\\n')}`
 ).join('\\n\\n---\\n\\n')}
 `;

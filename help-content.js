@@ -268,4 +268,272 @@ const HELP = {
 
 };
 
-module.exports = HELP;
+const HELP_EN = {
+
+  quickstart: {
+    title: 'Quick Start',
+    icon: '🚀',
+    summary: "Application overview and recommended workflow for preparing a buying season.",
+    sections: [
+      {
+        heading: "How the application is structured",
+        body: "Buying Intelligence is organized into 6 sections accessible from the navigation bar:\n\n- **📊 Budget**: automatic recommended budget calculation by brand\n- **🔄 NOS**: tracking and replenishment of permanent items\n- **📐 Size Curves**: sales distribution by size\n- **🔀 Transfers**: inter-store movement recommendations\n- **📝 Budget Planning**: entering and validating final budgets\n- **⚙️ Settings**: season configuration and calculation rules\n- **⚡ Velocity**: in-season item performance (separate page)",
+      },
+      {
+        heading: "Recommended workflow — season preparation",
+        body: "**1. Configure the target season** (Settings → Seasons)\nDefine the code, receipt dates and sales dates for the new season.\n\n**2. Analyze the recommended budget** (Budget → select the season)\nReview budgets by brand. Identify increases, decreases and alerts.\n\n**3. Review brand details**\nClick on a brand to see the breakdown by reference season, historical sell-through and sales curve.\n\n**4. Check size curves** (Size Curves section)\nValidate the order distribution by size for each brand.\n\n**5. Enter validated budgets** (Budget Planning)\nEnter final amounts by brand, drop and store.\n\n**6. Monitor during the season** (Velocity)\nTrack weekly sales pace and act quickly.",
+      },
+      {
+        heading: "Key terms glossary",
+        body: "- **Season**: a collection period identified by a code (e.g. P26 = Spring 2026, A26 = Fall 2026).\n- **Sell-through (ST)**: % of received items that were sold. ST = sales / receipts × 100.\n- **Implied receipts**: estimated ordered items = items sold + remaining stock tagged with the season.\n- **Blended base**: average of receipts and sales — anchors the budget to real demand, not just past purchases.\n- **Carryover**: unsold stock from a season that carries over to the next. Deducted from the net budget.\n- **Drop**: a planned delivery within a season (e.g. Drop 1 = January, Drop 2 = March).\n- **NOS**: Never Out of Stock — permanent items not tied to a season.\n- **Recency factor**: weight given to recent seasons in the average. A factor of 2 means the most recent season counts 2× more than the previous one.",
+      },
+      {
+        heading: "The AI assistant",
+        body: "The AI assistant button (bottom right of the screen) gives access to a chatbot that can:\n- Query the database directly (sales, inventory, sell-through)\n- Calculate budgets or size curves on demand\n- Recommend transfers\n- Answer questions about how the application works\n\nExample questions: *\"What is the ST for the Brax brand in P26?\"*, *\"Which items at Saint-Bruno should be transferred to Fan Club?\"*, *\"How does carryover work?\"*",
+      },
+    ],
+  },
+
+  budget: {
+    title: 'Seasonal Budget',
+    icon: '📊',
+    summary: "Calculates the recommended purchase budget by brand for a future season, based on historical receipt and sales data from previous seasons.",
+    sections: [
+      {
+        heading: 'How to read the table',
+        body: "Each row represents a brand. The main columns:\n\n- **Implied receipts**: estimated cost of items ordered for reference seasons (sold + remaining stock tagged with the season). It's a proxy for supplier receipts without relying on purchase orders.\n- **Weighted avg ST**: average sell-through across the N reference seasons, with recent seasons weighted more heavily.\n- **Trend**: direction of receipts from one season to the next. ↑ increase > 10%, ↓ decrease > 10%, → stable.\n- **Multiplier**: factor applied according to the ST tier (e.g.: ST ≥ 65% → ×1.10).\n- **Adjusted budget**: weighted base × multiplier.\n- **Carryover**: remaining stock from the previous season that will still be available.\n- **Net budget**: adjusted budget − (carryover × deduction rate). This is the amount to order.",
+      },
+      {
+        heading: 'Step-by-step calculation logic',
+        body: "**Step 1 — Identify reference seasons**\nIf the target season is P27, we use P26, P25, P24 (the 3 previous springs). The *Number of reference seasons* setting controls this number.\n\n**Step 2 — Calculate blended base per season**\nBase = (implied receipts + projected sales) ÷ 2\nWhy the average? Receipts alone perpetuate past buying mistakes. The blended base corrects toward real demand.\n\n**Step 3 — Projection for ongoing seasons**\nIf a reference season is still in progress (e.g. P26 at 57% of its period), sales are projected to the end using historical velocity from past seasons during the same remaining window.\n\n**Step 4 — Recency-weighted average**\nWeight = recency_factor^(position). With a factor of 2 over 3 seasons: P26 weighs 4, P25 weighs 2, P24 weighs 1.\n\n**Step 5 — Apply the multiplier**\nBased on weighted average ST, the multiplier is read from the configured tiers (Settings).\n\n**Step 6 — Deduct carryover**\nNet budget = adjusted budget − (previous season remaining stock × carryover rate).",
+      },
+      {
+        heading: 'Filters and options',
+        body: "- **Target season**: the season for which the budget is being prepared.\n- **Stores**: filter by one or more stores. All stores consolidated by default.\n- **Collections / Sizes**: filter products by collection or size (Lightspeed tags).\n- **CSV Export**: export the table for external use (Excel, sharing).\n- **Click on a brand**: opens the brand detail page with complete history.",
+      },
+      {
+        heading: "Frequently asked questions",
+        body: "**Why doesn't a brand appear?**\nIts products are not tagged with the target season code in Lightspeed. Check product tags.\n\n**Why is the budget 0 or very low?**\nThe ST for reference seasons is below the lowest threshold (< 35%) → multiplier ×0.50, or the carryover exceeds the adjusted budget.\n\n**Why do the numbers differ from Lightspeed?**\nLightspeed shows 'Received Stock' as depletion (received − remaining), not as sales. Buying Intelligence uses sales lines directly.\n\n**How do I force a different budget than recommended?**\nUse the *Budget Planning* section to enter the manually validated amount.",
+      },
+    ],
+  },
+
+  nos: {
+    title: 'NOS — Never Out of Stock',
+    icon: '🔄',
+    summary: "Tracking and replenishment of permanent items that must always be in stock.",
+    sections: [
+      {
+        heading: "What is a NOS item?",
+        body: "A NOS (Never Out of Stock) item is a permanent product — it is not tied to a season, it is sold year-round. Typical examples: a basic jean, a classic white shirt, recurring accessories.\n\nNOS items are identified by a specific tag in Lightspeed (e.g. \"NOS\"). This tag is configurable in Settings → Store Configuration.",
+      },
+      {
+        heading: 'Table columns',
+        body: "- **Brand / Reference**: brand and item description.\n- **Total stock**: current stock across all stores (or filtered by store).\n- **Sales N weeks**: total sales over the chosen reference period.\n- **Sales/week**: average weekly sales rate.\n- **Weeks of coverage**: at this rate, how many weeks the current stock can last.\n- **Action**: recommendation — Replenish (stock below threshold), OK (sufficient coverage).",
+      },
+      {
+        heading: 'How to interpret and act',
+        body: "**Replenishment threshold**\nIf stock covers less than N weeks (configurable), the item is flagged. The logic is: if the supplier lead time is 6 weeks, you need to order when coverage drops below 8 weeks.\n\n**Items in red**\nInsufficient stock relative to sales pace. Act quickly — contact the supplier or transfer from a better-stocked store.\n\n**Items in green**\nAdequate coverage. Monitor if sales pace accelerates.",
+      },
+      {
+        heading: 'Available filters',
+        body: "- **Stores**: view stock and sales store by store or consolidated.\n- **Collections**: filter by collection (Lightspeed tag).\n- **Reference weeks**: number of past weeks to calculate the sales rate (default: 12 weeks).",
+      },
+    ],
+  },
+
+  sizes: {
+    title: 'Size Curves',
+    icon: '📐',
+    summary: "Distribution of sales by size to define the optimal split of an order and avoid stockouts or surpluses by size.",
+    sections: [
+      {
+        heading: "What is it for",
+        body: "When ordering 100 units of an item, how many in S, M, L, XL?\n\nThe Size Curves section answers this question by analyzing the historical sales distribution. If 35% of a brand's sales are in size M, we order 35 units in M out of 100.\n\nIt is also useful for detecting imbalances: if M stock is exhausted but L is full, the order curve doesn't match the sales curve.",
+      },
+      {
+        heading: 'Reading the table',
+        body: "Each row is a brand. Each column is a size. The value in each cell is the **percentage of sales** in that size over the selected period.\n\nThe **Current stock** row (if shown) displays the current stock distribution. The gap between the two rows indicates over- or under-represented sizes.\n\nExample: sales M = 38%, stock M = 20% → size M understocked, stockout risk.",
+      },
+      {
+        heading: 'How to use for an order',
+        body: "1. Select the reference season (e.g. P26 to prepare P27).\n2. Filter by brand if needed.\n3. Read the distribution row for the brand.\n4. Multiply the total budget by these percentages to get units per size.\n\nExample: budget 50 units, distribution S=15%, M=35%, L=35%, XL=15% → order 7.5/17.5/17.5/7.5 → round to 8/17/17/8.",
+      },
+      {
+        heading: 'Available filters',
+        body: "- **Season**: select the reference season.\n- **Store**: analyze distribution for a specific store.\n- **Category**: filter by product type (pants, shirt…).\n- **Gender**: filter men / women if applicable.\n- **CSV Export**: export the curve for use in a purchase order.",
+      },
+    ],
+  },
+
+  transfers: {
+    title: 'Transfers / Actions',
+    icon: '🔀',
+    summary: "Automatic inter-store transfer recommendations to balance inventory, reduce tied-up capital and prevent stockouts.",
+    sections: [
+      {
+        heading: 'How recommendations are generated',
+        body: "The algorithm identifies items that simultaneously meet these two conditions:\n\n**Source store (too much stock)**:\n- High stock relative to recent sales\n- Low sales rate (weeks of coverage exceed a threshold)\n\n**Destination store (stock shortage)**:\n- Stockout or very low stock\n- Recent active sales (there is demand)\n\nThe recommended transfer is quantified in units (how many to move) and cost value.",
+      },
+      {
+        heading: 'Priority and order of recommendations',
+        body: "Recommendations are sorted by **decreasing dormant stock value** — the most costly items to hold appear first.\n\nAn item at $80 unit cost with 10 surplus units = $800 tied up. That takes priority over a $20 item with 5 units.\n\nThe value of the recommendation = cost × units to transfer.",
+      },
+      {
+        heading: 'How to act on a recommendation',
+        body: "1. **Review the recommendation**: click on the item to see the store-by-store breakdown.\n2. **Validate the logic**: does the destination store really need this item? (size suited to clientele, etc.)\n3. **Initiate the transfer** in Lightspeed POS.\n4. **Mark as processed** if applicable.\n\nNote: transferred items count neither as a receipt nor as a sale in the budget calculation for the sending store — this is intentional.",
+      },
+      {
+        heading: 'Available filters',
+        body: "- **Source store**: view items to send from a specific store.\n- **Destination store**: view items to receive at a store.\n- **Brand**: filter by supplier.\n- **Number of reference weeks**: time window for evaluating sales rate.\n- **Minimum value**: ignore recommendations below a value threshold.",
+      },
+    ],
+  },
+
+  plan: {
+    title: 'Budget Planning',
+    icon: '📝',
+    summary: "Tool for entering, planning and validating purchase budgets by season, brand and drop (delivery).",
+    sections: [
+      {
+        heading: "Overview",
+        body: "The Budget section calculates a recommendation — the Budget Planning section is where the buyer enters the **validated and committed amounts**.\n\nThis is where the final confirmation happens: after reviewing the recommendation, negotiating with suppliers and adjusting, you enter the definitive budget by brand.",
+      },
+      {
+        heading: 'The five indicators in the totals bar',
+        body: "The grey bar at the top shows five figures. Here is their exact meaning:\n\n| Indicator | What it represents |\n|---|---|\n| **Recommended** | Budget calculated by the algorithm (net budget × all visible brands), plus proportional redistribution of brands you removed from the plan. This is the baseline — no human intervention. |\n| **Suggested budget** | Same calculation, **but with your manual adjustments**. If you changed the amount for a brand in the \"Suggested Budget\" column, that value is used. As long as there are no adjustments, Recommended = Suggested. |\n| **Balance** | Difference between Recommended and Suggested. Only appears if you have active adjustments. Positive = you reduced vs the algo. Negative = you increased. |\n| **Planned** | Total amounts actually entered in the drops (committed orders by brand × store). |\n| **Gap** | Planned − Suggested. Shows how much remains to confirm to reach your suggested budget. |\n\n**Recommended vs Suggested — in practice**\nIf you leave the \"Suggested Budget\" column untouched, both figures are identical. As soon as you manually modify a line (example: you raise Fradi from $8,500 to $10,000), the Suggested rises accordingly and a Balance appears showing the gap. The ↺ button to the left of the field resets the brand to its recommended amount.\n\nThe small grey value shown below some fields (e.g. `rec. $8,524`) is the original recommended amount — it stays visible so you never lose the algorithmic reference.",
+      },
+      {
+        heading: 'The drop concept',
+        body: "A **drop** is a planned delivery within a season. Some suppliers deliver in multiple shipments — Drop 1 in January, Drop 2 in March, Drop 3 in May.\n\nThis allows you to:\n- Spread the budget over time (cash flow)\n- Track deliveries separately\n- Attach different documents per delivery\n\nEach brand can have an unlimited number of drops. By default, a brand has a single drop (Drop 1).",
+      },
+      {
+        heading: 'Entering amounts',
+        body: "- Amounts are in **purchase cost** (not selling price).\n- Enter by brand × drop × store.\n- Totals by brand, by drop and overall calculate automatically.\n- An amount can be entered differently per store if purchases are managed separately.\n- Entered budgets are persisted in the database — they remain available from session to session.",
+      },
+      {
+        heading: 'Attached documents',
+        body: "For each brand × drop, it is possible to attach files:\n- Supplier spec sheets\n- Order confirmations\n- Season lookbooks\n- Price lists\n\nThese documents are stored directly in the application and accessible by the whole team.",
+      },
+      {
+        heading: 'Tracking and export',
+        body: "- **Recommended vs entered comparison**: the algorithm's recommended budget is displayed alongside the entered budget for easy validation.\n- **Export**: the complete budget can be exported as CSV for integration into an accounting system or sharing with a supplier.",
+      },
+    ],
+  },
+
+  params: {
+    title: 'Settings',
+    icon: '⚙️',
+    summary: "Configuration of seasons, multiplier tiers and budget calculation parameters.",
+    sections: [
+      {
+        heading: 'Season configuration',
+        body: "Each season is defined by:\n- **Code**: short identifier (e.g. \"p26\").\n- **Label**: displayed name (e.g. \"Spring 2026\").\n- **Lightspeed tag**: the tag applied to products in Lightspeed to associate them with this season (e.g. \"p26\"). Must match exactly the tags used in Lightspeed.\n- **Receipt start**: date from which season receipts are counted.\n- **Sales start**: beginning of the sales window.\n- **Sales end**: end of the sales window.\n\nThese dates define the calculation windows. A misconfigured season will produce incorrect budgets.",
+      },
+      {
+        heading: 'Multiplier tiers',
+        body: "Each tier defines the **ST → multiplier** rule:\n\n| Avg ST | Multiplier | Interpretation |\n|--------|-----------|----------------|\n| ≥ 80% | ×1.25 | Increase |\n| ≥ 65% | ×1.10 | Slight increase |\n| ≥ 50% | ×1.00 | Maintain |\n| ≥ 35% | ×0.80 | Reduce |\n| < 35% | ×0.50 | Cut |\n\nThese tiers are fully editable. Thresholds and multipliers can be adjusted according to your buying strategy.",
+      },
+      {
+        heading: 'Calculation parameters',
+        body: "**Number of reference seasons** (default: 3)\nHow many past seasons enter the calculation. A higher number produces a more stable average but less reactive to recent trends.\n\n**Recency factor** (default: 2.0)\nWeight given to recent seasons. With 3 seasons and a factor of 2:\n- Season N-1 → weight 4 (2²)\n- Season N-2 → weight 2 (2¹)\n- Season N-3 → weight 1 (2⁰)\nTotal = 7. The most recent season accounts for 57% of the budget.\n\n**Carryover rate** (default: 50%)\nPercentage of remaining stock deducted from the net budget. A rate of 50% means that if $10,000 of stock from a season remains unsold, $5,000 is deducted from the next budget.\n\n**Per-store rate**\nOption to define a different carryover rate per store — useful if some stores have better sell-through capacity.",
+      },
+      {
+        heading: 'Store configuration (onboarding)',
+        body: "The Configuration page (⚙ in the nav) allows you to define:\n- Store / tenant name\n- The field used for product type (category, tag or description)\n- Enabling and values of the gender filter (men/women)\n- The tag identifying NOS items\n- Lightspeed connection credentials",
+      },
+    ],
+  },
+
+  velocity: {
+    title: 'Velocity',
+    icon: '⚡',
+    summary: "In-season item performance analysis — sell-through by week, full-price percentage and action recommendations.",
+    sections: [
+      {
+        heading: 'Weekly metrics',
+        body: "Velocity measures the sales rate relative to the opening stock (items received at the start of the season).\n\n- **ST W4**: % of opening stock sold after 4 weeks.\n- **ST W7**: % sold after 7 weeks.\n- **ST W10**: % sold after 10 weeks.\n- **ST W14**: % sold after 14 weeks.\n- **Final ST**: total % sold since the start of the season.\n- **% full price**: share of sales made without a discount ≥ 10%. A high % means customers buy without waiting for sales.",
+      },
+      {
+        heading: 'Rating A → D',
+        body: "Each item receives a rating based on the combination of ST and % full price:\n\n- **A (green)**: excellent ST and full price — top performer, may justify replenishment.\n- **B (blue)**: adequate performance — monitor.\n- **C (orange)**: low ST or full price — action recommended in the coming weeks.\n- **D (red)**: both metrics low — urgent clearance needed.",
+      },
+      {
+        heading: "Recommended actions",
+        body: "Based on sales rate, remaining stock and season progress:\n\n- **Replenish**: strong demand, stock will run out before end of season.\n- **Monitor**: normal performance, nothing to do now.\n- **Promote**: sales below expected pace — consider featuring or a light markdown.\n- **Mark down**: high stock, season advanced — trigger markdowns to clear.\n- **Urgent markdown**: very high stock, season near end — act immediately.",
+      },
+      {
+        heading: 'Available views',
+        body: "**By brand**\nAggregates all items for a brand. Gives a macro view of the full collection's ST.\n\n**By matrix**\nA matrix is a model available in multiple sizes/colours. This view shows each model's performance individually (e.g. pant A45118 in 5 sizes).\n\n**By item**\nUnit detail — one row per variant (size + colour). Shows exactly which colourways or sizes are performing and which are stalling.",
+      },
+      {
+        heading: 'Typical use cases',
+        body: "**Weekly review**: go through all D and C items — decide on the week's actions.\n\n**Markdown preparation**: list all items with ST < 50% and stock > 0 — build the markdown list.\n\n**Replenishment**: identify A items with stock < 2 weeks of coverage — place a quick order.\n\n**End-of-season review**: at season end, analyze ST curves to adjust budgets for the next season.",
+      },
+    ],
+  },
+
+  accounting: {
+    title: 'Supplier Accounting',
+    icon: '💰',
+    summary: "Decision support for discount vs net terms for each supplier, based on the annualized return on the discount and cost of capital.",
+    sections: [
+      {
+        heading: 'The discount vs net terms decision',
+        body: "Most suppliers offer an **early payment discount**: for example \"2/10 n/60\" means 2% off if paid in 10 days rather than 60 days.\n\nThe question is: is it better to take this discount (pay early and save 2%) or keep the money 50 more days (and invest or use it elsewhere)?\n\nThe answer depends on the **annualized return** of the discount compared to the company's **cost of capital**.",
+      },
+      {
+        heading: 'Annualized return formula',
+        body: "**Formula:**\n\n`Return = (discount% ÷ (1 − discount%)) × (365 ÷ (net_days − discount_days))`\n\n**Example: 2/10 n/60**\n- Discount = 2%\n- Days gained = 60 − 10 = 50 days\n- Return = (2 ÷ 98) × (365 ÷ 50) = **14.9% per year**\n\nIf cost of capital is 8%/year: **take the discount** (14.9% > 8%).\nIf cost of capital is 20%/year: **net terms** (14.9% < 20%).\n\nNote: dividing by `(1 − discount%)` reflects that the discount is calculated on the gross amount — without this correction, the return would be slightly underestimated.",
+      },
+      {
+        heading: 'Velocity and financing window',
+        body: "**Velocity** (days to sell through stock at the last 90 days' pace) is used to qualify the recommendation:\n\n- If `net_days > velocity` → the supplier finances the sale (you sell before having to pay). This is the ideal situation.\n- If `net_days < velocity` → you must pay before you've sold. The discount pulls cash out even earlier from slow-moving inventory — a ⚠ warning is shown.\n\nVelocity does not reverse the recommendation (if return > cost of capital, taking the discount remains profitable) but it flags a cash flow constraint to watch.",
+      },
+      {
+        heading: 'Entering supplier terms',
+        body: "Click the **Supplier Terms** column of a brand to open the entry panel. Accepted formats:\n\n- `2/10 n/60` — 2% discount if paid in 10 days, net 60 days\n- `2% 10 days net 60` — same thing, long format\n- `n/30` or `net 30` — no discount, 30-day terms\n\nA **margin override** can be entered if the margin calculated from sales doesn't reflect reality (e.g. contractually negotiated margin).",
+      },
+      {
+        heading: 'Cost of capital',
+        body: "The cost of capital is the central parameter of the comparison. It represents what money is worth to the company — either the borrowing rate if in overdraft, or the alternative return on cash.\n\n**Default: 8%/year.** Adjust in the page header according to the actual financial situation. The value is saved and applies to all brands.",
+      },
+    ],
+  },
+
+  'inv-history': {
+    title: 'Stock History',
+    icon: '📦',
+    summary: "Tracking stock changes over time — units, cost value and retail value — by store and by brand.",
+    sections: [
+      {
+        heading: "How it works",
+        body: "Each night, during the Lightspeed sync, a **snapshot** (photo) of inventory is taken and recorded. This snapshot captures exactly the number of units and the value of each item in each store at that precise moment.\n\nHistory begins on the date of the **first snapshot** (July 24, 2026). It is not possible to view stock before this date — the data does not exist retroactively.\n\nSnapshots cover a rolling window of **400 days** in daily detail. Beyond that, data is consolidated into monthly averages and kept indefinitely.",
+      },
+      {
+        heading: "The three metrics",
+        body: "| Metric | What it measures |\n|---|---|\n| **Units in stock** | Total number of items physically in store on the selected date. |\n| **Cost value** | Units × unit purchase cost (price paid to the supplier). Useful for evaluating capital tied up. |\n| **Retail value** | Units × selling price. Indicates potential revenue if everything were sold at full price. |\n\nValue is calculated at the unit cost **on the day of the snapshot** — it does not change if prices are later modified. It is a fixed snapshot, not an accounting valuation.",
+      },
+      {
+        heading: "Available filters",
+        body: "- **Date**: select any day since the first snapshot. KPIs and the breakdown table update.\n- **Store**: filter to a single store. By default all stores are included.\n- **Brand**: filter to a specific brand (e.g. \"Brax\"). Combinable with the store filter.\n- **Metric**: choose what the chart displays (units, cost value or retail value).\n- **Granularity**: Daily (one point per day) or Monthly (average of days in the month).",
+      },
+      {
+        heading: "The breakdown table",
+        body: "Without a store filter: the table shows the **breakdown by store**. Clicking a store opens the **by brand** detail for that store (← button to go back).\n\nWith a store filter: the table shows directly the **by brand** breakdown in that store.\n\nWith a brand filter: only that brand's totals are displayed.",
+      },
+      {
+        heading: "Numbers vs Lightspeed report",
+        body: "The application totals match the **Inventory Assets by Location** report in Lightspeed, with a residual variance of ±50 units due to the lag between the snapshot time (nightly sync) and when the Lightspeed report is viewed.\n\n**Important note**: Lightspeed contains an internal location (`shop_id 0`) that is not a real store — it is not included in our calculation, exactly as Lightspeed excludes it from its own location reports.",
+      },
+      {
+        heading: "Questions for the AI assistant",
+        body: "The AI assistant can query the history directly. Examples:\n\n- *\"What is the company's current inventory?\"*\n- *\"What is the value of Brax stock at Saint-Sauveur today?\"*\n- *\"Give me Fan Club's inventory as of August 1st\"*\n\nThe assistant uses the most recent available snapshot. If you ask about a date before July 24, 2026, it will tell you no history exists for that period.",
+      },
+    ],
+  },
+
+};
+
+module.exports = { fr: HELP, en: HELP_EN };

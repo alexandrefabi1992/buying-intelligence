@@ -122,9 +122,9 @@
     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
     Admin
   </button>
-  <button id="help-btn" onclick="HelpPanel.open()" class="ml-auto py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5" title="Guide d'utilisation">
+  <button id="help-btn" onclick="HelpPanel.open()" class="ml-auto py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5" data-i18n-tip="help_btn_title" title="Guide d'utilisation">
     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="currentColor" stroke-width="0"/></svg>
-    Aide
+    <span data-i18n="btn_help">Aide</span>
   </button>
 </nav>
 
@@ -969,6 +969,9 @@ const TRANSLATIONS = {
     tier_Augmenter:'Augmenter', 'tier_Légère hausse':'Légère hausse',
     tier_Reconduire:'Reconduire', 'tier_Réduire':'Réduire', tier_Couper:'Couper',
     btn_logout:'Déconnexion',
+    btn_help:'Aide', help_btn_title:"Guide d'utilisation", help_title:"Guide d'utilisation",
+    help_expand:'Plein écran', help_shrink:'Réduire',
+    help_tip_prefix:'💬 Astuce :', help_tip_body:"L'assistant IA (bouton en bas à droite) connaît toutes ces sections. Essayez : <em>« Comment fonctionne le carryover ? »</em> ou <em>« Explique-moi les paliers de multiplicateurs »</em>.",
     tab_inv_history:'Historique stock', tab_accounting:'Comptabilité', tab_config:'⚙ Configuration',
     nos_urgent_badge:'NOS — À commander',
     nos_filter_lbl:'Filtrer :',
@@ -1113,6 +1116,9 @@ const TRANSLATIONS = {
     tier_Augmenter:'Grow', 'tier_Légère hausse':'Slight Growth',
     tier_Reconduire:'Renew', 'tier_Réduire':'Reduce', tier_Couper:'Cut',
     btn_logout:'Log out',
+    btn_help:'Help', help_btn_title:'User Guide', help_title:'User Guide',
+    help_expand:'Full screen', help_shrink:'Minimize',
+    help_tip_prefix:'💬 Tip:', help_tip_body:'The AI assistant (button at bottom right) knows all these sections. Try: <em>"How does carryover work?"</em> or <em>"Explain the multiplier tiers"</em>.',
     tab_inv_history:'Stock History', tab_accounting:'Accounting', tab_config:'⚙ Configuration',
     nos_urgent_badge:'NOS — To Order',
     nos_filter_lbl:'Filter:',
@@ -1228,6 +1234,10 @@ function setLanguage(lang) {
   if (state.budgetNos.data.length)  BudgetTab.renderBudgetTable('budgetNos');
 
   if (document.getElementById('tiersTableBody')?.children.length) ParamsTab.renderTiersTable();
+  // Reload help panel content if it's currently open
+  if (document.getElementById('help-drawer')?.classList.contains('open')) {
+    HelpPanel.reload();
+  }
 }
 
 const BASE      = '';
@@ -4192,7 +4202,7 @@ if (getToken()) {
   <div class="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
     <div class="flex items-center gap-2">
       <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="currentColor" stroke-width="0"/></svg>
-      <span class="font-bold text-gray-900 text-base">Guide d'utilisation</span>
+      <span class="font-bold text-gray-900 text-base" data-i18n="help_title">Guide d'utilisation</span>
     </div>
     <div class="flex items-center gap-1">
       <button id="help-expand-btn" onclick="HelpPanel.toggleFullscreen()" title="Plein écran" class="text-gray-400 hover:text-gray-600 p-1.5 rounded hover:bg-gray-100 transition-colors">
@@ -4279,19 +4289,21 @@ const HelpPanel = (() => {
         <p class="summary">${s.summary}</p>
         ${blocksHtml}
         <div class="help-tip">
-          <strong>💬 Astuce :</strong> L'assistant IA (bouton en bas à droite) connaît toutes ces sections. Essayez : <em>« Comment fonctionne le carryover ? »</em> ou <em>« Explique-moi les paliers de multiplicateurs »</em>.
+          <strong>${t('help_tip_prefix')}</strong> ${t('help_tip_body')}
         </div>
       </div>`;
     renderNav(key);
     document.getElementById('help-content').scrollTop = 0;
   }
 
-  async function load() {
-    if (helpData) return;
+  async function load(forceReload) {
+    const lang = currentLang || 'fr';
+    if (helpData && helpData.__lang === lang && !forceReload) return;
     try {
-      const r = await fetch('/api/help', { headers: { Authorization: 'Bearer ' + (getToken() || '') } });
+      const r = await fetch('/api/help?lang=' + lang, { headers: { Authorization: 'Bearer ' + (getToken() || '') } });
       helpData = await r.json();
-    } catch { helpData = {}; }
+      helpData.__lang = lang;
+    } catch { helpData = { __lang: lang }; }
   }
 
   function currentTab() {
@@ -4303,7 +4315,7 @@ const HelpPanel = (() => {
     document.getElementById('help-expand-icon').innerHTML = isFullscreen
       ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9L4 4m0 0v4m0-4h4M15 9l5-5m0 0v4m0-4h-4M9 15l-5 5m0 0v-4m0 4h4M15 15l5 5m0 0v-4m0 4h-4"/>'
       : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"/>';
-    document.getElementById('help-expand-btn').title = isFullscreen ? 'Réduire' : 'Plein écran';
+    document.getElementById('help-expand-btn').title = isFullscreen ? t('help_shrink') : t('help_expand');
   }
 
   return {
@@ -4320,6 +4332,7 @@ const HelpPanel = (() => {
       if (isFullscreen) { isFullscreen = false; document.getElementById('help-drawer').classList.remove('fullscreen'); updateExpandIcon(); }
     },
     show(key) { if (helpData) renderSection(key); },
+    async reload() { await load(true); renderSection(currentKey); },
     toggleFullscreen() {
       isFullscreen = !isFullscreen;
       document.getElementById('help-drawer').classList.toggle('fullscreen', isFullscreen);
