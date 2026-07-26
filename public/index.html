@@ -2646,6 +2646,7 @@ const PlanTab = (() => {
     const dropBlocks = drops.map(drop => {
       const { drop_id, drop_name } = drop;
       const shopMap  = (planState.plan[mfr] ?? {})[drop_id] ?? {};
+      console.log('[plan-debug] renderDropsBlock mfr=%s drop=%s shopMap=%s', mfr, drop_id, JSON.stringify(shopMap));
       const dropTotal = visibleShops.reduce((s, sh) => s + (shopMap[sh.id] ?? 0), 0);
       const isDrop1  = drop_id === 'drop_1';
 
@@ -2781,6 +2782,8 @@ const PlanTab = (() => {
       if (!planState.plan[mfr]) planState.plan[mfr] = {};
       if (!planState.plan[mfr][dropId]) planState.plan[mfr][dropId] = {};
       planState.plan[mfr][dropId][shopId] = amount;
+      console.log('[plan-debug] mfr=%s drop=%s shop=%s amount=%s | planState.plan[mfr]=%s | selectedShops=%s',
+        mfr, dropId, shopId, amount, JSON.stringify(planState.plan[mfr]), JSON.stringify([...planState.selectedShops]));
 
       if (!planState.drops[mfr]) planState.drops[mfr] = [];
       if (!planState.drops[mfr].find(d => d.drop_id === dropId)) {
