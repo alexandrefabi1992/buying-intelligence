@@ -2835,7 +2835,10 @@ const PlanTab = (() => {
           <td class="px-4 py-2.5 text-right">${diffHtml}</td>
           <td class="px-4 py-2.5 text-right">
             ${m._manual
-              ? `<button class="plan-delete-brand-btn text-gray-300 hover:text-red-500 text-xs px-1" title="${t('plan_delete_brand_title')}" data-mfr="${escHtml(mfr)}">🗑</button>`
+              ? `<span class="flex items-center justify-end gap-0.5">
+                   <button class="plan-exclude-btn text-gray-300 hover:text-red-400 text-xs px-1" title="${t('plan_exclude_brand_title')}" data-mfr="${escHtml(mfr)}">✕</button>
+                   <button class="plan-delete-brand-btn text-gray-200 hover:text-red-500 text-[10px] px-1" title="${t('plan_delete_brand_title')}" data-mfr="${escHtml(mfr)}">🗑</button>
+                 </span>`
               : `<button class="plan-exclude-btn text-gray-300 hover:text-red-400 text-xs px-1" title="${t('plan_exclude_brand_title')}" data-mfr="${escHtml(mfr)}">✕</button>`
             }
           </td>
