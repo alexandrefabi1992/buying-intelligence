@@ -579,7 +579,7 @@ async function toolSearchBrands({ query }, { pool }) {
   return { resultats: rows.map(r => ({ marque: r.manufacturer, nb_articles: Number(r.nb_articles) })) };
 }
 
-async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tags, exclude_tags, season, shop_id, sort = 'st_desc', limit = 50 }, { pool, getSeasonsConfig }) {
+async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tags, exclude_tags, season, shop_id, sort = 'st_desc', limit = 200 }, { pool, getSeasonsConfig }) {
   shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
   let from, to;
@@ -634,7 +634,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   const shopStockWhere = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
 
   const limitIdx = params.length + 1;
-  params.push(Math.min(limit, 100));
+  params.push(Math.min(limit, 500));
 
   const orderBy = sort === 'st_asc'    ? 'st_pct ASC  NULLS LAST, sold DESC'
                : sort === 'sold_desc' ? 'sold DESC, st_pct DESC'
@@ -730,11 +730,14 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   const total_st    = total_recu > 0 ? Math.round(total_sold / total_recu * 1000) / 10 : 0;
   const nb_total    = rows[0] ? Number(rows[0].nb_variantes_total) : 0;
 
+  const truncated = rows.length < nb_total;
+
   return {
     periode:              { de: from, a: to },
     filtre:               { marque: manufacturer, categorie: category, genre, tags, exclude_tags, taille: size, saison: season },
     tri:                  sort,
     formule_calcul:       'recu_fournisseur = vendu + stock_actuel + transferts_sortants - transferts_entrants. IMPORTANT: stock_actuel est EXCLUSIF des transferts_sortants (ces unités ont déjà quitté la boutique et sont déduites de linventaire). Ne jamais dire que le stock "inclut" les transferts sortants.',
+    ...(truncated ? { AVERTISSEMENT: `DONNÉES TRONQUÉES — ${rows.length} variantes affichées sur ${nb_total}. Les totaux globaux (total_recu_fournisseur, total_vendu, etc.) sont exacts. MAIS ne pas recalculer les totaux en sommant les variantes individuelles — elles sont incomplètes. Pour obtenir toutes les variantes, rappeler l'outil avec limit=${nb_total}.` } : {}),
     total_recu_fournisseur: total_recu,
     total_vendu:          total_sold,
     total_stock_actuel_en_boutique: total_stock,

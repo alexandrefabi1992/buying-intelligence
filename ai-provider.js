@@ -167,7 +167,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_sellthrough_by_size',
-    description: 'Calculer le sell-through (ST), les ventes et les unités reçues par variante pour une marque et une saison. Retourne vendu + stock restant + ST% par article. Utiliser pour: (1) top/flop tailles ("quelles tailles se vendent le mieux"), (2) comparer deux saisons, (3) décisions de réachat, (4) toute question sur les unités REÇUES ("avons-nous reçu plus?", "combien de reçus?") — reçus = vendu + stock restant.',
+    description: 'Calculer le sell-through (ST), les ventes et les unités reçues par variante pour une marque et une saison. Retourne vendu + stock restant + ST% par article. Utiliser pour: (1) top/flop tailles ("quelles tailles se vendent le mieux"), (2) comparer deux saisons, (3) décisions de réachat, (4) toute question sur les unités REÇUES ("avons-nous reçu plus?", "combien de reçus?") — reçus = vendu + stock restant. IMPORTANT: les totaux globaux (total_recu_fournisseur, total_vendu, total_stock_actuel_en_boutique) sont TOUJOURS exacts — utiliser ces champs pour répondre, JAMAIS sommer les variantes individuelles. Si AVERTISSEMENT apparaît dans le résultat (données tronquées), rappeler avec limit=nb_variantes_total pour tout voir. IMPORTANT: ce tool ne supporte PAS les filtres par date — quand season est fourni, les dates de la saison sont utilisées automatiquement (date_from/date_to sont ignorés).',
     parameters: {
       type: 'object',
       properties: {
@@ -180,7 +180,7 @@ const TOOL_DEFS = [
         season:       { type: 'string',  description: 'Code saison pour la période de vente, ex: "p26", "a25"' },
         shop_id:      { type: 'string',  description: 'ID boutique (optionnel)' },
         sort:         { type: 'string',  enum: ['st_desc', 'st_asc', 'sold_desc'], description: 'Tri: st_desc = meilleures performances, st_asc = pires performances (flop), sold_desc = plus vendu' },
-        limit:        { type: 'integer', description: 'Nombre max de variantes (défaut: 50)' },
+        limit:        { type: 'integer', description: 'Nombre max de variantes (défaut: 200, max: 500). Augmenter si AVERTISSEMENT données tronquées.' },
       },
       required: [],
     },
@@ -341,7 +341,9 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
 - Ne JAMAIS dire "vérifie tes données" ou proposer des choix quand l'utilisateur conteste un résultat
 - TAILLES : si 0 résultat pour la taille demandée, réponds "0 unité" — JAMAIS substituer une autre taille
 - REÇUS : utiliser get_sellthrough_by_size (reçus = vendu + stock restant) — jamais estimer depuis le stock seul
+- TOTAUX get_sellthrough_by_size : TOUJOURS utiliser les champs total_recu_fournisseur, total_vendu, total_stock_actuel_en_boutique pour les totaux — JAMAIS les sommer depuis les variantes individuelles (elles peuvent être tronquées). Si le champ AVERTISSEMENT est présent, rappeler l'outil avec limit=nb_variantes_total avant de faire tout calcul par taille ou catégorie.
 - DESCRIPTIONS : get_sellthrough_by_size retourne une ligne par variante avec sa description complète. JAMAIS agréger par taille ni résumer plusieurs lignes en une. JAMAIS inventer ou deviner des noms de modèles (ex: "Soffys", "Aminase") — utiliser uniquement les descriptions exactes retournées par l'outil.
+- DATES get_sellthrough_by_size : ce tool ne supporte PAS les filtres par date personnalisés. Quand season est fourni, les dates de la saison sont utilisées automatiquement. Si l'utilisateur demande une plage de dates spécifique pour les "reçus", le lui expliquer clairement — la formule reçus=vendu+stock est valide seulement sur la fenêtre complète de la saison.
 - Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
 - Si tu n'es pas certain du nom exact d'une catégorie : appelle get_categories(manufacturer=X) d'abord
