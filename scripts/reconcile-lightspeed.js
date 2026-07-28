@@ -45,8 +45,7 @@ const COLUMN_MAP = {
 };
 
 // ── Config DB ───────────────────────────────────────────────────────────────
-const DB_URL    = process.env.DATABASE_URL
-  || 'postgresql://postgres:REDACTED_CREDENTIAL@zephyr.proxy.rlwy.net:38019/railway';
+const DB_URL    = process.env.DATABASE_URL;
 const TENANT_ID = process.env.TENANT_ID || 'valerie-simon';
 
 // ── Saisons (identiques à server.js) ───────────────────────────────────────

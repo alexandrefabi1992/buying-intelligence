@@ -10,8 +10,12 @@
 
 const { Pool } = require('pg');
 
-const DB_URL = process.env.DATABASE_URL
-  || 'postgresql://postgres:REDACTED_CREDENTIAL@zephyr.proxy.rlwy.net:38019/railway';
+const DB_URL = process.env.DATABASE_URL;
+if (!DB_URL) {
+  console.error('ERROR: DATABASE_URL environment variable is required.');
+  console.error('Run: railway run npm test   OR   DATABASE_URL=... npm test');
+  process.exit(1);
+}
 
 const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
 
