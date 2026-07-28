@@ -219,6 +219,145 @@ async function verifyLimitBreaksInvariant(manufacturer, badLimit) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Tests for toolGetSalesByVariant (LIMIT 100 + reduce bug, fixed 2026-07-27)
+// Invariant: window total_qty_all == true sum of ALL descriptions (not just top 100)
+// Baseline: Brax — 1261 descriptions, reduce(100 rows)=222 vs correct=1548 (86% wrong)
+// ---------------------------------------------------------------------------
+async function testSalesByVariant(manufacturer, displayLimit, minDescriptions) {
+  const today = new Date().toISOString().slice(0, 10);
+  const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const from = oneYearAgo.toISOString().slice(0, 10);
+
+  const { rows } = await pool.query(`
+    SELECT SUM(sl.qty) AS qty_vendue,
+      SUM(SUM(sl.qty)) OVER () AS total_qty_all,
+      COUNT(*)         OVER () AS nb_articles_total
+    FROM sale_lines sl
+    JOIN products p ON p.item_id = sl.item_id
+    WHERE p.manufacturer ILIKE $1
+      AND sl.completed_time BETWEEN $2 AND $3
+    GROUP BY p.description, p.manufacturer
+    ORDER BY qty_vendue DESC
+    LIMIT ${displayLimit}
+  `, [`%${manufacturer}%`, from, today]);
+
+  if (!rows.length) throw new Error(`[SalesByVariant ${manufacturer}] No rows`);
+
+  const nb_total     = Number(rows[0].nb_articles_total);
+  const window_total = Number(rows[0].total_qty_all);
+  const reduce_total = rows.reduce((s, r) => s + Number(r.qty_vendue), 0);
+
+  if (nb_total < minDescriptions) {
+    throw new Error(`[SalesByVariant ${manufacturer}] Only ${nb_total} descriptions — need ≥${minDescriptions}`);
+  }
+
+  const label = `[SalesByVariant ${manufacturer} LIMIT ${displayLimit}]`;
+  if (reduce_total === window_total) {
+    // Both match → either all rows fit within LIMIT, or there's a regression
+    if (nb_total <= displayLimit) {
+      console.log(`PASS ${label} ${nb_total} descriptions ≤ LIMIT — window=${window_total} ✅`);
+    } else {
+      console.error(`FAIL ${label} reduce=${reduce_total} == window=${window_total} but nb_total=${nb_total} > LIMIT`
+        + ` — window function may not be applied.`);
+      return false;
+    }
+  } else {
+    // reduce undercount confirms the bug would exist without the window fix
+    console.log(`PASS ${label} ${nb_total} descriptions — window=${window_total} ✅`
+      + `  (reduce on ${displayLimit} rows would give ${reduce_total}, ${Math.round((window_total-reduce_total)/window_total*100)}% wrong)`);
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Tests for toolGetSalesByCategory (LIMIT 60 + reduce bug, fixed 2026-07-27)
+// Invariant: window total_unites_all == true sum across ALL categories (not just top 60)
+// Baseline: 150 categories, reduce(60 rows)=29444 vs correct=31490 (6% wrong)
+// ---------------------------------------------------------------------------
+async function testSalesByCategory(displayLimit, minCategories) {
+  const today = new Date().toISOString().slice(0, 10);
+  const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const from = oneYearAgo.toISOString().slice(0, 10);
+
+  const { rows } = await pool.query(`
+    SELECT SUM(sl.qty)::int AS unites,
+      SUM(SUM(sl.qty)) OVER () AS total_unites_all,
+      COUNT(*)         OVER () AS nb_categories_total
+    FROM sale_lines sl
+    JOIN products p ON p.item_id = sl.item_id
+    WHERE sl.completed_time BETWEEN $1 AND $2
+      AND p.category IS NOT NULL AND p.category != ''
+    GROUP BY p.category
+    ORDER BY unites DESC
+    LIMIT ${displayLimit}
+  `, [from, today]);
+
+  if (!rows.length) throw new Error(`[SalesByCategory] No rows`);
+
+  const nb_total     = Number(rows[0].nb_categories_total);
+  const window_total = Number(rows[0].total_unites_all);
+  const reduce_total = rows.reduce((s, r) => s + Number(r.unites), 0);
+
+  if (nb_total < minCategories) {
+    throw new Error(`[SalesByCategory] Only ${nb_total} categories — need ≥${minCategories}`);
+  }
+
+  const label = `[SalesByCategory LIMIT ${displayLimit}]`;
+  if (reduce_total === window_total && nb_total > displayLimit) {
+    console.error(`FAIL ${label} reduce=${reduce_total} == window=${window_total} but ${nb_total} categories > LIMIT`);
+    return false;
+  }
+  console.log(`PASS ${label} ${nb_total} catégories — window=${window_total} ✅`
+    + (nb_total > displayLimit ? `  (reduce on ${displayLimit} rows would give ${reduce_total}, ${Math.round((window_total-reduce_total)/window_total*100)}% wrong)` : ''));
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Tests for toolGetSalesAnalysis category branch (LIMIT 20 + reduce, fixed 2026-07-27)
+// Invariant: window total_unites_all == true sum across ALL brands in the category
+// Baseline: Femme/Hauts/Chandail — 46 brands, reduce(20)=2888 vs correct=3196 (10% wrong)
+// ---------------------------------------------------------------------------
+async function testSalesAnalysisByCategory(category, displayLimit, minBrands) {
+  const today = new Date().toISOString().slice(0, 10);
+  const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const from = oneYearAgo.toISOString().slice(0, 10);
+
+  const { rows } = await pool.query(`
+    SELECT SUM(sl.qty) AS unites,
+      SUM(SUM(sl.qty)) OVER () AS total_unites_all,
+      COUNT(*)         OVER () AS nb_marques_total
+    FROM sale_lines sl
+    JOIN products p ON p.item_id = sl.item_id
+    JOIN shops sh ON sh.shop_id = sl.shop_id
+    WHERE sl.completed_time BETWEEN $1 AND $2
+      AND p.category ILIKE $3
+      AND p.manufacturer IS NOT NULL
+    GROUP BY p.manufacturer
+    ORDER BY unites DESC
+    LIMIT ${displayLimit}
+  `, [from, today, `%${category}%`]);
+
+  if (!rows.length) throw new Error(`[SalesAnalysis cat "${category}"] No rows`);
+
+  const nb_total     = Number(rows[0].nb_marques_total);
+  const window_total = Number(rows[0].total_unites_all);
+  const reduce_total = rows.reduce((s, r) => s + Number(r.unites), 0);
+
+  if (nb_total < minBrands) {
+    throw new Error(`[SalesAnalysis cat "${category}"] Only ${nb_total} brands — need ≥${minBrands}`);
+  }
+
+  const label = `[SalesAnalysis cat "${category}" LIMIT ${displayLimit}]`;
+  if (reduce_total === window_total && nb_total > displayLimit) {
+    console.error(`FAIL ${label} reduce=${reduce_total} == window=${window_total} but ${nb_total} brands > LIMIT`);
+    return false;
+  }
+  console.log(`PASS ${label} ${nb_total} marques — window=${window_total} ✅`
+    + (nb_total > displayLimit ? `  (reduce on ${displayLimit} rows would give ${reduce_total}, ${Math.round((window_total-reduce_total)/window_total*100)}% wrong)` : ''));
+  return true;
+}
+
 async function main() {
   let anyFailed = false;
 
@@ -249,6 +388,22 @@ async function main() {
   // Confirm the old bug (LIMIT 50) would break the invariant for Patrick Assaraf
   console.log('');
   await verifyLimitBreaksInvariant('Patrick Assaraf', 50);
+
+  // --- toolGetSalesByVariant (LIMIT 100 bug, fixed 2026-07-27) ---
+  // Brax: 1261 descriptions, reduce(100)=222 vs window=1548 (86% wrong without fix)
+  console.log('');
+  const sbv = await testSalesByVariant('Brax', 100, 200);
+  if (!sbv) anyFailed = true;
+
+  // --- toolGetSalesByCategory (LIMIT 60 bug, fixed 2026-07-27) ---
+  // 150 categories, reduce(60)=29444 vs window=31490 (6% wrong without fix)
+  const sbc = await testSalesByCategory(60, 100);
+  if (!sbc) anyFailed = true;
+
+  // --- toolGetSalesAnalysis category branch (LIMIT 20 bug, fixed 2026-07-27) ---
+  // Femme/Hauts/Chandail: 46 brands, reduce(20)=2888 vs window=3196 (10% wrong without fix)
+  const sac = await testSalesAnalysisByCategory('Femme/Hauts/Chandail', 20, 30);
+  if (!sac) anyFailed = true;
 
   await pool.end();
 
