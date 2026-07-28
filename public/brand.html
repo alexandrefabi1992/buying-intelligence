@@ -191,6 +191,7 @@
       kpi_velo_sub: 'moyenne 12 semaines',
       kpi_margin_lbl: 'Marge réelle',
       kpi_margin_sub: 'moy. sur articles actifs',
+      kpi_margin_sub_tag: code => `moy. sur articles taggés ${code}`,
       kpi_stock_lbl: 'Stock en main',
       kpi_stock_sub: 'qté dispo + en commande',
       kpi_sales_lbl: 'Ventes',
@@ -200,6 +201,7 @@
       tip_st: "Vendus (tag) ÷ (vendus + stock taggé) × 100\nNumérateur et dénominateur filtrés par tag saison\n+Période : numérateur restreint à la fenêtre de dates",
       tip_velo: "Moyenne d'unités vendues par semaine\nCalculée sur les 12 dernières semaines",
       tip_margin: "Moyenne de (prix vente − coût) ÷ prix vente\nSur tous les articles actifs de la marque",
+      tip_margin_tag: code => `Moyenne de (prix vente − coût) ÷ prix vente\nFiltrée sur les articles taggés ${code}`,
       tip_stock: "qty_on_hand + qty_on_order\nToutes boutiques (ou boutique sélectionnée)",
       tip_sales: "Tag : articles taggés saison (toutes dates)\nTag+Période : articles taggés ET vendus pendant la saison",
       tip_rev: "Somme de (qté vendue × prix unitaire)\n12 dernières semaines, articles taggés par saison",
@@ -248,6 +250,7 @@
       kpi_velo_sub: '12-week average',
       kpi_margin_lbl: 'Actual margin',
       kpi_margin_sub: 'avg. on active items',
+      kpi_margin_sub_tag: code => `avg. on tagged ${code} items`,
       kpi_stock_lbl: 'On-hand stock',
       kpi_stock_sub: 'qty on hand + on order',
       kpi_sales_lbl: 'Sales',
@@ -257,6 +260,7 @@
       tip_st: "Sold (tag) ÷ (sold + tagged stock) × 100\nNumerator and denominator filtered by season tag\n+Period: numerator restricted to the date window",
       tip_velo: "Average units sold per week\nCalculated over the last 12 weeks",
       tip_margin: "Average (selling price − cost) ÷ selling price\nAcross all active items for the brand",
+      tip_margin_tag: code => `Average (selling price − cost) ÷ selling price\nFiltered to items tagged ${code}`,
       tip_stock: "qty_on_hand + qty_on_order\nAll stores (or selected store)",
       tip_sales: "Tag: items tagged with season (all dates)\nTag+Period: items tagged AND sold during the season",
       tip_rev: "Sum of (qty sold × unit price)\nLast 12 weeks, items tagged by season",
@@ -466,6 +470,13 @@
     // Static KPIs (mode-independent)
     document.getElementById('kpiVelo').textContent   = fmt(p.weekly_velocity) + t('tooltip_unit');
     document.getElementById('kpiMargin').textContent = fmtP(p.avg_margin_pct);
+    if (d.season_code) {
+      document.getElementById('kpiMarginSub').textContent  = t('kpi_margin_sub_tag')(seasonLabel);
+      document.getElementById('kpiCardMargin').dataset.tip = t('tip_margin_tag')(seasonLabel);
+    } else {
+      document.getElementById('kpiMarginSub').textContent  = t('kpi_margin_sub');
+      document.getElementById('kpiCardMargin').dataset.tip = t('tip_margin');
+    }
     if (d.season_code) {
       document.getElementById('kpiStock').textContent    = fmt(p.current_stock_tag) + t('tooltip_unit');
       document.getElementById('kpiStockSub').textContent = t('kpi_stock_tagged')(d.season_code.toUpperCase(), fmt(p.current_stock));

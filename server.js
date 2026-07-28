@@ -3989,7 +3989,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           ROUND(SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)), 0)::float8 AS current_stock,
           ROUND(SUM(CASE WHEN p.tags ILIKE $3
                          THEN COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0) ELSE 0 END), 0)::float8 AS current_stock_tag,
-          ROUND(AVG(CASE WHEN p.default_price > 0
+          ROUND(AVG(CASE WHEN p.default_price > 0 AND p.tags ILIKE $3
                          THEN (p.default_price - p.default_cost) / p.default_price * 100
                          ELSE NULL END), 1)::float8 AS avg_margin_pct
         FROM products p
@@ -4004,7 +4004,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           ROUND(SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)), 0)::float8 AS current_stock,
           ROUND(SUM(CASE WHEN p.tags ILIKE $2
                          THEN COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0) ELSE 0 END), 0)::float8 AS current_stock_tag,
-          ROUND(AVG(CASE WHEN p.default_price > 0
+          ROUND(AVG(CASE WHEN p.default_price > 0 AND p.tags ILIKE $2
                          THEN (p.default_price - p.default_cost) / p.default_price * 100
                          ELSE NULL END), 1)::float8 AS avg_margin_pct
         FROM products p
