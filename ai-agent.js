@@ -12,6 +12,25 @@ const { createProvider, SYSTEM_PROMPT, buildSystemPrompt } = require('./ai-provi
 const MAX_TOOL_ROUNDS = 6; // safety limit against infinite loops
 
 // ---------------------------------------------------------------------------
+// Helper: extract size label from a variant description.
+// Handles alpha sizes (XS–3X) and numeric (28–115, 14.5–18.5).
+// ---------------------------------------------------------------------------
+function extractSize(desc) {
+  if (!desc) return 'N/A';
+  let m;
+  m = /\b(3XL|XXL|2XL|XL|XS|2X|3X)\b/i.exec(desc); if (m) return m[1].toUpperCase();
+  m = /\b([SML])\b/.exec(desc);                       if (m) return m[1].toUpperCase();
+  m = /\b(\d{2,3}(?:[.,]\d+)?)\b/.exec(desc);         if (m) return m[1].replace(',', '.');
+  return 'N/A';
+}
+
+const ALPHA_SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '2X', '3X', '4X'];
+function sizeRank(s) {
+  const idx = ALPHA_SIZE_ORDER.indexOf(s.toUpperCase());
+  return idx >= 0 ? idx : 100 + (parseFloat(s) || 999);
+}
+
+// ---------------------------------------------------------------------------
 // Helper: format currency for AI responses
 // ---------------------------------------------------------------------------
 function fmtMoney(v) {
@@ -316,7 +335,9 @@ async function toolGetStockByVariant({ manufacturer, size, category, genre, tags
       p.manufacturer,
       sh.name            AS boutique,
       i.qty_on_hand      AS stock,
-      p.default_cost     AS cout_unitaire
+      p.default_cost     AS cout_unitaire,
+      SUM(i.qty_on_hand) OVER () AS total_stock_all,
+      COUNT(*)           OVER () AS nb_lignes_total
     FROM products p
     JOIN inventory i ON i.item_id = p.item_id
     JOIN shops    sh ON sh.shop_id = i.shop_id
@@ -325,10 +346,14 @@ async function toolGetStockByVariant({ manufacturer, size, category, genre, tags
     LIMIT 100
   `, params);
 
-  const total = rows.reduce((s, r) => s + Number(r.stock), 0);
+  // total_stock_all from window function is correct even when LIMIT truncates rows
+  const total    = rows[0] ? Number(rows[0].total_stock_all) : 0;
+  const nb_total = rows[0] ? Number(rows[0].nb_lignes_total) : 0;
   return {
     filtre: { marque: manufacturer, taille: size, recherche: description_search },
-    total_unites: total,
+    total_unites:         total,
+    nb_lignes_total:      nb_total,
+    nb_lignes_affichees:  rows.length,
     articles: rows.map(r => ({
       description: r.description,
       boutique:    r.boutique,
@@ -633,9 +658,6 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   const shopSaleCond   = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
   const shopStockWhere = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
 
-  const limitIdx = params.length + 1;
-  params.push(Math.min(limit, 500));
-
   const orderBy = sort === 'st_asc'    ? 'st_pct ASC  NULLS LAST, sold DESC'
                : sort === 'sold_desc' ? 'sold DESC, st_pct DESC'
                : /* st_desc default */ 'st_pct DESC NULLS LAST, sold DESC';
@@ -718,26 +740,48 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
       COUNT(*)               OVER () AS nb_variantes_total
     FROM base
     ORDER BY ${orderBy}
-    LIMIT $${limitIdx}
   `, params);
 
-  // Totals from window functions — correct even when LIMIT truncates the rows
+  // Totals from window functions — always correct (no LIMIT on query)
   const total_recu  = rows[0] ? Number(rows[0].total_recu_all)  : 0;
   const total_sold  = rows[0] ? Number(rows[0].total_sold_all)  : 0;
   const total_stock = rows[0] ? Number(rows[0].total_stock_all) : 0;
   const total_in    = rows[0] ? Number(rows[0].total_in_all)    : 0;
   const total_out   = rows[0] ? Number(rows[0].total_out_all)   : 0;
   const total_st    = total_recu > 0 ? Math.round(total_sold / total_recu * 1000) / 10 : 0;
-  const nb_total    = rows[0] ? Number(rows[0].nb_variantes_total) : 0;
+  const nb_total    = rows.length;
 
-  const truncated = rows.length < nb_total;
+  // Aggregate by size in JS from ALL rows (no truncation risk)
+  const sizeAgg = {};
+  for (const r of rows) {
+    const t = extractSize(r.description);
+    if (!sizeAgg[t]) sizeAgg[t] = { recu: 0, vendu: 0, stock: 0, in: 0, out: 0 };
+    sizeAgg[t].recu  += Number(r.received_supplier);
+    sizeAgg[t].vendu += Number(r.sold);
+    sizeAgg[t].stock += Number(r.stock);
+    sizeAgg[t].in    += Number(r.transferred_in);
+    sizeAgg[t].out   += Number(r.transferred_out);
+  }
+  const par_taille = Object.entries(sizeAgg)
+    .map(([taille, d]) => ({
+      taille,
+      recu_fournisseur: d.recu,
+      vendu:            d.vendu,
+      stock_actuel:     d.stock,
+      transferts_entrants: d.in,
+      transferts_sortants: d.out,
+      st_pct: d.recu > 0 ? `${Math.round(d.vendu / d.recu * 1000) / 10}%` : '0%',
+    }))
+    .sort((a, b) => sizeRank(a.taille) - sizeRank(b.taille));
+
+  // Variantes capped to `limit` rows for display (par_taille already has the full aggregation)
+  const displayRows = rows.slice(0, Math.min(limit, rows.length));
 
   return {
     periode:              { de: from, a: to },
     filtre:               { marque: manufacturer, categorie: category, genre, tags, exclude_tags, taille: size, saison: season },
     tri:                  sort,
     formule_calcul:       'recu_fournisseur = vendu + stock_actuel + transferts_sortants - transferts_entrants. IMPORTANT: stock_actuel est EXCLUSIF des transferts_sortants (ces unités ont déjà quitté la boutique et sont déduites de linventaire). Ne jamais dire que le stock "inclut" les transferts sortants.',
-    ...(truncated ? { AVERTISSEMENT: `DONNÉES TRONQUÉES — ${rows.length} variantes affichées sur ${nb_total}. Les totaux globaux (total_recu_fournisseur, total_vendu, etc.) sont exacts. MAIS ne pas recalculer les totaux en sommant les variantes individuelles — elles sont incomplètes. Pour obtenir toutes les variantes, rappeler l'outil avec limit=${nb_total}.` } : {}),
     total_recu_fournisseur: total_recu,
     total_vendu:          total_sold,
     total_stock_actuel_en_boutique: total_stock,
@@ -745,8 +789,10 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
     total_transferts_sortants_vers_autres_boutiques:   total_out,
     st_global:            `${total_st}%`,
     nb_variantes_total:   nb_total,
-    nb_variantes_affiches: rows.length,
-    variantes:            rows.map(r => ({
+    // par_taille is always complete — computed from ALL rows before display truncation
+    par_taille:           par_taille,
+    nb_variantes_affiches: displayRows.length,
+    variantes:            displayRows.map(r => ({
       description:         r.description,
       recu_fournisseur:    Number(r.received_supplier),
       vendu:               Number(r.sold),
