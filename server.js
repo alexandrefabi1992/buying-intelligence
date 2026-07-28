@@ -3860,6 +3860,8 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       stTo   = today.toISOString().slice(0, 10) < season.to ? today.toISOString().slice(0, 10) : season.to;
     }
 
+    const seasonTag = allTime ? null : `%${seasonCode}%`;
+
     // Q6 — Transfers balance for this shop (only meaningful when shop filter active)
     // When a season is selected, filter transfers to season-tagged items only so that
     // stockTagRecon = stockTag + sentOut - receivedIn stays in the same tag universe.
@@ -3889,7 +3891,6 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     //   allTime + shop    : $1=mfr  $2=shopId
     //   season + no shop  : $1=mfr  $2=stFrom  $3=stTo  $4='%tag%'
     //   season + shop     : $1=mfr  $2=shopId  $3=stFrom $4=stTo  $5='%tag%'
-    const seasonTag = allTime ? null : `%${seasonCode}%`;
     let q1Promise;
     if (allTime) {
       q1Promise = pool.query(`
