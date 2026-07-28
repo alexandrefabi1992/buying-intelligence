@@ -27,25 +27,33 @@ function extractSize(desc) {
 
 // Run the same core query as toolGetSellthroughBySize — NO LIMIT.
 // Optionally cap with simulatedLimit to reproduce the old bug.
-async function runQuery(manufacturer, simulatedLimit = null) {
+// shop_id and tag_pattern are optional to scope the query.
+async function runQuery(manufacturer, simulatedLimit = null, { shopId = null, tagPattern = null, from = null, to = null } = {}) {
   const today = new Date().toISOString().slice(0, 10);
-  const oneYearAgo = new Date();
-  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-  const from = oneYearAgo.toISOString().slice(0, 10);
+  if (!from) {
+    const d = new Date(); d.setFullYear(d.getFullYear() - 1);
+    from = d.toISOString().slice(0, 10);
+  }
+  if (!to) to = today;
 
   const limitClause = simulatedLimit ? `LIMIT ${simulatedLimit}` : '';
+  const shopSaleCond   = shopId ? `AND sl2.shop_id = '${shopId}'` : '';
+  const shopStockWhere = shopId ? `WHERE inv.shop_id = '${shopId}'` : '';
+  const tagCond        = tagPattern ? `AND p.tags ILIKE '%${tagPattern}%'` : '';
 
   const { rows } = await pool.query(`
     WITH sales_by_item AS (
       SELECT sl2.item_id, SUM(sl2.qty) AS sold
       FROM sale_lines sl2
       WHERE sl2.completed_time BETWEEN $1 AND $2
+        ${shopSaleCond}
       GROUP BY sl2.item_id
     ),
     stock_by_item AS (
       SELECT inv.item_id, SUM(inv.qty_on_hand) AS stock
       FROM inventory inv
       JOIN products px ON px.item_id = inv.item_id AND px.archived = false
+      ${shopStockWhere}
       GROUP BY inv.item_id
     ),
     base AS (
@@ -58,6 +66,7 @@ async function runQuery(manufacturer, simulatedLimit = null) {
       LEFT JOIN sales_by_item s  ON s.item_id  = p.item_id
       LEFT JOIN stock_by_item st ON st.item_id = p.item_id
       WHERE p.manufacturer ILIKE $3
+        ${tagCond}
         AND (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)) > 0
     )
     SELECT *,
@@ -67,9 +76,57 @@ async function runQuery(manufacturer, simulatedLimit = null) {
     FROM base
     ORDER BY received_supplier DESC
     ${limitClause}
-  `, [from, today, `%${manufacturer}%`]);
+  `, [from, to, `%${manufacturer}%`]);
 
   return rows;
+}
+
+// Test a scoped query (specific boutique + season tag) — reproduces the exact original bug context.
+async function testBrandScoped(manufacturer, { shopId, shopName, tagPattern, from, to, badLimit }) {
+  const rows = await runQuery(manufacturer, null, { shopId, tagPattern, from, to });
+  if (rows.length === 0) {
+    throw new Error(`[${manufacturer} ${tagPattern} ${shopName}] No rows — check brand/tag/shop.`);
+  }
+
+  const nb_total    = Number(rows[0].nb_variantes_total);
+  const total_recu  = Number(rows[0].total_recu_all);
+  const total_stock = Number(rows[0].total_stock_all);
+
+  const sizeAgg = {};
+  for (const r of rows) {
+    const t = extractSize(r.description);
+    if (!sizeAgg[t]) sizeAgg[t] = { recu: 0, stock: 0 };
+    sizeAgg[t].recu  += Number(r.received_supplier);
+    sizeAgg[t].stock += Number(r.stock);
+  }
+  const sumRecu  = Object.values(sizeAgg).reduce((s, v) => s + v.recu,  0);
+  const sumStock = Object.values(sizeAgg).reduce((s, v) => s + v.stock, 0);
+
+  // Also simulate the old bug with the given limit
+  const buggedRows = await runQuery(manufacturer, badLimit, { shopId, tagPattern, from, to });
+  const bugAgg = {};
+  for (const r of buggedRows) {
+    const t = extractSize(r.description);
+    if (!bugAgg[t]) bugAgg[t] = { recu: 0, stock: 0 };
+    bugAgg[t].recu  += Number(r.received_supplier);
+    bugAgg[t].stock += Number(r.stock);
+  }
+  const bugStock = Object.values(bugAgg).reduce((s, v) => s + v.stock, 0);
+
+  const label = `[${manufacturer} ${tagPattern} @ ${shopName}]`;
+  let failed = false;
+
+  if (sumRecu !== total_recu || sumStock !== total_stock) {
+    console.error(`FAIL ${label} par_taille mismatch: recu=${sumRecu}≠${total_recu} stock=${sumStock}≠${total_stock}`);
+    failed = true;
+  } else {
+    console.log(`PASS ${label} ${nb_total} variantes — recu=${total_recu} ✅  stock=${total_stock} ✅`);
+    if (bugStock !== total_stock) {
+      console.log(`  → LIMIT ${badLimit} aurait produit stock=${bugStock} au lieu de ${total_stock} (bug original reproduit ✓)`);
+    }
+  }
+
+  return !failed;
 }
 
 async function testBrand(manufacturer, minVariants) {
@@ -161,7 +218,19 @@ async function verifyLimitBreaksInvariant(manufacturer, badLimit) {
 async function main() {
   let anyFailed = false;
 
-  // Patrick Assaraf: 77 variants, alpha sizes (XS–XXL). The original bug brand.
+  // --- Scoped test: exact original bug context (conv 168-169, 2026-07-27) ---
+  // Patrick Assaraf p26 @ Valérie Simon — 62 variants, old LIMIT 50 gave stock=27 instead of 34.
+  const paScoped = await testBrandScoped('Patrick Assaraf', {
+    shopId: '1', shopName: 'Valérie Simon',
+    tagPattern: 'p26',
+    from: '2025-10-01', to: '2026-07-27',
+    badLimit: 50,
+  });
+  if (!paScoped) anyFailed = true;
+
+  // --- Broad tests: no shop/season filter, verifies invariant at scale ---
+
+  // Patrick Assaraf: alpha sizes (XS–XXL). Original bug brand, all boutiques, 1 year.
   const pa = await testBrand('Patrick Assaraf', 50);
   if (!pa) anyFailed = true;
 
