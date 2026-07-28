@@ -63,6 +63,11 @@
       <select id="shopFilter" class="border border-gray-300 rounded px-2 py-1 text-sm text-gray-700">
         <option value="" data-i18n="opt_all_stores">Toutes les boutiques</option>
       </select>
+      <div class="w-px h-5 bg-gray-200"></div>
+      <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+        <button id="lang-fr" onclick="setLang('fr')" class="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 border-r border-gray-200">FR</button>
+        <button id="lang-en" onclick="setLang('en')" class="text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600">EN</button>
+      </div>
     </div>
   </header>
 
@@ -684,6 +689,20 @@
   // ── Init ──────────────────────────────────────────────────────────────────
   document.getElementById('shopFilter').addEventListener('change', load);
   document.getElementById('seasonFilter').addEventListener('change', load);
+
+  function setLang(lang) {
+    try { localStorage.setItem('buying_lang', lang); } catch {}
+    location.reload();
+  }
+
+  (function() {
+    const fr = document.getElementById('lang-fr');
+    const en = document.getElementById('lang-en');
+    if (fr && en && _lang === 'en') {
+      fr.className = 'text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600 border-r border-gray-200';
+      en.className = 'text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700';
+    }
+  })();
 
   applyI18n();
 

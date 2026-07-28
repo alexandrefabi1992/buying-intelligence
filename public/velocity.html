@@ -31,6 +31,11 @@
       <option value="a24">A24 — Automne 2024</option>
       <option value="p24">P24 — Printemps 2024</option>
     </select>
+    <div class="w-px h-5 bg-gray-200"></div>
+    <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+      <button id="lang-fr" onclick="setLang('fr')" class="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 border-r border-gray-200">FR</button>
+      <button id="lang-en" onclick="setLang('en')" class="text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600">EN</button>
+    </div>
   </div>
 </header>
 
@@ -331,6 +336,21 @@ function goToLevel(level) {
 
 function showLoader() { document.getElementById('loader').classList.remove('hidden'); document.getElementById('content').classList.add('hidden'); }
 function hideLoader() { document.getElementById('loader').classList.add('hidden'); document.getElementById('content').classList.remove('hidden'); }
+
+function setLang(lang) {
+  try { localStorage.setItem('buying_lang', lang); } catch {}
+  location.reload();
+}
+
+(function() {
+  const lang = (() => { try { return localStorage.getItem('buying_lang') || 'fr'; } catch { return 'fr'; } })();
+  const fr = document.getElementById('lang-fr');
+  const en = document.getElementById('lang-en');
+  if (fr && en && lang === 'en') {
+    fr.className = 'text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600 border-r border-gray-200';
+    en.className = 'text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700';
+  }
+})();
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async () => {

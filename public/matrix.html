@@ -18,6 +18,12 @@
             class="text-blue-600 text-sm hover:underline flex-shrink-0">← Retour</button>
     <div class="w-px h-5 bg-gray-200 flex-shrink-0"></div>
     <h1 id="pageTitle" class="text-base font-semibold text-gray-900 truncate">…</h1>
+    <div class="ml-auto flex items-center gap-3 flex-shrink-0">
+      <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+        <button id="lang-fr" onclick="setLang('fr')" class="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 border-r border-gray-200">FR</button>
+        <button id="lang-en" onclick="setLang('en')" class="text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600">EN</button>
+      </div>
+    </div>
   </header>
 
   <!-- Loader -->
@@ -179,6 +185,21 @@
       document.getElementById('loader').innerHTML = `<p class="text-red-500 text-sm">${e.message}</p>`;
     }
   }
+
+  function setLang(lang) {
+    try { localStorage.setItem('buying_lang', lang); } catch {}
+    location.reload();
+  }
+
+  (function() {
+    const lang = (() => { try { return localStorage.getItem('buying_lang') || 'fr'; } catch { return 'fr'; } })();
+    const fr = document.getElementById('lang-fr');
+    const en = document.getElementById('lang-en');
+    if (fr && en && lang === 'en') {
+      fr.className = 'text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600 border-r border-gray-200';
+      en.className = 'text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700';
+    }
+  })();
 
   load();
   </script>

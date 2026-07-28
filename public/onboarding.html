@@ -33,6 +33,11 @@
 </head>
 <body class="bg-gray-50 min-h-screen flex items-center justify-center p-6">
 
+<div class="fixed top-4 right-4 flex items-center border border-gray-200 rounded-lg overflow-hidden shadow-sm bg-white">
+  <button id="lang-fr" onclick="setLang('fr')" class="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 border-r border-gray-200">FR</button>
+  <button id="lang-en" onclick="setLang('en')" class="text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600">EN</button>
+</div>
+
 <div class="w-full max-w-2xl">
 
   <!-- Header -->
@@ -422,6 +427,21 @@ async function saveConfig() {
     alert('Erreur lors de la sauvegarde. Veuillez réessayer.');
   }
 }
+
+function setLang(lang) {
+  try { localStorage.setItem('buying_lang', lang); } catch {}
+  location.reload();
+}
+
+(function() {
+  const lang = (() => { try { return localStorage.getItem('buying_lang') || 'fr'; } catch { return 'fr'; } })();
+  const fr = document.getElementById('lang-fr');
+  const en = document.getElementById('lang-en');
+  if (fr && en && lang === 'en') {
+    fr.className = 'text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600 border-r border-gray-200';
+    en.className = 'text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700';
+  }
+})();
 
 // Init
 showStep(1);
