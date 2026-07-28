@@ -301,6 +301,13 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE item_attribute_sets ADD COLUMN IF NOT EXISTS size_axis  SMALLINT`);
   await pool.query(`ALTER TABLE item_attribute_sets ADD COLUMN IF NOT EXISTS color_axis SMALLINT`);
 
+  // Composite indexes for the 3 new analytics tools (Vague 1).
+  // idx_sale_lines_item_date enables index-only scans on sales_by_item CTE.
+  // idx_products_tenant_* accelerate GROUP BY on tenant-scoped brand/matrix queries.
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_sale_lines_item_date ON sale_lines (item_id, completed_time, qty)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_tenant_matrix ON products (tenant_id, matrix_id) WHERE archived = false`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_products_tenant_manufacturer ON products (tenant_id, manufacturer) WHERE archived = false`);
+
   // Monthly aggregate — long-term retention after 400-day detail window expires.
   // manufacturer='' represents items with no manufacturer (avoids NULL in PK).
   // total_qty = average daily qty over the month; cost/retail = average daily value.

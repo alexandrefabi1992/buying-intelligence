@@ -1809,6 +1809,541 @@ async function toolGetProductByDescription({ terme, season, shop_id }, { pool, g
 }
 
 // ---------------------------------------------------------------------------
+// computeSeasonMetrics — shared helper for toolGetBrandRanking and
+// toolGetSeasonComparison. Returns aggregate sell-through metrics for
+// one season, optionally filtered by manufacturer and/or shop.
+// ---------------------------------------------------------------------------
+async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, shop_id, tenantId }, pool) {
+  const params = [stFrom, stTo]; // $1 $2
+
+  const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
+  const shopSaleCond    = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
+  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
+
+  const tenantIdx = (params.push(tenantId), params.length);
+  const prodWhere = [`p.tenant_id = $${tenantIdx}`, `p.archived = false`];
+  if (seasonTag)    prodWhere.push(`p.tags ILIKE $${(params.push('%' + seasonTag + '%'), params.length)}`);
+  if (manufacturer) prodWhere.push(`p.manufacturer ILIKE $${(params.push('%' + manufacturer + '%'), params.length)}`);
+
+  const { rows } = await pool.query(`
+    WITH sales_by_item AS (
+      SELECT sl2.item_id,
+             SUM(sl2.qty) AS sold,
+             SUM(sl2.qty * sl2.unit_price - COALESCE(sl2.discount, 0)) AS revenue
+      FROM sale_lines sl2
+      WHERE sl2.completed_time BETWEEN $1 AND $2 ${shopSaleCond}
+      GROUP BY sl2.item_id
+    ),
+    stock_by_item AS (
+      SELECT inv.item_id, SUM(inv.qty_on_hand) AS stock
+      FROM inventory inv
+      JOIN products px ON px.item_id = inv.item_id AND px.archived = false
+      ${shopStockWhere}
+      GROUP BY inv.item_id
+    ),
+    transfers_in AS (
+      SELECT t.item_id, SUM(t.qty_received) AS qty_in
+      FROM transfers t
+      WHERE ${transferInCond} AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
+    transfers_out AS (
+      SELECT t.item_id,
+        SUM(CASE WHEN t.transfer_received THEN t.qty_received ELSE t.qty_sent END) AS qty_out
+      FROM transfers t
+      WHERE ${transferOutCond} AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
+    base AS (
+      SELECT
+        p.item_id,
+        p.default_price,
+        p.default_cost,
+        COALESCE(s.sold,    0)::int  AS sold,
+        COALESCE(st.stock,  0)::int  AS stock,
+        COALESCE(s.revenue, 0)       AS revenue,
+        GREATEST(0,
+          COALESCE(s.sold, 0) + COALESCE(st.stock, 0)
+          + COALESCE(to2.qty_out, 0) - COALESCE(ti.qty_in, 0)
+        )::int AS received_supplier
+      FROM products p
+      LEFT JOIN sales_by_item  s    ON s.item_id   = p.item_id
+      LEFT JOIN stock_by_item  st   ON st.item_id  = p.item_id
+      LEFT JOIN transfers_in   ti   ON ti.item_id  = p.item_id
+      LEFT JOIN transfers_out  to2  ON to2.item_id = p.item_id
+      WHERE ${prodWhere.join(' AND ')}
+        AND (GREATEST(0, COALESCE(s.sold,0) + COALESCE(st.stock,0)
+             + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)) > 0
+             OR COALESCE(st.stock, 0) > 0)
+    )
+    SELECT
+      SUM(received_supplier)::int  AS units_received,
+      SUM(sold)::int               AS units_sold,
+      SUM(stock)::int              AS stock_actuel,
+      CASE WHEN SUM(received_supplier) > 0
+        THEN ROUND(SUM(sold)::numeric / SUM(received_supplier) * 100, 1)
+        ELSE 0 END                 AS st_pct,
+      ROUND(SUM(revenue)::numeric, 2) AS revenue,
+      ROUND(AVG(CASE WHEN default_price > 0
+        THEN (default_price - COALESCE(default_cost, 0)) / default_price * 100
+        END)::numeric, 1)          AS margin_pct,
+      COUNT(DISTINCT item_id)::int AS nb_articles_actifs,
+      COUNT(DISTINCT CASE WHEN sold > 0 THEN item_id END)::int AS nb_articles_vendus
+    FROM base
+  `, params);
+
+  const r = rows[0];
+  return {
+    units_received:     Number(r?.units_received      ?? 0),
+    units_sold:         Number(r?.units_sold           ?? 0),
+    stock_final:        Number(r?.stock_actuel         ?? 0),
+    st_pct:             Number(r?.st_pct               ?? 0),
+    revenue:            Number(r?.revenue              ?? 0),
+    margin_pct:         r?.margin_pct != null ? Number(r.margin_pct) : null,
+    nb_articles_actifs: Number(r?.nb_articles_actifs   ?? 0),
+    nb_articles_vendus: Number(r?.nb_articles_vendus   ?? 0),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// toolGetBrandRanking — classement des marques par ST, revenue, stock dormant.
+// ---------------------------------------------------------------------------
+async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20 }, { pool, getSeasonsConfig, tenantId }) {
+  shop_id = await resolveShopId(shop_id, pool);
+  const today = new Date().toISOString().slice(0, 10);
+  limit = Math.min(Math.max(1, parseInt(limit) || 20), 50);
+
+  let stFrom, stTo, seasonCode = null, seasonTag = null;
+
+  if (season) {
+    const seasons = await getSeasonsConfig();
+    const s = seasons.find(x => x.code === season.toLowerCase());
+    if (!s) return { erreur: `Saison "${season}" introuvable dans la configuration.` };
+    stFrom = s.reception_from ?? s.sell_from;
+    stTo   = s.sell_to < today ? s.sell_to : today;
+    seasonCode = s.code.toUpperCase();
+    seasonTag  = s.tag_pattern ?? s.code;
+  } else {
+    const d = new Date(); d.setDate(d.getDate() - 84);
+    stFrom = d.toISOString().slice(0, 10); stTo = today;
+    seasonCode = 'Dernières 12 semaines';
+  }
+
+  const sortExprMap = {
+    st:            `CASE WHEN SUM(received_supplier) > 0 THEN SUM(sold)::float / SUM(received_supplier) ELSE 0 END`,
+    revenue:       `SUM(revenue)`,
+    stock_dormant: `SUM(stock_dormant_units)`,
+    units_sold:    `SUM(sold)`,
+    margin:        `AVG(CASE WHEN default_price > 0 THEN (default_price - COALESCE(default_cost, 0)) / default_price END)`,
+  };
+  const sortExpr = sortExprMap[sort_by] ?? sortExprMap.st;
+
+  const params = [stFrom, stTo]; // $1 $2
+  const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
+  const shopSaleCond    = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
+  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
+  const tenantIdx = (params.push(tenantId), params.length);
+  const tagIdx    = seasonTag ? (params.push(`%${seasonTag}%`), params.length) : null;
+  const tagCond   = tagIdx ? `AND p.tags ILIKE $${tagIdx}` : '';
+  const limitIdx  = (params.push(limit), params.length);
+
+  const { rows } = await pool.query(`
+    WITH sales_by_item AS (
+      SELECT sl2.item_id,
+             SUM(sl2.qty) AS sold,
+             SUM(sl2.qty * sl2.unit_price - COALESCE(sl2.discount, 0)) AS revenue
+      FROM sale_lines sl2
+      WHERE sl2.completed_time BETWEEN $1 AND $2 ${shopSaleCond}
+      GROUP BY sl2.item_id
+    ),
+    stock_by_item AS (
+      SELECT inv.item_id, SUM(inv.qty_on_hand) AS stock
+      FROM inventory inv
+      JOIN products px ON px.item_id = inv.item_id AND px.archived = false
+      ${shopStockWhere}
+      GROUP BY inv.item_id
+    ),
+    transfers_in AS (
+      SELECT t.item_id, SUM(t.qty_received) AS qty_in
+      FROM transfers t
+      WHERE ${transferInCond} AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
+    transfers_out AS (
+      SELECT t.item_id,
+        SUM(CASE WHEN t.transfer_received THEN t.qty_received ELSE t.qty_sent END) AS qty_out
+      FROM transfers t
+      WHERE ${transferOutCond} AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
+    base AS (
+      SELECT
+        p.manufacturer,
+        p.item_id,
+        p.default_price,
+        p.default_cost,
+        COALESCE(s.sold,    0)::int  AS sold,
+        COALESCE(st.stock,  0)::int  AS stock,
+        COALESCE(s.revenue, 0)       AS revenue,
+        GREATEST(0,
+          COALESCE(s.sold, 0) + COALESCE(st.stock, 0)
+          + COALESCE(to2.qty_out, 0) - COALESCE(ti.qty_in, 0)
+        )::int AS received_supplier,
+        CASE WHEN COALESCE(s.sold, 0) = 0
+                  OR (COALESCE(s.sold,0)::float / NULLIF(GREATEST(0,
+                    COALESCE(s.sold,0) + COALESCE(st.stock,0)
+                    + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)), 0)) < 0.40
+             THEN COALESCE(st.stock, 0) ELSE 0 END AS stock_dormant_units,
+        CASE WHEN COALESCE(s.sold, 0) = 0
+                  OR (COALESCE(s.sold,0)::float / NULLIF(GREATEST(0,
+                    COALESCE(s.sold,0) + COALESCE(st.stock,0)
+                    + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)), 0)) < 0.40
+             THEN COALESCE(st.stock, 0) * COALESCE(p.default_cost, 0)
+             ELSE 0 END AS stock_dormant_value
+      FROM products p
+      LEFT JOIN sales_by_item  s   ON s.item_id   = p.item_id
+      LEFT JOIN stock_by_item  st  ON st.item_id  = p.item_id
+      LEFT JOIN transfers_in   ti  ON ti.item_id  = p.item_id
+      LEFT JOIN transfers_out  to2 ON to2.item_id = p.item_id
+      WHERE p.tenant_id = $${tenantIdx} AND p.archived = false ${tagCond}
+        AND (GREATEST(0, COALESCE(s.sold,0) + COALESCE(st.stock,0)
+             + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)) > 0
+             OR COALESCE(st.stock, 0) > 0)
+    )
+    SELECT
+      manufacturer,
+      CASE WHEN SUM(received_supplier) > 0
+        THEN ROUND(SUM(sold)::numeric / SUM(received_supplier) * 100, 1)
+        ELSE 0 END                                AS st_pct,
+      SUM(sold)::int                              AS units_sold,
+      SUM(received_supplier)::int                 AS units_received,
+      SUM(stock)::int                             AS stock_actuel,
+      SUM(stock_dormant_units)::int               AS stock_dormant_unites,
+      ROUND(SUM(stock_dormant_value)::numeric, 2) AS stock_dormant_valeur,
+      ROUND(SUM(revenue)::numeric, 2)             AS revenue,
+      ROUND(AVG(CASE WHEN default_price > 0
+        THEN (default_price - COALESCE(default_cost, 0)) / default_price * 100
+        END)::numeric, 1)                         AS margin_pct,
+      COUNT(DISTINCT item_id)::int                AS nb_articles_actifs,
+      COUNT(DISTINCT CASE WHEN sold > 0 THEN item_id END)::int  AS nb_articles_vendus,
+      COUNT(DISTINCT CASE WHEN stock = 0 THEN item_id END)::int AS nb_articles_stock_zero
+    FROM base
+    WHERE manufacturer IS NOT NULL AND manufacturer != ''
+    GROUP BY manufacturer
+    HAVING SUM(received_supplier) > 0 OR SUM(stock) > 0
+    ORDER BY ${sortExpr} DESC NULLS LAST
+    LIMIT $${limitIdx}
+  `, params);
+
+  let shopName = 'Toutes boutiques';
+  if (shop_id) {
+    const { rows: sr } = await pool.query('SELECT name FROM shops WHERE shop_id = $1', [shop_id]);
+    shopName = sr[0]?.name ?? String(shop_id);
+  }
+
+  return {
+    periode:    { de: stFrom, a: stTo },
+    saison:     seasonCode,
+    boutique:   shopName,
+    tri:        sort_by,
+    nb_marques: rows.length,
+    marques:    rows.map(r => ({
+      manufacturer:           r.manufacturer,
+      st_pct:                 Number(r.st_pct),
+      units_sold:             Number(r.units_sold),
+      units_received:         Number(r.units_received),
+      stock_actuel:           Number(r.stock_actuel),
+      stock_dormant_unites:   Number(r.stock_dormant_unites),
+      stock_dormant_valeur:   Number(r.stock_dormant_valeur),
+      revenue:                Number(r.revenue),
+      margin_pct:             r.margin_pct != null ? Number(r.margin_pct) : null,
+      nb_articles_actifs:     Number(r.nb_articles_actifs),
+      nb_articles_vendus:     Number(r.nb_articles_vendus),
+      nb_articles_stock_zero: Number(r.nb_articles_stock_zero),
+    })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// toolGetSeasonComparison — comparaison détaillée de deux saisons.
+// Utilise computeSeasonMetrics en parallèle pour éviter la duplication SQL.
+// ---------------------------------------------------------------------------
+async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id }, { pool, getSeasonsConfig, tenantId }) {
+  if (!season1 || !season2) return { erreur: 'season1 et season2 sont obligatoires.' };
+  shop_id = await resolveShopId(shop_id, pool);
+  const today = new Date().toISOString().slice(0, 10);
+  const allSeasons = await getSeasonsConfig();
+
+  const s1conf = allSeasons.find(x => x.code === season1.toLowerCase());
+  const s2conf = allSeasons.find(x => x.code === season2.toLowerCase());
+  if (!s1conf) return { erreur: `Saison ${season1.toUpperCase()} introuvable dans la configuration.` };
+  if (!s2conf) return { erreur: `Saison ${season2.toUpperCase()} introuvable dans la configuration.` };
+
+  const toParams = (conf) => ({
+    stFrom:       conf.reception_from ?? conf.sell_from,
+    stTo:         conf.sell_to < today ? conf.sell_to : today,
+    seasonTag:    conf.tag_pattern ?? conf.code,
+    manufacturer, shop_id, tenantId,
+  });
+
+  const [m1, m2] = await Promise.all([
+    computeSeasonMetrics(toParams(s1conf), pool),
+    computeSeasonMetrics(toParams(s2conf), pool),
+  ]);
+
+  const s1Active = today <= s1conf.sell_to;
+  const s2Active = today <= s2conf.sell_to;
+
+  const saison1 = {
+    code:               s1conf.code.toUpperCase(),
+    periode:            `${s1conf.reception_from ?? s1conf.sell_from} → ${s1conf.sell_to}`,
+    st_pct:             m1.st_pct,
+    units_sold:         m1.units_sold,
+    units_received:     m1.units_received,
+    stock_final:        s1Active ? m1.stock_final : null,
+    revenue:            m1.revenue,
+    margin_pct:         m1.margin_pct,
+    nb_articles_actifs: m1.nb_articles_actifs,
+    nb_articles_vendus: m1.nb_articles_vendus,
+    note_stock:         s1Active ? null : 'Stock fin de saison non disponible pour les saisons passées',
+  };
+  const saison2 = {
+    code:               s2conf.code.toUpperCase(),
+    periode:            `${s2conf.reception_from ?? s2conf.sell_from} → ${s2conf.sell_to}`,
+    st_pct:             m2.st_pct,
+    units_sold:         m2.units_sold,
+    units_received:     m2.units_received,
+    stock_final:        s2Active ? m2.stock_final : null,
+    revenue:            m2.revenue,
+    margin_pct:         m2.margin_pct,
+    nb_articles_actifs: m2.nb_articles_actifs,
+    nb_articles_vendus: m2.nb_articles_vendus,
+    note_stock:         s2Active ? null : 'Stock fin de saison non disponible pour les saisons passées',
+  };
+
+  const variations = {
+    st_pct:             Math.round((m1.st_pct       - m2.st_pct)       * 10) / 10,
+    units_sold:         m1.units_sold - m2.units_sold,
+    units_sold_pct:     m2.units_sold > 0 ? Math.round((m1.units_sold - m2.units_sold) / m2.units_sold * 1000) / 10 : null,
+    revenue:            Math.round((m1.revenue      - m2.revenue)       * 100) / 100,
+    revenue_pct:        m2.revenue    > 0 ? Math.round((m1.revenue    - m2.revenue)    / m2.revenue    * 1000) / 10 : null,
+    margin_pct:         m1.margin_pct != null && m2.margin_pct != null
+                          ? Math.round((m1.margin_pct - m2.margin_pct) * 10) / 10 : null,
+    nb_articles_actifs: m1.nb_articles_actifs - m2.nb_articles_actifs,
+  };
+
+  let shopName = 'Toutes boutiques';
+  if (shop_id) {
+    const { rows: sr } = await pool.query('SELECT name FROM shops WHERE shop_id = $1', [shop_id]);
+    shopName = sr[0]?.name ?? String(shop_id);
+  }
+
+  return {
+    manufacturer:       manufacturer ?? 'Toutes marques',
+    boutique:           shopName,
+    saison_reference:   saison1,
+    saison_comparaison: saison2,
+    variations,
+    note: 'Variation positive = amélioration vs saison de comparaison',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// toolGetItemsByCriteria — modèles filtrés par ST, stock, ventes, marque.
+// Agrégation au niveau matrice (matrix_id = un modèle = toutes ses variantes).
+// ---------------------------------------------------------------------------
+async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_stock, max_stock, has_sales, manufacturer, sort_by = 'st', limit = 50 }, { pool, getSeasonsConfig, tenantId }) {
+  if (min_st == null && max_st == null && min_stock == null && max_stock == null && has_sales == null && !manufacturer) {
+    return { erreur: 'Spécifiez au moins un critère de filtre (min_st, max_st, min_stock, max_stock, has_sales, ou manufacturer).' };
+  }
+
+  shop_id = await resolveShopId(shop_id, pool);
+  const today = new Date().toISOString().slice(0, 10);
+  limit = Math.min(Math.max(1, parseInt(limit) || 50), 200);
+
+  let stFrom, stTo, seasonCode = null, seasonTag = null;
+
+  if (season) {
+    const seasons = await getSeasonsConfig();
+    const s = seasons.find(x => x.code === season.toLowerCase());
+    if (!s) return { erreur: `Saison "${season}" introuvable dans la configuration.` };
+    stFrom = s.reception_from ?? s.sell_from;
+    stTo   = s.sell_to < today ? s.sell_to : today;
+    seasonCode = s.code.toUpperCase();
+    seasonTag  = s.tag_pattern ?? s.code;
+  } else {
+    const d = new Date(); d.setDate(d.getDate() - 84);
+    stFrom = d.toISOString().slice(0, 10); stTo = today;
+    seasonCode = 'Personnalisée';
+  }
+
+  const sortExprMap = {
+    st:            'st_pct',
+    stock:         'stock_actuel::float',
+    stock_dormant: 'CASE WHEN st_pct < 35 THEN stock_actuel::float ELSE 0 END',
+    revenue:       'revenue',
+  };
+  const sortExpr = sortExprMap[sort_by] ?? 'st_pct';
+
+  const params = [stFrom, stTo]; // $1 $2
+  const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
+  const shopSaleCond    = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
+  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
+  const tenantIdx = (params.push(tenantId), params.length);
+  const tagIdx    = seasonTag    ? (params.push(`%${seasonTag}%`),    params.length) : null;
+  const mfrIdx    = manufacturer ? (params.push(`%${manufacturer}%`), params.length) : null;
+  const tagCond   = tagIdx ? `AND p.tags ILIKE $${tagIdx}` : '';
+  const mfrCond   = mfrIdx ? `AND p.manufacturer ILIKE $${mfrIdx}` : '';
+
+  // Post-CTE filter conditions on matrix_base
+  const filterConds = [];
+  if (min_st    != null) filterConds.push(`st_pct       >= $${(params.push(Number(min_st)),    params.length)}`);
+  if (max_st    != null) filterConds.push(`st_pct       <= $${(params.push(Number(max_st)),    params.length)}`);
+  if (min_stock != null) filterConds.push(`stock_actuel >= $${(params.push(Number(min_stock)), params.length)}`);
+  if (max_stock != null) filterConds.push(`stock_actuel <= $${(params.push(Number(max_stock)), params.length)}`);
+  if (has_sales != null) filterConds.push(`has_sales     = $${(params.push(Boolean(has_sales)), params.length)}`);
+  const filterWhere = filterConds.length ? 'AND ' + filterConds.join(' AND ') : '';
+  const limitIdx = (params.push(limit), params.length);
+
+  const { rows } = await pool.query(`
+    WITH sales_by_item AS (
+      SELECT sl2.item_id,
+             SUM(sl2.qty) AS sold,
+             SUM(sl2.qty * sl2.unit_price - COALESCE(sl2.discount, 0)) AS revenue,
+             MAX(sl2.completed_time) AS last_sale_date
+      FROM sale_lines sl2
+      WHERE sl2.completed_time BETWEEN $1 AND $2 ${shopSaleCond}
+      GROUP BY sl2.item_id
+    ),
+    stock_by_item AS (
+      SELECT inv.item_id, SUM(inv.qty_on_hand) AS stock
+      FROM inventory inv
+      JOIN products px ON px.item_id = inv.item_id AND px.archived = false
+      ${shopStockWhere}
+      GROUP BY inv.item_id
+    ),
+    transfers_in AS (
+      SELECT t.item_id, SUM(t.qty_received) AS qty_in
+      FROM transfers t
+      WHERE ${transferInCond} AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
+    transfers_out AS (
+      SELECT t.item_id,
+        SUM(CASE WHEN t.transfer_received THEN t.qty_received ELSE t.qty_sent END) AS qty_out
+      FROM transfers t
+      WHERE ${transferOutCond} AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
+    item_base AS (
+      SELECT
+        p.item_id, p.matrix_id, p.manufacturer, p.category,
+        p.default_cost, p.default_price,
+        COALESCE(s.sold,      0)::int  AS sold,
+        COALESCE(st.stock,    0)::int  AS stock,
+        COALESCE(s.revenue,   0)       AS revenue,
+        COALESCE(to2.qty_out, 0)::int  AS transferred_out,
+        COALESCE(ti.qty_in,   0)::int  AS transferred_in,
+        GREATEST(0,
+          COALESCE(s.sold,0) + COALESCE(st.stock,0)
+          + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)
+        )::int AS received_supplier,
+        s.last_sale_date,
+        CASE WHEN COALESCE(s.sold, 0) > 0 THEN true ELSE false END AS has_sales_flag,
+        CASE ias.size_axis
+          WHEN 1 THEN p.raw->'ItemAttributes'->>'attribute1'
+          WHEN 2 THEN p.raw->'ItemAttributes'->>'attribute2'
+          WHEN 3 THEN p.raw->'ItemAttributes'->>'attribute3'
+        END AS taille
+      FROM products p
+      LEFT JOIN item_attribute_sets ias
+        ON  ias.attribute_set_id = (p.raw->'ItemAttributes'->>'itemAttributeSetID')
+        AND ias.tenant_id = p.tenant_id
+      LEFT JOIN sales_by_item  s   ON s.item_id   = p.item_id
+      LEFT JOIN stock_by_item  st  ON st.item_id  = p.item_id
+      LEFT JOIN transfers_in   ti  ON ti.item_id  = p.item_id
+      LEFT JOIN transfers_out  to2 ON to2.item_id = p.item_id
+      WHERE p.tenant_id = $${tenantIdx} AND p.archived = false ${tagCond} ${mfrCond}
+        AND (GREATEST(0, COALESCE(s.sold,0) + COALESCE(st.stock,0)
+             + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)) > 0
+             OR COALESCE(st.stock, 0) > 0)
+    ),
+    matrix_base AS (
+      SELECT
+        matrix_id,
+        (ARRAY_AGG(manufacturer ORDER BY item_id ASC))[1] AS manufacturer,
+        (ARRAY_AGG(category     ORDER BY item_id ASC))[1] AS category,
+        CASE WHEN SUM(received_supplier) > 0
+          THEN ROUND(SUM(sold)::numeric / SUM(received_supplier) * 100, 1)
+          ELSE 0 END                          AS st_pct,
+        SUM(sold)::int                        AS units_sold,
+        SUM(received_supplier)::int           AS units_received,
+        SUM(stock)::int                       AS stock_actuel,
+        ROUND(SUM(stock * default_cost)::numeric, 2) AS stock_valeur,
+        ROUND(SUM(revenue)::numeric, 2)       AS revenue,
+        COUNT(DISTINCT item_id)::int          AS nb_variantes_actives,
+        COUNT(DISTINCT CASE WHEN sold > 0 THEN item_id END)::int AS nb_variantes_vendues,
+        BOOL_OR(has_sales_flag)               AS has_sales,
+        MAX(last_sale_date)                   AS last_sale_date,
+        ARRAY_AGG(DISTINCT taille) FILTER (WHERE stock = 0 AND taille IS NOT NULL AND taille != '') AS tailles_epuisees,
+        ARRAY_AGG(DISTINCT taille) FILTER (WHERE stock > 0 AND taille IS NOT NULL AND taille != '') AS tailles_en_stock
+      FROM item_base
+      WHERE matrix_id IS NOT NULL AND matrix_id != '0'
+      GROUP BY matrix_id
+    )
+    SELECT *
+    FROM matrix_base
+    WHERE 1=1 ${filterWhere}
+    ORDER BY ${sortExpr} DESC NULLS LAST
+    LIMIT $${limitIdx}
+  `, params);
+
+  let shopName = 'Toutes boutiques';
+  if (shop_id) {
+    const { rows: sr } = await pool.query('SELECT name FROM shops WHERE shop_id = $1', [shop_id]);
+    shopName = sr[0]?.name ?? String(shop_id);
+  }
+
+  const articles = rows.map(r => {
+    const st = Number(r.st_pct);
+    const epuisees  = r.tailles_epuisees ?? [];
+    const en_stock  = r.tailles_en_stock ?? [];
+    return {
+      matrix_id:            r.matrix_id,
+      manufacturer:         r.manufacturer,
+      category:             r.category,
+      st_pct:               st,
+      units_sold:           Number(r.units_sold),
+      units_received:       Number(r.units_received),
+      stock_actuel:         Number(r.stock_actuel),
+      stock_valeur:         Number(r.stock_valeur),
+      revenue:              Number(r.revenue),
+      nb_variantes_actives: Number(r.nb_variantes_actives),
+      nb_variantes_vendues: Number(r.nb_variantes_vendues),
+      has_sales:            Boolean(r.has_sales),
+      last_sale_date:       r.last_sale_date ? new Date(r.last_sale_date).toISOString().slice(0, 10) : null,
+      taille_manquante:     st > 70 ? epuisees : [],
+      tailles_en_stock:     en_stock,
+    };
+  });
+
+  return {
+    periode:     { de: stFrom, a: stTo },
+    saison:      seasonCode,
+    boutique:    shopName,
+    criteres:    { min_st, max_st, min_stock, max_stock, has_sales: has_sales ?? null, manufacturer: manufacturer ?? null },
+    nb_articles: articles.length,
+    articles,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Tool dispatcher
 // ---------------------------------------------------------------------------
 async function dispatchTool(name, args, ctx) {
@@ -1834,6 +2369,9 @@ async function dispatchTool(name, args, ctx) {
     case 'resolve_search_term':             return await toolResolveSearchTerm(args, ctx);
     case 'get_matrix_sellthrough':          return await toolGetMatrixSellthrough(args, ctx);
     case 'get_product_by_description':      return await toolGetProductByDescription(args, ctx);
+    case 'get_brand_ranking':               return await toolGetBrandRanking(args, ctx);
+    case 'get_season_comparison':           return await toolGetSeasonComparison(args, ctx);
+    case 'get_items_by_criteria':           return await toolGetItemsByCriteria(args, ctx);
     default:                                return { erreur: `Outil inconnu: ${name}` };
   }
 }
@@ -1999,6 +2537,9 @@ const TOOL_LABELS = {
   resolve_search_term:          'Résolution du terme de recherche',
   get_matrix_sellthrough:       'Analyse du modèle (matrice)',
   get_product_by_description:   'Recherche par description',
+  get_brand_ranking:            'Classement des marques (analytique)',
+  get_season_comparison:        'Comparaison de deux saisons',
+  get_items_by_criteria:        'Recherche de modèles par critères',
 };
 
 // ---------------------------------------------------------------------------
@@ -2102,4 +2643,7 @@ module.exports = {
   toolGetSalesByVariant,
   toolGetSalesByCategory,
   toolGetSalesAnalysis,
+  toolGetBrandRanking,
+  toolGetSeasonComparison,
+  toolGetItemsByCriteria,
 };

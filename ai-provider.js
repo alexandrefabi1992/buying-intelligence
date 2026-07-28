@@ -315,6 +315,54 @@ const TOOL_DEFS = [
       required: ['terme'],
     },
   },
+  {
+    name: 'get_brand_ranking',
+    description: "Classement analytique des marques par ST, revenue, unités vendues, stock dormant ou marge — calculé directement depuis les ventes (pas le cache budget). Utiliser quand l'utilisateur demande : 'quelle marque a le meilleur ST cette saison', 'classement par chiffre d'affaires', 'quelles marques ont du stock qui dort', 'top marques par marge'. Différent de get_top_performers qui dépend du cache budget.",
+    parameters: {
+      type: 'object',
+      properties: {
+        season:  { type: 'string', description: 'Code de saison (ex: p26). Sans season : fenêtre 12 semaines glissantes.' },
+        shop_id: { type: 'string', description: 'Nom ou ID de la boutique (optionnel)' },
+        sort_by: { type: 'string', enum: ['st', 'revenue', 'stock_dormant', 'units_sold', 'margin'], description: "Critère de tri. 'st'=sell-through, 'revenue'=chiffre d'affaires, 'stock_dormant'=stock invendu, 'units_sold'=unités vendues, 'margin'=marge brute. Défaut: 'st'" },
+        limit:   { type: 'integer', description: 'Nombre de marques à retourner (1-50, défaut: 20)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_season_comparison',
+    description: "Comparaison détaillée de deux saisons avec deltas calculés (ST, revenue, unités, marge). Utiliser pour : 'P26 vs P25 pour Brax', 'est-ce qu'on a fait mieux cette saison', 'évolution du ST entre deux saisons'. Retourne les métriques des deux saisons et les variations (positif = amélioration). Différent de compare_seasons qui compare N saisons sans calculer les deltas.",
+    parameters: {
+      type: 'object',
+      properties: {
+        season1:      { type: 'string', description: 'Saison de référence (la plus récente), ex: p26' },
+        season2:      { type: 'string', description: 'Saison de comparaison (la plus ancienne), ex: p25' },
+        manufacturer: { type: 'string', description: 'Nom de la marque (optionnel — omettre pour toutes les marques)' },
+        shop_id:      { type: 'string', description: 'Nom ou ID de la boutique (optionnel)' },
+      },
+      required: ['season1', 'season2'],
+    },
+  },
+  {
+    name: 'get_items_by_criteria',
+    description: "Rechercher des modèles (matrices) selon des critères de performance : ST, stock, ventes, marque. Agrège au niveau modèle (toutes tailles/couleurs combinées). Utiliser pour : 'quels articles réapprovisionner' (min_st=80, min_stock=1), 'articles jamais vendus' (has_sales=false, min_stock=1), 'stock dormant Brax' (manufacturer=Brax, max_st=35, min_stock=1), 'modèles à plus de 80% ST'. Retourne taille_manquante pour les modèles épuisés à fort ST.",
+    parameters: {
+      type: 'object',
+      properties: {
+        season:       { type: 'string',  description: 'Code de saison (ex: p26). Sans season : 12 semaines glissantes.' },
+        shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel)' },
+        min_st:       { type: 'number',  description: 'ST minimum en % (ex: 80 pour ST ≥ 80%)' },
+        max_st:       { type: 'number',  description: 'ST maximum en % (ex: 35 pour ST ≤ 35%)' },
+        min_stock:    { type: 'integer', description: 'Stock minimum en unités' },
+        max_stock:    { type: 'integer', description: 'Stock maximum en unités' },
+        has_sales:    { type: 'boolean', description: 'true = au moins une vente dans la période ; false = aucune vente' },
+        manufacturer: { type: 'string',  description: 'Filtrer par marque (optionnel)' },
+        sort_by:      { type: 'string',  enum: ['st', 'stock', 'stock_dormant', 'revenue'], description: "Critère de tri. Défaut: 'st'" },
+        limit:        { type: 'integer', description: 'Nombre de modèles (1-200, défaut: 50)' },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -385,7 +433,9 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
 - Quand tu affiches plusieurs boutiques, ajoute toujours une ligne TOTAL
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
 - Si tu n'es pas certain du nom exact d'une catégorie : appelle get_categories(manufacturer=X) d'abord
-- COMPARAISONS INTER-SAISONS : pour toute question comparant plusieurs saisons ("P26 vs P25", "évolution sur 3 saisons", "croissance d'une saison à l'autre"), utiliser compare_seasons avec la liste des codes de saison dans "seasons"
+- COMPARAISONS INTER-SAISONS : pour toute question comparant plusieurs saisons ("P26 vs P25", "évolution sur 3 saisons", "croissance d'une saison à l'autre"), utiliser compare_seasons avec la liste des codes de saison dans "seasons". Pour une comparaison approfondie ENTRE DEUX saisons avec deltas calculés ("+X% de ST", "variation du revenue") → utiliser get_season_comparison(season1, season2) à la place
+- CLASSEMENT DES MARQUES (analytique) : pour "quelle marque a le meilleur ST", "classement par revenue", "marques avec stock dormant", "top par marge" → utiliser get_brand_ranking. JAMAIS inventer un classement. get_brand_ranking et get_top_performers sont complémentaires : get_brand_ranking calcule tout en temps réel (ST, revenue, marge, stock dormant) ; get_top_performers lit le cache budget (disponible après calcul de budget)
+- MODÈLES PAR CRITÈRES : pour "quels articles réapprovisionner" (min_st=80, min_stock=1), "modèles jamais vendus" (has_sales=false, min_stock=1), "stock dormant chez [marque]" (manufacturer=X, max_st=35, min_stock=1), "quels modèles épuisés" (min_st=80, max_stock=0) → utiliser get_items_by_criteria. Ce tool agrège au niveau modèle complet (toutes tailles combinées), pas par variante individuelle
 - CATÉGORIES : pour toute question sur les ventes/répartition par TYPE DE PRODUIT ("quelle catégorie se vend le mieux?", "top catégories", "répartition par type de produit"), utiliser get_sales_by_category — JAMAIS get_sales_by_variant ni get_categories pour ces questions
 - COLLECTIONS/MARQUES : en mode achat, "collection" désigne la gamme saisonnière d'une marque, PAS une catégorie de produit. "quelle collection se vend le mieux" = "quelle marque performe le mieux cette saison" → utiliser get_top_performers (metric="sold_cost") ou get_sales_analysis sans manufacturer. NE JAMAIS appeler get_sales_by_category pour une question qui contient le mot "collection".
 - SUIVI PAR MOT UNIQUE : si l'utilisateur répond avec un seul mot comme "marque", "catégorie", "boutique", "saison" après une réponse précédente, interpréter comme "donne-moi le top [mot] avec les mêmes filtres boutique/saison/période que la question précédente" — appeler l'outil approprié avec ces filtres. NE PAS creuser dans un sous-résultat de la réponse précédente (ex: ne pas filtrer par la catégorie affichée dans la réponse d'avant).
