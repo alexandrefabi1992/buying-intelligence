@@ -319,8 +319,10 @@ app.put('/api/admin/users/:id/password', requireAdmin, async (req, res) => {
 // Both routes inherit requireAdmin from app.use('/api/admin', requireAdmin) above.
 // ---------------------------------------------------------------------------
 
-// GET /api/admin/attribute-sets — list all sets with labels and configured axes
+// GET /api/admin/attribute-sets?tenant_id=X — list all sets with labels and configured axes
 app.get('/api/admin/attribute-sets', async (req, res) => {
+  const tenantId = req.query.tenant_id;
+  if (!tenantId) return res.status(400).json({ error: 'tenant_id query param required' });
   try {
     const { rows } = await pool.query(`
       SELECT attribute_set_id, name,
@@ -329,13 +331,16 @@ app.get('/api/admin/attribute-sets', async (req, res) => {
       FROM   item_attribute_sets
       WHERE  tenant_id = $1
       ORDER  BY attribute_set_id::int
-    `, [req.tenantId]);
+    `, [tenantId]);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// PATCH /api/admin/attribute-sets/:setId — manually override size_axis / color_axis
+// PATCH /api/admin/attribute-sets/:setId?tenant_id=X — manually override size_axis / color_axis
 app.patch('/api/admin/attribute-sets/:setId', async (req, res) => {
+  const tenantId = req.query.tenant_id;
+  if (!tenantId) return res.status(400).json({ error: 'tenant_id query param required' });
+
   const { size_axis, color_axis } = req.body ?? {};
   const { setId } = req.params;
 
@@ -350,7 +355,7 @@ app.patch('/api/admin/attribute-sets/:setId', async (req, res) => {
 
   try {
     const setClauses = [];
-    const params     = [req.tenantId, setId];
+    const params     = [tenantId, setId];
     if (hasSize)  { setClauses.push(`size_axis  = $${params.length + 1}`);  params.push(size_axis  ?? null); }
     if (hasColor) { setClauses.push(`color_axis = $${params.length + 1}`); params.push(color_axis ?? null); }
 
