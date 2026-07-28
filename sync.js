@@ -281,6 +281,22 @@ async function ensureSchema() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_inv_snap_date ON inventory_snapshots (tenant_id, snapshot_date)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_inv_snap_item ON inventory_snapshots (tenant_id, item_id)`);
 
+  // Lightspeed attribute set definitions — one row per set, gives label of each attribute axis.
+  // attribute1_label = "Taille", attribute2_label = "Couleur", etc.
+  // Joined via raw->'ItemAttributes'->>'itemAttributeSetID' to resolve size/color axis per product.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS item_attribute_sets (
+      tenant_id        TEXT NOT NULL,
+      attribute_set_id TEXT NOT NULL,
+      name             TEXT,
+      attribute1_label TEXT,
+      attribute2_label TEXT,
+      attribute3_label TEXT,
+      synced_at        TIMESTAMPTZ DEFAULT now(),
+      PRIMARY KEY (tenant_id, attribute_set_id)
+    )
+  `);
+
   // Monthly aggregate — long-term retention after 400-day detail window expires.
   // manufacturer='' represents items with no manufacturer (avoids NULL in PK).
   // total_qty = average daily qty over the month; cost/retail = average daily value.
@@ -296,6 +312,32 @@ async function ensureSchema() {
       PRIMARY KEY (tenant_id, month, shop_id, manufacturer)
     )
   `);
+}
+
+// ---------------------------------------------------------------------------
+// ItemAttributeSet sync — fetches set definitions (attribute axis labels) from Lightspeed.
+// Each set has a name and attribute1/2/3 labels (e.g. "Taille Col", "Coupe").
+// Products reference a set via raw->'ItemAttributes'->>'itemAttributeSetID'.
+// Tiny dataset (~10-100 rows), always full sync, no checkpoint needed.
+// ---------------------------------------------------------------------------
+async function syncItemAttributeSets(tenantId) {
+  let count = 0;
+  for await (const { items } of paginate(null, 'ItemAttributeSet', {})) {
+    for (const s of items) {
+      const setId = String(s.itemAttributeSetID ?? '');
+      if (!setId || setId === '0') continue;
+      await pool.query(`
+        INSERT INTO item_attribute_sets
+          (tenant_id, attribute_set_id, name, attribute1_label, attribute2_label, attribute3_label, synced_at)
+        VALUES ($1,$2,$3,$4,$5,$6,now())
+        ON CONFLICT(tenant_id, attribute_set_id) DO UPDATE
+          SET name=$3, attribute1_label=$4, attribute2_label=$5, attribute3_label=$6, synced_at=now()
+      `, [tenantId, setId, s.name ?? null, s.attribute1 ?? null, s.attribute2 ?? null, s.attribute3 ?? null]);
+      count++;
+    }
+  }
+  console.log(`[sync] ItemAttributeSets synced: ${count}`);
+  return count;
 }
 
 // ---------------------------------------------------------------------------
@@ -895,6 +937,10 @@ async function runSync({ forceDaysBack = null } = {}) {
     // outside SYNC_STEPS because it's small and requires no checkpointing.
     await syncManufacturers(tenantId);
     await backfillNumericManufacturers(tenantId);
+
+    // Sync attribute set labels (tiny, no checkpoint) — needed for deterministic
+    // size/color identification in top-attributes endpoint.
+    await syncItemAttributeSets(tenantId);
 
     // ── 1. Shops ──────────────────────────────────────────────────────────
     if (cps.shops?.next_url === 'COMPLETED') {
