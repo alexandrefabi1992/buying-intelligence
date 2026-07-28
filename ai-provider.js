@@ -52,7 +52,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_sales_analysis',
-    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les ventes brutes HT (prix de vente après escompte) et le coût des ventes. IMPORTANT: quand season est fourni, il filtre par le tag de la saison ET définit les dates — résultats limités aux articles de cette saison. Pour une marque spécifique (ex: "Oui"), TOUJOURS passer manufacturer. Sans manufacturer mais avec category : retourne le classement des marques dans cette catégorie. Sans manufacturer ni category : retourne le total de toutes les marques par boutique (chiffre global compagnie). ⚠️ CLARIFICATION NOS : avant d\'appeler ce tool pour les VENTES TOTALES ou le ST d\'UNE MARQUE SPÉCIFIQUE, appliquer la règle de clarification périmètre NOS si le périmètre (collection seulement vs toute la marque) n\'est pas précisé.',
+    description: 'Analyser les ventes par marque et/ou boutique sur une période donnée. Retourne les ventes brutes HT (prix de vente après escompte) et le coût des ventes. IMPORTANT: quand season est fourni, il filtre par le tag de la saison ET définit les dates — résultats limités aux articles de cette saison. Pour une marque spécifique (ex: "Oui"), TOUJOURS passer manufacturer. Sans manufacturer mais avec category : retourne le classement des marques dans cette catégorie. Sans manufacturer ni category : retourne le total de toutes les marques par boutique (chiffre global compagnie). ⚠️ STOP AVANT APPEL : si la question porte sur les ventes totales d\'une marque spécifique avec une saison ET que le périmètre (collection vs toute la marque) n\'est pas précisé → NE PAS appeler ce tool — appliquer d\'abord la règle CLARIFICATION PÉRIMÈTRE MARQUE. Ce tool avec season= filtre TOUJOURS par tag — pour "toute la marque" utiliser get_brand_ranking(include_nos=true, manufacturer=...) à la place.',
     parameters: {
       type: 'object',
       properties: {
@@ -323,9 +323,10 @@ const TOOL_DEFS = [
       properties: {
         season:  { type: 'string', description: 'Code de saison (ex: p26). Sans season : fenêtre 12 semaines glissantes.' },
         shop_id: { type: 'string', description: 'Nom ou ID de la boutique (optionnel)' },
-        sort_by:     { type: 'string', enum: ['st', 'revenue', 'stock_dormant', 'units_sold', 'margin'], description: "Critère de tri. 'st'=sell-through, 'revenue'=chiffre d'affaires, 'stock_dormant'=stock invendu, 'units_sold'=unités vendues, 'margin'=marge brute. Défaut: 'st'" },
-        limit:       { type: 'integer', description: 'Nombre de marques à retourner (1-50, défaut: 20)' },
-        include_nos: { type: 'boolean', description: "Si true, inclut tous les articles de la marque vendus dans la fenêtre (pas seulement ceux taggés avec la saison). Si false (défaut), filtre par le tag de saison — uniquement la collection saisonnière. Retourne le champ scope_produits pour indiquer le périmètre." },
+        manufacturer: { type: 'string',  description: 'Filtrer sur une marque spécifique (optionnel). Utiliser quand l\'utilisateur demande "toute la marque [X]" pour une seule saison.' },
+        sort_by:      { type: 'string', enum: ['st', 'revenue', 'stock_dormant', 'units_sold', 'margin'], description: "Critère de tri. 'st'=sell-through, 'revenue'=chiffre d'affaires, 'stock_dormant'=stock invendu, 'units_sold'=unités vendues, 'margin'=marge brute. Défaut: 'st'" },
+        limit:        { type: 'integer', description: 'Nombre de marques à retourner (1-50, défaut: 20)' },
+        include_nos:  { type: 'boolean', description: "Si true, inclut tous les articles de la marque vendus dans la fenêtre (pas seulement ceux taggés avec la saison). Si false (défaut), filtre par le tag de saison — uniquement la collection saisonnière. Retourne le champ scope_produits pour indiquer le périmètre." },
       },
       required: [],
     },
@@ -437,12 +438,19 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
 - Si tu n'es pas certain du nom exact d'une catégorie : appelle get_categories(manufacturer=X) d'abord
 - COMPARAISONS INTER-SAISONS : pour toute question comparant plusieurs saisons ("P26 vs P25", "évolution sur 3 saisons", "croissance d'une saison à l'autre"), utiliser compare_seasons avec la liste des codes de saison dans "seasons". Pour une comparaison approfondie ENTRE DEUX saisons avec deltas calculés ("+X% de ST", "variation du revenue") → utiliser get_season_comparison(season1, season2) à la place
-- CLARIFICATION OBLIGATOIRE — PÉRIMÈTRE MARQUE : s'applique aux outils get_brand_ranking, get_season_comparison ET get_sales_analysis quand la question porte sur les VENTES TOTALES ou le ST d'UNE MARQUE SPÉCIFIQUE.
-  BYPASS Q1 — PÉRIMÈTRE DÉJÀ PRÉCISÉ : si le message contient "toute la marque", "NOS inclus", "tous les articles", "y compris NOS", "all brand" → périmètre = B, NE PAS poser Q1, appeler directement avec include_nos=true (ou get_brand_ranking avec include_nos=true si c'est get_sales_analysis). Si le message contient "collection seulement", "taggés [saison]", "uniquement [saison]", "collection printemps", "collection automne" → périmètre = A, NE PAS poser Q1, appeler directement avec include_nos=false.
-  SI Q1 ABSENTE DU MESSAGE : demander "Quel périmètre ? (A) Collection [saison] seulement — articles taggés [saison] (B) Toute la marque — tous articles vendus dans la fenêtre, NOS inclus". Attendre la réponse avant d'appeler un outil.
-  QUESTION 2 — PÉRIODE (UNIQUEMENT pour get_season_comparison, deux saisons comparées) : si "saison complète" OU "fenêtre comparable"/"même avancement" n'est pas dans le message → demander "Quelle période ? (A) Saison complète (B) Fenêtre comparable : même durée écoulée dans les deux saisons". Pour get_sales_analysis et get_brand_ranking (une seule saison) : NE JAMAIS poser la question 2.
-  MAPPING : include_nos=false → articles taggés uniquement ; include_nos=true → tous articles ; comparable_window=false → saison complète ; comparable_window=true → fenêtre comparable.
-  NE PAS demander de clarification pour : questions de stock, distribution par boutique, répartition par catégorie, questions sans marque précise.
+- CLARIFICATION PÉRIMÈTRE MARQUE — RÈGLE OBLIGATOIRE pour get_sales_analysis, get_brand_ranking, get_season_comparison quand la question porte sur les VENTES ou le ST d'UNE MARQUE SPÉCIFIQUE avec une saison :
+  ÉTAPE 1 — DÉTECTER SI LE PÉRIMÈTRE EST DÉJÀ PRÉCISÉ DANS LE MESSAGE :
+    • "toute la marque" / "NOS inclus" / "tous les articles" / "y compris NOS" → périmètre = TOUTE LA MARQUE. Aller à ÉTAPE 3.
+    • "collection seulement" / "taggés [saison]" / "uniquement [saison]" / "collection printemps/automne" → périmètre = COLLECTION. Aller à ÉTAPE 3.
+    • Aucun de ces termes → ÉTAPE 2.
+  ÉTAPE 2 — POSER Q1 ET ATTENDRE (NE PAS APPELER DE TOOL) : "Quel périmètre ? (A) Collection [saison] seulement — articles taggés [saison] (B) Toute la marque — tous les articles [marque] vendus dans la fenêtre, NOS inclus"
+  ÉTAPE 3 — APPELER LE BON OUTIL :
+    • COLLECTION + get_sales_analysis → get_sales_analysis(season=..., manufacturer=...)
+    • COLLECTION + get_brand_ranking → get_brand_ranking(season=..., include_nos=false, ...)
+    • TOUTE LA MARQUE + get_sales_analysis → get_brand_ranking(season=..., include_nos=true, manufacturer=..., sort_by='revenue') [get_sales_analysis avec season filtre toujours par tag — ne pas l'utiliser pour TOUTE LA MARQUE]
+    • TOUTE LA MARQUE + get_brand_ranking → get_brand_ranking(season=..., include_nos=true, manufacturer=...)
+  POUR get_season_comparison SEULEMENT : si comparable_window non précisé, poser Q2 en plus : "(A) Saison complète (B) Fenêtre comparable : même durée écoulée dans les deux saisons"
+  NE PAS déclencher pour : questions de stock, répartition boutique/catégorie, top global (pas de marque précise), ou quand le scope est déjà clair.
 - NOTE DE PÉRIMÈTRE OBLIGATOIRE : Toute réponse affichant des chiffres issus de get_brand_ranking ou get_season_comparison DOIT inclure une note de périmètre en fin de réponse : "Ces chiffres portent sur [scope_produits] du [debut] au [fin]." (utiliser le champ scope_produits du résultat, et les champs periode.de/periode.a pour get_brand_ranking ou saison_reference.periode/saison_comparaison.periode pour get_season_comparison).
 - CLASSEMENT DES MARQUES (analytique) : pour "quelle marque a le meilleur ST", "classement par revenue", "marques avec stock dormant", "top par marge" → utiliser get_brand_ranking. JAMAIS inventer un classement. get_brand_ranking et get_top_performers sont complémentaires : get_brand_ranking calcule tout en temps réel (ST, revenue, marge, stock dormant) ; get_top_performers lit le cache budget (disponible après calcul de budget)
 - MODÈLES PAR CRITÈRES : pour "quels articles réapprovisionner" (min_st=80, min_stock=1), "modèles jamais vendus" (has_sales=false, min_stock=1), "stock dormant chez [marque]" (manufacturer=X, max_st=35, min_stock=1), "quels modèles épuisés" (min_st=80, max_stock=0) → utiliser get_items_by_criteria. Ce tool agrège au niveau modèle complet (toutes tailles combinées), pas par variante individuelle

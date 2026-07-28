@@ -1912,7 +1912,7 @@ async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, sho
 // ---------------------------------------------------------------------------
 // toolGetBrandRanking — classement des marques par ST, revenue, stock dormant.
 // ---------------------------------------------------------------------------
-async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20, include_nos = false }, { pool, getSeasonsConfig, tenantId }) {
+async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20, include_nos = false, manufacturer }, { pool, getSeasonsConfig, tenantId }) {
   shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
   limit = Math.min(Math.max(1, parseInt(limit) || 20), 50);
@@ -1951,6 +1951,8 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
   const tenantIdx = (params.push(tenantId), params.length);
   const tagIdx  = (seasonTag && !include_nos) ? (params.push(`%${seasonTag}%`), params.length) : null;
   const tagCond = tagIdx ? `AND p.tags ILIKE $${tagIdx}` : '';
+  const mfrIdx  = manufacturer ? (params.push(`%${manufacturer}%`), params.length) : null;
+  const mfrCond = mfrIdx ? `AND p.manufacturer ILIKE $${mfrIdx}` : '';
   const limitIdx  = (params.push(limit), params.length);
 
   const { rows } = await pool.query(`
@@ -2011,7 +2013,7 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
       LEFT JOIN stock_by_item  st  ON st.item_id  = p.item_id
       LEFT JOIN transfers_in   ti  ON ti.item_id  = p.item_id
       LEFT JOIN transfers_out  to2 ON to2.item_id = p.item_id
-      WHERE p.tenant_id = $${tenantIdx} ${tagCond}
+      WHERE p.tenant_id = $${tenantIdx} ${tagCond} ${mfrCond}
         AND (GREATEST(0, COALESCE(s.sold,0) + COALESCE(st.stock,0)
              + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)) > 0
              OR COALESCE(st.stock, 0) > 0)
@@ -2047,11 +2049,12 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
     shopName = sr[0]?.name ?? String(shop_id);
   }
 
+  const mfrLabel = manufacturer ? manufacturer : 'toutes les marques';
   const scope_produits_brand = seasonTag && !include_nos
-    ? `Collection ${seasonCode} uniquement (articles taggés ${seasonTag})`
+    ? `Collection ${seasonCode} uniquement — ${mfrLabel} (articles taggés ${seasonTag})`
     : include_nos && seasonTag
-    ? `Toute la marque incluant NOS (tous articles vendus du ${stFrom} au ${stTo})`
-    : 'Toutes les marques (12 semaines glissantes)';
+    ? `${mfrLabel} incluant NOS (tous articles vendus du ${stFrom} au ${stTo})`
+    : `${mfrLabel} (12 semaines glissantes)`;
 
   return {
     periode:        { de: stFrom, a: stTo },
