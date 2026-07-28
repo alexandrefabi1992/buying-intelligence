@@ -1472,6 +1472,343 @@ async function toolGetPaymentTermsAnalysis({ manufacturer }, { pool, tenantId })
 }
 
 // ---------------------------------------------------------------------------
+// toolResolveSearchTerm — classify a search term before calling a data tool.
+// Returns resolved_type: 'manufacturer' | 'matrix' | 'description' | 'ambiguous' | 'not_found'
+// ---------------------------------------------------------------------------
+async function toolResolveSearchTerm({ terme }, { pool, tenantId }) {
+  const t = terme?.trim();
+  if (!t) return { erreur: 'terme is required' };
+
+  const [mfrRes, descRes, matRes] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(DISTINCT manufacturer)::int AS cnt,
+              array_agg(DISTINCT manufacturer ORDER BY manufacturer) FILTER (WHERE manufacturer IS NOT NULL AND manufacturer != '') AS names
+       FROM products WHERE manufacturer ILIKE $1 AND tenant_id = $2 AND manufacturer != ''`,
+      [`%${t}%`, tenantId]
+    ),
+    pool.query(
+      `SELECT COUNT(*)::int AS cnt FROM products WHERE description ILIKE $1 AND tenant_id = $2`,
+      [`%${t}%`, tenantId]
+    ),
+    pool.query(
+      `SELECT COUNT(DISTINCT matrix_id)::int AS cnt,
+              MIN(matrix_id)    AS exemple_matrix_id,
+              MIN(description)  AS exemple_description,
+              MIN(manufacturer) AS exemple_manufacturer
+       FROM products
+       WHERE description ILIKE $1 AND tenant_id = $2
+         AND matrix_id IS NOT NULL AND matrix_id != '0'`,
+      [`%${t}%`, tenantId]
+    ),
+  ]);
+
+  const manufacturer_matches = Number(mfrRes.rows[0]?.cnt ?? 0);
+  const description_matches  = Number(descRes.rows[0]?.cnt ?? 0);
+  const matrix_matches       = Number(matRes.rows[0]?.cnt  ?? 0);
+  const mfrNames = (mfrRes.rows[0]?.names ?? []).slice(0, 3);
+  const exMat    = matRes.rows[0];
+
+  let resolved_type, suggestion, extra = {};
+
+  if (manufacturer_matches === 0 && description_matches === 0) {
+    resolved_type = 'not_found';
+    // pg_trgm similarity suggestions
+    try {
+      const { rows: similar } = await pool.query(
+        `SELECT DISTINCT manufacturer FROM products
+         WHERE manufacturer % $1 AND tenant_id = $2 AND manufacturer != ''
+         ORDER BY similarity(manufacturer, $1) DESC LIMIT 5`,
+        [t, tenantId]
+      );
+      extra.suggestions = similar.map(r => r.manufacturer);
+      suggestion = extra.suggestions.length
+        ? `Terme introuvable. Vouliez-vous dire : ${extra.suggestions.join(', ')} ?`
+        : `Terme introuvable dans le catalogue.`;
+    } catch {
+      extra.suggestions = [];
+      suggestion = `Terme introuvable dans le catalogue.`;
+    }
+  } else if (manufacturer_matches > 0 && description_matches === 0) {
+    resolved_type = 'manufacturer';
+    suggestion    = `Terme résolu comme marque : ${mfrNames.join(', ')}`;
+    extra.manufacturers = mfrNames;
+  } else if (description_matches > 0 && manufacturer_matches === 0) {
+    if (matrix_matches === 1) {
+      resolved_type = 'matrix';
+      suggestion    = `Terme résolu comme modèle précis (1 matrice). Marque : ${exMat.exemple_manufacturer}, matrix_id : ${exMat.exemple_matrix_id}`;
+      extra.matrix_id          = exMat.exemple_matrix_id;
+      extra.manufacturer       = exMat.exemple_manufacturer;
+      extra.exemple_description = exMat.exemple_description;
+    } else {
+      resolved_type = 'description';
+      suggestion    = `Terme résolu comme famille de produits (${matrix_matches} matrices, ${description_matches} variantes).`;
+    }
+  } else {
+    // manufacturer_matches > 0 AND description_matches > 0
+    resolved_type = 'ambiguous';
+    suggestion    = `Terme ambigu : ${manufacturer_matches} marque(s) (${mfrNames.join(', ')}) ET ${description_matches} article(s) dans la description.`;
+    extra.manufacturers        = mfrNames;
+    extra.exemple_description  = exMat?.exemple_description;
+  }
+
+  return {
+    terme,
+    manufacturer_matches,
+    description_matches,
+    matrix_matches,
+    resolved_type,
+    suggestion,
+    ...extra,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// toolGetMatrixSellthrough — ST complet pour un modèle précis (par matrix_id).
+// Même logique que toolGetSellthroughBySize mais filtré par matrix_id.
+// ---------------------------------------------------------------------------
+async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, getSeasonsConfig, tenantId }) {
+  if (!matrix_id) return { erreur: 'matrix_id is required' };
+  shop_id = await resolveShopId(shop_id, pool);
+
+  const today = new Date().toISOString().slice(0, 10);
+  let from = null, to = today, seasonTag = null;
+
+  if (season) {
+    const seasons = await getSeasonsConfig();
+    const s = seasons.find(x => x.code === season.toLowerCase());
+    if (s) {
+      from      = s.reception_from ?? s.sell_from;
+      to        = s.sell_to < today ? s.sell_to : today;
+      seasonTag = s.tag_pattern ?? s.code;
+    }
+  }
+  if (!from) { const d = new Date(); d.setFullYear(d.getFullYear() - 1); from = d.toISOString().slice(0, 10); }
+
+  const params = [from, to, matrix_id]; // $1 $2 $3
+  const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
+  const tagIdx  = seasonTag ? (params.push(`%${seasonTag}%`), params.length) : null;
+
+  const shopSaleCond   = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
+  const shopStockWhere = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
+  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
+  const tagCond         = tagIdx  ? `AND p.tags ILIKE $${tagIdx}`  : '';
+
+  const { rows } = await pool.query(`
+    WITH sales_by_item AS (
+      SELECT sl2.item_id, SUM(sl2.qty) AS sold
+      FROM sale_lines sl2
+      WHERE sl2.completed_time BETWEEN $1 AND $2 ${shopSaleCond}
+      GROUP BY sl2.item_id
+    ),
+    stock_by_item AS (
+      SELECT inv.item_id, SUM(inv.qty_on_hand) AS stock
+      FROM inventory inv
+      JOIN products px ON px.item_id = inv.item_id AND px.archived = false
+      ${shopStockWhere}
+      GROUP BY inv.item_id
+    ),
+    transfers_in AS (
+      SELECT t.item_id, SUM(t.qty_received) AS qty_in
+      FROM transfers t
+      WHERE ${transferInCond} AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
+    transfers_out AS (
+      SELECT t.item_id,
+        SUM(CASE WHEN t.transfer_received THEN t.qty_received ELSE t.qty_sent END) AS qty_out
+      FROM transfers t
+      WHERE ${transferOutCond} AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
+    base AS (
+      SELECT
+        p.description,
+        p.manufacturer,
+        p.category,
+        p.raw->'ItemAttributes'->>'attribute1'         AS attr1,
+        p.raw->'ItemAttributes'->>'attribute2'         AS attr2,
+        p.raw->'ItemAttributes'->>'attribute3'         AS attr3,
+        p.raw->'ItemAttributes'->>'itemAttributeSetID' AS set_id,
+        ias.size_axis,
+        ias.color_axis,
+        COALESCE(s.sold,     0)::int AS sold,
+        COALESCE(st.stock,   0)::int AS stock,
+        COALESCE(ti.qty_in,  0)::int AS transferred_in,
+        COALESCE(to2.qty_out,0)::int AS transferred_out,
+        GREATEST(0, COALESCE(s.sold,0)+COALESCE(st.stock,0)+COALESCE(to2.qty_out,0)-COALESCE(ti.qty_in,0))::int AS received_supplier,
+        CASE WHEN GREATEST(0,COALESCE(s.sold,0)+COALESCE(st.stock,0)+COALESCE(to2.qty_out,0)-COALESCE(ti.qty_in,0))>0
+          THEN ROUND(GREATEST(0,COALESCE(s.sold,0))::numeric
+            / GREATEST(1,COALESCE(s.sold,0)+COALESCE(st.stock,0)+COALESCE(to2.qty_out,0)-COALESCE(ti.qty_in,0))*100,1)
+          ELSE 0 END AS st_pct
+      FROM products p
+      LEFT JOIN item_attribute_sets ias
+        ON  ias.attribute_set_id = (p.raw->'ItemAttributes'->>'itemAttributeSetID')
+        AND ias.tenant_id = p.tenant_id
+      LEFT JOIN sales_by_item  s   ON s.item_id   = p.item_id
+      LEFT JOIN stock_by_item  st  ON st.item_id  = p.item_id
+      LEFT JOIN transfers_in   ti  ON ti.item_id  = p.item_id
+      LEFT JOIN transfers_out  to2 ON to2.item_id = p.item_id
+      WHERE p.matrix_id = $3 ${tagCond}
+        AND (GREATEST(0,COALESCE(s.sold,0))+COALESCE(st.stock,0)+COALESCE(ti.qty_in,0)+COALESCE(to2.qty_out,0)) > 0
+    )
+    SELECT *,
+      SUM(received_supplier) OVER() AS total_recu_all,
+      SUM(sold)              OVER() AS total_sold_all,
+      SUM(stock)             OVER() AS total_stock_all,
+      COUNT(*)               OVER() AS nb_variantes_total
+    FROM base
+    ORDER BY st_pct DESC NULLS LAST, sold DESC
+  `, params);
+
+  if (!rows.length) return {
+    matrix_id,
+    erreur: `Aucune donnée pour la matrice ${matrix_id} sur ${from} → ${to}${season ? ` (saison ${season.toUpperCase()})` : ''}.`,
+  };
+
+  const total_recu  = Number(rows[0].total_recu_all);
+  const total_sold  = Number(rows[0].total_sold_all);
+  const total_stock = Number(rows[0].total_stock_all);
+  const total_st    = total_recu > 0 ? Math.round(total_sold / total_recu * 1000) / 10 : 0;
+
+  // Aggregate by size and color using deterministic size_axis
+  const sizeAgg = {}, colorAgg = {};
+  for (const r of rows) {
+    const sz = extractSize(r.description, r);
+    if (!sizeAgg[sz]) sizeAgg[sz] = { recu: 0, vendu: 0, stock: 0 };
+    sizeAgg[sz].recu  += Number(r.received_supplier);
+    sizeAgg[sz].vendu += Number(r.sold);
+    sizeAgg[sz].stock += Number(r.stock);
+
+    if (r.color_axis) {
+      const col = ([null, r.attr1, r.attr2, r.attr3][r.color_axis] ?? '').trim() || null;
+      if (col) {
+        if (!colorAgg[col]) colorAgg[col] = { recu: 0, vendu: 0, stock: 0 };
+        colorAgg[col].recu  += Number(r.received_supplier);
+        colorAgg[col].vendu += Number(r.sold);
+        colorAgg[col].stock += Number(r.stock);
+      }
+    }
+  }
+
+  const par_taille = Object.entries(sizeAgg)
+    .map(([taille, d]) => ({ taille, recu: d.recu, vendu: d.vendu, stock: d.stock, st_pct: d.recu > 0 ? `${Math.round(d.vendu/d.recu*1000)/10}%` : '0%' }))
+    .sort((a, b) => sizeRank(a.taille) - sizeRank(b.taille));
+
+  const par_couleur = Object.entries(colorAgg)
+    .map(([couleur, d]) => ({ couleur, recu: d.recu, vendu: d.vendu, stock: d.stock, st_pct: d.recu > 0 ? `${Math.round(d.vendu/d.recu*1000)/10}%` : '0%' }))
+    .sort((a, b) => b.vendu - a.vendu);
+
+  return {
+    matrix_id,
+    marque:   rows[0].manufacturer,
+    modele:   rows[0].description,
+    periode:  { de: from, a: to },
+    saison:   season?.toUpperCase() ?? null,
+    boutique: shop_id ?? 'toutes',
+    total_recu_fournisseur: total_recu,
+    total_vendu:            total_sold,
+    total_stock_actuel:     total_stock,
+    st_global:              `${total_st}%`,
+    nb_variantes:           rows.length,
+    par_taille,
+    par_couleur: par_couleur.length ? par_couleur : undefined,
+    variantes: rows.map(r => ({
+      description:      r.description,
+      recu_fournisseur: Number(r.received_supplier),
+      vendu:            Number(r.sold),
+      stock_actuel:     Number(r.stock),
+      st_pct:           `${r.st_pct}%`,
+    })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// toolGetProductByDescription — ST agrégé par matrice pour une recherche description.
+// Utiliser quand resolved_type='description' (matrix_matches > 1).
+// ---------------------------------------------------------------------------
+async function toolGetProductByDescription({ terme, season, shop_id }, { pool, getSeasonsConfig, tenantId }) {
+  if (!terme) return { erreur: 'terme is required' };
+  shop_id = await resolveShopId(shop_id, pool);
+
+  const today = new Date().toISOString().slice(0, 10);
+  let from = null, to = today, seasonTag = null;
+
+  if (season) {
+    const seasons = await getSeasonsConfig();
+    const s = seasons.find(x => x.code === season.toLowerCase());
+    if (s) {
+      from      = s.reception_from ?? s.sell_from;
+      to        = s.sell_to < today ? s.sell_to : today;
+      seasonTag = s.tag_pattern ?? s.code;
+    }
+  }
+  if (!from) { const d = new Date(); d.setFullYear(d.getFullYear() - 1); from = d.toISOString().slice(0, 10); }
+
+  const params = [from, to, `%${terme}%`, tenantId]; // $1 $2 $3 $4
+  const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
+  const tagIdx  = seasonTag ? (params.push(`%${seasonTag}%`), params.length) : null;
+
+  const shopSaleCond   = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
+  const shopStockWhere = shopIdx ? `AND inv.shop_id = $${shopIdx}` : '';
+  const tagCond        = tagIdx  ? `AND p.tags ILIKE $${tagIdx}`  : '';
+
+  const { rows } = await pool.query(`
+    WITH sales_by_item AS (
+      SELECT sl2.item_id, SUM(sl2.qty) AS sold
+      FROM sale_lines sl2
+      WHERE sl2.completed_time BETWEEN $1 AND $2 ${shopSaleCond}
+      GROUP BY sl2.item_id
+    ),
+    stock_by_item AS (
+      SELECT inv.item_id, SUM(inv.qty_on_hand) AS stock
+      FROM inventory inv
+      JOIN products px ON px.item_id = inv.item_id AND px.archived = false ${shopStockWhere}
+      GROUP BY inv.item_id
+    )
+    SELECT
+      p.matrix_id,
+      p.manufacturer,
+      MIN(p.description) AS exemple_description,
+      COUNT(DISTINCT p.item_id)::int AS nb_variantes,
+      SUM(GREATEST(0, COALESCE(s.sold,0) + COALESCE(st.stock,0)))::int AS recu_fournisseur,
+      SUM(COALESCE(s.sold, 0))::int AS vendu,
+      SUM(COALESCE(st.stock, 0))::int AS stock_actuel,
+      CASE WHEN SUM(GREATEST(0,COALESCE(s.sold,0)+COALESCE(st.stock,0))) > 0
+        THEN ROUND(SUM(COALESCE(s.sold,0))::numeric
+          / SUM(GREATEST(0,COALESCE(s.sold,0)+COALESCE(st.stock,0))) * 100, 1)
+        ELSE 0 END AS st_pct
+    FROM products p
+    LEFT JOIN sales_by_item s  ON s.item_id  = p.item_id
+    LEFT JOIN stock_by_item st ON st.item_id = p.item_id
+    WHERE p.description ILIKE $3 AND p.tenant_id = $4 ${tagCond}
+      AND (COALESCE(s.sold,0) + COALESCE(st.stock,0)) > 0
+    GROUP BY p.matrix_id, p.manufacturer
+    ORDER BY vendu DESC
+    LIMIT 20
+  `, params);
+
+  if (!rows.length) return { terme, erreur: `Aucun article trouvé pour "${terme}" sur ${from} → ${to}.` };
+
+  return {
+    terme,
+    periode:     { de: from, a: to },
+    saison:      season?.toUpperCase() ?? null,
+    nb_matrices: rows.length,
+    resultats:   rows.map(r => ({
+      matrix_id:    r.matrix_id,
+      marque:       r.manufacturer,
+      modele:       r.exemple_description,
+      nb_variantes: r.nb_variantes,
+      recu:         r.recu_fournisseur,
+      vendu:        r.vendu,
+      stock:        r.stock_actuel,
+      st_pct:       `${r.st_pct}%`,
+    })),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Tool dispatcher
 // ---------------------------------------------------------------------------
 async function dispatchTool(name, args, ctx) {
@@ -1494,6 +1831,9 @@ async function dispatchTool(name, args, ctx) {
     case 'get_sales_by_category':           return await toolGetSalesByCategory(args, ctx);
     case 'get_inventory_at_date':           return await toolGetInventoryAtDate(args, ctx);
     case 'get_payment_terms_analysis':      return await toolGetPaymentTermsAnalysis(args, ctx);
+    case 'resolve_search_term':             return await toolResolveSearchTerm(args, ctx);
+    case 'get_matrix_sellthrough':          return await toolGetMatrixSellthrough(args, ctx);
+    case 'get_product_by_description':      return await toolGetProductByDescription(args, ctx);
     default:                                return { erreur: `Outil inconnu: ${name}` };
   }
 }
@@ -1656,6 +1996,9 @@ const TOOL_LABELS = {
   get_categories:               'Récupération des catégories',
   compare_seasons:              'Comparaison inter-saisons',
   get_sales_by_category:        'Analyse des ventes par catégorie',
+  resolve_search_term:          'Résolution du terme de recherche',
+  get_matrix_sellthrough:       'Analyse du modèle (matrice)',
+  get_product_by_description:   'Recherche par description',
 };
 
 // ---------------------------------------------------------------------------

@@ -278,6 +278,43 @@ const TOOL_DEFS = [
       required: [],
     },
   },
+  {
+    name: 'resolve_search_term',
+    description: "Résoudre le type d'un terme de recherche avant d'appeler un outil de données. Utiliser quand le terme n'est pas clairement un nom de marque connu (codes modèle, SKU, références partielles). Retourne resolved_type et les détails pour choisir le bon outil suivant.",
+    parameters: {
+      type: 'object',
+      properties: {
+        terme: { type: 'string', description: 'Le terme à résoudre (code modèle, SKU, référence, nom partiel)' },
+      },
+      required: ['terme'],
+    },
+  },
+  {
+    name: 'get_matrix_sellthrough',
+    description: "Obtenir le sell-through complet (reçus, vendus, stock, ST%) pour un modèle précis identifié par son matrix_id. Inclut le détail par taille et par couleur. Utiliser après resolve_search_term quand resolved_type='matrix', avec le matrix_id retourné.",
+    parameters: {
+      type: 'object',
+      properties: {
+        matrix_id: { type: 'string', description: 'ID de la matrice — retourné par resolve_search_term dans le champ matrix_id' },
+        season:    { type: 'string', description: 'Code de saison (ex: p26). Filtre par tag et dates de la saison.' },
+        shop_id:   { type: 'string', description: 'Nom ou ID de la boutique (optionnel)' },
+      },
+      required: ['matrix_id'],
+    },
+  },
+  {
+    name: 'get_product_by_description',
+    description: "Rechercher des produits par mot-clé dans la description et retourner un agrégat ST par modèle (matrice). Utiliser après resolve_search_term quand resolved_type='description' (plusieurs matrices matchent le terme).",
+    parameters: {
+      type: 'object',
+      properties: {
+        terme:   { type: 'string', description: 'Terme de recherche dans la description des produits' },
+        season:  { type: 'string', description: 'Code de saison (optionnel, ex: p26)' },
+        shop_id: { type: 'string', description: 'Nom ou ID de la boutique (optionnel)' },
+      },
+      required: ['terme'],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -356,6 +393,7 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
 - NIVEAUX DE STOCK / VALEUR D'INVENTAIRE : pour toute question sur la valeur ou la quantité totale du stock ("quels sont mes stocks", "valeur totale de l'inventaire", "stock par boutique", "combien d'unités en stock", "quel était le stock le [date]"), utiliser get_inventory_at_date. Sans date précise = utiliser la date d'aujourd'hui (le tool trouve automatiquement le dernier snapshot). Retourne les VRAIS totaux dans le champ "totaux" — lire ce champ pour répondre, JAMAIS calculer ni inventer un total. Si l'outil retourne une erreur (aucun snapshot), le dire EXPLICITEMENT — JAMAIS estimer.
 - LECTURE DES TRANSFERTS DANS LE SELL-THROUGH : le champ "stock_actuel" est EXCLUSIF des transferts sortants (les unités transférées ont déjà quitté la boutique et sont déduites de l'inventaire). Ne JAMAIS dire que le stock "inclut" des unités transférées. La formule est : reçu_fournisseur = vendu + stock_actuel + transferts_sortants − transferts_entrants. Présenter les transferts comme une ligne séparée, pas comme faisant partie du stock.
 - MATRICES / TAILLES : pour voir toutes les tailles d'un modèle ou le stock par taille, utiliser get_matrix_info avec le code modèle (ex: "A45118") dans description_search
+- RÉSOLUTION DU TERME : avant toute question sur ST/ventes/stock d'un produit ou d'une référence (SKU, code modèle, référence partielle), si le terme n'est PAS clairement un nom de marque connu, appeler resolve_search_term en premier. Ne jamais supposer manufacturer par défaut. Selon resolved_type : 'manufacturer' → get_sellthrough_by_size ; 'matrix' → get_matrix_sellthrough(matrix_id retourné) ; 'description' → get_product_by_description ; 'ambiguous' → demander à l'utilisateur "Je trouve X marque(s) [noms] et Y article(s) — vous cherchez la marque ou l'article ?" ; 'not_found' → indiquer le terme introuvable et proposer les suggestions du champ suggestions.
 - TAGS : "tags" (tableau, max 10) filtre les produits qui ont TOUS les tags listés — logique AND. Ex: tags=["p26","consigne"] → uniquement les produits avec les deux tags. "exclude_tags" (tableau, max 10) exclut les produits ayant N'IMPORTE LEQUEL de ces tags. Ex: exclude_tags=["nos","solde"] → aucun NOS ni solde. Les deux paramètres sont combinables simultanément.
 - PARSING DES TAGS : quand l'utilisateur dit "tager X", "tagé X", "tagué X", "avec le tag X", "avec la balise X", "tagged X", "with tag X", "labelled X", "étiquetté X" — extraire X comme tag et NE JAMAIS l'inclure dans le nom de la marque. Ex: "Part Two tager p26" → manufacturer="Part Two", tags=["p26"]. Ex: "Eton tagged p25 slim" → manufacturer="Eton", tags=["p25"], description_search="slim".
 - QUESTIONS DE CLARIFICATION : UNE SEULE question, UNIQUEMENT si l'info manquante est BLOQUANTE. JAMAIS demander la couleur, la boutique ou la période.
