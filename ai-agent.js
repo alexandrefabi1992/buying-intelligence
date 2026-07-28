@@ -1912,7 +1912,7 @@ async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, sho
 // ---------------------------------------------------------------------------
 // toolGetBrandRanking — classement des marques par ST, revenue, stock dormant.
 // ---------------------------------------------------------------------------
-async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20 }, { pool, getSeasonsConfig, tenantId }) {
+async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20, include_nos = false }, { pool, getSeasonsConfig, tenantId }) {
   shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
   limit = Math.min(Math.max(1, parseInt(limit) || 20), 50);
@@ -1949,8 +1949,8 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
   const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
   const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
   const tenantIdx = (params.push(tenantId), params.length);
-  const tagIdx    = seasonTag ? (params.push(`%${seasonTag}%`), params.length) : null;
-  const tagCond   = tagIdx ? `AND p.tags ILIKE $${tagIdx}` : '';
+  const tagIdx  = (seasonTag && !include_nos) ? (params.push(`%${seasonTag}%`), params.length) : null;
+  const tagCond = tagIdx ? `AND p.tags ILIKE $${tagIdx}` : '';
   const limitIdx  = (params.push(limit), params.length);
 
   const { rows } = await pool.query(`
@@ -2047,11 +2047,18 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
     shopName = sr[0]?.name ?? String(shop_id);
   }
 
+  const scope_produits_brand = seasonTag && !include_nos
+    ? `Collection ${seasonCode} uniquement (articles taggés ${seasonTag})`
+    : include_nos && seasonTag
+    ? `Toute la marque incluant NOS (tous articles vendus du ${stFrom} au ${stTo})`
+    : 'Toutes les marques (12 semaines glissantes)';
+
   return {
-    periode:    { de: stFrom, a: stTo },
-    saison:     seasonCode,
-    boutique:   shopName,
-    tri:        sort_by,
+    periode:        { de: stFrom, a: stTo },
+    saison:         seasonCode,
+    boutique:       shopName,
+    tri:            sort_by,
+    scope_produits: scope_produits_brand,
     nb_marques: rows.length,
     marques:    rows.map(r => ({
       manufacturer:           r.manufacturer,
@@ -2074,7 +2081,7 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
 // toolGetSeasonComparison — comparaison détaillée de deux saisons.
 // Utilise computeSeasonMetrics en parallèle pour éviter la duplication SQL.
 // ---------------------------------------------------------------------------
-async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id }, { pool, getSeasonsConfig, tenantId }) {
+async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id, include_nos = false, comparable_window = true }, { pool, getSeasonsConfig, tenantId }) {
   if (!season1 || !season2) return { erreur: 'season1 et season2 sont obligatoires.' };
   shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
@@ -2085,20 +2092,32 @@ async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id
   if (!s1conf) return { erreur: `Saison ${season1.toUpperCase()} introuvable dans la configuration.` };
   if (!s2conf) return { erreur: `Saison ${season2.toUpperCase()} introuvable dans la configuration.` };
 
-  const toParams = (conf) => ({
-    stFrom:       conf.reception_from ?? conf.sell_from,
-    stTo:         conf.sell_to < today ? conf.sell_to : today,
-    seasonTag:    conf.tag_pattern ?? conf.code,
+  const s1Active = today <= s1conf.sell_to;
+  const s2Active = today <= s2conf.sell_to;
+
+  let s2ToAdjusted = null;
+  let avertissement = null;
+  if (include_nos && comparable_window && s1Active && !s2Active) {
+    const s1Start   = new Date(s1conf.reception_from ?? s1conf.sell_from);
+    const s2Start   = new Date(s2conf.reception_from ?? s2conf.sell_from);
+    const elapsedMs = new Date(today) - s1Start;
+    const s2Cutoff  = new Date(s2Start.getTime() + elapsedMs).toISOString().slice(0, 10);
+    s2ToAdjusted = s2Cutoff < s2conf.sell_to ? s2Cutoff : s2conf.sell_to;
+    const elapsedDays = Math.round(elapsedMs / 86400000);
+    avertissement = `${s1conf.code.toUpperCase()} est en cours (${elapsedDays} jours depuis le début de saison). ${s2conf.code.toUpperCase()} a été recalculée sur la même durée écoulée (jusqu'au ${s2ToAdjusted}) pour une comparaison équitable.`;
+  }
+
+  const toParams = (conf, stToOverride = null) => ({
+    stFrom:    conf.reception_from ?? conf.sell_from,
+    stTo:      stToOverride ?? (conf.sell_to < today ? conf.sell_to : today),
+    seasonTag: include_nos ? null : (conf.tag_pattern ?? conf.code),
     manufacturer, shop_id, tenantId,
   });
 
   const [m1, m2] = await Promise.all([
     computeSeasonMetrics(toParams(s1conf), pool),
-    computeSeasonMetrics(toParams(s2conf), pool),
+    computeSeasonMetrics(toParams(s2conf, s2ToAdjusted), pool),
   ]);
-
-  const s1Active = today <= s1conf.sell_to;
-  const s2Active = today <= s2conf.sell_to;
 
   const saison1 = {
     code:               s1conf.code.toUpperCase(),
@@ -2113,9 +2132,10 @@ async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id
     nb_articles_vendus: m1.nb_articles_vendus,
     note_stock:         s1Active ? null : 'Stock fin de saison non disponible pour les saisons passées',
   };
+  const s2PerTo = s2ToAdjusted ?? s2conf.sell_to;
   const saison2 = {
     code:               s2conf.code.toUpperCase(),
-    periode:            `${s2conf.reception_from ?? s2conf.sell_from} → ${s2conf.sell_to}`,
+    periode:            `${s2conf.reception_from ?? s2conf.sell_from} → ${s2PerTo}${s2ToAdjusted ? ' (fenêtre comparable)' : ''}`,
     st_pct:             m2.st_pct,
     units_sold:         m2.units_sold,
     units_received:     m2.units_received,
@@ -2144,13 +2164,19 @@ async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id
     shopName = sr[0]?.name ?? String(shop_id);
   }
 
+  const scope_produits_cmp = include_nos
+    ? 'Toute la marque incluant NOS (tous articles vendus dans la fenêtre)'
+    : `Collections ${s1conf.code.toUpperCase()} et ${s2conf.code.toUpperCase()} uniquement (articles taggés)`;
+
   return {
     manufacturer:       manufacturer ?? 'Toutes marques',
     boutique:           shopName,
+    scope_produits:     scope_produits_cmp,
     saison_reference:   saison1,
     saison_comparaison: saison2,
     variations,
-    note: 'Variation positive = amélioration vs saison de comparaison',
+    note:          'Variation positive = amélioration vs saison de comparaison',
+    avertissement: avertissement ?? undefined,
   };
 }
 

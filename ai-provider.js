@@ -323,8 +323,9 @@ const TOOL_DEFS = [
       properties: {
         season:  { type: 'string', description: 'Code de saison (ex: p26). Sans season : fenêtre 12 semaines glissantes.' },
         shop_id: { type: 'string', description: 'Nom ou ID de la boutique (optionnel)' },
-        sort_by: { type: 'string', enum: ['st', 'revenue', 'stock_dormant', 'units_sold', 'margin'], description: "Critère de tri. 'st'=sell-through, 'revenue'=chiffre d'affaires, 'stock_dormant'=stock invendu, 'units_sold'=unités vendues, 'margin'=marge brute. Défaut: 'st'" },
-        limit:   { type: 'integer', description: 'Nombre de marques à retourner (1-50, défaut: 20)' },
+        sort_by:     { type: 'string', enum: ['st', 'revenue', 'stock_dormant', 'units_sold', 'margin'], description: "Critère de tri. 'st'=sell-through, 'revenue'=chiffre d'affaires, 'stock_dormant'=stock invendu, 'units_sold'=unités vendues, 'margin'=marge brute. Défaut: 'st'" },
+        limit:       { type: 'integer', description: 'Nombre de marques à retourner (1-50, défaut: 20)' },
+        include_nos: { type: 'boolean', description: "Si true, inclut tous les articles de la marque vendus dans la fenêtre (pas seulement ceux taggés avec la saison). Si false (défaut), filtre par le tag de saison — uniquement la collection saisonnière. Retourne le champ scope_produits pour indiquer le périmètre." },
       },
       required: [],
     },
@@ -335,10 +336,12 @@ const TOOL_DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        season1:      { type: 'string', description: 'Saison de référence (la plus récente), ex: p26' },
-        season2:      { type: 'string', description: 'Saison de comparaison (la plus ancienne), ex: p25' },
-        manufacturer: { type: 'string', description: 'Nom de la marque (optionnel — omettre pour toutes les marques)' },
-        shop_id:      { type: 'string', description: 'Nom ou ID de la boutique (optionnel)' },
+        season1:           { type: 'string',  description: 'Saison de référence (la plus récente), ex: p26' },
+        season2:           { type: 'string',  description: 'Saison de comparaison (la plus ancienne), ex: p25' },
+        manufacturer:      { type: 'string',  description: 'Nom de la marque (optionnel — omettre pour toutes les marques)' },
+        shop_id:           { type: 'string',  description: 'Nom ou ID de la boutique (optionnel)' },
+        include_nos:       { type: 'boolean', description: "Si true, inclut tous les articles de la marque vendus dans la fenêtre (pas seulement ceux taggés). Si false (défaut), filtre par le tag de saison. Retourne le champ scope_produits." },
+        comparable_window: { type: 'boolean', description: "Si true (défaut) et que season1 est en cours et season2 terminée, recalcule season2 sur la même durée écoulée que season1 pour une comparaison équitable. Passer false si l'utilisateur veut la saison2 complète (toutes ses données). Pertinent surtout quand include_nos=true." },
       },
       required: ['season1', 'season2'],
     },
@@ -434,6 +437,8 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
 - Formate les montants: $1 234,56 — les pourcentages: 67,3%
 - Si tu n'es pas certain du nom exact d'une catégorie : appelle get_categories(manufacturer=X) d'abord
 - COMPARAISONS INTER-SAISONS : pour toute question comparant plusieurs saisons ("P26 vs P25", "évolution sur 3 saisons", "croissance d'une saison à l'autre"), utiliser compare_seasons avec la liste des codes de saison dans "seasons". Pour une comparaison approfondie ENTRE DEUX saisons avec deltas calculés ("+X% de ST", "variation du revenue") → utiliser get_season_comparison(season1, season2) à la place
+- CLARIFICATION OBLIGATOIRE — PÉRIMÈTRE MARQUE (get_brand_ranking / get_season_comparison) : Quand l'utilisateur demande les ventes, le ST ou une comparaison de saison pour UNE MARQUE sans préciser explicitement (a) périmètre : "collection seulement"/"taggés [saison]"/"uniquement [saison]" OU "toute la marque"/"NOS inclus"/"tous les articles" ET (b) période : "saison complète"/"depuis le début" OU "fenêtre comparable"/"même avancement"/"à la même date" → POSER LES DEUX QUESTIONS AVANT tout appel d'outil : "1. Quelle période ? (A) Saison complète (B) Fenêtre comparable : même nombre de jours écoulés dans les deux saisons / 2. Quel périmètre ? (A) Collection [saison] seulement — articles taggés [saison] (B) Toute la marque — tous articles vendus dans la fenêtre, NOS inclus". Si une des précisions est déjà dans le message, poser SEULEMENT la question manquante. Si les deux sont claires → appeler directement sans demander. MAPPING : "collection seulement"/"taggés" → include_nos=false ; "toute la marque"/"NOS inclus" → include_nos=true ; "saison complète" → comparable_window=false ; "fenêtre comparable"/"même avancement" → comparable_window=true. Cette règle s'applique UNIQUEMENT aux outils get_brand_ranking et get_season_comparison — NE PAS l'appliquer aux autres outils.
+- NOTE DE PÉRIMÈTRE OBLIGATOIRE : Toute réponse affichant des chiffres issus de get_brand_ranking ou get_season_comparison DOIT inclure une note de périmètre en fin de réponse : "Ces chiffres portent sur [scope_produits] du [debut] au [fin]." (utiliser le champ scope_produits du résultat, et les champs periode.de/periode.a pour get_brand_ranking ou saison_reference.periode/saison_comparaison.periode pour get_season_comparison).
 - CLASSEMENT DES MARQUES (analytique) : pour "quelle marque a le meilleur ST", "classement par revenue", "marques avec stock dormant", "top par marge" → utiliser get_brand_ranking. JAMAIS inventer un classement. get_brand_ranking et get_top_performers sont complémentaires : get_brand_ranking calcule tout en temps réel (ST, revenue, marge, stock dormant) ; get_top_performers lit le cache budget (disponible après calcul de budget)
 - MODÈLES PAR CRITÈRES : pour "quels articles réapprovisionner" (min_st=80, min_stock=1), "modèles jamais vendus" (has_sales=false, min_stock=1), "stock dormant chez [marque]" (manufacturer=X, max_st=35, min_stock=1), "quels modèles épuisés" (min_st=80, max_stock=0) → utiliser get_items_by_criteria. Ce tool agrège au niveau modèle complet (toutes tailles combinées), pas par variante individuelle
 - CATÉGORIES : pour toute question sur les ventes/répartition par TYPE DE PRODUIT ("quelle catégorie se vend le mieux?", "top catégories", "répartition par type de produit"), utiliser get_sales_by_category — JAMAIS get_sales_by_variant ni get_categories pour ces questions
