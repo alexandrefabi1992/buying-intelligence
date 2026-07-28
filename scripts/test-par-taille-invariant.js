@@ -23,9 +23,11 @@ if (!DB_URL) {
   process.exit(1);
 }
 
-const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
+// Default to 'valerie-simon' — the only tenant in this deployment.
+// Override with TENANT_ID for multi-tenant testing.
+const TENANT = process.env.TENANT_ID || 'valerie-simon';
 
-const TENANT = 'valerie-simon';
+const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
 
 async function buildCtx() {
   const getSeasonsConfig = async () => {
@@ -40,13 +42,32 @@ async function buildCtx() {
 
 const sumField = (arr, field) => arr.reduce((s, x) => s + Number(x[field] ?? 0), 0);
 
+// Run an independent SELECT SUM(...) and assert it equals `expected`.
+// This verifies the window function total is actually correct, not just that
+// it's bigger than the truncated displayed rows.
+async function assertIndependentSum(expected, sql, params, label) {
+  const { rows } = await pool.query(sql, params);
+  const independent = Number(rows[0]?.total ?? 0);
+  if (independent !== expected) {
+    console.error(
+      `FAIL ${label} — window_total=${expected} ≠ independent_SUM=${independent}` +
+      ` — window function may compute wrong total`
+    );
+    return false;
+  }
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // toolGetSellthroughBySize
-// Invariants: sum(par_taille[*].recu_fournisseur) == total_recu_fournisseur
-//             sum(par_taille[*].stock_actuel) == total_stock_actuel_en_boutique
-// par_taille is built from ALL SQL rows; totals are window functions — both
-// bypass the display LIMIT. If someone reintroduces LIMIT before the JS
-// aggregation, one side stays correct and the other shrinks → mismatch.
+// Invariants (equality, not inequality — par_taille is built from ALL SQL rows):
+//   sum(par_taille[*].recu_fournisseur) == total_recu_fournisseur
+//   sum(par_taille[*].stock_actuel)     == total_stock_actuel_en_boutique
+//
+// The SQL has no LIMIT, so both sides of the check are derived from the same
+// full result set. A LIMIT reintroduced on the SQL would cause the window
+// totals to remain correct (window functions apply before LIMIT in SQL) while
+// par_taille shrinks → equality breaks → FAIL.
 // ---------------------------------------------------------------------------
 async function testSellthroughBySize(label, args, ctx, { minVariants = 1 } = {}) {
   const result = await toolGetSellthroughBySize(args, ctx);
@@ -79,12 +100,16 @@ async function testSellthroughBySize(label, args, ctx, { minVariants = 1 } = {})
 
 // ---------------------------------------------------------------------------
 // toolGetStockByVariant
-// Invariant: when nb_lignes_total > nb_lignes_affichees (LIMIT 100),
-//            sum(articles[*].stock) < total_unites (window function).
-// If LIMIT were applied before the window, the window total would be wrong
-// and the two sums would match — that's the regression signal.
+// Two-part invariant:
+//   1. When truncated: sum(articles[*].stock) < total_unites
+//      (detects missing window function — without it total equals sum of LIMIT rows)
+//   2. total_unites == independent SELECT SUM(qty_on_hand) with same filters
+//      (detects a window function that computes the wrong total)
+// Options:
+//   independentSQL  — SQL with a `total` alias, no LIMIT
+//   independentParams — params array (or function taking result → array)
 // ---------------------------------------------------------------------------
-async function testStockByVariant(label, args, ctx) {
+async function testStockByVariant(label, args, ctx, { independentSQL, independentParams } = {}) {
   const result = await toolGetStockByVariant(args, ctx);
 
   if (!result.articles) throw new Error(`${label} — no articles in result`);
@@ -101,6 +126,13 @@ async function testStockByVariant(label, args, ctx) {
     );
     failed = true;
   }
+
+  if (independentSQL) {
+    const params = typeof independentParams === 'function' ? independentParams(result) : independentParams;
+    const ok = await assertIndependentSum(windowTotal, independentSQL, params, label);
+    if (!ok) failed = true;
+  }
+
   if (!failed) {
     const note = truncated
       ? `  (affiches=${result.nb_lignes_affichees}/${result.nb_lignes_total} — sum(displayed)=${displayedSum} < window=${windowTotal} ✓)`
@@ -112,11 +144,13 @@ async function testStockByVariant(label, args, ctx) {
 
 // ---------------------------------------------------------------------------
 // toolGetSalesByVariant
-// Invariant: when nb_articles_total > nb_articles_affiches (LIMIT 100),
-//            sum(articles[*].qty_vendue) < total_unites_vendues.
-// Baseline: Brax — ~1261 descriptions, without fix reduce(100) ≈ 86% wrong.
+// Two-part invariant:
+//   1. When truncated: sum(articles[*].qty_vendue) < total_unites_vendues
+//   2. total_unites_vendues == independent SELECT SUM(qty) with same filters
+// Baseline: Brax all-time — 5463 descriptions, reduce(100)=420 vs window=7797
+// (old 1-year window baseline: 1261 descriptions, reduce(100)=222 vs window=1548)
 // ---------------------------------------------------------------------------
-async function testSalesByVariant(label, args, ctx, { minDescriptions = 1 } = {}) {
+async function testSalesByVariant(label, args, ctx, { minDescriptions = 1, independentSQL, independentParams } = {}) {
   const result = await toolGetSalesByVariant(args, ctx);
 
   if (!result.articles) throw new Error(`${label} — no articles in result`);
@@ -136,6 +170,13 @@ async function testSalesByVariant(label, args, ctx, { minDescriptions = 1 } = {}
     );
     failed = true;
   }
+
+  if (independentSQL) {
+    const params = typeof independentParams === 'function' ? independentParams(result) : independentParams;
+    const ok = await assertIndependentSum(windowTotal, independentSQL, params, label);
+    if (!ok) failed = true;
+  }
+
   if (!failed) {
     const pct = truncated ? Math.round((windowTotal - displayedSum) / windowTotal * 100) : 0;
     const note = truncated
@@ -148,11 +189,12 @@ async function testSalesByVariant(label, args, ctx, { minDescriptions = 1 } = {}
 
 // ---------------------------------------------------------------------------
 // toolGetSalesByCategory
-// Invariant: when nb_categories_total > nb_categories_affiches (LIMIT 60),
-//            sum(categories[*].unites) < total.unites.
-// Baseline: 150 categories, without fix reduce(60) ≈ 6% wrong.
+// Two-part invariant:
+//   1. When truncated: sum(categories[*].unites) < total.unites
+//   2. total.unites == independent SELECT SUM(qty) with same filters
+// Baseline: 150 categories, reduce(60)=28370 vs window=31490 (10% wrong)
 // ---------------------------------------------------------------------------
-async function testSalesByCategory(label, args, ctx, { minCategories = 1 } = {}) {
+async function testSalesByCategory(label, args, ctx, { minCategories = 1, independentSQL, independentParams } = {}) {
   const result = await toolGetSalesByCategory(args, ctx);
 
   if (result.erreur) throw new Error(`${label} — tool returned error: ${result.erreur}`);
@@ -173,6 +215,13 @@ async function testSalesByCategory(label, args, ctx, { minCategories = 1 } = {})
     );
     failed = true;
   }
+
+  if (independentSQL) {
+    const params = typeof independentParams === 'function' ? independentParams(result) : independentParams;
+    const ok = await assertIndependentSum(windowTotal, independentSQL, params, label);
+    if (!ok) failed = true;
+  }
+
   if (!failed) {
     const pct = truncated ? Math.round((windowTotal - displayedSum) / windowTotal * 100) : 0;
     const note = truncated
@@ -185,11 +234,12 @@ async function testSalesByCategory(label, args, ctx, { minCategories = 1 } = {})
 
 // ---------------------------------------------------------------------------
 // toolGetSalesAnalysis — category branch
-// Invariant: when nb_marques_total > nb_marques_affiches (LIMIT 20),
-//            sum(marques[*].unites) < total.unites.
-// Baseline: Femme/Hauts/Chandail — 46 brands, without fix reduce(20) ≈ 10% wrong.
+// Two-part invariant:
+//   1. When truncated: sum(marques[*].unites) < total.unites
+//   2. total.unites == independent SELECT SUM(qty) with same filters
+// Baseline: Femme/Hauts/Chandail — 46 brands, reduce(20)=2880 vs window=3196 (10% wrong)
 // ---------------------------------------------------------------------------
-async function testSalesAnalysisCategory(label, args, ctx, { minBrands = 1 } = {}) {
+async function testSalesAnalysisCategory(label, args, ctx, { minBrands = 1, independentSQL, independentParams } = {}) {
   const result = await toolGetSalesAnalysis(args, ctx);
 
   if (result.erreur) throw new Error(`${label} — tool returned error: ${result.erreur}`);
@@ -214,6 +264,13 @@ async function testSalesAnalysisCategory(label, args, ctx, { minBrands = 1 } = {
     );
     failed = true;
   }
+
+  if (independentSQL) {
+    const params = typeof independentParams === 'function' ? independentParams(result) : independentParams;
+    const ok = await assertIndependentSum(windowTotal, independentSQL, params, label);
+    if (!ok) failed = true;
+  }
+
   if (!failed) {
     const pct = truncated ? Math.round((windowTotal - displayedSum) / windowTotal * 100) : 0;
     const note = truncated
@@ -231,8 +288,10 @@ async function main() {
   let anyFailed = false;
 
   // --- toolGetSellthroughBySize ---
-  // Scoped: exact original bug context — Patrick Assaraf p26 @ boutique 1
-  // (62 variants, old LIMIT 50 gave stock=27 instead of 34)
+  // Invariant: equality (sum par_taille == window totals).
+  // No independent SQL needed — par_taille is JS-aggregated from ALL SQL rows
+  // (no LIMIT in the query), so the equality already catches any truncation bug.
+
   const r1 = await testSellthroughBySize(
     '[SellthroughBySize] Patrick Assaraf p26 @ boutique 1',
     { manufacturer: 'Patrick Assaraf', season: 'p26', shop_id: '1' },
@@ -240,7 +299,6 @@ async function main() {
   );
   if (!r1) anyFailed = true;
 
-  // Broad: all boutiques, no season filter
   const r2 = await testSellthroughBySize(
     '[SellthroughBySize] Patrick Assaraf (toutes boutiques)',
     { manufacturer: 'Patrick Assaraf' },
@@ -263,39 +321,90 @@ async function main() {
   if (!r4) anyFailed = true;
 
   // --- toolGetStockByVariant ---
-  // Brax: many stock lines across shops, LIMIT 100
+  // Brax: many stock lines across shops, LIMIT 100.
+  // Independent SQL mirrors the tool's exact WHERE (archived=false, manufacturer, shops join).
   console.log('');
   const r5 = await testStockByVariant(
     '[StockByVariant] Brax (toutes boutiques)',
     { manufacturer: 'Brax' },
-    ctx
+    ctx, {
+      independentSQL: `
+        SELECT SUM(i.qty_on_hand) AS total
+        FROM products p
+        JOIN inventory i  ON i.item_id  = p.item_id
+        JOIN shops    sh  ON sh.shop_id = i.shop_id
+        WHERE p.archived = false
+          AND p.manufacturer ILIKE $1
+      `,
+      independentParams: ['%Brax%'],
+    }
   );
   if (!r5) anyFailed = true;
 
   // --- toolGetSalesByVariant ---
-  // Brax: ~1261 descriptions, LIMIT 100 — without fix, reduce gives ~86% wrong
+  // Brax, all-time (no date filter) → 5463 descriptions, LIMIT 100.
+  // reduce(100) gives 420 vs correct 7797 (95% wrong without window fix).
+  // Note: 1-year window baseline at fix time was 222 vs 1548 (86% wrong) —
+  // different because all-time has far more variant×date combinations.
   const r6 = await testSalesByVariant(
-    '[SalesByVariant] Brax (toutes boutiques)',
+    '[SalesByVariant] Brax (toutes boutiques, all-time)',
     { manufacturer: 'Brax' },
-    ctx, { minDescriptions: 200 }
+    ctx, {
+      minDescriptions: 200,
+      independentSQL: `
+        SELECT SUM(sl.qty) AS total
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE sl.qty > 0
+          AND p.manufacturer ILIKE $1
+      `,
+      independentParams: ['%Brax%'],
+    }
   );
   if (!r6) anyFailed = true;
 
   // --- toolGetSalesByCategory ---
-  // All categories over 1 year, LIMIT 60 — without fix, reduce gives ~6% wrong
+  // All categories over 1 year, LIMIT 60.
+  // reduce(60) gives ~28370 vs correct ~31490 (10% wrong without window fix).
+  // Independent SQL uses the period dates from result.periode.
   const r7 = await testSalesByCategory(
     '[SalesByCategory] 1 an (toutes boutiques)',
     { period: '1y' },
-    ctx, { minCategories: 100 }
+    ctx, {
+      minCategories: 100,
+      independentSQL: `
+        SELECT SUM(sl.qty) AS total
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE sl.completed_time BETWEEN $1 AND $2
+          AND p.category IS NOT NULL
+          AND p.category != ''
+      `,
+      independentParams: (result) => [result.periode.de, result.periode.a],
+    }
   );
   if (!r7) anyFailed = true;
 
   // --- toolGetSalesAnalysis — category branch ---
-  // Femme/Hauts/Chandail over 1 year, LIMIT 20 — without fix, reduce gives ~10% wrong
+  // Femme/Hauts/Chandail, 1 year, LIMIT 20.
+  // reduce(20) gives ~2880 vs correct ~3196 (10% wrong without window fix).
+  // Independent SQL mirrors the tool's JOIN shops (INNER) + manufacturer IS NOT NULL.
   const r8 = await testSalesAnalysisCategory(
     '[SalesAnalysis] Femme/Hauts/Chandail (toutes boutiques, 1 an)',
     { category: 'Femme/Hauts/Chandail', period: '1y' },
-    ctx, { minBrands: 30 }
+    ctx, {
+      minBrands: 30,
+      independentSQL: `
+        SELECT SUM(sl.qty) AS total
+        FROM sale_lines sl
+        JOIN products p  ON p.item_id  = sl.item_id
+        JOIN shops    sh ON sh.shop_id = sl.shop_id
+        WHERE sl.completed_time BETWEEN $1 AND $2
+          AND p.category ILIKE $3
+          AND p.manufacturer IS NOT NULL
+      `,
+      independentParams: (result) => [result.periode.de, result.periode.a, '%Femme/Hauts/Chandail%'],
+    }
   );
   if (!r8) anyFailed = true;
 
