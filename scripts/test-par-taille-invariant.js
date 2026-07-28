@@ -1,14 +1,20 @@
 'use strict';
-// Non-regression test: par_taille sums must equal window-function totals.
+// Non-regression test: validates invariants on the real tool functions in ai-agent.js.
 //
-// This test fails loudly if someone reintroduces a SQL LIMIT on
-// toolGetSellthroughBySize before the JS aggregation step — the bug that
-// caused wrong "total reçu" numbers in the chatbot (Patrick Assaraf, VS).
+// Calls production code directly so any regression in the SQL or aggregation
+// logic is caught — reimplementing the queries here would miss those bugs.
 //
 // Run: DATABASE_URL=... node scripts/test-par-taille-invariant.js
-//      OR: railway run node scripts/test-par-taille-invariant.js
+//      OR: railway run npm test
 
 const { Pool } = require('pg');
+const {
+  toolGetSellthroughBySize,
+  toolGetStockByVariant,
+  toolGetSalesByVariant,
+  toolGetSalesByCategory,
+  toolGetSalesAnalysis,
+} = require('../ai-agent');
 
 const DB_URL = process.env.DATABASE_URL;
 if (!DB_URL) {
@@ -19,396 +25,284 @@ if (!DB_URL) {
 
 const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
 
-// Mirrors extractSize() in ai-agent.js exactly — update both if regex changes.
-function extractSize(desc) {
-  if (!desc) return 'N/A';
-  let m;
-  m = /\b(3XL|XXL|2XL|XL|XS|2X|3X)\b/i.exec(desc); if (m) return m[1].toUpperCase();
-  m = /\b([SML])\b/.exec(desc);                       if (m) return m[1].toUpperCase();
-  m = /\b(\d{2,3}(?:[.,]\d+)?)\b/.exec(desc);         if (m) return m[1].replace(',', '.');
-  return 'N/A';
+const TENANT = 'valerie-simon';
+
+async function buildCtx() {
+  const getSeasonsConfig = async () => {
+    const { rows } = await pool.query(
+      "SELECT value FROM app_settings WHERE key = 'seasons_config' AND tenant_id = $1",
+      [TENANT]
+    );
+    return rows.length && Array.isArray(rows[0].value) ? rows[0].value : [];
+  };
+  return { pool, getSeasonsConfig };
 }
 
-// Run the same core query as toolGetSellthroughBySize — NO LIMIT.
-// Optionally cap with simulatedLimit to reproduce the old bug.
-// shop_id and tag_pattern are optional to scope the query.
-async function runQuery(manufacturer, simulatedLimit = null, { shopId = null, tagPattern = null, from = null, to = null } = {}) {
-  const today = new Date().toISOString().slice(0, 10);
-  if (!from) {
-    const d = new Date(); d.setFullYear(d.getFullYear() - 1);
-    from = d.toISOString().slice(0, 10);
-  }
-  if (!to) to = today;
+const sumField = (arr, field) => arr.reduce((s, x) => s + Number(x[field] ?? 0), 0);
 
-  const limitClause = simulatedLimit ? `LIMIT ${simulatedLimit}` : '';
-  const shopSaleCond   = shopId ? `AND sl2.shop_id = '${shopId}'` : '';
-  const shopStockWhere = shopId ? `WHERE inv.shop_id = '${shopId}'` : '';
-  const tagCond        = tagPattern ? `AND p.tags ILIKE '%${tagPattern}%'` : '';
+// ---------------------------------------------------------------------------
+// toolGetSellthroughBySize
+// Invariants: sum(par_taille[*].recu_fournisseur) == total_recu_fournisseur
+//             sum(par_taille[*].stock_actuel) == total_stock_actuel_en_boutique
+// par_taille is built from ALL SQL rows; totals are window functions — both
+// bypass the display LIMIT. If someone reintroduces LIMIT before the JS
+// aggregation, one side stays correct and the other shrinks → mismatch.
+// ---------------------------------------------------------------------------
+async function testSellthroughBySize(label, args, ctx, { minVariants = 1 } = {}) {
+  const result = await toolGetSellthroughBySize(args, ctx);
 
-  const { rows } = await pool.query(`
-    WITH sales_by_item AS (
-      SELECT sl2.item_id, SUM(sl2.qty) AS sold
-      FROM sale_lines sl2
-      WHERE sl2.completed_time BETWEEN $1 AND $2
-        ${shopSaleCond}
-      GROUP BY sl2.item_id
-    ),
-    stock_by_item AS (
-      SELECT inv.item_id, SUM(inv.qty_on_hand) AS stock
-      FROM inventory inv
-      JOIN products px ON px.item_id = inv.item_id AND px.archived = false
-      ${shopStockWhere}
-      GROUP BY inv.item_id
-    ),
-    base AS (
-      SELECT
-        p.description,
-        COALESCE(s.sold,   0)::int AS sold,
-        COALESCE(st.stock, 0)::int AS stock,
-        GREATEST(0, COALESCE(s.sold, 0) + COALESCE(st.stock, 0))::int AS received_supplier
-      FROM products p
-      LEFT JOIN sales_by_item s  ON s.item_id  = p.item_id
-      LEFT JOIN stock_by_item st ON st.item_id = p.item_id
-      WHERE p.manufacturer ILIKE $3
-        ${tagCond}
-        AND (COALESCE(s.sold, 0) + COALESCE(st.stock, 0)) > 0
-    )
-    SELECT *,
-      SUM(received_supplier) OVER () AS total_recu_all,
-      SUM(stock)             OVER () AS total_stock_all,
-      COUNT(*)               OVER () AS nb_variantes_total
-    FROM base
-    ORDER BY received_supplier DESC
-    ${limitClause}
-  `, [from, to, `%${manufacturer}%`]);
-
-  return rows;
-}
-
-// Test a scoped query (specific boutique + season tag) — reproduces the exact original bug context.
-async function testBrandScoped(manufacturer, { shopId, shopName, tagPattern, from, to, badLimit }) {
-  const rows = await runQuery(manufacturer, null, { shopId, tagPattern, from, to });
-  if (rows.length === 0) {
-    throw new Error(`[${manufacturer} ${tagPattern} ${shopName}] No rows — check brand/tag/shop.`);
+  if (!result.par_taille) throw new Error(`${label} — no par_taille in result`);
+  if (result.nb_variantes_total < minVariants) {
+    throw new Error(`${label} — only ${result.nb_variantes_total} variants, need ≥${minVariants}`);
   }
 
-  const nb_total    = Number(rows[0].nb_variantes_total);
-  const total_recu  = Number(rows[0].total_recu_all);
-  const total_stock = Number(rows[0].total_stock_all);
-
-  const sizeAgg = {};
-  for (const r of rows) {
-    const t = extractSize(r.description);
-    if (!sizeAgg[t]) sizeAgg[t] = { recu: 0, stock: 0 };
-    sizeAgg[t].recu  += Number(r.received_supplier);
-    sizeAgg[t].stock += Number(r.stock);
-  }
-  const sumRecu  = Object.values(sizeAgg).reduce((s, v) => s + v.recu,  0);
-  const sumStock = Object.values(sizeAgg).reduce((s, v) => s + v.stock, 0);
-
-  // Also simulate the old bug with the given limit
-  const buggedRows = await runQuery(manufacturer, badLimit, { shopId, tagPattern, from, to });
-  const bugAgg = {};
-  for (const r of buggedRows) {
-    const t = extractSize(r.description);
-    if (!bugAgg[t]) bugAgg[t] = { recu: 0, stock: 0 };
-    bugAgg[t].recu  += Number(r.received_supplier);
-    bugAgg[t].stock += Number(r.stock);
-  }
-  const bugStock = Object.values(bugAgg).reduce((s, v) => s + v.stock, 0);
-
-  const label = `[${manufacturer} ${tagPattern} @ ${shopName}]`;
+  const sumRecu  = sumField(result.par_taille, 'recu_fournisseur');
+  const sumStock = sumField(result.par_taille, 'stock_actuel');
   let failed = false;
 
-  if (sumRecu !== total_recu || sumStock !== total_stock) {
-    console.error(`FAIL ${label} par_taille mismatch: recu=${sumRecu}≠${total_recu} stock=${sumStock}≠${total_stock}`);
-    failed = true;
-  } else {
-    console.log(`PASS ${label} ${nb_total} variantes — recu=${total_recu} ✅  stock=${total_stock} ✅`);
-    if (bugStock !== total_stock) {
-      console.log(`  → LIMIT ${badLimit} aurait produit stock=${bugStock} au lieu de ${total_stock} (bug original reproduit ✓)`);
-    }
-  }
-
-  return !failed;
-}
-
-async function testBrand(manufacturer, minVariants) {
-  const rows = await runQuery(manufacturer);
-
-  if (rows.length === 0) {
-    throw new Error(`[${manufacturer}] No rows returned — brand not found or no activity.`);
-  }
-
-  const nb_total      = Number(rows[0].nb_variantes_total);
-  const total_recu    = Number(rows[0].total_recu_all);
-  const total_stock   = Number(rows[0].total_stock_all);
-
-  if (nb_total < minVariants) {
-    throw new Error(
-      `[${manufacturer}] Only ${nb_total} variants found — need ≥${minVariants} to be a meaningful regression test.`
-    );
-  }
-
-  // Compute par_taille from ALL rows (same as toolGetSellthroughBySize)
-  const sizeAgg = {};
-  for (const r of rows) {
-    const t = extractSize(r.description);
-    if (!sizeAgg[t]) sizeAgg[t] = { recu: 0, stock: 0 };
-    sizeAgg[t].recu  += Number(r.received_supplier);
-    sizeAgg[t].stock += Number(r.stock);
-  }
-
-  const sumRecu  = Object.values(sizeAgg).reduce((s, v) => s + v.recu,  0);
-  const sumStock = Object.values(sizeAgg).reduce((s, v) => s + v.stock, 0);
-
-  let failed = false;
-
-  if (sumRecu !== total_recu) {
-    console.error(
-      `FAIL [${manufacturer}] recu: sum(par_taille)=${sumRecu} ≠ window total=${total_recu}` +
-      ` — a SQL LIMIT before JS aggregation would cause this.`
-    );
+  if (sumRecu !== result.total_recu_fournisseur) {
+    console.error(`FAIL ${label} — recu: sum(par_taille)=${sumRecu} ≠ total=${result.total_recu_fournisseur}`);
     failed = true;
   }
-
-  if (sumStock !== total_stock) {
-    console.error(
-      `FAIL [${manufacturer}] stock: sum(par_taille)=${sumStock} ≠ window total=${total_stock}` +
-      ` — a SQL LIMIT before JS aggregation would cause this.`
-    );
+  if (sumStock !== result.total_stock_actuel_en_boutique) {
+    console.error(`FAIL ${label} — stock: sum(par_taille)=${sumStock} ≠ total=${result.total_stock_actuel_en_boutique}`);
     failed = true;
   }
-
   if (!failed) {
-    console.log(
-      `PASS [${manufacturer}] ${nb_total} variantes — recu=${total_recu} ✅  stock=${total_stock} ✅`
-    );
+    const truncNote = result.nb_variantes_total > result.nb_variantes_affiches
+      ? ` (affiches=${result.nb_variantes_affiches}/${result.nb_variantes_total} — LIMIT ne touche pas par_taille ✓)`
+      : '';
+    console.log(`PASS ${label} — ${result.nb_variantes_total} variantes, recu=${result.total_recu_fournisseur} ✅ stock=${result.total_stock_actuel_en_boutique} ✅${truncNote}`);
   }
-
   return !failed;
 }
 
-// Verify that introducing a LIMIT would actually break the invariant (sanity check on the test itself).
-async function verifyLimitBreaksInvariant(manufacturer, badLimit) {
-  const rowsFull    = await runQuery(manufacturer);
-  const rowsLimited = await runQuery(manufacturer, badLimit);
+// ---------------------------------------------------------------------------
+// toolGetStockByVariant
+// Invariant: when nb_lignes_total > nb_lignes_affichees (LIMIT 100),
+//            sum(articles[*].stock) < total_unites (window function).
+// If LIMIT were applied before the window, the window total would be wrong
+// and the two sums would match — that's the regression signal.
+// ---------------------------------------------------------------------------
+async function testStockByVariant(label, args, ctx) {
+  const result = await toolGetStockByVariant(args, ctx);
 
-  if (rowsFull.length === 0) return; // already caught above
+  if (!result.articles) throw new Error(`${label} — no articles in result`);
 
-  const totalRecu = Number(rowsFull[0].total_recu_all);
+  const displayedSum = sumField(result.articles, 'stock');
+  const windowTotal  = result.total_unites;
+  const truncated    = result.nb_lignes_total > result.nb_lignes_affichees;
+  let failed = false;
 
-  const sizeAgg = {};
-  for (const r of rowsLimited) {
-    const t = extractSize(r.description);
-    if (!sizeAgg[t]) sizeAgg[t] = { recu: 0 };
-    sizeAgg[t].recu += Number(r.received_supplier);
-  }
-  const sumLimited = Object.values(sizeAgg).reduce((s, v) => s + v.recu, 0);
-
-  if (sumLimited === totalRecu) {
-    console.warn(
-      `WARN [${manufacturer}] LIMIT ${badLimit} did NOT change the sum (${sumLimited}==${totalRecu}).` +
-      ` This brand may have ≤${badLimit} active variants — pick a brand with more variants.`
+  if (truncated && displayedSum >= windowTotal) {
+    console.error(
+      `FAIL ${label} — truncated (${result.nb_lignes_affichees}/${result.nb_lignes_total}) ` +
+      `but sum(displayed)=${displayedSum} >= window=${windowTotal} — window function missing?`
     );
-  } else {
-    console.log(
-      `INFO [${manufacturer}] Confirmed: LIMIT ${badLimit} produces sum=${sumLimited} vs correct=${totalRecu}` +
-      ` — old bug reproduced as expected.`
+    failed = true;
+  }
+  if (!failed) {
+    const note = truncated
+      ? `  (affiches=${result.nb_lignes_affichees}/${result.nb_lignes_total} — sum(displayed)=${displayedSum} < window=${windowTotal} ✓)`
+      : `  (${result.nb_lignes_total} lignes ≤ LIMIT, pas de troncation)`;
+    console.log(`PASS ${label}${note} ✅`);
+  }
+  return !failed;
+}
+
+// ---------------------------------------------------------------------------
+// toolGetSalesByVariant
+// Invariant: when nb_articles_total > nb_articles_affiches (LIMIT 100),
+//            sum(articles[*].qty_vendue) < total_unites_vendues.
+// Baseline: Brax — ~1261 descriptions, without fix reduce(100) ≈ 86% wrong.
+// ---------------------------------------------------------------------------
+async function testSalesByVariant(label, args, ctx, { minDescriptions = 1 } = {}) {
+  const result = await toolGetSalesByVariant(args, ctx);
+
+  if (!result.articles) throw new Error(`${label} — no articles in result`);
+  if (result.nb_articles_total < minDescriptions) {
+    throw new Error(`${label} — only ${result.nb_articles_total} descriptions, need ≥${minDescriptions}`);
+  }
+
+  const displayedSum = sumField(result.articles, 'qty_vendue');
+  const windowTotal  = result.total_unites_vendues;
+  const truncated    = result.nb_articles_total > result.nb_articles_affiches;
+  let failed = false;
+
+  if (truncated && displayedSum >= windowTotal) {
+    console.error(
+      `FAIL ${label} — truncated (${result.nb_articles_affiches}/${result.nb_articles_total}) ` +
+      `but sum(displayed)=${displayedSum} >= window=${windowTotal} — window function missing?`
+    );
+    failed = true;
+  }
+  if (!failed) {
+    const pct = truncated ? Math.round((windowTotal - displayedSum) / windowTotal * 100) : 0;
+    const note = truncated
+      ? `  (reduce=${displayedSum} vs window=${windowTotal}, ${pct}% wrong without fix)`
+      : `  (${result.nb_articles_total} descriptions ≤ LIMIT, pas de troncation)`;
+    console.log(`PASS ${label} — ${result.nb_articles_total} descriptions, window=${windowTotal} ✅${note}`);
+  }
+  return !failed;
+}
+
+// ---------------------------------------------------------------------------
+// toolGetSalesByCategory
+// Invariant: when nb_categories_total > nb_categories_affiches (LIMIT 60),
+//            sum(categories[*].unites) < total.unites.
+// Baseline: 150 categories, without fix reduce(60) ≈ 6% wrong.
+// ---------------------------------------------------------------------------
+async function testSalesByCategory(label, args, ctx, { minCategories = 1 } = {}) {
+  const result = await toolGetSalesByCategory(args, ctx);
+
+  if (result.erreur) throw new Error(`${label} — tool returned error: ${result.erreur}`);
+  if (!result.categories) throw new Error(`${label} — no categories in result`);
+  if (result.nb_categories_total < minCategories) {
+    throw new Error(`${label} — only ${result.nb_categories_total} categories, need ≥${minCategories}`);
+  }
+
+  const displayedSum = sumField(result.categories, 'unites');
+  const windowTotal  = result.total.unites;
+  const truncated    = result.nb_categories_total > result.nb_categories_affiches;
+  let failed = false;
+
+  if (truncated && displayedSum >= windowTotal) {
+    console.error(
+      `FAIL ${label} — truncated (${result.nb_categories_affiches}/${result.nb_categories_total}) ` +
+      `but sum(displayed)=${displayedSum} >= window=${windowTotal} — window function missing?`
+    );
+    failed = true;
+  }
+  if (!failed) {
+    const pct = truncated ? Math.round((windowTotal - displayedSum) / windowTotal * 100) : 0;
+    const note = truncated
+      ? `  (reduce=${displayedSum} vs window=${windowTotal}, ${pct}% wrong without fix)`
+      : `  (${result.nb_categories_total} catégories ≤ LIMIT, pas de troncation)`;
+    console.log(`PASS ${label} — ${result.nb_categories_total} catégories, window=${windowTotal} ✅${note}`);
+  }
+  return !failed;
+}
+
+// ---------------------------------------------------------------------------
+// toolGetSalesAnalysis — category branch
+// Invariant: when nb_marques_total > nb_marques_affiches (LIMIT 20),
+//            sum(marques[*].unites) < total.unites.
+// Baseline: Femme/Hauts/Chandail — 46 brands, without fix reduce(20) ≈ 10% wrong.
+// ---------------------------------------------------------------------------
+async function testSalesAnalysisCategory(label, args, ctx, { minBrands = 1 } = {}) {
+  const result = await toolGetSalesAnalysis(args, ctx);
+
+  if (result.erreur) throw new Error(`${label} — tool returned error: ${result.erreur}`);
+  if (!result.marques) {
+    throw new Error(
+      `${label} — no marques in result (wrong branch?), keys: ${JSON.stringify(Object.keys(result))}`
     );
   }
+  if (result.nb_marques_total < minBrands) {
+    throw new Error(`${label} — only ${result.nb_marques_total} brands, need ≥${minBrands}`);
+  }
+
+  const displayedSum = sumField(result.marques, 'unites');
+  const windowTotal  = result.total.unites;
+  const truncated    = result.nb_marques_total > result.nb_marques_affiches;
+  let failed = false;
+
+  if (truncated && displayedSum >= windowTotal) {
+    console.error(
+      `FAIL ${label} — truncated (${result.nb_marques_affiches}/${result.nb_marques_total}) ` +
+      `but sum(displayed)=${displayedSum} >= window=${windowTotal} — window function missing?`
+    );
+    failed = true;
+  }
+  if (!failed) {
+    const pct = truncated ? Math.round((windowTotal - displayedSum) / windowTotal * 100) : 0;
+    const note = truncated
+      ? `  (reduce=${displayedSum} vs window=${windowTotal}, ${pct}% wrong without fix)`
+      : `  (${result.nb_marques_total} marques ≤ LIMIT, pas de troncation)`;
+    console.log(`PASS ${label} — ${result.nb_marques_total} marques, window=${windowTotal} ✅${note}`);
+  }
+  return !failed;
 }
 
 // ---------------------------------------------------------------------------
-// Tests for toolGetSalesByVariant (LIMIT 100 + reduce bug, fixed 2026-07-27)
-// Invariant: window total_qty_all == true sum of ALL descriptions (not just top 100)
-// Baseline: Brax — 1261 descriptions, reduce(100 rows)=222 vs correct=1548 (86% wrong)
-// ---------------------------------------------------------------------------
-async function testSalesByVariant(manufacturer, displayLimit, minDescriptions) {
-  const today = new Date().toISOString().slice(0, 10);
-  const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-  const from = oneYearAgo.toISOString().slice(0, 10);
-
-  const { rows } = await pool.query(`
-    SELECT SUM(sl.qty) AS qty_vendue,
-      SUM(SUM(sl.qty)) OVER () AS total_qty_all,
-      COUNT(*)         OVER () AS nb_articles_total
-    FROM sale_lines sl
-    JOIN products p ON p.item_id = sl.item_id
-    WHERE p.manufacturer ILIKE $1
-      AND sl.completed_time BETWEEN $2 AND $3
-    GROUP BY p.description, p.manufacturer
-    ORDER BY qty_vendue DESC
-    LIMIT ${displayLimit}
-  `, [`%${manufacturer}%`, from, today]);
-
-  if (!rows.length) throw new Error(`[SalesByVariant ${manufacturer}] No rows`);
-
-  const nb_total     = Number(rows[0].nb_articles_total);
-  const window_total = Number(rows[0].total_qty_all);
-  const reduce_total = rows.reduce((s, r) => s + Number(r.qty_vendue), 0);
-
-  if (nb_total < minDescriptions) {
-    throw new Error(`[SalesByVariant ${manufacturer}] Only ${nb_total} descriptions — need ≥${minDescriptions}`);
-  }
-
-  const label = `[SalesByVariant ${manufacturer} LIMIT ${displayLimit}]`;
-  if (reduce_total === window_total) {
-    // Both match → either all rows fit within LIMIT, or there's a regression
-    if (nb_total <= displayLimit) {
-      console.log(`PASS ${label} ${nb_total} descriptions ≤ LIMIT — window=${window_total} ✅`);
-    } else {
-      console.error(`FAIL ${label} reduce=${reduce_total} == window=${window_total} but nb_total=${nb_total} > LIMIT`
-        + ` — window function may not be applied.`);
-      return false;
-    }
-  } else {
-    // reduce undercount confirms the bug would exist without the window fix
-    console.log(`PASS ${label} ${nb_total} descriptions — window=${window_total} ✅`
-      + `  (reduce on ${displayLimit} rows would give ${reduce_total}, ${Math.round((window_total-reduce_total)/window_total*100)}% wrong)`);
-  }
-  return true;
-}
-
-// ---------------------------------------------------------------------------
-// Tests for toolGetSalesByCategory (LIMIT 60 + reduce bug, fixed 2026-07-27)
-// Invariant: window total_unites_all == true sum across ALL categories (not just top 60)
-// Baseline: 150 categories, reduce(60 rows)=29444 vs correct=31490 (6% wrong)
-// ---------------------------------------------------------------------------
-async function testSalesByCategory(displayLimit, minCategories) {
-  const today = new Date().toISOString().slice(0, 10);
-  const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-  const from = oneYearAgo.toISOString().slice(0, 10);
-
-  const { rows } = await pool.query(`
-    SELECT SUM(sl.qty)::int AS unites,
-      SUM(SUM(sl.qty)) OVER () AS total_unites_all,
-      COUNT(*)         OVER () AS nb_categories_total
-    FROM sale_lines sl
-    JOIN products p ON p.item_id = sl.item_id
-    WHERE sl.completed_time BETWEEN $1 AND $2
-      AND p.category IS NOT NULL AND p.category != ''
-    GROUP BY p.category
-    ORDER BY unites DESC
-    LIMIT ${displayLimit}
-  `, [from, today]);
-
-  if (!rows.length) throw new Error(`[SalesByCategory] No rows`);
-
-  const nb_total     = Number(rows[0].nb_categories_total);
-  const window_total = Number(rows[0].total_unites_all);
-  const reduce_total = rows.reduce((s, r) => s + Number(r.unites), 0);
-
-  if (nb_total < minCategories) {
-    throw new Error(`[SalesByCategory] Only ${nb_total} categories — need ≥${minCategories}`);
-  }
-
-  const label = `[SalesByCategory LIMIT ${displayLimit}]`;
-  if (reduce_total === window_total && nb_total > displayLimit) {
-    console.error(`FAIL ${label} reduce=${reduce_total} == window=${window_total} but ${nb_total} categories > LIMIT`);
-    return false;
-  }
-  console.log(`PASS ${label} ${nb_total} catégories — window=${window_total} ✅`
-    + (nb_total > displayLimit ? `  (reduce on ${displayLimit} rows would give ${reduce_total}, ${Math.round((window_total-reduce_total)/window_total*100)}% wrong)` : ''));
-  return true;
-}
-
-// ---------------------------------------------------------------------------
-// Tests for toolGetSalesAnalysis category branch (LIMIT 20 + reduce, fixed 2026-07-27)
-// Invariant: window total_unites_all == true sum across ALL brands in the category
-// Baseline: Femme/Hauts/Chandail — 46 brands, reduce(20)=2888 vs correct=3196 (10% wrong)
-// ---------------------------------------------------------------------------
-async function testSalesAnalysisByCategory(category, displayLimit, minBrands) {
-  const today = new Date().toISOString().slice(0, 10);
-  const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-  const from = oneYearAgo.toISOString().slice(0, 10);
-
-  const { rows } = await pool.query(`
-    SELECT SUM(sl.qty) AS unites,
-      SUM(SUM(sl.qty)) OVER () AS total_unites_all,
-      COUNT(*)         OVER () AS nb_marques_total
-    FROM sale_lines sl
-    JOIN products p ON p.item_id = sl.item_id
-    JOIN shops sh ON sh.shop_id = sl.shop_id
-    WHERE sl.completed_time BETWEEN $1 AND $2
-      AND p.category ILIKE $3
-      AND p.manufacturer IS NOT NULL
-    GROUP BY p.manufacturer
-    ORDER BY unites DESC
-    LIMIT ${displayLimit}
-  `, [from, today, `%${category}%`]);
-
-  if (!rows.length) throw new Error(`[SalesAnalysis cat "${category}"] No rows`);
-
-  const nb_total     = Number(rows[0].nb_marques_total);
-  const window_total = Number(rows[0].total_unites_all);
-  const reduce_total = rows.reduce((s, r) => s + Number(r.unites), 0);
-
-  if (nb_total < minBrands) {
-    throw new Error(`[SalesAnalysis cat "${category}"] Only ${nb_total} brands — need ≥${minBrands}`);
-  }
-
-  const label = `[SalesAnalysis cat "${category}" LIMIT ${displayLimit}]`;
-  if (reduce_total === window_total && nb_total > displayLimit) {
-    console.error(`FAIL ${label} reduce=${reduce_total} == window=${window_total} but ${nb_total} brands > LIMIT`);
-    return false;
-  }
-  console.log(`PASS ${label} ${nb_total} marques — window=${window_total} ✅`
-    + (nb_total > displayLimit ? `  (reduce on ${displayLimit} rows would give ${reduce_total}, ${Math.round((window_total-reduce_total)/window_total*100)}% wrong)` : ''));
-  return true;
-}
 
 async function main() {
+  const ctx = await buildCtx();
   let anyFailed = false;
 
-  // --- Scoped test: exact original bug context (conv 168-169, 2026-07-27) ---
-  // Patrick Assaraf p26 @ Valérie Simon — 62 variants, old LIMIT 50 gave stock=27 instead of 34.
-  const paScoped = await testBrandScoped('Patrick Assaraf', {
-    shopId: '1', shopName: 'Valérie Simon',
-    tagPattern: 'p26',
-    from: '2025-10-01', to: '2026-07-27',
-    badLimit: 50,
-  });
-  if (!paScoped) anyFailed = true;
+  // --- toolGetSellthroughBySize ---
+  // Scoped: exact original bug context — Patrick Assaraf p26 @ boutique 1
+  // (62 variants, old LIMIT 50 gave stock=27 instead of 34)
+  const r1 = await testSellthroughBySize(
+    '[SellthroughBySize] Patrick Assaraf p26 @ boutique 1',
+    { manufacturer: 'Patrick Assaraf', season: 'p26', shop_id: '1' },
+    ctx, { minVariants: 30 }
+  );
+  if (!r1) anyFailed = true;
 
-  // --- Broad tests: no shop/season filter, verifies invariant at scale ---
+  // Broad: all boutiques, no season filter
+  const r2 = await testSellthroughBySize(
+    '[SellthroughBySize] Patrick Assaraf (toutes boutiques)',
+    { manufacturer: 'Patrick Assaraf' },
+    ctx, { minVariants: 50 }
+  );
+  if (!r2) anyFailed = true;
 
-  // Patrick Assaraf: alpha sizes (XS–XXL). Original bug brand, all boutiques, 1 year.
-  const pa = await testBrand('Patrick Assaraf', 50);
-  if (!pa) anyFailed = true;
+  const r3 = await testSellthroughBySize(
+    '[SellthroughBySize] Eton (toutes boutiques)',
+    { manufacturer: 'Eton' },
+    ctx, { minVariants: 100 }
+  );
+  if (!r3) anyFailed = true;
 
-  // Eton: 3000+ variants, decimal collar sizes (14.5, 15, 15.5…). Tests numeric regex.
-  const eton = await testBrand('Eton', 100);
-  if (!eton) anyFailed = true;
+  const r4 = await testSellthroughBySize(
+    '[SellthroughBySize] Brax (toutes boutiques)',
+    { manufacturer: 'Brax' },
+    ctx, { minVariants: 100 }
+  );
+  if (!r4) anyFailed = true;
 
-  // Brax: 3000+ variants, waist/length sizes. Tests multi-part numeric descriptions.
-  const brax = await testBrand('Brax', 100);
-  if (!brax) anyFailed = true;
-
-  // Confirm the old bug (LIMIT 50) would break the invariant for Patrick Assaraf
+  // --- toolGetStockByVariant ---
+  // Brax: many stock lines across shops, LIMIT 100
   console.log('');
-  await verifyLimitBreaksInvariant('Patrick Assaraf', 50);
+  const r5 = await testStockByVariant(
+    '[StockByVariant] Brax (toutes boutiques)',
+    { manufacturer: 'Brax' },
+    ctx
+  );
+  if (!r5) anyFailed = true;
 
-  // --- toolGetSalesByVariant (LIMIT 100 bug, fixed 2026-07-27) ---
-  // Brax: 1261 descriptions, reduce(100)=222 vs window=1548 (86% wrong without fix)
-  console.log('');
-  const sbv = await testSalesByVariant('Brax', 100, 200);
-  if (!sbv) anyFailed = true;
+  // --- toolGetSalesByVariant ---
+  // Brax: ~1261 descriptions, LIMIT 100 — without fix, reduce gives ~86% wrong
+  const r6 = await testSalesByVariant(
+    '[SalesByVariant] Brax (toutes boutiques)',
+    { manufacturer: 'Brax' },
+    ctx, { minDescriptions: 200 }
+  );
+  if (!r6) anyFailed = true;
 
-  // --- toolGetSalesByCategory (LIMIT 60 bug, fixed 2026-07-27) ---
-  // 150 categories, reduce(60)=29444 vs window=31490 (6% wrong without fix)
-  const sbc = await testSalesByCategory(60, 100);
-  if (!sbc) anyFailed = true;
+  // --- toolGetSalesByCategory ---
+  // All categories over 1 year, LIMIT 60 — without fix, reduce gives ~6% wrong
+  const r7 = await testSalesByCategory(
+    '[SalesByCategory] 1 an (toutes boutiques)',
+    { period: '1y' },
+    ctx, { minCategories: 100 }
+  );
+  if (!r7) anyFailed = true;
 
-  // --- toolGetSalesAnalysis category branch (LIMIT 20 bug, fixed 2026-07-27) ---
-  // Femme/Hauts/Chandail: 46 brands, reduce(20)=2888 vs window=3196 (10% wrong without fix)
-  const sac = await testSalesAnalysisByCategory('Femme/Hauts/Chandail', 20, 30);
-  if (!sac) anyFailed = true;
+  // --- toolGetSalesAnalysis — category branch ---
+  // Femme/Hauts/Chandail over 1 year, LIMIT 20 — without fix, reduce gives ~10% wrong
+  const r8 = await testSalesAnalysisCategory(
+    '[SalesAnalysis] Femme/Hauts/Chandail (toutes boutiques, 1 an)',
+    { category: 'Femme/Hauts/Chandail', period: '1y' },
+    ctx, { minBrands: 30 }
+  );
+  if (!r8) anyFailed = true;
 
   await pool.end();
 
   if (anyFailed) {
-    console.error('\n❌  INVARIANT VIOLATED — par_taille totals do not match window function totals.');
+    console.error('\n❌  INVARIANT VIOLATED — totaux incorrects.');
     process.exit(1);
   } else {
     console.log('\n✅  All invariants pass.');

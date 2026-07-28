@@ -1660,4 +1660,12 @@ Résolution du langage naturel :
   onEvent({ type: 'done', content: "Désolé, j'ai atteint la limite de traitement. Veuillez reformuler.", messages: fullMessages.slice(1) });
 }
 
-module.exports = { runAgentLoop, runAgentLoopStream };
+module.exports = {
+  runAgentLoop,
+  runAgentLoopStream,
+  toolGetSellthroughBySize,
+  toolGetStockByVariant,
+  toolGetSalesByVariant,
+  toolGetSalesByCategory,
+  toolGetSalesAnalysis,
+};
