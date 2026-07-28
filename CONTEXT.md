@@ -1,5 +1,39 @@
 # CONTEXT — Diagnostic et historique technique
 
+## Règle absolue : jamais de credential en fallback (depuis juillet 2026)
+
+**Pattern interdit** — a causé la fuite du credential PostgreSQL le 23 juillet 2026
+(commit `790ac83`, détecté par GitGuardian le 28 juillet) :
+
+```js
+// ❌ INTERDIT — le fallback se retrouve dans git si le fichier est commité
+const DB_URL = process.env.DATABASE_URL || 'postgresql://user:MOT_DE_PASSE@host/db';
+```
+
+**Pattern obligatoire** — fail explicite si la variable est absente :
+
+```js
+// ✅ OBLIGATOIRE
+const DB_URL = process.env.DATABASE_URL;
+if (!DB_URL) {
+  console.error('ERROR: DATABASE_URL environment variable is required.');
+  process.exit(1);
+}
+```
+
+S'applique à **toute** variable sensible : `DATABASE_URL`, `JWT_SECRET`, `MISTRAL_API_KEY`,
+tokens Lightspeed, clés Railway, etc. — dans tous les fichiers sans exception
+(`server.js`, `sync.js`, scripts, tests).
+
+**Historique** : le secret a été présent dans le repo public du 23 au 28 juillet 2026.
+L'historique git a été purgé via `git filter-repo` + force-push le 28 juillet 2026.
+Le mot de passe PostgreSQL a été roté côté Railway avant la purge.
+
+**Test de non-régression** : avant tout déploiement touchant `ai-agent.js` :
+```bash
+railway run npm test  # doit passer sans erreur
+```
+
 ## Discordance compare_seasons vs Lightspeed (résolu — juillet 2026)
 
 ### Symptôme
