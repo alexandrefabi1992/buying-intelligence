@@ -39,7 +39,7 @@
 
   <!-- ── Header ──────────────────────────────────────────────────────────── -->
   <header class="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
-    <button onclick="location.href='/'"
+    <button id="btn-back" onclick="location.href='/'"
             class="text-blue-600 text-sm hover:underline flex-shrink-0">← Retour</button>
     <div class="w-px h-5 bg-gray-200 flex-shrink-0"></div>
     <h1 id="brandName" class="text-base font-semibold text-gray-900 truncate">…</h1>
@@ -47,19 +47,21 @@
          class="px-3 py-1 rounded-full text-white text-xs font-bold tracking-wide flex-shrink-0 hidden"></div>
     <p id="recoLabel" class="text-xs text-gray-400 hidden"></p>
     <div class="ml-auto flex items-center gap-3 flex-shrink-0">
-      <label class="text-xs text-gray-500">Saison</label>
+      <label id="lbl-saison" class="text-xs text-gray-500">Saison</label>
       <select id="seasonFilter" class="border border-gray-300 rounded px-2 py-1 text-sm text-gray-700">
-        <option value="">Toutes les saisons</option>
-        <option value="p26">P26 — Printemps 2026</option>
-        <option value="a25">A25 — Automne 2025</option>
-        <option value="p25">P25 — Printemps 2025</option>
-        <option value="a24">A24 — Automne 2024</option>
-        <option value="p24">P24 — Printemps 2024</option>
+        <option value="" data-i18n="opt_all_seasons">Toutes les saisons</option>
+        <option value="p27" data-i18n="season_p27">P27 — Printemps 2027</option>
+        <option value="a26" data-i18n="season_a26">A26 — Automne 2026</option>
+        <option value="p26" data-i18n="season_p26">P26 — Printemps 2026</option>
+        <option value="a25" data-i18n="season_a25">A25 — Automne 2025</option>
+        <option value="p25" data-i18n="season_p25">P25 — Printemps 2025</option>
+        <option value="a24" data-i18n="season_a24">A24 — Automne 2024</option>
+        <option value="p24" data-i18n="season_p24">P24 — Printemps 2024</option>
       </select>
       <div class="w-px h-5 bg-gray-200"></div>
-      <label class="text-xs text-gray-500">Boutique</label>
+      <label id="lbl-boutique" class="text-xs text-gray-500">Boutique</label>
       <select id="shopFilter" class="border border-gray-300 rounded px-2 py-1 text-sm text-gray-700">
-        <option value="">Toutes les boutiques</option>
+        <option value="" data-i18n="opt_all_stores">Toutes les boutiques</option>
       </select>
     </div>
   </header>
@@ -74,35 +76,30 @@
 
     <!-- KPI row -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
-           data-tip="Vendus (tag) ÷ (vendus + stock taggé) × 100&#10;Numérateur et dénominateur filtrés par tag saison&#10;+Période : numérateur restreint à la fenêtre de dates">
-        <p class="text-xs text-gray-400 mb-1">Sell-through <span id="kpiSTSeason" class="font-semibold text-gray-600"></span></p>
+      <div id="kpiCardST" class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-400 mb-1"><span id="kpiSTLabel">Sell-through</span> <span id="kpiSTSeason" class="font-semibold text-gray-600"></span></p>
         <p id="kpiST" class="text-2xl font-bold text-gray-900">—</p>
         <p id="kpiSTRecon" class="text-xs text-amber-600 mt-0.5 hidden font-medium"></p>
         <p id="kpiSTSub" class="text-xs text-gray-400 mt-0.5">vendus depuis début de saison</p>
       </div>
-      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
-           data-tip="Moyenne d'unités vendues par semaine&#10;Calculée sur les 12 dernières semaines">
-        <p class="text-xs text-gray-400 mb-1">Vélocité / sem</p>
+      <div id="kpiCardVelo" class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
+        <p id="kpiVeloLabel" class="text-xs text-gray-400 mb-1">Vélocité / sem</p>
         <p id="kpiVelo" class="text-2xl font-bold text-gray-900">—</p>
-        <p class="text-xs text-gray-400 mt-0.5">moyenne 12 semaines</p>
+        <p id="kpiVeloSub" class="text-xs text-gray-400 mt-0.5">moyenne 12 semaines</p>
       </div>
-      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
-           data-tip="Moyenne de (prix vente − coût) ÷ prix vente&#10;Sur tous les articles actifs de la marque">
-        <p class="text-xs text-gray-400 mb-1">Marge réelle</p>
+      <div id="kpiCardMargin" class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
+        <p id="kpiMarginLabel" class="text-xs text-gray-400 mb-1">Marge réelle</p>
         <p id="kpiMargin" class="text-2xl font-bold text-gray-900">—</p>
-        <p class="text-xs text-gray-400 mt-0.5">moy. sur articles actifs</p>
+        <p id="kpiMarginSub" class="text-xs text-gray-400 mt-0.5">moy. sur articles actifs</p>
       </div>
-      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
-           data-tip="qty_on_hand + qty_on_order&#10;Toutes boutiques (ou boutique sélectionnée)">
-        <p class="text-xs text-gray-400 mb-1">Stock en main</p>
+      <div id="kpiCardStock" class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
+        <p id="kpiStockLabel" class="text-xs text-gray-400 mb-1">Stock en main</p>
         <p id="kpiStock" class="text-2xl font-bold text-gray-900">—</p>
         <p id="kpiStockSub" class="text-xs text-gray-400 mt-0.5">qté dispo + en commande</p>
       </div>
-      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
-           data-tip="Tag : articles taggés saison (toutes dates)&#10;Tag+Période : articles taggés ET vendus pendant la saison">
+      <div id="kpiCardSales" class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
         <div class="flex items-start justify-between gap-1 mb-1">
-          <p class="text-xs text-gray-400 leading-tight">Ventes <span id="kpiGlobalSeasonLabel" class="font-semibold text-gray-600"></span></p>
+          <p class="text-xs text-gray-400 leading-tight"><span id="kpiSalesLabel">Ventes</span> <span id="kpiGlobalSeasonLabel" class="font-semibold text-gray-600"></span></p>
           <div id="salesModeToggle" class="hidden flex-shrink-0 flex text-[10px] border border-gray-200 rounded overflow-hidden">
             <button id="btnModeTag" onclick="setMode('tag')"
                     class="px-1.5 py-0.5 bg-blue-600 text-white font-medium">Tag</button>
@@ -113,9 +110,8 @@
         <p id="kpiGlobalRevenue" class="text-2xl font-bold text-gray-900">—</p>
         <p id="kpiGlobalUnits" class="text-xs text-gray-400 mt-0.5">— unités</p>
       </div>
-      <div class="kpi-card bg-white rounded-xl border border-gray-200 p-4"
-           data-tip="Somme de (qté vendue × prix unitaire)&#10;12 dernières semaines, articles taggés par saison">
-        <p class="text-xs text-gray-400 mb-1">Revenu <span id="kpiRevLabel" class="font-semibold text-gray-600"></span></p>
+      <div id="kpiCardRev" class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-400 mb-1"><span id="kpiRevStaticLabel">Revenu</span> <span id="kpiRevLabel" class="font-semibold text-gray-600"></span></p>
         <p id="kpiRevenue" class="text-2xl font-bold text-gray-900">—</p>
         <p id="kpiItems" class="text-xs text-gray-400 mt-0.5">—</p>
       </div>
@@ -123,7 +119,7 @@
 
     <!-- Weekly chart -->
     <div class="bg-white rounded-xl border border-gray-200 p-5">
-      <h2 class="text-sm font-semibold text-gray-700 mb-4">Évolution des ventes — 12 semaines</h2>
+      <h2 id="chartTitle" class="text-sm font-semibold text-gray-700 mb-4">Évolution des ventes — 12 semaines</h2>
       <div class="relative" style="height:200px">
         <canvas id="salesChart"></canvas>
       </div>
@@ -131,7 +127,7 @@
 
     <!-- Top sizes + colors -->
     <div id="attrCard" class="bg-white rounded-xl border border-gray-200 p-5">
-      <h2 class="text-sm font-semibold text-gray-700 mb-4">Meilleures tailles &amp; couleurs — 12 semaines</h2>
+      <h2 id="attrTitle" class="text-sm font-semibold text-gray-700 mb-4">Meilleures tailles &amp; couleurs — 12 semaines</h2>
       <div id="attrContent" class="grid grid-cols-2 gap-8">
         <div class="flex justify-center py-2 col-span-2"><div class="spinner"></div></div>
       </div>
@@ -142,22 +138,22 @@
 
       <!-- Top 10 items -->
       <div class="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 class="text-sm font-semibold text-gray-700 mb-3">Top 10 articles (12 sem.)</h2>
+        <h2 id="topItemsTitle" class="text-sm font-semibold text-gray-700 mb-3">Top 10 articles (12 sem.)</h2>
         <div id="topItems"></div>
       </div>
 
       <!-- By category -->
       <div class="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 class="text-sm font-semibold text-gray-700 mb-3">Répartition par catégorie</h2>
+        <h2 id="byCatTitle" class="text-sm font-semibold text-gray-700 mb-3">Répartition par catégorie</h2>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="text-xs text-gray-400 border-b border-gray-100">
-                <th class="text-left pb-2 font-medium">Catégorie</th>
-                <th class="text-right pb-2 font-medium">Art. actifs</th>
-                <th class="text-right pb-2 font-medium">Vendus</th>
-                <th class="text-right pb-2 font-medium">Stock</th>
-                <th class="text-right pb-2 font-medium">Revenu</th>
+                <th id="thCat"    class="text-left pb-2 font-medium">Catégorie</th>
+                <th id="thActive" class="text-right pb-2 font-medium">Art. actifs</th>
+                <th id="thSold"   class="text-right pb-2 font-medium">Vendus</th>
+                <th id="thStock"  class="text-right pb-2 font-medium">Stock</th>
+                <th id="thRev"    class="text-right pb-2 font-medium">Revenu</th>
               </tr>
             </thead>
             <tbody id="catBody" class="divide-y divide-gray-50"></tbody>
@@ -169,18 +165,194 @@
   </main>
 
   <script>
+  // ── i18n ──────────────────────────────────────────────────────────────────
+  const _lang = (() => { try { return localStorage.getItem('buying_lang') || 'fr'; } catch { return 'fr'; } })();
+  const locale = _lang === 'en' ? 'en-CA' : 'fr-CA';
+
+  const TRANSLATIONS = {
+    fr: {
+      back: '← Retour',
+      lbl_saison: 'Saison',
+      lbl_boutique: 'Boutique',
+      opt_all_seasons: 'Toutes les saisons',
+      opt_all_stores: 'Toutes les boutiques',
+      season_p27: 'P27 — Printemps 2027', season_a26: 'A26 — Automne 2026',
+      season_p26: 'P26 — Printemps 2026', season_a25: 'A25 — Automne 2025',
+      season_p25: 'P25 — Printemps 2025', season_a24: 'A24 — Automne 2024',
+      season_p24: 'P24 — Printemps 2024',
+      kpi_st_lbl: 'Sell-through',
+      kpi_st_sub: 'vendus depuis début de saison',
+      kpi_velo_lbl: 'Vélocité / sem',
+      kpi_velo_sub: 'moyenne 12 semaines',
+      kpi_margin_lbl: 'Marge réelle',
+      kpi_margin_sub: 'moy. sur articles actifs',
+      kpi_stock_lbl: 'Stock en main',
+      kpi_stock_sub: 'qté dispo + en commande',
+      kpi_sales_lbl: 'Ventes',
+      kpi_rev_lbl: 'Revenu',
+      btn_mode_tag: 'Tag',
+      btn_mode_period: '+Période',
+      tip_st: "Vendus (tag) ÷ (vendus + stock taggé) × 100\nNumérateur et dénominateur filtrés par tag saison\n+Période : numérateur restreint à la fenêtre de dates",
+      tip_velo: "Moyenne d'unités vendues par semaine\nCalculée sur les 12 dernières semaines",
+      tip_margin: "Moyenne de (prix vente − coût) ÷ prix vente\nSur tous les articles actifs de la marque",
+      tip_stock: "qty_on_hand + qty_on_order\nToutes boutiques (ou boutique sélectionnée)",
+      tip_sales: "Tag : articles taggés saison (toutes dates)\nTag+Période : articles taggés ET vendus pendant la saison",
+      tip_rev: "Somme de (qté vendue × prix unitaire)\n12 dernières semaines, articles taggés par saison",
+      chart_title: 'Évolution des ventes — 12 semaines',
+      attr_title: 'Meilleures tailles & couleurs — 12 semaines',
+      top_items_title: 'Top 10 articles (12 sem.)',
+      by_cat_title: 'Répartition par catégorie',
+      th_cat: 'Catégorie', th_active: 'Art. actifs', th_sold: 'Vendus', th_stock: 'Stock', th_rev: 'Revenu',
+      reco_tip_buy: 'Forte rotation — accélérer les commandes',
+      reco_tip_hold: 'Bon équilibre — maintenir le niveau actuel',
+      reco_tip_reduce: 'Rotation lente — réduire les commandes',
+      reco_tip_stop: 'Stock dormant — envisager liquidation',
+      units_sfx: ' unités',
+      before_transfers: 'Avant transferts : ',
+      stock_detail: (stk, rec, tin, tout) => `Stock actuel ${stk} u. · reconstitué ${rec} u. (reçu ${tin}, envoyé ${tout})`,
+      all_history: "Tout l'historique",
+      tagged_all: code => `Articles taggés ${code}, toutes dates`,
+      tagged_since: (code, date) => `Articles taggés ${code} · depuis le ${date}`,
+      chart_this_year: 'Cette année',
+      chart_last_year: 'Année passée',
+      tooltip_unit: ' u.',
+      no_items_sold: 'Aucun article vendu ces 12 dernières semaines.',
+      no_data: 'Aucune donnée',
+      attr_sizes: 'Tailles',
+      attr_colors: 'Couleurs',
+      data_unavailable: 'Données indisponibles.',
+      perf_unavailable: 'Données de performance indisponibles.',
+      kpi_items: (total, active) => `${total} articles · ${active} actifs`,
+      kpi_stock_tagged: (code, total) => `taggé ${code} · total ${total} u.`,
+      kpi_rev_12w: code => `12 sem. ${code}`,
+      kpi_rev_12w_plain: '12 sem.',
+    },
+    en: {
+      back: '← Back',
+      lbl_saison: 'Season',
+      lbl_boutique: 'Store',
+      opt_all_seasons: 'All seasons',
+      opt_all_stores: 'All stores',
+      season_p27: 'P27 — Spring 2027', season_a26: 'A26 — Fall 2026',
+      season_p26: 'P26 — Spring 2026', season_a25: 'A25 — Fall 2025',
+      season_p25: 'P25 — Spring 2025', season_a24: 'A24 — Fall 2024',
+      season_p24: 'P24 — Spring 2024',
+      kpi_st_lbl: 'Sell-through',
+      kpi_st_sub: 'sold since season start',
+      kpi_velo_lbl: 'Velocity / wk',
+      kpi_velo_sub: '12-week average',
+      kpi_margin_lbl: 'Actual margin',
+      kpi_margin_sub: 'avg. on active items',
+      kpi_stock_lbl: 'On-hand stock',
+      kpi_stock_sub: 'qty on hand + on order',
+      kpi_sales_lbl: 'Sales',
+      kpi_rev_lbl: 'Revenue',
+      btn_mode_tag: 'Tag',
+      btn_mode_period: '+Period',
+      tip_st: "Sold (tag) ÷ (sold + tagged stock) × 100\nNumerator and denominator filtered by season tag\n+Period: numerator restricted to the date window",
+      tip_velo: "Average units sold per week\nCalculated over the last 12 weeks",
+      tip_margin: "Average (selling price − cost) ÷ selling price\nAcross all active items for the brand",
+      tip_stock: "qty_on_hand + qty_on_order\nAll stores (or selected store)",
+      tip_sales: "Tag: items tagged with season (all dates)\nTag+Period: items tagged AND sold during the season",
+      tip_rev: "Sum of (qty sold × unit price)\nLast 12 weeks, items tagged by season",
+      chart_title: 'Sales trend — 12 weeks',
+      attr_title: 'Top sizes & colors — 12 weeks',
+      top_items_title: 'Top 10 items (12 wks.)',
+      by_cat_title: 'By category',
+      th_cat: 'Category', th_active: 'Active items', th_sold: 'Sold', th_stock: 'Stock', th_rev: 'Revenue',
+      reco_tip_buy: 'High turnover — speed up orders',
+      reco_tip_hold: 'Good balance — maintain current level',
+      reco_tip_reduce: 'Slow turnover — reduce orders',
+      reco_tip_stop: 'Dormant stock — consider liquidation',
+      units_sfx: ' units',
+      before_transfers: 'Before transfers: ',
+      stock_detail: (stk, rec, tin, tout) => `Current stock ${stk} u. · reconstituted ${rec} u. (received ${tin}, sent ${tout})`,
+      all_history: 'All history',
+      tagged_all: code => `Items tagged ${code}, all dates`,
+      tagged_since: (code, date) => `Items tagged ${code} · since ${date}`,
+      chart_this_year: 'This year',
+      chart_last_year: 'Last year',
+      tooltip_unit: ' u.',
+      no_items_sold: 'No items sold in the last 12 weeks.',
+      no_data: 'No data',
+      attr_sizes: 'Sizes',
+      attr_colors: 'Colors',
+      data_unavailable: 'Data unavailable.',
+      perf_unavailable: 'Performance data unavailable.',
+      kpi_items: (total, active) => `${total} items · ${active} active`,
+      kpi_stock_tagged: (code, total) => `tagged ${code} · total ${total} u.`,
+      kpi_rev_12w: code => `12 wks. ${code}`,
+      kpi_rev_12w_plain: '12 wks.',
+    },
+  };
+
+  function t(key) {
+    return TRANSLATIONS[_lang]?.[key] ?? TRANSLATIONS['fr']?.[key] ?? key;
+  }
+
+  // Apply i18n to static DOM elements
+  function applyI18n() {
+    document.getElementById('btn-back').textContent   = t('back');
+    document.getElementById('lbl-saison').textContent = t('lbl_saison');
+    document.getElementById('lbl-boutique').textContent = t('lbl_boutique');
+
+    // Season filter options
+    document.querySelectorAll('#seasonFilter option[data-i18n]').forEach(opt => {
+      opt.textContent = t(opt.dataset.i18n);
+    });
+    // Shop filter first option
+    const shopAll = document.querySelector('#shopFilter option[data-i18n]');
+    if (shopAll) shopAll.textContent = t('opt_all_stores');
+
+    // KPI labels
+    document.getElementById('kpiSTLabel').textContent    = t('kpi_st_lbl');
+    document.getElementById('kpiSTSub').textContent      = t('kpi_st_sub');
+    document.getElementById('kpiVeloLabel').textContent  = t('kpi_velo_lbl');
+    document.getElementById('kpiVeloSub').textContent    = t('kpi_velo_sub');
+    document.getElementById('kpiMarginLabel').textContent = t('kpi_margin_lbl');
+    document.getElementById('kpiMarginSub').textContent  = t('kpi_margin_sub');
+    document.getElementById('kpiStockLabel').textContent = t('kpi_stock_lbl');
+    document.getElementById('kpiSalesLabel').textContent = t('kpi_sales_lbl');
+    document.getElementById('kpiRevStaticLabel').textContent = t('kpi_rev_lbl');
+
+    // KPI tooltips
+    document.getElementById('kpiCardST').dataset.tip    = t('tip_st');
+    document.getElementById('kpiCardVelo').dataset.tip  = t('tip_velo');
+    document.getElementById('kpiCardMargin').dataset.tip = t('tip_margin');
+    document.getElementById('kpiCardStock').dataset.tip = t('tip_stock');
+    document.getElementById('kpiCardSales').dataset.tip = t('tip_sales');
+    document.getElementById('kpiCardRev').dataset.tip   = t('tip_rev');
+
+    // Mode toggle buttons
+    document.getElementById('btnModeTag').textContent    = t('btn_mode_tag');
+    document.getElementById('btnModePeriod').textContent = t('btn_mode_period');
+
+    // Section titles
+    document.getElementById('chartTitle').textContent    = t('chart_title');
+    document.getElementById('attrTitle').textContent     = t('attr_title');
+    document.getElementById('topItemsTitle').textContent = t('top_items_title');
+    document.getElementById('byCatTitle').textContent    = t('by_cat_title');
+
+    // Table headers
+    document.getElementById('thCat').textContent    = t('th_cat');
+    document.getElementById('thActive').textContent = t('th_active');
+    document.getElementById('thSold').textContent   = t('th_sold');
+    document.getElementById('thStock').textContent  = t('th_stock');
+    document.getElementById('thRev').textContent    = t('th_rev');
+  }
+
   // ── Utilities ─────────────────────────────────────────────────────────────
   const mfr = decodeURIComponent(location.pathname.replace(/^\/brand\//, ''));
   document.title = mfr + ' — Buying Intelligence';
 
   const fmt  = n => (n == null || isNaN(n)) ? '—'
-    : Number(n).toLocaleString('fr-CA', { maximumFractionDigits: 0 });
+    : Number(n).toLocaleString(locale, { maximumFractionDigits: 0 });
   const fmtC = n => (n == null || isNaN(n)) ? '—'
-    : Number(n).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 });
-  const fmtP = n => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(1) + ' %';
+    : Number(n).toLocaleString(locale, { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 });
+  const fmtP = n => (n == null || isNaN(n)) ? '—' : Number(n).toFixed(1) + ' %';
 
   function fmtWeek(iso) {
-    return new Date(iso).toLocaleDateString('fr-CA', { month: 'short', day: 'numeric' });
+    return new Date(iso).toLocaleDateString(locale, { month: 'short', day: 'numeric' });
   }
 
   function initials(str) {
@@ -190,10 +362,10 @@
 
   // ── Recommendation config ─────────────────────────────────────────────────
   const RECO = {
-    'ACHETER+':  { bg: '#16a34a', kpiColor: 'text-green-600',  tip: 'Forte rotation — accélérer les commandes' },
-    'MAINTENIR': { bg: '#2563eb', kpiColor: 'text-blue-600',   tip: 'Bon équilibre — maintenir le niveau actuel' },
-    'RÉDUIRE':   { bg: '#d97706', kpiColor: 'text-amber-600',  tip: 'Rotation lente — réduire les commandes' },
-    'ARRÊTER':   { bg: '#dc2626', kpiColor: 'text-red-600',    tip: 'Stock dormant — envisager liquidation' },
+    'ACHETER+':  { bg: '#16a34a', kpiColor: 'text-green-600',  tipKey: 'reco_tip_buy'    },
+    'MAINTENIR': { bg: '#2563eb', kpiColor: 'text-blue-600',   tipKey: 'reco_tip_hold'   },
+    'RÉDUIRE':   { bg: '#d97706', kpiColor: 'text-amber-600',  tipKey: 'reco_tip_reduce' },
+    'ARRÊTER':   { bg: '#dc2626', kpiColor: 'text-red-600',    tipKey: 'reco_tip_stop'   },
   };
 
   // ── Chart instance ────────────────────────────────────────────────────────
@@ -202,7 +374,7 @@
   // ── Sales mode toggle (tag | period) ─────────────────────────────────────
   let currentMode = 'tag';
   let lastData = null;
-  let loadSeq = 0; // monotonic counter to drop stale responses
+  let loadSeq = 0;
 
   function setMode(mode) {
     currentMode = mode;
@@ -221,13 +393,11 @@
     const isTag = currentMode === 'tag';
     const r    = RECO[p.recommendation] ?? RECO['MAINTENIR'];
 
-    // Ventes saison card
     document.getElementById('kpiGlobalRevenue').textContent =
       fmtC(isTag ? p.revenue_tag : p.revenue_tag_period);
     document.getElementById('kpiGlobalUnits').textContent =
-      fmt(isTag ? p.units_sold_tag : p.units_sold_tag_period) + ' unités';
+      fmt(isTag ? p.units_sold_tag : p.units_sold_tag_period) + t('units_sfx');
 
-    // Sell-through KPI
     const stPct   = isTag ? p.sell_through_pct        : p.sell_through_period_pct;
     const stRecon = isTag ? p.sell_through_recon_pct  : p.sell_through_period_recon_pct;
     const kpiST      = document.getElementById('kpiST');
@@ -240,19 +410,20 @@
     if (d.shop_id && txTotal > 0) {
       const diff  = Math.round((stRecon || 0) - (stPct || 0));
       const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '=';
-      kpiSTRecon.textContent = `Avant transferts : ${fmtP(stRecon)} ${arrow}${Math.abs(diff)} pts`;
+      kpiSTRecon.textContent = `${t('before_transfers')}${fmtP(stRecon)} ${arrow}${Math.abs(diff)} pts`;
       kpiSTRecon.classList.remove('hidden');
-      kpiSTSub.textContent =
-        `Stock actuel ${fmt(p.current_stock)} u. · reconstitué ${fmt(p.stock_reconstituted)} u.`
-        + ` (reçu ${fmt(p.transfers_received_in)}, envoyé ${fmt(p.transfers_sent_out)})`;
+      kpiSTSub.textContent = t('stock_detail')(
+        fmt(p.current_stock), fmt(p.stock_reconstituted),
+        fmt(p.transfers_received_in), fmt(p.transfers_sent_out)
+      );
     } else {
       kpiSTRecon.classList.add('hidden');
       if (!d.season_code) {
-        kpiSTSub.textContent = 'Tout l\'historique';
+        kpiSTSub.textContent = t('all_history');
       } else if (isTag) {
-        kpiSTSub.textContent = `Articles taggés ${d.season_code.toUpperCase()}, toutes dates`;
+        kpiSTSub.textContent = t('tagged_all')(d.season_code.toUpperCase());
       } else {
-        kpiSTSub.textContent = `Articles taggés ${d.season_code.toUpperCase()} · depuis le ${d.season_from}`;
+        kpiSTSub.textContent = t('tagged_since')(d.season_code.toUpperCase(), d.season_from);
       }
     }
   }
@@ -262,7 +433,7 @@
     const p = d.performance;
     if (!p) {
       const loader = document.getElementById('loader');
-      loader.innerHTML = `<p class="text-red-500 text-sm">${d.error ?? 'Données de performance indisponibles.'}</p>`;
+      loader.innerHTML = `<p class="text-red-500 text-sm">${d.error ?? t('perf_unavailable')}</p>`;
       loader.classList.remove('hidden');
       return;
     }
@@ -275,34 +446,34 @@
     const rLabel = document.getElementById('recoLabel');
     badge.textContent      = p.recommendation;
     badge.style.background = r.bg;
-    badge.title            = r.tip;
+    badge.title            = t(r.tipKey);
     badge.classList.remove('hidden');
-    rLabel.textContent = r.tip;
+    rLabel.textContent = t(r.tipKey);
     rLabel.classList.remove('hidden');
 
     // Season label + toggle visibility
     const seasonLabel = d.season_code ? d.season_code.toUpperCase() : '';
-    document.getElementById('kpiSTSeason').textContent      = seasonLabel;
+    document.getElementById('kpiSTSeason').textContent         = seasonLabel;
     document.getElementById('kpiGlobalSeasonLabel').textContent = seasonLabel;
     const toggle = document.getElementById('salesModeToggle');
     if (d.season_code) { toggle.classList.remove('hidden'); } else { toggle.classList.add('hidden'); }
 
     // Static KPIs (mode-independent)
-    document.getElementById('kpiVelo').textContent   = fmt(p.weekly_velocity) + ' u.';
+    document.getElementById('kpiVelo').textContent   = fmt(p.weekly_velocity) + t('tooltip_unit');
     document.getElementById('kpiMargin').textContent = fmtP(p.avg_margin_pct);
     if (d.season_code) {
-      document.getElementById('kpiStock').textContent    = fmt(p.current_stock_tag) + ' u.';
-      document.getElementById('kpiStockSub').textContent = `taggé ${d.season_code.toUpperCase()} · total ${fmt(p.current_stock)} u.`;
+      document.getElementById('kpiStock').textContent    = fmt(p.current_stock_tag) + t('tooltip_unit');
+      document.getElementById('kpiStockSub').textContent = t('kpi_stock_tagged')(d.season_code.toUpperCase(), fmt(p.current_stock));
     } else {
-      document.getElementById('kpiStock').textContent    = fmt(p.current_stock) + ' u.';
-      document.getElementById('kpiStockSub').textContent = 'qté dispo + en commande';
+      document.getElementById('kpiStock').textContent    = fmt(p.current_stock) + t('tooltip_unit');
+      document.getElementById('kpiStockSub').textContent = t('kpi_stock_sub');
     }
 
     document.getElementById('kpiRevLabel').textContent =
-      d.season_code ? `12 sem. ${seasonLabel}` : '12 sem.';
+      d.season_code ? t('kpi_rev_12w')(seasonLabel) : t('kpi_rev_12w_plain');
     document.getElementById('kpiRevenue').textContent = fmtC(p.revenue_12w);
     document.getElementById('kpiItems').textContent   =
-      `${fmt(p.total_items)} articles · ${fmt(p.active_items)} actifs`;
+      t('kpi_items')(fmt(p.total_items), fmt(p.active_items));
 
     // Reset to tag mode and apply
     currentMode = 'tag';
@@ -326,7 +497,7 @@
         labels,
         datasets: [
           {
-            label: 'Cette année',
+            label: t('chart_this_year'),
             data: currU,
             borderColor: '#3b82f6',
             backgroundColor: 'rgba(59,130,246,0.06)',
@@ -337,7 +508,7 @@
             tension: 0.35,
           },
           {
-            label: 'Année passée',
+            label: t('chart_last_year'),
             data: lyU,
             borderColor: '#9ca3af',
             borderDash: [5, 4],
@@ -357,7 +528,7 @@
           legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 24, padding: 12 } },
           tooltip: {
             callbacks: {
-              label: ctx => ` ${ctx.dataset.label} : ${fmt(ctx.parsed.y)} u.`,
+              label: ctx => ` ${ctx.dataset.label} : ${fmt(ctx.parsed.y)}${t('tooltip_unit')}`,
             },
           },
         },
@@ -371,7 +542,7 @@
     // ── Top items ─────────────────────────────────────────────────────────
     const topEl = document.getElementById('topItems');
     if (!d.top_items.length) {
-      topEl.innerHTML = '<p class="text-sm text-gray-400 text-center py-6">Aucun article vendu ces 12 dernières semaines.</p>';
+      topEl.innerHTML = `<p class="text-sm text-gray-400 text-center py-6">${t('no_items_sold')}</p>`;
     } else {
       topEl.innerHTML = d.top_items.map((item, i) => {
         const img = item.image_url
@@ -389,11 +560,11 @@
             ${img}
             <div class="flex-1 min-w-0">
               <p class="text-xs font-medium text-gray-800 truncate" title="${item.description ?? ''}">${item.description ?? '—'}</p>
-              <p class="text-xs text-gray-400 truncate">${cat}${margin != null ? ` · ${margin} % marge` : ''}</p>
+              <p class="text-xs text-gray-400 truncate">${cat}${margin != null ? ` · ${margin} % marge` : ''}</p>
             </div>
             <div class="text-right flex-shrink-0">
-              <p class="text-xs font-semibold text-gray-800">${fmt(item.units_sold_12w)} u.</p>
-              <p class="text-xs text-gray-400">stk ${fmt(item.current_stock)}</p>
+              <p class="text-xs font-semibold text-gray-800">${fmt(item.units_sold_12w)}${t('tooltip_unit')}</p>
+              <p class="text-xs text-gray-400">stk ${fmt(item.current_stock)}</p>
             </div>
             <span class="text-gray-300 flex-shrink-0 text-sm">›</span>
           </div>`;
@@ -408,7 +579,7 @@
         <td class="py-2 text-right text-xs font-medium text-gray-800">${fmt(c.units_sold_12w)}</td>
         <td class="py-2 text-right text-xs text-gray-500">${fmt(c.stock_units)}</td>
         <td class="py-2 text-right text-xs text-gray-500">${fmtC(c.revenue_12w)}</td>
-      </tr>`).join('') || '<tr><td colspan="5" class="py-6 text-center text-xs text-gray-400">Aucune donnée</td></tr>';
+      </tr>`).join('') || `<tr><td colspan="5" class="py-6 text-center text-xs text-gray-400">${t('no_data')}</td></tr>`;
   }
 
   // ── Top sizes & colors ────────────────────────────────────────────────────
@@ -422,7 +593,7 @@
       renderAttributes(d);
     } catch (_) {
       document.getElementById('attrContent').innerHTML =
-        '<p class="col-span-2 text-xs text-gray-400 text-center py-3">Données indisponibles.</p>';
+        `<p class="col-span-2 text-xs text-gray-400 text-center py-3">${t('data_unavailable')}</p>`;
     }
   }
 
@@ -437,24 +608,24 @@
         <div class="flex-1 bg-gray-100 rounded-full h-1.5">
           <div class="${colorClass} h-1.5 rounded-full" style="width:${pct}%"></div>
         </div>
-        <span class="text-xs text-gray-500 w-10 text-right tabular-nums">${item.units} u.</span>
+        <span class="text-xs text-gray-500 w-10 text-right tabular-nums">${item.units}${t('tooltip_unit')}</span>
       </div>`;
     }
 
     const sizesHtml  = d.top_sizes.length
       ? d.top_sizes.map(i => bar(i, maxS, 'bg-blue-400')).join('')
-      : '<p class="text-xs text-gray-400 py-2">Aucune donnée</p>';
+      : `<p class="text-xs text-gray-400 py-2">${t('no_data')}</p>`;
     const colorsHtml = d.top_colors.length
       ? d.top_colors.map(i => bar(i, maxC, 'bg-violet-400')).join('')
-      : '<p class="text-xs text-gray-400 py-2">Aucune donnée</p>';
+      : `<p class="text-xs text-gray-400 py-2">${t('no_data')}</p>`;
 
     document.getElementById('attrContent').innerHTML = `
       <div>
-        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Tailles</p>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">${t('attr_sizes')}</p>
         ${sizesHtml}
       </div>
       <div>
-        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Couleurs</p>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">${t('attr_colors')}</p>
         ${colorsHtml}
       </div>`;
   }
@@ -497,9 +668,9 @@
       if (season) params.set('season', season);
       const qs   = params.toString() ? '?' + params.toString() : '';
       const data = await authFetch(`/api/brand/${encodeURIComponent(mfr)}${qs}`).then(r => r.json());
-      if (seq !== loadSeq) return; // a newer request is in flight — discard this stale response
+      if (seq !== loadSeq) return;
       render(data);
-      loadAttributes(); // fire-and-forget; has its own spinner
+      loadAttributes();
     } catch (e) {
       if (seq !== loadSeq) return;
       document.getElementById('loader').innerHTML =
@@ -513,6 +684,8 @@
   // ── Init ──────────────────────────────────────────────────────────────────
   document.getElementById('shopFilter').addEventListener('change', load);
   document.getElementById('seasonFilter').addEventListener('change', load);
+
+  applyI18n();
 
   (async () => {
     try {
