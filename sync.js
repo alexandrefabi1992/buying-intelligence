@@ -332,7 +332,7 @@ async function syncItemAttributeSets(tenantId) {
         VALUES ($1,$2,$3,$4,$5,$6,now())
         ON CONFLICT(tenant_id, attribute_set_id) DO UPDATE
           SET name=$3, attribute1_label=$4, attribute2_label=$5, attribute3_label=$6, synced_at=now()
-      `, [tenantId, setId, s.name ?? null, s.attribute1 ?? null, s.attribute2 ?? null, s.attribute3 ?? null]);
+      `, [tenantId, setId, s.name ?? null, s.attributeName1 ?? null, s.attributeName2 ?? null, s.attributeName3 ?? null]);
       count++;
     }
   }
