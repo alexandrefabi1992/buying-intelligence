@@ -1,5 +1,44 @@
 # CONTEXT — Diagnostic et historique technique
 
+## Règle d'or : valeur identique entre deux marques = soupçonner un filtre manquant (juillet 2026)
+
+Quand un KPI affiche la même valeur pour deux marques (ou deux boutiques) différentes, la
+première hypothèse doit être : le filtre `manufacturer` (ou `shop_id`) n'est pas appliqué
+dans la requête concernée, et la valeur retournée est globale (compagnie entière).
+
+### Bugs diagnostiqués (page brand detail, juillet 2026)
+
+**Bug ST avant transferts = 100 %** (corrigé)
+- Symptôme : `sell_through_recon_pct` affichait 100 % pour toute combinaison marque/boutique.
+- Cause : Q6 (transferts) comptait TOUS les transferts de la marque sans filtre de tag saison.
+  `stockTagRecon = max(0, stockTag + sentOut - receivedIn)`. Avec `sentOut - receivedIn < 0`
+  (net de transferts entrants), `stockTagRecon` tombait à 0 malgré un `stockTag` réel non-nul,
+  faisant `stRecon = soldTag / soldTag = 100 %`.
+- Fix : ajout de `AND p.tags ILIKE $N` dans Q6 quand `!allTime`, pour ne compter que les
+  transferts d'articles taggés saison. Exemple Brax/Filles d'Ève P26 : avant=100 %, après≈81 %.
+
+**Bug stock_detail label incohérent** (corrigé)
+- `current_stock` (total, toutes saisons) était affiché à côté de `stock_reconstituted`
+  (filtré par tag saison). Incohérent : 226 u. stock total vs 0 u. reconstitué.
+- Fix : le sous-texte utilise maintenant `current_stock_tag` (même périmètre que reconstitué).
+
+**Bug articles count = catalogue entier** (corrigé)
+- `total_items` (Q2) comptait TOUS les articles non-archivés de la marque, y compris
+  ceux jamais commandés ni vendus. Résultat : "3 750 articles" pour Brax, qui a 3 750
+  produits catalogue mais seulement ~200 actifs par saison/boutique.
+- Fix : `kpiItems` utilise désormais la somme des `items_count` de Q5 (`by_category`),
+  qui applique la définition "actifs" = stock > 0 OU ventes dans la fenêtre. Cohérent
+  avec la table "Répartition par catégorie".
+
+**Marge réelle** : filtre manufacturer vérifié correct. Brax=60.7 %, Patrick Assaraf=60.6 %
+(légère différence, pas un bug). La marge est une moyenne simple sur les articles
+(non pondérée par les ventes) — approximation connue et acceptable.
+
+**Graphique vide pour Patrick Assaraf** : les données existent en DB (13 semaines de ventes).
+Cas défensif ajouté dans le rendu pour éviter une zone blanche si `weekly_current = []`.
+
+---
+
 ## Règle absolue : jamais de credential en fallback (depuis juillet 2026)
 
 **Pattern interdit** — a causé la fuite du credential PostgreSQL le 23 juillet 2026

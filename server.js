@@ -3861,6 +3861,12 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     }
 
     // Q6 — Transfers balance for this shop (only meaningful when shop filter active)
+    // When a season is selected, filter transfers to season-tagged items only so that
+    // stockTagRecon = stockTag + sentOut - receivedIn stays in the same tag universe.
+    // Without this filter, untagged transfers can push stockTagRecon below zero,
+    // causing "ST avant transferts" to clamp at 100 % even when tagged stock remains.
+    const q6TagCond = (!allTime && seasonTag) ? `AND p.tags ILIKE $${p.length + 1}` : '';
+    const q6Params  = (!allTime && seasonTag) ? [...p, seasonTag] : p;
     const q6Promise = hasShop
       ? pool.query(`
           SELECT
@@ -3872,8 +3878,9 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
             AND t.transfer_received = true
             AND t.item_id IS NOT NULL
             AND (t.from_shop_id = $2 OR t.to_shop_id = $2)
+            ${q6TagCond}
             ${tenantCondP}
-        `, p)
+        `, q6Params)
       : Promise.resolve({ rows: [{ received_in: 0, sent_out: 0 }] });
 
     // Q1 — sell-through (season date range) + revenue_12w (last 12w + season tag)

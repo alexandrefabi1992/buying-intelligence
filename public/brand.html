@@ -214,7 +214,7 @@
       reco_tip_stop: 'Stock dormant — envisager liquidation',
       units_sfx: ' unités',
       before_transfers: 'Avant transferts : ',
-      stock_detail: (stk, rec, tin, tout) => `Stock actuel ${stk} u. · reconstitué ${rec} u. (reçu ${tin}, envoyé ${tout})`,
+      stock_detail: (stk, rec, tin, tout) => `Stock tag ${stk} u. · reconstitué ${rec} u. (reçu ${tin}, envoyé ${tout})`,
       all_history: "Tout l'historique",
       tagged_all: code => `Articles taggés ${code}, toutes dates`,
       tagged_since: (code, date) => `Articles taggés ${code} · depuis le ${date}`,
@@ -227,7 +227,7 @@
       attr_colors: 'Couleurs',
       data_unavailable: 'Données indisponibles.',
       perf_unavailable: 'Données de performance indisponibles.',
-      kpi_items: (total, active) => `${total} articles · ${active} actifs`,
+      kpi_items: (actifs, vendus) => `${actifs} art. actifs · ${vendus} avec ventes`,
       kpi_stock_tagged: (code, total) => `taggé ${code} · total ${total} u.`,
       kpi_rev_12w: code => `12 sem. ${code}`,
       kpi_rev_12w_plain: '12 sem.',
@@ -271,7 +271,7 @@
       reco_tip_stop: 'Dormant stock — consider liquidation',
       units_sfx: ' units',
       before_transfers: 'Before transfers: ',
-      stock_detail: (stk, rec, tin, tout) => `Current stock ${stk} u. · reconstituted ${rec} u. (received ${tin}, sent ${tout})`,
+      stock_detail: (stk, rec, tin, tout) => `Tagged stock ${stk} u. · reconstituted ${rec} u. (received ${tin}, sent ${tout})`,
       all_history: 'All history',
       tagged_all: code => `Items tagged ${code}, all dates`,
       tagged_since: (code, date) => `Items tagged ${code} · since ${date}`,
@@ -284,7 +284,7 @@
       attr_colors: 'Colors',
       data_unavailable: 'Data unavailable.',
       perf_unavailable: 'Performance data unavailable.',
-      kpi_items: (total, active) => `${total} items · ${active} active`,
+      kpi_items: (actifs, sold) => `${actifs} active art. · ${sold} with sales`,
       kpi_stock_tagged: (code, total) => `tagged ${code} · total ${total} u.`,
       kpi_rev_12w: code => `12 wks. ${code}`,
       kpi_rev_12w_plain: '12 wks.',
@@ -418,7 +418,7 @@
       kpiSTRecon.textContent = `${t('before_transfers')}${fmtP(stRecon)} ${arrow}${Math.abs(diff)} pts`;
       kpiSTRecon.classList.remove('hidden');
       kpiSTSub.textContent = t('stock_detail')(
-        fmt(p.current_stock), fmt(p.stock_reconstituted),
+        fmt(p.current_stock_tag), fmt(p.stock_reconstituted),
         fmt(p.transfers_received_in), fmt(p.transfers_sent_out)
       );
     } else {
@@ -477,8 +477,10 @@
     document.getElementById('kpiRevLabel').textContent =
       d.season_code ? t('kpi_rev_12w')(seasonLabel) : t('kpi_rev_12w_plain');
     document.getElementById('kpiRevenue').textContent = fmtC(p.revenue_12w);
+    // Active items = stock > 0 OR sold in window (sum from by_category, consistent with the table)
+    const totalActive = (d.by_category || []).reduce((s, c) => s + (c.items_count || 0), 0);
     document.getElementById('kpiItems').textContent   =
-      t('kpi_items')(fmt(p.total_items), fmt(p.active_items));
+      t('kpi_items')(fmt(totalActive), fmt(p.active_items));
 
     // Reset to tag mode and apply
     currentMode = 'tag';
@@ -489,11 +491,19 @@
     // ── Weekly chart ──────────────────────────────────────────────────────
     const curr   = d.weekly_current;
     const ly     = d.weekly_ly;
+    const chartWrap = document.getElementById('salesChart').parentElement;
+    if (!curr.length) {
+      if (chart) { chart.destroy(); chart = null; }
+      chartWrap.innerHTML = `<p class="flex items-center justify-center h-full text-xs text-gray-400">${t('no_data')}</p>`;
+    } else {
     const labels = curr.map(r => fmtWeek(r.week));
     const currU  = curr.map(r => parseFloat(r.units) || 0);
     const lyU    = ly.map(r => parseFloat(r.units_ly) || 0);
     while (lyU.length < currU.length) lyU.push(null);
 
+    if (!chartWrap.querySelector('canvas')) {
+      chartWrap.innerHTML = '<canvas id="salesChart"></canvas>';
+    }
     const ctx = document.getElementById('salesChart').getContext('2d');
     if (chart) chart.destroy();
     chart = new Chart(ctx, {
@@ -543,6 +553,7 @@
         },
       },
     });
+    } // end chart else-block
 
     // ── Top items ─────────────────────────────────────────────────────────
     const topEl = document.getElementById('topItems');
