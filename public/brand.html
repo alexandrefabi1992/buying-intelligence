@@ -230,6 +230,7 @@
       data_unavailable: 'Données indisponibles.',
       perf_unavailable: 'Données de performance indisponibles.',
       kpi_items: (actifs, vendus) => `${actifs} art. actifs · ${vendus} avec ventes`,
+      kpi_items_season: (actifs, vendus, code) => `${actifs} art. ${code} · ${vendus} vendus en saison`,
       kpi_stock_tagged: (code, total) => `taggé ${code} · total ${total} u.`,
       kpi_rev_12w: code => `12 sem. ${code}`,
       kpi_rev_12w_plain: '12 sem.',
@@ -289,6 +290,7 @@
       data_unavailable: 'Data unavailable.',
       perf_unavailable: 'Performance data unavailable.',
       kpi_items: (actifs, sold) => `${actifs} active art. · ${sold} with sales`,
+      kpi_items_season: (actifs, sold, code) => `${actifs} ${code} art. · ${sold} sold in season`,
       kpi_stock_tagged: (code, total) => `tagged ${code} · total ${total} u.`,
       kpi_rev_12w: code => `12 wks. ${code}`,
       kpi_rev_12w_plain: '12 wks.',
@@ -490,8 +492,9 @@
     document.getElementById('kpiRevenue').textContent = fmtC(p.revenue_12w);
     // Active items = stock > 0 OR sold in window (sum from by_category, consistent with the table)
     const totalActive = (d.by_category || []).reduce((s, c) => s + (c.items_count || 0), 0);
-    document.getElementById('kpiItems').textContent   =
-      t('kpi_items')(fmt(totalActive), fmt(p.active_items));
+    document.getElementById('kpiItems').textContent = d.season_code
+      ? t('kpi_items_season')(fmt(totalActive), fmt(p.active_items), seasonLabel)
+      : t('kpi_items')(fmt(totalActive), fmt(p.active_items));
 
     // Reset to tag mode and apply
     currentMode = 'tag';
