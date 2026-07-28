@@ -408,6 +408,32 @@ async function main() {
   );
   if (!r8) anyFailed = true;
 
+  // --- marque_introuvable (typo detection, 2026-07-27) ---
+  // "Patrick Assarag" (faute de frappe) doit déclencher marque_introuvable: true
+  // avec "Patrick Assaraf" dans les suggestions (pg_trgm similarity > 0.15).
+  // Testé sur toolGetSalesByVariant — la logique buildBrandNotFoundResult est
+  // partagée par les 4 tools, donc un seul cas suffit.
+  console.log('');
+  const r9 = await (async () => {
+    const label = '[BrandNotFound] "Patrick Assarag" (faute de frappe)';
+    const result = await toolGetSalesByVariant({ manufacturer: 'Patrick Assarag' }, ctx);
+    let failed = false;
+
+    if (!result.marque_introuvable) {
+      console.error(`FAIL ${label} — marque_introuvable devrait être true, got: ${JSON.stringify(result)}`);
+      failed = true;
+    }
+    if (!result.suggestions?.some(s => s.toLowerCase().includes('assaraf'))) {
+      console.error(`FAIL ${label} — suggestions devrait inclure "Patrick Assaraf", got: ${JSON.stringify(result.suggestions)}`);
+      failed = true;
+    }
+    if (!failed) {
+      console.log(`PASS ${label} — marque_introuvable=true ✅, suggestions=${JSON.stringify(result.suggestions)} ✅`);
+    }
+    return !failed;
+  })();
+  if (!r9) anyFailed = true;
+
   await pool.end();
 
   if (anyFailed) {

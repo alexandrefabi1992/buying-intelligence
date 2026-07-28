@@ -83,6 +83,51 @@ function buildTagConditions(tags, excludeTags, params) {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers: manufacturer existence check + pg_trgm similarity suggestions
+// ---------------------------------------------------------------------------
+
+// Returns true if at least one product row matches manufacturer (ILIKE substring).
+// Used to distinguish "brand exists, no data for this filter" from "brand not found".
+async function checkManufacturerExists(pool, manufacturer) {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM products WHERE manufacturer ILIKE $1 LIMIT 1`,
+    [`%${manufacturer}%`]
+  );
+  return rows.length > 0;
+}
+
+// Returns up to 3 manufacturer names whose pg_trgm similarity to the query exceeds 0.15.
+// pg_trgm (already installed) handles typos better than simple ILIKE prefix matching.
+async function findSimilarManufacturers(pool, manufacturer) {
+  // GROUP BY instead of DISTINCT so the similarity alias is available for ORDER BY.
+  const { rows } = await pool.query(`
+    SELECT manufacturer,
+           max(similarity(lower(manufacturer), lower($1))) AS sim
+    FROM products
+    WHERE manufacturer IS NOT NULL
+      AND manufacturer != ''
+    GROUP BY manufacturer
+    HAVING max(similarity(lower(manufacturer), lower($1))) > 0.15
+    ORDER BY sim DESC
+    LIMIT 3
+  `, [manufacturer]);
+  return rows.map(r => r.manufacturer);
+}
+
+// Shared early-return for "brand not found" across tools that filter by manufacturer.
+// Call this after the main query when rows.length === 0 && manufacturer was provided.
+// Returns the marque_introuvable object, or null if the brand actually exists (no data for the filters).
+async function buildBrandNotFoundResult(pool, manufacturer) {
+  const exists = await checkManufacturerExists(pool, manufacturer);
+  if (exists) return null;
+  return {
+    marque_introuvable: true,
+    marque_cherchee:    manufacturer,
+    suggestions:        await findSimilarManufacturers(pool, manufacturer),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Tool implementations
 // ---------------------------------------------------------------------------
 
@@ -302,6 +347,11 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
     LIMIT 50
   `, params);
 
+  if (rows.length === 0 && manufacturer) {
+    const notFound = await buildBrandNotFoundResult(pool, manufacturer);
+    if (notFound) return notFound;
+  }
+
   const totVentes  = rows[0] ? Number(rows[0].total_ventes_all) : 0;
   const totCout    = rows[0] ? Number(rows[0].total_cout_all)   : 0;
   const totUnites  = rows[0] ? Number(rows[0].total_unites_all) : 0;
@@ -358,6 +408,11 @@ async function toolGetStockByVariant({ manufacturer, size, category, genre, tags
     ORDER BY p.description, sh.name
     LIMIT 100
   `, params);
+
+  if (rows.length === 0 && manufacturer) {
+    const notFound = await buildBrandNotFoundResult(pool, manufacturer);
+    if (notFound) return notFound;
+  }
 
   // total_stock_all from window function is correct even when LIMIT truncates rows
   const total    = rows[0] ? Number(rows[0].total_stock_all) : 0;
@@ -452,6 +507,11 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
     ORDER BY qty_vendue DESC
     LIMIT 100
   `, params);
+
+  if (rows.length === 0 && manufacturer) {
+    const notFound = await buildBrandNotFoundResult(pool, manufacturer);
+    if (notFound) return notFound;
+  }
 
   const total_qty    = rows[0] ? Number(rows[0].total_qty_all)    : 0;
   const total_ventes = rows[0] ? Number(rows[0].total_ventes_all) : 0;
@@ -760,6 +820,11 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
     FROM base
     ORDER BY ${orderBy}
   `, params);
+
+  if (rows.length === 0 && manufacturer) {
+    const notFound = await buildBrandNotFoundResult(pool, manufacturer);
+    if (notFound) return notFound;
+  }
 
   // Totals from window functions — always correct (no LIMIT on query)
   const total_recu  = rows[0] ? Number(rows[0].total_recu_all)  : 0;
