@@ -1823,7 +1823,9 @@ async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, sho
   const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
 
   const tenantIdx = (params.push(tenantId), params.length);
-  const prodWhere = [`p.tenant_id = $${tenantIdx}`, `p.archived = false`];
+  // No p.archived=false here — archived items still have real sales (CLAUDE.md convention).
+  // stock_by_item already excludes archived via its own JOIN filter.
+  const prodWhere = [`p.tenant_id = $${tenantIdx}`];
   if (seasonTag)    prodWhere.push(`p.tags ILIKE $${(params.push('%' + seasonTag + '%'), params.length)}`);
   if (manufacturer) prodWhere.push(`p.manufacturer ILIKE $${(params.push('%' + manufacturer + '%'), params.length)}`);
 
@@ -2009,7 +2011,7 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
       LEFT JOIN stock_by_item  st  ON st.item_id  = p.item_id
       LEFT JOIN transfers_in   ti  ON ti.item_id  = p.item_id
       LEFT JOIN transfers_out  to2 ON to2.item_id = p.item_id
-      WHERE p.tenant_id = $${tenantIdx} AND p.archived = false ${tagCond}
+      WHERE p.tenant_id = $${tenantIdx} ${tagCond}
         AND (GREATEST(0, COALESCE(s.sold,0) + COALESCE(st.stock,0)
              + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)) > 0
              OR COALESCE(st.stock, 0) > 0)
@@ -2269,7 +2271,7 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
       LEFT JOIN stock_by_item  st  ON st.item_id  = p.item_id
       LEFT JOIN transfers_in   ti  ON ti.item_id  = p.item_id
       LEFT JOIN transfers_out  to2 ON to2.item_id = p.item_id
-      WHERE p.tenant_id = $${tenantIdx} AND p.archived = false ${tagCond} ${mfrCond}
+      WHERE p.tenant_id = $${tenantIdx} ${tagCond} ${mfrCond}
         AND (GREATEST(0, COALESCE(s.sold,0) + COALESCE(st.stock,0)
              + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)) > 0
              OR COALESCE(st.stock, 0) > 0)
