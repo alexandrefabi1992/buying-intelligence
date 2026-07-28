@@ -211,7 +211,10 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
         p.manufacturer                       AS marque,
         SUM(sl.qty)                          AS unites,
         ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0)), 2)::numeric(12,2) AS ventes_brutes,
-        ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(12,2) AS cout_ventes
+        ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(12,2) AS cout_ventes,
+        SUM(SUM(sl.qty))                     OVER () AS total_unites_all,
+        SUM(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0))) OVER () AS total_ventes_all,
+        COUNT(*)                             OVER () AS nb_marques_total
       FROM sale_lines sl
       JOIN products p  ON p.item_id  = sl.item_id
       JOIN shops    sh ON sh.shop_id = sl.shop_id
@@ -222,13 +225,16 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
       LIMIT 20
     `, params);
 
-    const totVentes = rows.reduce((s, r) => s + parseFloat(r.ventes_brutes ?? 0), 0);
-    const totUnites = rows.reduce((s, r) => s + parseInt(r.unites          ?? 0), 0);
+    const totVentes  = rows[0] ? Number(rows[0].total_ventes_all)  : 0;
+    const totUnites  = rows[0] ? Number(rows[0].total_unites_all)   : 0;
+    const nb_marques = rows[0] ? Number(rows[0].nb_marques_total)   : 0;
 
     return {
       categorie: category,
       periode:   { de: from, a: to },
       filtre:    { boutique: shop_id ?? 'toutes', saison: season ?? null },
+      nb_marques_total:    nb_marques,
+      nb_marques_affiches: rows.length,
       marques:   rows.map(r => ({
         marque:        r.marque,
         unites:        Number(r.unites),
@@ -282,7 +288,11 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
       sh.name                              AS boutique,
       SUM(sl.qty)                          AS unites,
       ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0)), 2)::numeric(12,2) AS ventes_brutes,
-      ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(12,2) AS cout_ventes
+      ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(12,2) AS cout_ventes,
+      SUM(SUM(sl.qty))                     OVER () AS total_unites_all,
+      SUM(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0))) OVER () AS total_ventes_all,
+      SUM(SUM(sl.qty * COALESCE(p.default_cost, 0)))  OVER () AS total_cout_all,
+      COUNT(*)                             OVER () AS nb_lignes_total
     FROM sale_lines sl
     JOIN products p  ON p.item_id  = sl.item_id
     JOIN shops    sh ON sh.shop_id = sl.shop_id
@@ -292,12 +302,15 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
     LIMIT 50
   `, params);
 
-  const totVentes = rows.reduce((s, r) => s + parseFloat(r.ventes_brutes ?? 0), 0);
-  const totCout   = rows.reduce((s, r) => s + parseFloat(r.cout_ventes   ?? 0), 0);
-  const totUnites = rows.reduce((s, r) => s + parseInt(r.unites          ?? 0), 0);
+  const totVentes  = rows[0] ? Number(rows[0].total_ventes_all) : 0;
+  const totCout    = rows[0] ? Number(rows[0].total_cout_all)   : 0;
+  const totUnites  = rows[0] ? Number(rows[0].total_unites_all) : 0;
+  const nb_total   = rows[0] ? Number(rows[0].nb_lignes_total)  : 0;
 
   return {
     periode: { de: from, a: to },
+    nb_lignes_total:    nb_total,
+    nb_lignes_affiches: rows.length,
     resultats: rows.map(r => ({
       marque:        r.manufacturer,
       boutique:      r.boutique,
@@ -428,7 +441,10 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
       p.manufacturer,
       SUM(sl.qty)                          AS qty_vendue,
       ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price)), 2) AS ventes_brutes,
-      ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2) AS cout_ventes
+      ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2) AS cout_ventes,
+      SUM(SUM(sl.qty))                     OVER () AS total_qty_all,
+      SUM(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price))) OVER () AS total_ventes_all,
+      COUNT(*)                             OVER () AS nb_articles_total
     FROM sale_lines sl
     JOIN products p ON p.item_id = sl.item_id
     WHERE ${conditions.join(' AND ')}
@@ -437,13 +453,16 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
     LIMIT 100
   `, params);
 
-  const total_qty    = rows.reduce((s, r) => s + Number(r.qty_vendue),    0);
-  const total_ventes = rows.reduce((s, r) => s + parseFloat(r.ventes_brutes ?? 0), 0);
+  const total_qty    = rows[0] ? Number(rows[0].total_qty_all)    : 0;
+  const total_ventes = rows[0] ? Number(rows[0].total_ventes_all) : 0;
+  const nb_total     = rows[0] ? Number(rows[0].nb_articles_total): 0;
 
   return {
     filtre: { marque: manufacturer, taille: size, recherche: description_search, de: from, a: to },
-    total_unites_vendues:  total_qty,
-    total_ventes_brutes:   fmtMoney(total_ventes),
+    total_unites_vendues:   total_qty,
+    total_ventes_brutes:    fmtMoney(total_ventes),
+    nb_articles_total:      nb_total,
+    nb_articles_affiches:   rows.length,
     articles: rows.map(r => ({
       description:   r.description,
       qty_vendue:    Number(r.qty_vendue),
@@ -1122,7 +1141,10 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
       SUM(sl.qty)::int AS unites,
       ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0)), 2) AS ventes_brutes,
       ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)  AS cout_ventes,
-      COUNT(DISTINCT p.manufacturer)::int AS nb_marques
+      COUNT(DISTINCT p.manufacturer)::int AS nb_marques,
+      SUM(SUM(sl.qty))                    OVER () AS total_unites_all,
+      SUM(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0))) OVER () AS total_ventes_all,
+      COUNT(*)                            OVER () AS nb_categories_total
     FROM sale_lines sl
     JOIN products p ON p.item_id = sl.item_id
     WHERE ${conditions.join(' AND ')}
@@ -1131,13 +1153,15 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
     LIMIT 60
   `, params);
 
-  const totVentes = rows.reduce((s, r) => s + parseFloat(r.ventes_brutes ?? 0), 0);
-  const totUnites = rows.reduce((s, r) => s + parseInt(r.unites          ?? 0), 0);
+  const totVentes    = rows[0] ? Number(rows[0].total_ventes_all)   : 0;
+  const totUnites    = rows[0] ? Number(rows[0].total_unites_all)    : 0;
+  const nb_cat_total = rows[0] ? Number(rows[0].nb_categories_total) : 0;
 
   return {
     periode:    { de: from, a: to },
     filtre:     { marque: manufacturer ?? 'toutes', boutique: shop_id ?? 'toutes', saison: season },
-    nb_categories: rows.length,
+    nb_categories_total:    nb_cat_total,
+    nb_categories_affiches: rows.length,
     categories: rows.map(r => ({
       categorie:     r.category,
       unites:        Number(r.unites),
