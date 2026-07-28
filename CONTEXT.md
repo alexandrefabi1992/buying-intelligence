@@ -724,3 +724,67 @@ Tous les `fetch(...)` remplacés par `authFetch(...)` dans brand.html, matrix.ht
 
 ### Leçon
 Toute nouvelle page HTML secondaire qui appelle `/api/*` doit inclure `authFetch`. Le token est stocké sous la clé `auth_token` dans localStorage (même clé que index.html).
+
+---
+
+## Architecture size_axis / color_axis — identification déterministe taille/couleur (juillet 2026)
+
+### Concept
+
+`item_attribute_sets.size_axis` et `color_axis` (SMALLINT, valeurs 1/2/3) désignent quel
+attribut Lightspeed contient la taille et la couleur pour chaque set.
+
+Exemple : set 5 "Taille/Couleur" → `size_axis=1`, `color_axis=2`.
+Pour un produit de ce set : taille = `raw->'ItemAttributes'->>'attribute1'`.
+
+Ces colonnes sont la **source de vérité unique** — le code ne fait jamais de ILIKE sur les
+labels au moment du query. Avantages : déterministe, zéro ambiguïté de casse/langue,
+configurable par un admin sans toucher au code.
+
+### Sets connus (tenant valerie-simon, juillet 2026)
+
+| set_id | Nom | size_axis | color_axis | Notes |
+|--------|-----|-----------|-----------|-------|
+| 1 | Color/Size | 2 | 1 | Brax (set 1 dans Lightspeed) |
+| 2 | Size | 2 | null | Edge case: attr1_label=NULL |
+| 3 | Color | null | 1 | Set couleur pur — pas de dimension taille |
+| 4 | 3 Attributes | null | null | Labels génériques — peu utilisé |
+| 5 | Taille/Couleur | 1 | 2 | Principal : Brax, Marc Cain, Patrick Assaraf |
+| 6 | Taille | 1 | null | Taille seule |
+| 7 | Couleur | null | 1 | Couleur seule — pas de dimension taille |
+| 8 | Taille/coupe | 1 | null | Taille + coupe (pas de couleur) |
+| 9 | Taille/couleur/coupe | 1 | 2 | Eton : taille=attr1, couleur=attr2, coupe=attr3 |
+
+Sets 3 et 7 ont `size_axis=NULL` de façon intentionnelle : ce sont des sets couleur-pur
+(Marcoliani, chaussettes, accessoires), aucun produit n'a de dimension taille dans ces sets.
+
+### Cycle de vie
+
+1. **Sync** (`syncItemAttributeSets`) : upsert des labels depuis Lightspeed, puis auto-détection
+   `size_axis`/`color_axis` via ILIKE sur les labels. Règle critique :
+   `SET size_axis = COALESCE(size_axis, $detected)` — jamais écraser une valeur existante.
+
+2. **Fallback** : si `size_axis IS NULL` pour un produit, le code tombe en arrière sur le
+   regex actuel (`extractSize` / `pickSizeColor`) et logue un WARNING **une seule fois par
+   `set_id` par lifetime du process** (pas une fois par produit).
+
+3. **Endpoint admin** : `GET /api/admin/attribute-sets` liste tous les sets avec leurs axes.
+   `PATCH /api/admin/attribute-sets/:setId` avec `{ size_axis: 2, color_axis: 1 }` permet
+   à un admin de corriger manuellement sans toucher au code.
+
+### Procédure onboarding nouveau tenant avec labels non-standard
+
+1. Ajouter le tenant, lancer une sync.
+2. `syncItemAttributeSets` loggue des `[WARNING] attribute-set X "Name" — size_axis not
+   auto-detected. Labels: ...` pour chaque set non reconnu.
+3. L'admin appelle `PATCH /api/admin/attribute-sets/:setId` avec `{ size_axis: N }` pour
+   chaque set ambiguë. Valeur N = numéro de l'attribut (1, 2 ou 3) qui contient la taille.
+4. Relancer une sync (ou juste attendre la suivante) — les axes sont maintenant protégés
+   via COALESCE et ne seront pas écrasés.
+5. Vérifier via `GET /api/admin/attribute-sets` que tous les sets actifs ont `size_axis` configuré.
+
+### Règle ABSOLUE
+
+`size_axis` / `color_axis` configurés manuellement **ne doivent jamais être écrasés** par
+le sync automatique. Le `COALESCE(size_axis, $detected)` dans l'UPDATE garantit cela.
+Toute modification future de `syncItemAttributeSets` doit préserver cette règle.

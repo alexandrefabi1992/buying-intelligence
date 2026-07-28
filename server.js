@@ -315,6 +315,55 @@ app.put('/api/admin/users/:id/password', requireAdmin, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Admin — attribute sets (size_axis / color_axis configuration)
+// Both routes inherit requireAdmin from app.use('/api/admin', requireAdmin) above.
+// ---------------------------------------------------------------------------
+
+// GET /api/admin/attribute-sets — list all sets with labels and configured axes
+app.get('/api/admin/attribute-sets', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT attribute_set_id, name,
+             attribute1_label, attribute2_label, attribute3_label,
+             size_axis, color_axis, synced_at
+      FROM   item_attribute_sets
+      WHERE  tenant_id = $1
+      ORDER  BY attribute_set_id::int
+    `, [req.tenantId]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/admin/attribute-sets/:setId — manually override size_axis / color_axis
+app.patch('/api/admin/attribute-sets/:setId', async (req, res) => {
+  const { size_axis, color_axis } = req.body ?? {};
+  const { setId } = req.params;
+
+  // Allow explicit null to clear a previously set axis.
+  const hasSize  = 'size_axis'  in (req.body ?? {});
+  const hasColor = 'color_axis' in (req.body ?? {});
+  if (!hasSize && !hasColor) return res.status(400).json({ error: 'Provide size_axis and/or color_axis' });
+
+  const validAxis = v => v === null || v === undefined || [1, 2, 3].includes(Number(v));
+  if (hasSize  && !validAxis(size_axis))  return res.status(400).json({ error: 'size_axis must be 1, 2, 3, or null' });
+  if (hasColor && !validAxis(color_axis)) return res.status(400).json({ error: 'color_axis must be 1, 2, 3, or null' });
+
+  try {
+    const setClauses = [];
+    const params     = [req.tenantId, setId];
+    if (hasSize)  { setClauses.push(`size_axis  = $${params.length + 1}`);  params.push(size_axis  ?? null); }
+    if (hasColor) { setClauses.push(`color_axis = $${params.length + 1}`); params.push(color_axis ?? null); }
+
+    const { rowCount } = await pool.query(
+      `UPDATE item_attribute_sets SET ${setClauses.join(', ')} WHERE tenant_id = $1 AND attribute_set_id = $2`,
+      params
+    );
+    if (!rowCount) return res.status(404).json({ error: `attribute-set ${setId} not found` });
+    res.json({ ok: true, attribute_set_id: setId, size_axis: hasSize ? (size_axis ?? null) : undefined, color_axis: hasColor ? (color_axis ?? null) : undefined });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---------------------------------------------------------------------------
 // Superadmin API — JWT-protected, role=superadmin required
 // ---------------------------------------------------------------------------
 
@@ -4213,6 +4262,9 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 // GET /api/brand/:manufacturer/top-attributes — top sizes & colors (12 weeks)
 // ---------------------------------------------------------------------------
+// Module-level: warn once per unknown set_id per server lifetime, not once per request.
+const _warnedTopAttrSets = new Set();
+
 app.get('/api/brand/:manufacturer/top-attributes', async (req, res, next) => {
   try {
     const mfr      = decodeURIComponent(req.params.manufacturer);
@@ -4224,15 +4276,33 @@ app.get('/api/brand/:manufacturer/top-attributes', async (req, res, next) => {
     if (shopId) { params.push(shopId); shopCond = `AND sl.shop_id = $${params.length}`; }
 
     const { rows } = await pool.query(`
-      SELECT p.description, SUM(sl.qty)::int AS units
+      SELECT
+        p.description,
+        p.raw->'ItemAttributes'->>'attribute1'         AS attr1,
+        p.raw->'ItemAttributes'->>'attribute2'         AS attr2,
+        p.raw->'ItemAttributes'->>'attribute3'         AS attr3,
+        p.raw->'ItemAttributes'->>'itemAttributeSetID' AS set_id,
+        ias.size_axis,
+        ias.color_axis,
+        SUM(sl.qty)::int AS units
       FROM   sale_lines sl
-      JOIN   products   p  ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
+      JOIN   products   p   ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
+      LEFT JOIN item_attribute_sets ias
+        ON  ias.attribute_set_id = (p.raw->'ItemAttributes'->>'itemAttributeSetID')
+        AND ias.tenant_id = p.tenant_id
       WHERE  sl.tenant_id = $1
-        AND  p.manufacturer = $2
+        AND  p.manufacturer ILIKE $2
         AND  sl.completed_time > now() - interval '12 weeks'
         AND  p.matrix_id IS NOT NULL
         ${shopCond}
-      GROUP  BY p.description
+      GROUP  BY
+        p.description,
+        p.raw->'ItemAttributes'->>'attribute1',
+        p.raw->'ItemAttributes'->>'attribute2',
+        p.raw->'ItemAttributes'->>'attribute3',
+        p.raw->'ItemAttributes'->>'itemAttributeSetID',
+        ias.size_axis,
+        ias.color_axis
       HAVING SUM(sl.qty) > 0
     `, params);
 
@@ -4302,13 +4372,36 @@ app.get('/api/brand/:manufacturer/top-attributes', async (req, res, next) => {
       return color.charAt(0).toUpperCase() + color.slice(1).toLowerCase();
     }
 
+    // size_axis/color_axis = source of truth (1/2/3 = which attribute holds size/color).
+    // Set at sync time via auto-detection; overrideable via PATCH /api/admin/attribute-sets/:id.
+    // Falls back to regex only when no axis is configured for this set.
+    function pickSizeColor(row) {
+      const { size_axis, color_axis, attr1, attr2, attr3, set_id } = row;
+      const byAxis = [null, attr1, attr2, attr3]; // 1-indexed
+
+      if (size_axis || color_axis) {
+        let size  = size_axis  ? (byAxis[size_axis]  ?? null) : null;
+        let color = color_axis ? (byAxis[color_axis] ?? null) : null;
+        if (size  === '') size  = null;
+        if (color === '') color = null;
+        if (size  && /taille\s+unique|one\s+size/i.test(size))  size  = 'Unique';
+        if (color && /taille\s+unique|one\s+size/i.test(color)) color = 'Unique';
+        return { size, color };
+      }
+      if (set_id && !_warnedTopAttrSets.has(set_id)) {
+        _warnedTopAttrSets.add(set_id);
+        console.warn(`[top-attributes] WARNING: attribute-set ${set_id} has no size_axis — regex fallback. Use PATCH /api/admin/attribute-sets/${set_id} to configure.`);
+      }
+      return extractSizeColor(row.description);
+    }
+
     const sizeTotals  = {};
     const colorTotals = {};
     for (const r of rows) {
-      const { size, color } = extractSizeColor(r.description);
+      const { size, color } = pickSizeColor(r);
       const normColor = normalizeColor(color);
-      if (size)      sizeTotals[size]           = (sizeTotals[size]           || 0) + r.units;
-      if (normColor) colorTotals[normColor]      = (colorTotals[normColor]    || 0) + r.units;
+      if (size)      sizeTotals[size]      = (sizeTotals[size]      || 0) + r.units;
+      if (normColor) colorTotals[normColor] = (colorTotals[normColor] || 0) + r.units;
     }
 
     const rank = obj => Object.entries(obj)

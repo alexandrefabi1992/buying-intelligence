@@ -283,6 +283,8 @@ async function ensureSchema() {
 
   // Lightspeed attribute set definitions — one row per set, gives label of each attribute axis.
   // attribute1_label = "Taille", attribute2_label = "Couleur", etc.
+  // size_axis / color_axis = which attribute number (1/2/3) holds size/color for this set.
+  // These are the source of truth — auto-detected at sync, overrideable by admin PATCH endpoint.
   // Joined via raw->'ItemAttributes'->>'itemAttributeSetID' to resolve size/color axis per product.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS item_attribute_sets (
@@ -296,6 +298,8 @@ async function ensureSchema() {
       PRIMARY KEY (tenant_id, attribute_set_id)
     )
   `);
+  await pool.query(`ALTER TABLE item_attribute_sets ADD COLUMN IF NOT EXISTS size_axis  SMALLINT`);
+  await pool.query(`ALTER TABLE item_attribute_sets ADD COLUMN IF NOT EXISTS color_axis SMALLINT`);
 
   // Monthly aggregate — long-term retention after 400-day detail window expires.
   // manufacturer='' represents items with no manufacturer (avoids NULL in PK).
@@ -326,16 +330,52 @@ async function syncItemAttributeSets(tenantId) {
     for (const s of items) {
       const setId = String(s.itemAttributeSetID ?? '');
       if (!setId || setId === '0') continue;
+      const l1 = s.attributeName1 ?? null;
+      const l2 = s.attributeName2 ?? null;
+      const l3 = s.attributeName3 ?? null;
+
+      // Upsert labels — never touch size_axis/color_axis here (protected from manual override).
       await pool.query(`
         INSERT INTO item_attribute_sets
           (tenant_id, attribute_set_id, name, attribute1_label, attribute2_label, attribute3_label, synced_at)
         VALUES ($1,$2,$3,$4,$5,$6,now())
         ON CONFLICT(tenant_id, attribute_set_id) DO UPDATE
           SET name=$3, attribute1_label=$4, attribute2_label=$5, attribute3_label=$6, synced_at=now()
-      `, [tenantId, setId, s.name ?? null, s.attributeName1 ?? null, s.attributeName2 ?? null, s.attributeName3 ?? null]);
+      `, [tenantId, setId, s.name ?? null, l1, l2, l3]);
+
+      // Auto-detect size_axis/color_axis from labels — COALESCE keeps any existing manual value.
+      const labels = [l1, l2, l3];
+      const detectedSize  = labels.findIndex(l => l && (/taille/i.test(l) || /size/i.test(l)));
+      const detectedColor = labels.findIndex(l => l && (/couleur/i.test(l) || /color/i.test(l)));
+      const sizeAxis  = detectedSize  >= 0 ? detectedSize  + 1 : null; // 1-indexed
+      const colorAxis = detectedColor >= 0 ? detectedColor + 1 : null;
+
+      // COALESCE(size_axis, $3) — keeps existing manual value if set, writes detected value if NULL.
+      await pool.query(`
+        UPDATE item_attribute_sets
+        SET size_axis  = COALESCE(size_axis,  $3),
+            color_axis = COALESCE(color_axis, $4)
+        WHERE tenant_id = $1 AND attribute_set_id = $2
+      `, [tenantId, setId, sizeAxis, colorAxis]);
+
       count++;
     }
   }
+
+  // Warn for any set that still has no size_axis after auto-detection — needs manual PATCH.
+  const { rows: undetected } = await pool.query(`
+    SELECT attribute_set_id, name, attribute1_label, attribute2_label, attribute3_label
+    FROM   item_attribute_sets
+    WHERE  tenant_id = $1 AND size_axis IS NULL
+  `, [tenantId]);
+  for (const r of undetected) {
+    console.warn(
+      `[WARNING] attribute-set ${r.attribute_set_id} "${r.name}" — size_axis not auto-detected. ` +
+      `Labels: attr1="${r.attribute1_label}" attr2="${r.attribute2_label}" attr3="${r.attribute3_label}". ` +
+      `Use PATCH /api/admin/attribute-sets/${r.attribute_set_id} to configure manually.`
+    );
+  }
+
   console.log(`[sync] ItemAttributeSets synced: ${count}`);
   return count;
 }

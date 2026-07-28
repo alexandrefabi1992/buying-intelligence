@@ -15,7 +15,24 @@ const MAX_TOOL_ROUNDS = 6; // safety limit against infinite loops
 // Helper: extract size label from a variant description.
 // Handles alpha sizes (XS–3X) and numeric (28–115, 14.5–18.5).
 // ---------------------------------------------------------------------------
-function extractSize(desc) {
+// Warn at most once per set_id per process — avoids log spam on large queries.
+const _warnedSizeSets = new Set();
+
+function extractSize(desc, attrData = null) {
+  if (attrData) {
+    const { size_axis, attr1, attr2, attr3, set_id } = attrData;
+    if (size_axis) {
+      const val = [null, attr1, attr2, attr3][size_axis] ?? null; // 1-indexed
+      if (!val || val === '') return 'N/A';
+      if (/taille\s+unique|one\s+size/i.test(val)) return 'Unique';
+      return val;
+    }
+    // set_id known but size_axis not configured → warn once, then fall through to regex.
+    if (set_id && !_warnedSizeSets.has(set_id)) {
+      _warnedSizeSets.add(set_id);
+      console.warn(`[extractSize] WARNING: attribute-set ${set_id} has no size_axis — regex fallback. Use PATCH /api/admin/attribute-sets/${set_id} to configure.`);
+    }
+  }
   if (!desc) return 'N/A';
   let m;
   m = /\b(3XL|XXL|2XL|XL|XS|2X|3X)\b/i.exec(desc); if (m) return m[1].toUpperCase();
@@ -784,6 +801,12 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
         p.description,
         p.manufacturer,
         p.category,
+        p.raw->'ItemAttributes'->>'attribute1'         AS attr1,
+        p.raw->'ItemAttributes'->>'attribute2'         AS attr2,
+        p.raw->'ItemAttributes'->>'attribute3'         AS attr3,
+        p.raw->'ItemAttributes'->>'itemAttributeSetID' AS set_id,
+        ias.size_axis,
+        ias.color_axis,
         COALESCE(s.sold,    0)::int  AS sold,
         COALESCE(st.stock,  0)::int  AS stock,
         COALESCE(ti.qty_in, 0)::int  AS transferred_in,
@@ -801,6 +824,9 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
             + COALESCE(to2.qty_out, 0) - COALESCE(ti.qty_in, 0)) * 100, 1)
           ELSE 0 END AS st_pct
       FROM products p
+      LEFT JOIN item_attribute_sets ias
+        ON  ias.attribute_set_id = (p.raw->'ItemAttributes'->>'itemAttributeSetID')
+        AND ias.tenant_id = p.tenant_id
       LEFT JOIN sales_by_item  s    ON s.item_id    = p.item_id
       LEFT JOIN stock_by_item  st   ON st.item_id   = p.item_id
       LEFT JOIN transfers_in   ti   ON ti.item_id   = p.item_id
@@ -838,7 +864,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   // Aggregate by size in JS from ALL rows (no truncation risk)
   const sizeAgg = {};
   for (const r of rows) {
-    const t = extractSize(r.description);
+    const t = extractSize(r.description, r);
     if (!sizeAgg[t]) sizeAgg[t] = { recu: 0, vendu: 0, stock: 0, in: 0, out: 0 };
     sizeAgg[t].recu  += Number(r.received_supplier);
     sizeAgg[t].vendu += Number(r.sold);
