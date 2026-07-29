@@ -1912,7 +1912,7 @@ async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, sho
 // ---------------------------------------------------------------------------
 // toolGetBrandRanking — classement des marques par ST, revenue, stock dormant.
 // ---------------------------------------------------------------------------
-async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20, include_nos = false, manufacturer }, { pool, getSeasonsConfig, tenantId }) {
+async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20, include_nos = false, manufacturer, max_st, min_st }, { pool, getSeasonsConfig, tenantId }) {
   shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
   limit = Math.min(Math.max(1, parseInt(limit) || 20), 50);
@@ -1953,6 +1953,8 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
   const tagCond = tagIdx ? `AND p.tags ILIKE $${tagIdx}` : '';
   const mfrIdx  = manufacturer ? (params.push(`%${manufacturer}%`), params.length) : null;
   const mfrCond = mfrIdx ? `AND p.manufacturer ILIKE $${mfrIdx}` : '';
+  const maxStIdx = max_st != null ? (params.push(Number(max_st)), params.length) : null;
+  const minStIdx = min_st != null ? (params.push(Number(min_st)), params.length) : null;
   const limitIdx  = (params.push(limit), params.length);
 
   const { rows } = await pool.query(`
@@ -2038,7 +2040,9 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
     FROM base
     WHERE manufacturer IS NOT NULL AND manufacturer != ''
     GROUP BY manufacturer
-    HAVING SUM(received_supplier) > 0 OR SUM(stock) > 0
+    HAVING (SUM(received_supplier) > 0 OR SUM(stock) > 0)
+      ${maxStIdx ? `AND CASE WHEN SUM(received_supplier) > 0 THEN SUM(sold)::float / SUM(received_supplier) * 100 ELSE 0 END <= $${maxStIdx}` : ''}
+      ${minStIdx ? `AND CASE WHEN SUM(received_supplier) > 0 THEN SUM(sold)::float / SUM(received_supplier) * 100 ELSE 0 END >= $${minStIdx}` : ''}
     ORDER BY ${sortExpr} DESC NULLS LAST
     LIMIT $${limitIdx}
   `, params);

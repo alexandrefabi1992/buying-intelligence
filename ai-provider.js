@@ -317,7 +317,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_brand_ranking',
-    description: "Classement analytique des marques par ST, revenue, unités vendues, stock dormant ou marge — calculé directement depuis les ventes (pas le cache budget). Utiliser quand l'utilisateur demande : 'quelle marque a le meilleur ST cette saison', 'classement par chiffre d'affaires', 'quelles marques ont du stock qui dort', 'top marques par marge'. Différent de get_top_performers qui dépend du cache budget.",
+    description: "Classement analytique des marques par ST, revenue, unités vendues, stock dormant ou marge — calculé directement depuis les ventes (pas le cache budget). Utiliser quand l'utilisateur demande : 'quelle marque a le meilleur ST cette saison', 'classement par chiffre d'affaires', 'quelles marques ont du stock qui dort', 'top marques par marge', 'marques sous 50% de ST'. Supporte filtres min_st/max_st pour cibler une plage de ST au niveau marque. Différent de get_top_performers qui dépend du cache budget.",
     parameters: {
       type: 'object',
       properties: {
@@ -327,6 +327,8 @@ const TOOL_DEFS = [
         sort_by:      { type: 'string', enum: ['st', 'revenue', 'stock_dormant', 'units_sold', 'margin'], description: "Critère de tri. 'st'=sell-through, 'revenue'=chiffre d'affaires, 'stock_dormant'=stock invendu, 'units_sold'=unités vendues, 'margin'=marge brute. Défaut: 'st'" },
         limit:        { type: 'integer', description: 'Nombre de marques à retourner (1-50, défaut: 20)' },
         include_nos:  { type: 'boolean', description: "Si true, inclut tous les articles de la marque vendus dans la fenêtre (pas seulement ceux taggés avec la saison). Si false (défaut), filtre par le tag de saison — uniquement la collection saisonnière. Retourne le champ scope_produits pour indiquer le périmètre." },
+        min_st:       { type: 'number', description: 'ST minimum en % au niveau marque (ex: 60 pour marques avec ST ≥ 60%). Filtre les marques sous ce seuil.' },
+        max_st:       { type: 'number', description: 'ST maximum en % au niveau marque (ex: 50 pour marques avec ST ≤ 50%). Filtre les marques au-dessus de ce seuil.' },
       },
       required: [],
     },
