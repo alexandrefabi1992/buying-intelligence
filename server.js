@@ -4271,11 +4271,33 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
                shopSale: '', shopInv: '' };
     };
 
-    // Factory: one season's sold + stock metrics
+    // Factory: one season's sold + stock + transfers metrics.
+    // sold_cte has NO date bounds (mirrors main Q1: all tagged sales ever) so that
+    // received_supplier and ST% are identical to the main KPI for the current season.
+    // Params: hasShop=[mfr,shopId,tag,tid]  no-shop=[mfr,tag,tid]
     const histQ = (conf) => {
       const hTag = `%${conf.tag_pattern}%`;
-      const hTo  = conf.sell_to < todayStr ? conf.sell_to : todayStr;
-      const { params, i, shopSale, shopInv } = mkSP(conf.sell_from, hTo, hTag);
+      const params    = hasShop ? [mfr, shopId, hTag, req.tenantId] : [mfr, hTag, req.tenantId];
+      const [mi, si, ti, di] = hasShop ? [1, 2, 3, 4] : [1, null, 2, 3];
+      const shopSale  = hasShop ? `AND sl.shop_id = $${si}` : '';
+      const shopInv2  = hasShop ? `AND inv2.shop_id = $${si}` : '';
+
+      const transfersCte = hasShop ? `
+        transfers_cte AS (
+          SELECT
+            COALESCE(SUM(CASE WHEN t.to_shop_id   = $${si} THEN t.qty_received ELSE 0 END), 0)::float8 AS received_in,
+            COALESCE(SUM(CASE WHEN t.from_shop_id = $${si} THEN t.qty_received ELSE 0 END), 0)::float8 AS sent_out
+          FROM transfers t
+          JOIN products p ON p.item_id = t.item_id
+          WHERE p.manufacturer ILIKE $${mi}
+            AND t.transfer_received = true
+            AND t.item_id IS NOT NULL
+            AND (t.from_shop_id = $${si} OR t.to_shop_id = $${si})
+            AND p.tags ILIKE $${ti}
+            AND p.tenant_id = $${di}
+        )` : `
+        transfers_cte AS (SELECT 0::float8 AS received_in, 0::float8 AS sent_out)`;
+
       return pool.query(`
         WITH
         sold_cte AS (
@@ -4284,24 +4306,24 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
             COALESCE(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)), 0)::float8 AS revenue
           FROM sale_lines sl
           JOIN products p ON p.item_id = sl.item_id
-          WHERE p.manufacturer ILIKE $${i.mfr}
-            AND p.tags ILIKE $${i.tag}
-            AND sl.completed_time >= $${i.from}::date
-            AND sl.completed_time <= $${i.to}::date
-            AND p.tenant_id = $${i.tid}
+          WHERE p.manufacturer ILIKE $${mi}
+            AND p.tags ILIKE $${ti}
+            AND sl.completed_time IS NOT NULL
+            AND p.tenant_id = $${di}
             ${shopSale}
         ),
         stock_cte AS (
           SELECT COALESCE(SUM(COALESCE(inv2.qty_on_hand,0) + COALESCE(inv2.qty_on_order,0)), 0)::float8 AS stock_tag
           FROM products p
-          LEFT JOIN inventory inv2 ON inv2.item_id = p.item_id ${shopInv}
-          WHERE p.manufacturer ILIKE $${i.mfr}
-            AND p.tags ILIKE $${i.tag}
+          LEFT JOIN inventory inv2 ON inv2.item_id = p.item_id ${shopInv2}
+          WHERE p.manufacturer ILIKE $${mi}
+            AND p.tags ILIKE $${ti}
             AND p.archived = false
-            AND p.tenant_id = $${i.tid}
-        )
-        SELECT s.units_sold, s.revenue, st2.stock_tag
-        FROM sold_cte s, stock_cte st2
+            AND p.tenant_id = $${di}
+        ),
+        ${transfersCte}
+        SELECT s.units_sold, s.revenue, st2.stock_tag, tc.received_in, tc.sent_out
+        FROM sold_cte s, stock_cte st2, transfers_cte tc
       `, params);
     };
 
@@ -4448,13 +4470,15 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       };
     }
 
-    // Compute historique_saisons
+    // Compute historique_saisons — immutable received_supplier formula
     const historique_saisons = histSeasons.map((conf, idx) => {
       const r    = b2[histStartIdx + idx]?.rows[0];
-      const sold = parseFloat(r?.units_sold) || 0;
-      const stk  = parseFloat(r?.stock_tag)  || 0;
-      const rev  = parseFloat(r?.revenue)    || 0;
-      const received = Math.max(0, sold + stk);
+      const sold = parseFloat(r?.units_sold)   || 0;
+      const stk  = parseFloat(r?.stock_tag)    || 0;
+      const rev  = parseFloat(r?.revenue)      || 0;
+      const tin  = parseFloat(r?.received_in)  || 0;
+      const tout = parseFloat(r?.sent_out)     || 0;
+      const received = Math.max(0, sold + stk + tout - tin);
       return {
         code:           conf.code.toUpperCase(),
         periode:        { de: conf.sell_from, a: conf.sell_to },
