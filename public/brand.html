@@ -114,6 +114,11 @@
         </div>
         <p id="kpiGlobalRevenue" class="text-2xl font-bold text-gray-900">—</p>
         <p id="kpiGlobalUnits" class="text-xs text-gray-400 mt-0.5">— unités</p>
+        <div id="nosDetail" class="hidden mt-2 pt-2 border-t border-gray-100 space-y-0.5">
+          <p class="text-[10px] text-gray-400 leading-tight"><span id="nosCollLabel">Collection</span> : <span id="nosCollection" class="font-medium text-gray-600">—</span></p>
+          <p class="text-[10px] text-gray-400 leading-tight">NOS / autres : <span id="nosAutres" class="font-medium text-gray-600">—</span></p>
+          <p class="text-[10px] text-gray-300 leading-tight border-t border-gray-100 pt-0.5">Total : <span id="nosTotal" class="text-gray-500">—</span></p>
+        </div>
       </div>
       <div id="kpiCardRev" class="kpi-card bg-white rounded-xl border border-gray-200 p-4">
         <p class="text-xs text-gray-400 mb-1"><span id="kpiRevStaticLabel">Revenu</span> <span id="kpiRevLabel" class="font-semibold text-gray-600"></span></p>
@@ -122,11 +127,66 @@
       </div>
     </div>
 
+    <!-- Historique des saisons -->
+    <div id="histCard" class="bg-white rounded-xl border border-gray-200 p-5">
+      <h2 id="histTitle" class="text-sm font-semibold text-gray-700 mb-3">Historique des saisons</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs text-gray-400 border-b border-gray-100">
+              <th id="thHistSaison"  class="text-left pb-2 font-medium">Saison</th>
+              <th id="thHistRecu"    class="text-right pb-2 font-medium">Reçu</th>
+              <th id="thHistVendu"   class="text-right pb-2 font-medium">Vendu</th>
+              <th id="thHistST"      class="text-right pb-2 font-medium">ST%</th>
+              <th id="thHistRevenu"  class="text-right pb-2 font-medium">Revenu</th>
+              <th id="thHistTendance" class="text-right pb-2 font-medium">Tendance</th>
+            </tr>
+          </thead>
+          <tbody id="histBody" class="divide-y divide-gray-50"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Projection fin de saison -->
+    <div id="projCard" class="hidden bg-white rounded-xl border border-gray-200 p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="projTitle" class="text-sm font-semibold text-gray-700">Projection fin de saison</h2>
+        <span id="projSignalBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold text-white"></span>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3">
+        <div>
+          <p id="projVeloLbl" class="text-xs text-gray-400 mb-0.5">Vélocité 4 sem.</p>
+          <p id="projVelo"    class="text-xl font-bold text-gray-900">—</p>
+        </div>
+        <div>
+          <p id="projSemLbl"  class="text-xs text-gray-400 mb-0.5">Semaines restantes</p>
+          <p id="projSemRest" class="text-xl font-bold text-gray-900">—</p>
+        </div>
+        <div>
+          <p id="projVentesLbl" class="text-xs text-gray-400 mb-0.5">Ventes projetées</p>
+          <p id="projVentes"   class="text-xl font-bold text-gray-900">—</p>
+        </div>
+        <div>
+          <p id="projSTLbl" class="text-xs text-gray-400 mb-0.5">ST projeté</p>
+          <p id="projST"    class="text-xl font-bold text-gray-900">—</p>
+        </div>
+      </div>
+      <p id="projRupture" class="text-xs text-gray-500"></p>
+    </div>
+
     <!-- Weekly chart -->
     <div class="bg-white rounded-xl border border-gray-200 p-5">
       <h2 id="chartTitle" class="text-sm font-semibold text-gray-700 mb-4">Évolution des ventes — 12 semaines</h2>
       <div class="relative" style="height:200px">
         <canvas id="salesChart"></canvas>
+      </div>
+    </div>
+
+    <!-- ST cumulatif chart -->
+    <div id="stCumCard" class="hidden bg-white rounded-xl border border-gray-200 p-5">
+      <h2 id="stCumTitle" class="text-sm font-semibold text-gray-700 mb-4">Sell-through cumulatif — depuis le début de saison</h2>
+      <div class="relative" style="height:200px">
+        <canvas id="stCumChart"></canvas>
       </div>
     </div>
 
@@ -379,8 +439,17 @@
     'ARRÊTER':   { bg: '#dc2626', kpiColor: 'text-red-600',    tipKey: 'reco_tip_stop'   },
   };
 
-  // ── Chart instance ────────────────────────────────────────────────────────
-  let chart = null;
+  // ── Chart instances ───────────────────────────────────────────────────────
+  let chart    = null;
+  let stCumChart = null;
+
+  const SIGNAL_STYLE = {
+    augmenter:    { bg: '#16a34a', label: 'Augmenter' },
+    legere_hausse:{ bg: '#7c3aed', label: 'Légère hausse' },
+    reconduire:   { bg: '#6b7280', label: 'Reconduire' },
+    reduire:      { bg: '#d97706', label: 'Réduire' },
+    couper:       { bg: '#dc2626', label: 'Couper' },
+  };
 
   // ── Sales mode toggle (tag | period) ─────────────────────────────────────
   let currentMode = 'tag';
@@ -437,6 +506,159 @@
         kpiSTSub.textContent = t('tagged_since')(d.season_code.toUpperCase(), d.season_from);
       }
     }
+  }
+
+  // ── Historique des saisons ────────────────────────────────────────────────
+  function renderHistorique(rows, currentCode) {
+    const card = document.getElementById('histCard');
+    if (!rows || !rows.length) { card.classList.add('hidden'); return; }
+    card.classList.remove('hidden');
+    document.getElementById('histBody').innerHTML = rows.map((s, idx) => {
+      const prev = rows[idx - 1];
+      const trend = prev == null ? '' :
+        s.st_pct == null || prev.st_pct == null ? '—' :
+        s.st_pct - prev.st_pct > 2  ? '<span class="text-green-500 font-bold">↑</span>' :
+        s.st_pct - prev.st_pct < -2 ? '<span class="text-red-500 font-bold">↓</span>' :
+        '<span class="text-gray-400">→</span>';
+      const isActive = s.en_cours;
+      const row = `
+        <tr class="${isActive ? 'bg-blue-50/50' : 'hover:bg-gray-50'}">
+          <td class="py-2 pr-2 text-xs font-${isActive ? 'semibold text-blue-700' : 'medium text-gray-700'}">${s.code}${isActive ? ' ●' : ''}</td>
+          <td class="py-2 text-right text-xs text-gray-500 tabular-nums">${fmt(s.units_received)}</td>
+          <td class="py-2 text-right text-xs text-gray-700 font-medium tabular-nums">${fmt(s.units_sold)}</td>
+          <td class="py-2 text-right text-xs font-semibold tabular-nums ${s.st_pct >= 65 ? 'text-green-600' : s.st_pct >= 50 ? 'text-blue-600' : s.st_pct >= 35 ? 'text-amber-600' : 'text-red-600'}">${fmtP(s.st_pct)}</td>
+          <td class="py-2 text-right text-xs text-gray-500 tabular-nums">${fmtC(s.revenue)}</td>
+          <td class="py-2 text-right text-xs">${trend}</td>
+        </tr>`;
+      return row;
+    }).join('');
+  }
+
+  // ── Projection fin de saison ──────────────────────────────────────────────
+  function renderProjection(proj) {
+    const card = document.getElementById('projCard');
+    if (!proj) { card.classList.add('hidden'); return; }
+    card.classList.remove('hidden');
+
+    const sig = SIGNAL_STYLE[proj.signal] ?? SIGNAL_STYLE.reconduire;
+    const badge = document.getElementById('projSignalBadge');
+    badge.textContent       = sig.label;
+    badge.style.background  = sig.bg;
+
+    document.getElementById('projVelo').textContent    = `${proj.velocite_4sem} u./sem`;
+    document.getElementById('projSemRest').textContent = `${proj.semaines_restantes} sem.`;
+    document.getElementById('projVentes').textContent  = `+${fmt(proj.ventes_projetees)} u.`;
+    document.getElementById('projST').textContent      = fmtP(proj.st_projete_pct);
+
+    const rupt = document.getElementById('projRupture');
+    if (proj.date_rupture_stock) {
+      const d = new Date(proj.date_rupture_stock).toLocaleDateString(locale, { day: 'numeric', month: 'long' });
+      rupt.textContent = `Rupture de stock estimée : ${d} (dans ${proj.semaines_avant_rupture} sem.)`;
+    } else if (proj.velocite_4sem === 0) {
+      rupt.textContent = 'Aucune vente ces 4 dernières semaines.';
+    } else {
+      rupt.textContent = 'Pas de rupture anticipée avant la fin de saison.';
+    }
+  }
+
+  // ── NOS breakdown ─────────────────────────────────────────────────────────
+  function renderNos(nos, seasonCode) {
+    const el = document.getElementById('nosDetail');
+    if (!nos || !seasonCode || nos.nos_autres === 0) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    document.getElementById('nosCollLabel').textContent  = `Collection ${seasonCode.toUpperCase()}`;
+    document.getElementById('nosCollection').textContent = `${fmt(nos.collection)} u.`;
+    document.getElementById('nosAutres').textContent     = `${fmt(nos.nos_autres)} u.`;
+    document.getElementById('nosTotal').textContent      = `${fmt(nos.total)} u.`;
+  }
+
+  // ── ST cumulatif chart ────────────────────────────────────────────────────
+  function renderStCumulatif(rows, seasonCode, thresholdPct) {
+    const card = document.getElementById('stCumCard');
+    if (!rows || !rows.length || !seasonCode) { card.classList.add('hidden'); return; }
+    card.classList.remove('hidden');
+
+    const prevCode = seasonCode[0] + (parseInt(seasonCode.slice(1), 10) - 1);
+    const labels   = rows.map(r => fmtWeek(r.week_start));
+    const currData = rows.map(r => r.st_pct_cumulative);
+    const prevData = rows.map(r => r.st_pct_cumulative_prev_season);
+    const hasPrev  = prevData.some(v => v !== null);
+
+    const canvas = document.getElementById('stCumChart');
+    const wrap   = canvas.parentElement;
+    if (stCumChart) { stCumChart.destroy(); stCumChart = null; }
+
+    const threshold = thresholdPct ?? 50;
+    const datasets = [
+      {
+        label: seasonCode.toUpperCase(),
+        data: currData,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.05)',
+        borderWidth: 2,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        fill: false,
+        tension: 0.3,
+      },
+    ];
+    if (hasPrev) datasets.push({
+      label: prevCode.toUpperCase(),
+      data: prevData,
+      borderColor: '#9ca3af',
+      borderDash: [5, 4],
+      borderWidth: 1.5,
+      pointRadius: 2,
+      pointHoverRadius: 3,
+      fill: false,
+      tension: 0.3,
+    });
+
+    stCumChart = new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 24, padding: 12 } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ST cumulatif ${ctx.dataset.label} : ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) + ' %' : '—'}`,
+            },
+          },
+          annotation: undefined,
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0 } },
+          y: {
+            min: 0, max: 100,
+            ticks: { font: { size: 10 }, callback: v => v + ' %' },
+            grid: { color: '#f3f4f6' },
+          },
+        },
+      },
+      plugins: [{
+        id: 'threshold_line',
+        afterDraw(chart2) {
+          const { ctx, scales: { y, x } } = chart2;
+          const yPx = y.getPixelForValue(threshold);
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(x.left, yPx);
+          ctx.lineTo(x.right, yPx);
+          ctx.strokeStyle = 'rgba(239,68,68,0.5)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+          ctx.fillStyle = '#ef4444';
+          ctx.font = '10px sans-serif';
+          ctx.fillText(`Reconduire ${threshold}%`, x.right - 80, yPx - 4);
+          ctx.restore();
+        },
+      }],
+    });
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -610,6 +832,13 @@
         <td class="py-2 text-right text-xs text-gray-500">${fmt(c.stock_units)}</td>
         <td class="py-2 text-right text-xs text-gray-500">${fmtC(c.revenue_12w)}</td>
       </tr>`).join('') || `<tr><td colspan="5" class="py-6 text-center text-xs text-gray-400">${t('no_data')}</td></tr>`;
+
+    // ── New season-specific sections ──────────────────────────────────────
+    renderHistorique(d.historique_saisons, d.season_code);
+    renderProjection(d.projection);
+    renderNos(d.ventes_nos, d.season_code);
+
+    renderStCumulatif(d.weekly_st_cumulative, d.season_code, d.reconduire_threshold_pct ?? 50);
   }
 
   // ── Top sizes & colors ────────────────────────────────────────────────────

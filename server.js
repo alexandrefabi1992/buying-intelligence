@@ -3882,6 +3882,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     const mfr    = decodeURIComponent(req.params.manufacturer);
     const shopId = req.query.shop_id || null;
     const hasShop = !!shopId;
+    const configPromise = Promise.all([getSeasonsConfig(req.tenantId), getMultiplierTiers(req.tenantId)]);
     // p layout: [mfr, shopId?, tenantId]
     const p      = hasShop ? [mfr, shopId, req.tenantId] : [mfr, req.tenantId];
     const tIdx   = p.length; // $3 or $2
@@ -4072,7 +4073,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       `, [mfr, seasonTag, req.tenantId]);
     }
 
-    const [q1, q2, q3a, q3b, q4, q5, q6] = await Promise.all([
+    const [q1, q2, q3a, q3b, q4, q5, q6, [seasonsConfig, tiers]] = await Promise.all([
       q1Promise,
       q2Promise,
 
@@ -4203,6 +4204,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       })(),
 
       q6Promise,
+      configPromise,
     ]);
 
     // Sold units per mode
@@ -4236,6 +4238,234 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       st >= 0.40 ? 'MAINTENIR' :
       st >= 0.20 ? 'RÉDUIRE'  : 'ARRÊTER';
 
+    // ── Second batch: season-specific features ──────────────────────────────
+    const todayStr        = today.toISOString().slice(0, 10);
+    const receivedSupplier = !allTime ? Math.max(0, soldTag + stockTag + sentOut - receivedIn) : null;
+    const seasonConf      = !allTime ? seasonsConfig.find(s => s.code === seasonCode) : null;
+    const isActive        = !allTime && !!seasonConf && todayStr <= (seasonConf.sell_to ?? '');
+
+    const prevSeasonConf = !allTime ? (() => {
+      const t = seasonCode[0], y = parseInt(seasonCode.slice(1), 10);
+      return seasonsConfig.find(s => s.code === `${t}${y - 1}`) ?? null;
+    })() : null;
+
+    const histSeasons = !allTime
+      ? (() => {
+          const t = seasonCode[0], y = parseInt(seasonCode.slice(1), 10);
+          return [y - 2, y - 1, y]
+            .map(yr => seasonsConfig.find(s => s.code === `${t}${yr}`))
+            .filter(Boolean);
+        })()
+      : [...seasonsConfig].sort((a, b) => b.sell_from.localeCompare(a.sell_from)).slice(0, 3).reverse();
+
+    // Build param objects for season-scoped brand queries.
+    // Returns params array + index map + shop conditions.
+    const mkSP = (from, to, tag) => {
+      if (hasShop) {
+        return { params: [mfr, shopId, from, to, tag, req.tenantId],
+                 i: { mfr: 1, shop: 2, from: 3, to: 4, tag: 5, tid: 6 },
+                 shopSale: 'AND sl.shop_id = $2', shopInv: 'AND inv2.shop_id = $2' };
+      }
+      return { params: [mfr, from, to, tag, req.tenantId],
+               i: { mfr: 1, from: 2, to: 3, tag: 4, tid: 5 },
+               shopSale: '', shopInv: '' };
+    };
+
+    // Factory: one season's sold + stock metrics
+    const histQ = (conf) => {
+      const hTag = `%${conf.tag_pattern}%`;
+      const hTo  = conf.sell_to < todayStr ? conf.sell_to : todayStr;
+      const { params, i, shopSale, shopInv } = mkSP(conf.sell_from, hTo, hTag);
+      return pool.query(`
+        WITH
+        sold_cte AS (
+          SELECT
+            COALESCE(SUM(sl.qty), 0)::float8 AS units_sold,
+            COALESCE(SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)), 0)::float8 AS revenue
+          FROM sale_lines sl
+          JOIN products p ON p.item_id = sl.item_id
+          WHERE p.manufacturer ILIKE $${i.mfr}
+            AND p.tags ILIKE $${i.tag}
+            AND sl.completed_time >= $${i.from}::date
+            AND sl.completed_time <= $${i.to}::date
+            AND p.tenant_id = $${i.tid}
+            ${shopSale}
+        ),
+        stock_cte AS (
+          SELECT COALESCE(SUM(COALESCE(inv2.qty_on_hand,0) + COALESCE(inv2.qty_on_order,0)), 0)::float8 AS stock_tag
+          FROM products p
+          LEFT JOIN inventory inv2 ON inv2.item_id = p.item_id ${shopInv}
+          WHERE p.manufacturer ILIKE $${i.mfr}
+            AND p.tags ILIKE $${i.tag}
+            AND p.archived = false
+            AND p.tenant_id = $${i.tid}
+        )
+        SELECT s.units_sold, s.revenue, st2.stock_tag
+        FROM sold_cte s, stock_cte st2
+      `, params);
+    };
+
+    // Factory: cumulative weekly sold (for ST chart)
+    const wklyQ = (from, to, tag) => {
+      const { params, i, shopSale } = mkSP(from, to, tag);
+      return pool.query(`
+        WITH ws AS (
+          SELECT date_trunc('week', sl.completed_time) AS wk,
+                 SUM(sl.qty) AS q
+          FROM sale_lines sl
+          JOIN products p ON p.item_id = sl.item_id
+          WHERE p.manufacturer ILIKE $${i.mfr}
+            AND p.tags ILIKE $${i.tag}
+            AND sl.completed_time >= $${i.from}::date
+            AND sl.completed_time <= $${i.to}::date
+            AND p.tenant_id = $${i.tid}
+            ${shopSale}
+          GROUP BY 1
+        )
+        SELECT wk AS week_start, SUM(q) OVER (ORDER BY wk)::float8 AS cum_sold
+        FROM ws ORDER BY wk
+      `, params);
+    };
+
+    // Assemble second batch
+    const batch2 = [];
+    const bk     = []; // keys parallel to batch2
+
+    if (!allTime) {
+      // NOS breakdown
+      const xn = mkSP(stFrom, stTo, seasonTag);
+      batch2.push(pool.query(`
+        SELECT
+          ROUND(SUM(CASE WHEN p.tags ILIKE $${xn.i.tag} THEN sl.qty ELSE 0 END), 0)::int AS collection,
+          ROUND(SUM(sl.qty), 0)::int AS total
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $${xn.i.mfr}
+          AND sl.completed_time >= $${xn.i.from}::date
+          AND sl.completed_time <= $${xn.i.to}::date
+          AND p.tenant_id = $${xn.i.tid}
+          ${xn.shopSale}
+      `, xn.params));
+      bk.push('nos');
+
+      // Weekly cumulative ST — current season
+      batch2.push(wklyQ(stFrom, stTo, seasonTag));
+      bk.push('wk_curr');
+
+      // Weekly cumulative ST — previous season
+      batch2.push(prevSeasonConf
+        ? wklyQ(prevSeasonConf.sell_from, prevSeasonConf.sell_to, `%${prevSeasonConf.tag_pattern}%`)
+        : Promise.resolve({ rows: [] }));
+      bk.push('wk_prev');
+
+      // Velocity 4 weeks (for projection)
+      const veloParams = hasShop ? [mfr, shopId, seasonTag, req.tenantId] : [mfr, seasonTag, req.tenantId];
+      const [veloTagIdx, veloTidIdx] = hasShop ? [3, 4] : [2, 3];
+      const veloShop = hasShop ? 'AND sl.shop_id = $2' : '';
+      batch2.push(isActive ? pool.query(`
+        SELECT ROUND(SUM(sl.qty) / 4.0, 1)::float8 AS velo
+        FROM sale_lines sl
+        JOIN products p ON p.item_id = sl.item_id
+        WHERE p.manufacturer ILIKE $1
+          AND p.tags ILIKE $${veloTagIdx}
+          AND sl.completed_time >= now() - INTERVAL '4 weeks'
+          AND sl.completed_time IS NOT NULL
+          AND p.tenant_id = $${veloTidIdx}
+          ${veloShop}
+      `, veloParams) : Promise.resolve({ rows: [{ velo: 0 }] }));
+      bk.push('velo4');
+    }
+
+    const histStartIdx = batch2.length;
+    for (const conf of histSeasons) { batch2.push(histQ(conf)); bk.push(`h_${conf.code}`); }
+
+    const b2 = await Promise.all(batch2);
+    const gr  = (key) => b2[bk.indexOf(key)];
+
+    // Compute ventes_nos
+    let ventes_nos = null;
+    if (!allTime) {
+      const rn = gr('nos')?.rows[0];
+      const col = parseInt(rn?.collection) || 0;
+      const tot = parseInt(rn?.total)      || 0;
+      ventes_nos = { collection: col, nos_autres: tot - col, total: tot };
+    }
+
+    // Compute weekly_st_cumulative
+    let weekly_st_cumulative = null;
+    if (!allTime && receivedSupplier > 0) {
+      const currRows = gr('wk_curr')?.rows ?? [];
+      const prevRows = gr('wk_prev')?.rows ?? [];
+
+      // Received_supplier for prev season (sold_prev + stock_prev)
+      let prevReceived = 0;
+      if (prevSeasonConf) {
+        const phi = histSeasons.findIndex(s => s.code === prevSeasonConf.code);
+        if (phi >= 0) {
+          const ph = b2[histStartIdx + phi]?.rows[0];
+          prevReceived = Math.max(0, (parseFloat(ph?.units_sold) || 0) + (parseFloat(ph?.stock_tag) || 0));
+        }
+      }
+
+      weekly_st_cumulative = currRows.map((row, idx) => {
+        const cumSold = parseFloat(row.cum_sold) || 0;
+        const stPct   = Math.round(cumSold / receivedSupplier * 1000) / 10;
+        const prow    = prevRows[idx];
+        const prevCum = prow ? (parseFloat(prow.cum_sold) || 0) : null;
+        const prevPct = (prevCum !== null && prevReceived > 0)
+          ? Math.round(prevCum / prevReceived * 1000) / 10 : null;
+        return { week_start: row.week_start, st_pct_cumulative: stPct, st_pct_cumulative_prev_season: prevPct };
+      });
+    }
+
+    // Compute projection
+    let projection = null;
+    if (!allTime && isActive && seasonConf) {
+      const sellToDate    = new Date(seasonConf.sell_to + 'T12:00:00Z');
+      const semRestantes  = Math.max(0, (sellToDate - today) / (7 * 24 * 3600 * 1000));
+      const velo4         = parseFloat(gr('velo4')?.rows[0]?.velo) || 0;
+      const ventesProj    = Math.round(velo4 * semRestantes);
+      const stProjeteFrac = receivedSupplier > 0 ? Math.min(1, (soldTag + ventesProj) / receivedSupplier) : null;
+      const stProjete     = stProjeteFrac !== null ? Math.round(stProjeteFrac * 1000) / 10 : null;
+
+      const rupture = (velo4 > 0 && stockTag > 0) ? (() => {
+        const sem = stockTag / velo4;
+        const d   = new Date(today.getTime() + sem * 7 * 24 * 3600 * 1000);
+        return { date: d.toISOString().slice(0, 10), semaines: Math.round(sem * 10) / 10 };
+      })() : null;
+
+      const tiersResult = stProjeteFrac !== null ? applyMultiplierTiers(stProjeteFrac, tiers) : null;
+      const signalMap   = { 'Augmenter': 'augmenter', 'Légère hausse': 'legere_hausse',
+                             'Reconduire': 'reconduire', 'Réduire': 'reduire', 'Couper': 'couper' };
+      projection = {
+        semaines_restantes:    Math.round(semRestantes * 10) / 10,
+        velocite_4sem:         Math.round(velo4 * 10) / 10,
+        ventes_projetees:      ventesProj,
+        st_projete_pct:        stProjete,
+        date_rupture_stock:    rupture?.date ?? null,
+        semaines_avant_rupture: rupture?.semaines ?? null,
+        signal:                tiersResult ? (signalMap[tiersResult.label] ?? 'reconduire') : 'reconduire',
+      };
+    }
+
+    // Compute historique_saisons
+    const historique_saisons = histSeasons.map((conf, idx) => {
+      const r    = b2[histStartIdx + idx]?.rows[0];
+      const sold = parseFloat(r?.units_sold) || 0;
+      const stk  = parseFloat(r?.stock_tag)  || 0;
+      const rev  = parseFloat(r?.revenue)    || 0;
+      const received = Math.max(0, sold + stk);
+      return {
+        code:           conf.code.toUpperCase(),
+        periode:        { de: conf.sell_from, a: conf.sell_to },
+        st_pct:         received > 0 ? Math.round(sold / received * 1000) / 10 : null,
+        units_received: Math.round(received),
+        units_sold:     Math.round(sold),
+        revenue:        Math.round(rev),
+        en_cours:       conf.sell_to >= todayStr,
+      };
+    });
+
     res.json({
       manufacturer:  mfr,
       shop_id:       shopId,
@@ -4256,10 +4486,19 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         transfers_sent_out:          Math.round(sentOut),
         recommendation,
       },
-      weekly_current: q3a.rows,
-      weekly_ly:      q3b.rows,
-      top_items:      q4.rows,
-      by_category:    q5.rows,
+      weekly_current:       q3a.rows,
+      weekly_ly:            q3b.rows,
+      top_items:            q4.rows,
+      by_category:          q5.rows,
+      weekly_st_cumulative,
+      projection,
+      historique_saisons,
+      ventes_nos,
+      reconduire_threshold_pct: (() => {
+        const t2 = [...tiers].sort((a, b) => b.st_min - a.st_min);
+        const reconduire = t2.find(tier => tier.label === 'Reconduire');
+        return reconduire ? Math.round(reconduire.st_min * 100) : 50;
+      })(),
     });
   } catch (err) { next(err); }
 });
