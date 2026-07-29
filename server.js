@@ -76,10 +76,11 @@ function requireSuperAdmin(req, res, next) {
 // Tiers are checked highest-to-lowest; first match wins.
 // ---------------------------------------------------------------------------
 const DEFAULT_MULTIPLIER_TIERS = [
-  { st_min: 0.80, multiplier: 1.25, label: 'Augmenter'     },
-  { st_min: 0.65, multiplier: 1.10, label: 'Légère hausse' },
+  { st_min: 0.80, multiplier: 1.15, label: 'Augmenter'     },
+  { st_min: 0.65, multiplier: 1.08, label: 'Légère hausse' },
   { st_min: 0.50, multiplier: 1.00, label: 'Reconduire'    },
-  { st_min: 0.35, multiplier: 0.80, label: 'Réduire'       },
+  { st_min: 0.40, multiplier: 0.90, label: 'Léger recul'   },
+  { st_min: 0.30, multiplier: 0.75, label: 'Réduire'       },
   { st_min: 0.00, multiplier: 0.50, label: 'Couper'        },
 ];
 
