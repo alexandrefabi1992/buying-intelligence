@@ -282,6 +282,92 @@ async function testSalesAnalysisCategory(label, args, ctx, { minBrands = 1, inde
 }
 
 // ---------------------------------------------------------------------------
+// Chatbot behavioral test — calls the production API and asserts conversational behavior.
+// Skipped (SKIP, not FAIL) if JWT_SECRET is not set in the environment.
+// ---------------------------------------------------------------------------
+async function testChatbotClarification(label, question) {
+  if (!process.env.JWT_SECRET) {
+    console.log(`SKIP ${label} — JWT_SECRET not set`);
+    return true;
+  }
+
+  const jwt = require('jsonwebtoken');
+  const https = require('https');
+  const PROD_URL = process.env.PROD_URL || 'https://buying-intelligence-production.up.railway.app';
+  const token = jwt.sign(
+    { userId: '1', tenantId: TENANT, role: 'superadmin' },
+    process.env.JWT_SECRET,
+    { expiresIn: '5m' }
+  );
+
+  const body = JSON.stringify({ messages: [{ role: 'user', content: question }] });
+  const url  = new URL('/api/ai/chat', PROD_URL);
+
+  const responseText = await new Promise((resolve, reject) => {
+    const req = https.request(
+      { hostname: url.hostname, path: url.pathname, method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Length': Buffer.byteLength(body) } },
+      res => {
+        let data = '';
+        res.on('data', chunk => { data += chunk; });
+        res.on('end', () => resolve(data));
+      }
+    );
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+
+  let parsed;
+  try { parsed = JSON.parse(responseText); } catch (e) {
+    console.error(`FAIL ${label} — réponse non-JSON: ${responseText.slice(0, 200)}`);
+    return false;
+  }
+
+  if (parsed.error) {
+    console.error(`FAIL ${label} — API error: ${parsed.error}`);
+    return false;
+  }
+
+  // Extract the assistant text from the last message
+  const messages = parsed.messages ?? [];
+  const assistantMsg = [...messages].reverse().find(m => m.role === 'assistant');
+  const assistantText = typeof assistantMsg?.content === 'string'
+    ? assistantMsg.content
+    : JSON.stringify(assistantMsg?.content ?? '');
+
+  let failed = false;
+
+  // Must not contain numbers (unit counts or dollar amounts)
+  if (/\d+\s*unités?/i.test(assistantText)) {
+    console.error(`FAIL ${label} — assertion "\d+ unités" failed — réponse contient des chiffres: "${assistantText.slice(0, 200)}"`);
+    failed = true;
+  }
+  if (/\$\s*[\d\s,.]+/.test(assistantText)) {
+    console.error(`FAIL ${label} — assertion "\$\\d+" failed — réponse contient des montants: "${assistantText.slice(0, 200)}"`);
+    failed = true;
+  }
+
+  // Must contain clarification options (A) and (B)
+  if (!assistantText.includes('(A)') || !assistantText.includes('(B)')) {
+    console.error(`FAIL ${label} — assertion "(A)/(B)" failed — pas de question de clarification: "${assistantText.slice(0, 300)}"`);
+    failed = true;
+  }
+
+  // Must not have triggered a tool call (clarification should come before any tool use)
+  const hasToolCall = messages.some(m => Array.isArray(m.content) && m.content.some(c => c.type === 'tool_use'));
+  if (hasToolCall) {
+    console.error(`FAIL ${label} — assertion "pas d'appel outil" failed — le chatbot a appelé un outil avant de clarifier`);
+    failed = true;
+  }
+
+  if (!failed) {
+    console.log(`PASS ${label} ✅`);
+  }
+  return !failed;
+}
+
+// ---------------------------------------------------------------------------
 
 async function main() {
   const ctx = await buildCtx();
@@ -407,6 +493,14 @@ async function main() {
     }
   );
   if (!r8) anyFailed = true;
+
+  // --- chatbot conversational behavior ---
+  console.log('');
+  const r10 = await testChatbotClarification(
+    '[Chatbot] "ventes de Marc Cain ce printemps" → clarification, pas de chiffres',
+    'ventes de Marc Cain ce printemps'
+  );
+  if (!r10) anyFailed = true;
 
   // --- marque_introuvable (typo detection, 2026-07-27) ---
   // "Patrick Assarag" (faute de frappe) doit déclencher marque_introuvable: true
