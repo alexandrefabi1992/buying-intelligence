@@ -2481,7 +2481,8 @@ async function toolGetRestockRecommendations(
     item_base AS (
       SELECT
         p.item_id, p.matrix_id, p.manufacturer, p.category,
-        COALESCE(p.default_cost, 0)::numeric AS default_cost,
+        COALESCE(p.default_cost,  0)::numeric AS default_cost,
+        COALESCE(p.default_price, 0)::numeric AS default_price,
         p.description AS item_description,
         im.description AS matrix_description,
         ias.size_axis,
@@ -2533,7 +2534,8 @@ async function toolGetRestockRecommendations(
         SUM(received_supplier)::int       AS units_received,
         SUM(stock)::int                   AS stock_actuel,
         ROUND(SUM(vel_4w)::numeric, 4)    AS velocite_4sem,
-        MAX(default_cost)::numeric(12,2)  AS unit_cost,
+        MAX(default_cost)::numeric(12,2)   AS unit_cost,
+        MAX(default_price)::numeric(12,2)  AS unit_price,
         BOOL_OR(has_season_tag)           AS has_season_tag,
         JSON_AGG(JSON_BUILD_OBJECT(
           'taille',            COALESCE(taille, 'N/A'),
@@ -2570,8 +2572,11 @@ async function toolGetRestockRecommendations(
     const unites_manquantes = Math.max(0, Math.round(velocite_4sem * horizon) - stock_actuel);
     if (unites_manquantes === 0) continue;
 
-    const unit_cost       = Number(r.unit_cost ?? 0);
-    const valeur_reassort = Math.round(unites_manquantes * unit_cost * 100) / 100;
+    const unit_cost             = Number(r.unit_cost  ?? 0);
+    const unit_price            = Number(r.unit_price ?? 0);
+    const valeur_reassort       = Math.round(unites_manquantes * unit_cost  * 100) / 100;
+    const valeur_ventes_manquees = Math.round(unites_manquantes * unit_price * 100) / 100;
+    const urgence               = semaines_couverture < 2 ? 'critique' : semaines_couverture < 4 ? 'elevee' : 'moderee';
 
     // Tailles à réassortir — aggregate by size first, then apply criteria
     const variantes   = Array.isArray(r.variantes_json) ? r.variantes_json : [];
@@ -2622,20 +2627,22 @@ async function toolGetRestockRecommendations(
       stock_actuel,
       velocite_4sem:          Math.round(velocite_4sem * 100) / 100,
       semaines_couverture,
+      urgence,
       unites_manquantes,
       valeur_reassort,
+      valeur_ventes_manquees,
       delai_semaines,
       delai_manquant,
       commande_utile,
       date_limite_commande,
-      transfert_possible:     null, // filled below
+      transfert_possible:      null, // filled below: 'complet'/'partiel'/'aucun'
       stock_autres_boutiques: null, // filled below
       tailles_a_reassortir,
     });
   }
 
-  // Sort by valeur_reassort desc, take top N
-  recommended.sort((a, b) => b.valeur_reassort - a.valeur_reassort);
+  // Sort by valeur_ventes_manquees desc (revenue impact), take top N
+  recommended.sort((a, b) => b.valeur_ventes_manquees - a.valeur_ventes_manquees);
   const topN = recommended.slice(0, limit);
 
   // Stock in other shops (batch query when shop_id provided)
@@ -2685,27 +2692,29 @@ async function toolGetRestockRecommendations(
       const autres   = otherMap[m.matrix_id] ?? [];
       const totalQty = autres.reduce((sum, b) => sum + b.qty, 0);
       m.stock_autres_boutiques = autres;
-      m.transfert_possible     = totalQty >= m.unites_manquantes;
+      m.transfert_possible     = totalQty >= m.unites_manquantes ? 'complet'
+                               : totalQty  > 0                   ? 'partiel'
+                               :                                   'aucun';
     }
   }
 
   // Build summary fields
   const marquesSansDelai = new Set(topN.filter(m => m.delai_manquant).map(m => m.manufacturer));
-  const valeur_reassort_estimee = Math.round(
-    topN.reduce((sum, m) => sum + (m.valeur_reassort ?? 0), 0) * 100
-  ) / 100;
+  const valeur_reassort_estimee       = Math.round(topN.reduce((sum, m) => sum + (m.valeur_reassort        ?? 0), 0) * 100) / 100;
+  const valeur_ventes_manquees_estimee = Math.round(topN.reduce((sum, m) => sum + (m.valeur_ventes_manquees ?? 0), 0) * 100) / 100;
 
   return {
-    periode:                   { de: stFrom, a: s.sell_to },
-    saison:                    season.toUpperCase(),
-    boutique:                  shopName,
-    semaines_restantes_saison: Math.round(semaines_restantes * 10) / 10,
-    scope_produits:            include_nos ? `Collection ${season.toUpperCase()} + NOS` : `Collection ${season.toUpperCase()}`,
-    criteres:                  { min_st, max_semaines_couverture: max_semaines_couverture ?? null, manufacturer: manufacturer ?? null },
-    nb_modeles:                topN.length,
-    nb_marques_sans_delai:     marquesSansDelai.size,
+    periode:                      { de: stFrom, a: s.sell_to },
+    saison:                       season.toUpperCase(),
+    boutique:                     shopName,
+    semaines_restantes_saison:    Math.round(semaines_restantes * 10) / 10,
+    scope_produits:               include_nos ? `Collection ${season.toUpperCase()} + NOS` : `Collection ${season.toUpperCase()}`,
+    criteres:                     { min_st, max_semaines_couverture: max_semaines_couverture ?? null, manufacturer: manufacturer ?? null },
+    nb_modeles:                   topN.length,
+    nb_marques_sans_delai:        marquesSansDelai.size,
     valeur_reassort_estimee,
-    modeles:                   topN,
+    valeur_ventes_manquees_estimee,
+    modeles:                      topN,
   };
 }
 
