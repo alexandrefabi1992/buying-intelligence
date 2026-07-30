@@ -962,6 +962,21 @@ async function runMigrations() {
     )
   `);
 
+  // item_matrices — Lightspeed matrix descriptions (clean model names without size/color suffixes).
+  // Synced by sync.js with checkpoint+delta; read-only here.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS item_matrices (
+      tenant_id        TEXT NOT NULL,
+      matrix_id        TEXT NOT NULL,
+      description      TEXT,
+      manufacturer_id  TEXT,
+      category_id      TEXT,
+      attribute_set_id TEXT,
+      synced_at        TIMESTAMPTZ DEFAULT now(),
+      PRIMARY KEY (tenant_id, matrix_id)
+    )
+  `);
+
   console.log('[migration] Schema up to date');
 }
 
@@ -1314,6 +1329,7 @@ app.get('/api/transfers', async (req, res, next) => {
       SELECT
         p.item_id, p.description, p.manufacturer, p.category,
         p.matrix_id, p.default_price,
+        im.description                            AS matrix_description,
         COALESCE(
           CASE WHEN p.raw->'ItemAttributes'->>'attribute1' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute1' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute1' END,
           CASE WHEN p.raw->'ItemAttributes'->>'attribute2' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute2' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute2' END,
@@ -1336,6 +1352,7 @@ app.get('/api/transfers', async (req, res, next) => {
         AND i.qty_on_hand >= $2
       JOIN shops sh_d ON sh_d.shop_id = ba.dormant_shop_id
       JOIN shops sh_a ON sh_a.shop_id = ba.active_shop_id
+      LEFT JOIN item_matrices im ON im.tenant_id = $${tidN} AND im.matrix_id = p.matrix_id
       LEFT JOIN inventory i_dest ON i_dest.item_id = p.item_id AND i_dest.shop_id = ba.active_shop_id
       LEFT JOIN sales_90d s_dest ON s_dest.item_id = p.item_id AND s_dest.shop_id = ba.active_shop_id
       LEFT JOIN sales_90d s_src  ON s_src.item_id  = p.item_id AND s_src.shop_id  = ba.dormant_shop_id

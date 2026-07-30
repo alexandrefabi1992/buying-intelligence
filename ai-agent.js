@@ -1013,7 +1013,7 @@ async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1
     SELECT
       p.manufacturer,
       p.matrix_id,
-      MIN(p.description) AS model_name,
+      COALESCE(MAX(im.description), MIN(p.description)) AS model_name,
       sh_d.name AS boutique_dormante,
       sh_a.name AS boutique_active,
       ba.days_dormant,
@@ -1033,6 +1033,7 @@ async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1
     JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = ba.dormant_shop_id AND i.qty_on_hand >= $2
     JOIN shops sh_d ON sh_d.shop_id = ba.dormant_shop_id
     JOIN shops sh_a ON sh_a.shop_id = ba.active_shop_id
+    LEFT JOIN item_matrices im ON im.matrix_id = p.matrix_id
     WHERE NOT (p.default_cost = 0 AND p.default_price = 0)
       AND p.description NOT ILIKE '%shopify%'
       ${nosFilter} ${catFilter}
@@ -1077,7 +1078,7 @@ async function toolGetMatrixInfo({ manufacturer, description_search, category, s
     SELECT
       p.matrix_id,
       p.manufacturer,
-      MIN(p.description) AS exemple_description,
+      COALESCE(MAX(im.description), MIN(p.description)) AS exemple_description,
       COUNT(DISTINCT p.item_id)::int AS nb_variantes,
       COALESCE(SUM(i.qty_on_hand), 0)::int AS stock_total,
       string_agg(DISTINCT COALESCE(
@@ -1091,6 +1092,7 @@ async function toolGetMatrixInfo({ manufacturer, description_search, category, s
          AND sl2.completed_time >= now() - interval '365 days')::int AS ventes_12m
     FROM products p
     ${shopJoin}
+    LEFT JOIN item_matrices im ON im.matrix_id = p.matrix_id
     WHERE ${conditions.join(' AND ')}
     GROUP BY p.matrix_id, p.manufacturer
     ORDER BY stock_total DESC NULLS LAST
@@ -1632,6 +1634,7 @@ async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, 
         p.raw->'ItemAttributes'->>'itemAttributeSetID' AS set_id,
         ias.size_axis,
         ias.color_axis,
+        im.description                                 AS matrix_description,
         COALESCE(s.sold,     0)::int AS sold,
         COALESCE(st.stock,   0)::int AS stock,
         COALESCE(ti.qty_in,  0)::int AS transferred_in,
@@ -1645,6 +1648,7 @@ async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, 
       LEFT JOIN item_attribute_sets ias
         ON  ias.attribute_set_id = (p.raw->'ItemAttributes'->>'itemAttributeSetID')
         AND ias.tenant_id = p.tenant_id
+      LEFT JOIN item_matrices im ON im.matrix_id = p.matrix_id AND im.tenant_id = p.tenant_id
       LEFT JOIN sales_by_item  s   ON s.item_id   = p.item_id
       LEFT JOIN stock_by_item  st  ON st.item_id  = p.item_id
       LEFT JOIN transfers_in   ti  ON ti.item_id  = p.item_id
@@ -1702,7 +1706,7 @@ async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, 
   return {
     matrix_id,
     marque:   rows[0].manufacturer,
-    modele:   rows[0].description,
+    modele:   rows[0].matrix_description ?? rows[0].description,
     periode:  { de: from, a: to },
     saison:   season?.toUpperCase() ?? null,
     boutique: shop_id ?? 'toutes',
@@ -1769,7 +1773,7 @@ async function toolGetProductByDescription({ terme, season, shop_id }, { pool, g
     SELECT
       p.matrix_id,
       p.manufacturer,
-      MIN(p.description) AS exemple_description,
+      COALESCE(MAX(im.description), MIN(p.description)) AS exemple_description,
       COUNT(DISTINCT p.item_id)::int AS nb_variantes,
       SUM(GREATEST(0, COALESCE(s.sold,0) + COALESCE(st.stock,0)))::int AS recu_fournisseur,
       SUM(COALESCE(s.sold, 0))::int AS vendu,
@@ -1781,6 +1785,7 @@ async function toolGetProductByDescription({ terme, season, shop_id }, { pool, g
     FROM products p
     LEFT JOIN sales_by_item s  ON s.item_id  = p.item_id
     LEFT JOIN stock_by_item st ON st.item_id = p.item_id
+    LEFT JOIN item_matrices im ON im.matrix_id = p.matrix_id AND im.tenant_id = p.tenant_id
     WHERE p.description ILIKE $3 AND p.tenant_id = $4 ${tagCond}
       AND (COALESCE(s.sold,0) + COALESCE(st.stock,0)) > 0
     GROUP BY p.matrix_id, p.manufacturer

@@ -33,7 +33,7 @@ let _unresolvedMfgCount = 0; // items upserted this run whose manufacturer could
 
 // Steps whose data doesn't change daily — only re-sync if stale (> STATIC_SYNC_DAYS old).
 // Time-filtered steps (sales, orders, transfers) always re-run to pick up the daily delta.
-const STATIC_STEPS    = new Set(['shops', 'items', 'inventory']);
+const STATIC_STEPS    = new Set(['shops', 'items', 'item_matrices', 'inventory']);
 const STATIC_SYNC_DAYS = parseInt(process.env.STATIC_SYNC_DAYS ?? '1', 10);
 
 // ---------------------------------------------------------------------------
@@ -323,6 +323,21 @@ async function ensureSchema() {
       PRIMARY KEY (tenant_id, month, shop_id, manufacturer)
     )
   `);
+
+  // ItemMatrix descriptions — one row per Lightspeed matrix, synced with checkpoint+delta.
+  // Gives clean model names (description without size/color suffixes) for UI and AI tools.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS item_matrices (
+      tenant_id        TEXT NOT NULL,
+      matrix_id        TEXT NOT NULL,
+      description      TEXT,
+      manufacturer_id  TEXT,
+      category_id      TEXT,
+      attribute_set_id TEXT,
+      synced_at        TIMESTAMPTZ DEFAULT now(),
+      PRIMARY KEY (tenant_id, matrix_id)
+    )
+  `);
 }
 
 // ---------------------------------------------------------------------------
@@ -439,6 +454,29 @@ async function backfillNumericManufacturers(tenantId) {
   );
   if (resolved > 0 || zeroed > 0) {
     console.log(`[sync] Backfill manufacturers: ${resolved} IDs → name, ${zeroed} ID=0 → NULL`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ItemMatrix upsert — one row per matrix, description is the clean model name.
+// ---------------------------------------------------------------------------
+async function upsertItemMatrices(tenantId, matrices) {
+  for (const mx of matrices) {
+    const matrixId = String(mx.itemMatrixID ?? '');
+    if (!matrixId || matrixId === '0') continue;
+    await pool.query(`
+      INSERT INTO item_matrices (tenant_id, matrix_id, description, manufacturer_id, category_id, attribute_set_id, synced_at)
+      VALUES ($1, $2, $3, $4, $5, $6, now())
+      ON CONFLICT (tenant_id, matrix_id) DO UPDATE
+        SET description = $3, manufacturer_id = $4, category_id = $5, attribute_set_id = $6, synced_at = now()
+    `, [
+      tenantId,
+      matrixId,
+      mx.description ?? null,
+      mx.manufacturerID ? String(mx.manufacturerID) : null,
+      mx.categoryID     ? String(mx.categoryID)     : null,
+      mx.itemAttributeSetID ? String(mx.itemAttributeSetID) : null,
+    ]);
   }
 }
 
@@ -901,7 +939,7 @@ async function refreshMaterializedView(viewName) {
 // ---------------------------------------------------------------------------
 // Main sync
 // ---------------------------------------------------------------------------
-const SYNC_STEPS = ['shops', 'items', 'inventory', 'sales', 'orders', 'transfers'];
+const SYNC_STEPS = ['shops', 'items', 'item_matrices', 'inventory', 'sales', 'orders', 'transfers'];
 
 async function runSync({ forceDaysBack = null } = {}) {
   console.log(`[sync] Starting — ${new Date().toISOString()}`);
@@ -1035,7 +1073,49 @@ async function runSync({ forceDaysBack = null } = {}) {
       await saveCheckpoint('items_delta_since', itemsSyncStarted, itemCount);
     }
 
-    // ── 3. ItemMatrix — skipped; matrix_id stored on each product row ─────
+    // ── 3. ItemMatrix (matrix descriptions) ──────────────────────────────
+    // Delta sync: only fetch matrices modified since last completed sync.
+    // Checkpoint cursor in 'item_matrices'; delta boundary in 'item_matrices_delta_since'.
+    if (cps.item_matrices?.next_url === 'COMPLETED') {
+      console.log('[sync] item_matrices: skipping (already completed)');
+    } else {
+      const mxDeltaRow = await getCheckpoint('item_matrices_delta_since');
+      const mxDelta    = !isFirstSync && mxDeltaRow?.next_url && mxDeltaRow.next_url !== 'COMPLETED'
+        ? mxDeltaRow.next_url
+        : null;
+      const mxParams       = mxDelta ? { timeStamp: `>,${mxDelta}` } : {};
+      const mxSyncStarted  = new Date().toISOString();
+
+      let mxCount = cps.item_matrices?.processed_count ?? 0;
+      if (cps.item_matrices) console.log(`[sync] Resuming item_matrices from checkpoint at ${mxCount}…`);
+      else if (mxDelta)       console.log(`[sync] ItemMatrix delta sync since ${mxDelta}…`);
+      else                    console.log('[sync] ItemMatrix full sync…');
+
+      let mxPages = 0;
+      for await (const { items, nextUrl } of paginate(client, 'ItemMatrix', mxParams, cps.item_matrices?.next_url)) {
+        await upsertItemMatrices(tenantId, items);
+        mxCount += items.length;
+        mxPages++;
+        if (mxCount % 1000 === 0) console.log(`[sync] ItemMatrix upserted: ${mxCount}`);
+        if (nextUrl) await saveCheckpoint('item_matrices', nextUrl, mxCount);
+      }
+      console.log(`[sync] ItemMatrix done: ${mxCount} records (${mxPages} pages)`);
+      await markStepCompleted('item_matrices', mxCount);
+      await saveCheckpoint('item_matrices_delta_since', mxSyncStarted, mxCount);
+
+      // Warn for product matrix_ids with no item_matrices entry after full sync.
+      if (!mxDelta) {
+        const { rows: orphans } = await pool.query(`
+          SELECT COUNT(DISTINCT p.matrix_id) AS n
+          FROM   products p
+          LEFT JOIN item_matrices im ON im.tenant_id = $1 AND im.matrix_id = p.matrix_id
+          WHERE  p.tenant_id = $1 AND p.matrix_id IS NOT NULL AND p.matrix_id != ''
+            AND  im.matrix_id IS NULL
+        `, [tenantId]);
+        const orphanCount = Number(orphans[0]?.n ?? 0);
+        if (orphanCount > 0) console.warn(`[sync] WARNING: ${orphanCount} product matrix_ids have no item_matrices entry`);
+      }
+    }
 
     // ── 4. Inventory (ItemShop) ───────────────────────────────────────────
     // Delta sync: on subsequent runs, only fetch records modified since the last

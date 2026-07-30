@@ -2536,6 +2536,7 @@ var TransfersTab = (function() {
       if (!groups[key]) {
         groups[key] = {
           key: key, matrix_id: r.matrix_id,
+          matrix_description: r.matrix_description || null,
           manufacturer: r.manufacturer || '—', category: r.category || '—',
           total_qty: 0, total_value: 0, days_dormant: 0,
           active_sold_30d: 0, sold_90d_dest: 0, sold_90d_src: 0,
@@ -2573,7 +2574,8 @@ var TransfersTab = (function() {
     return groups.slice().sort(function(a, b) {
       var av, bv;
       if (col === 'description') {
-        av = (a.items[0] && a.items[0].description) || ''; bv = (b.items[0] && b.items[0].description) || '';
+        av = a.matrix_description || (a.items[0] && a.items[0].description) || '';
+        bv = b.matrix_description || (b.items[0] && b.items[0].description) || '';
         return dir * av.localeCompare(bv);
       }
       if (col === 'manufacturer') return dir * (a.manufacturer || '').localeCompare(b.manufacturer || '');
@@ -2622,7 +2624,7 @@ var TransfersTab = (function() {
     var html   = '';
     sorted.forEach(function(g) {
       var isOpen       = expandedGroups.has(g.key);
-      var modelName    = (g.items[0] && g.items[0].description) ? escHtml(g.items[0].description) : '—';
+      var modelName    = g.matrix_description ? escHtml(g.matrix_description) : (g.items[0] && g.items[0].description) ? escHtml(g.items[0].description) : '—';
       var nItems       = g.items.length;
       var dormantNames = g.dormant_shops.map(function(s) { return escHtml(s.name); }).join(', ');
       var activeNames  = g.active_shops.map(function(s) { return escHtml(s.name); }).join(', ');
@@ -2632,7 +2634,7 @@ var TransfersTab = (function() {
 
       html += '<tr class="tr-group cursor-pointer hover:bg-amber-50 transition-colors" data-key="' + escHtml(g.key) + '">' +
         '<td class="px-3 py-2 text-gray-400 text-center">' + (isOpen ? '▾' : '▸') + '</td>' +
-        '<td class="px-3 py-2 font-medium max-w-[240px] truncate" title="' + modelName + '">' + modelName +
+        '<td class="px-3 py-2 font-medium max-w-[240px] truncate" title="' + modelName + ' (matrix_id: ' + escHtml(String(g.matrix_id)) + ')">' + modelName +
           (nItems > 1 ? ' <span class="text-gray-400 font-normal">' + t('transfers_size_plus')(nItems - 1) + '</span>' : '') + '</td>' +
         '<td class="px-3 py-2 text-gray-600">' + escHtml(g.manufacturer) + '</td>' +
         '<td class="px-3 py-2 text-gray-500 max-w-[110px] truncate" title="' + escHtml(g.category) + '">' + escHtml(g.category) + '</td>' +
