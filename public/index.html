@@ -407,6 +407,9 @@
       <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
         <input type="checkbox" id="transfersExcludeNos" class="rounded"> <span data-i18n="transfers_exclude_nos">Exclure NOS</span>
       </label>
+      <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+        <input type="checkbox" id="transfersShowDismissed" class="rounded"> <span data-i18n="transfers_show_dismissed">Afficher masqués</span>
+      </label>
       <button id="transfersApplyBtn" class="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700" data-i18n="btn_apply">Appliquer</button>
       <span id="transfersCount" class="text-xs text-gray-500 ml-auto"></span>
     </div>
@@ -417,14 +420,18 @@
           <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide select-none">
             <tr>
               <th class="px-3 py-2 w-6"></th>
-              <th class="px-3 py-2 text-left" data-i18n="col_model">Modèle</th>
-              <th class="px-3 py-2 text-left" data-i18n="col_brand_th">Marque</th>
+              <th class="px-3 py-2 text-left cursor-pointer select-none" data-sort="description" data-i18n="col_model">Modèle</th>
+              <th class="px-3 py-2 text-left cursor-pointer select-none" data-sort="manufacturer" data-i18n="col_brand_th">Marque</th>
               <th class="px-3 py-2 text-left" data-i18n="col_category">Catégorie</th>
-              <th class="px-3 py-2 text-left" title="Boutique avec stock dormant — n'a pas vendu ce modèle depuis X jours" data-i18n="col_dormant_at">Stock dort chez</th>
-              <th class="px-3 py-2 text-right" title="Total des unités disponibles à transférer" data-i18n="col_qty">Qté</th>
-              <th class="px-3 py-2 text-right" title="Jours sans vente sur ce modèle dans la boutique dormante. «Jamais» = aucune vente dans les 90 derniers jours." data-i18n="col_dormant_since">Inactif depuis</th>
-              <th class="px-3 py-2 text-left" title="Boutique qui a vendu ce modèle dans les X derniers jours" data-i18n="col_active_at">Actif chez</th>
-              <th class="px-3 py-2 text-right" title="Unités vendues dans les 30 derniers jours dans la boutique active" data-i18n="col_sold_30d">Vendu (30j)</th>
+              <th class="px-3 py-2 text-left" title="Boutique(s) avec stock dormant" data-i18n="col_dormant_at">Stock dort chez</th>
+              <th class="px-3 py-2 text-right cursor-pointer select-none" data-sort="total_qty" title="Total des unités disponibles à transférer" data-i18n="col_qty">Qté</th>
+              <th class="px-3 py-2 text-right cursor-pointer select-none" data-sort="total_value" title="Valeur totale du stock dormant (qté × prix)" data-i18n="col_value">Valeur</th>
+              <th class="px-3 py-2 text-right cursor-pointer select-none" data-sort="days_dormant" title="Jours sans vente (max du groupe). «Jamais» = aucune vente dans les 90 derniers jours." data-i18n="col_dormant_since">Inactif</th>
+              <th class="px-3 py-2 text-left" title="Boutique(s) active(s)" data-i18n="col_active_at">Actif chez</th>
+              <th class="px-3 py-2 text-right cursor-pointer select-none" data-sort="active_sold_30d" title="Unités vendues dans les 30 derniers jours dans la boutique active" data-i18n="col_sold_30d">30j</th>
+              <th class="px-3 py-2 text-right cursor-pointer select-none" data-sort="velocity" title="Ventes destination ÷ ventes source sur 90j. 100% = même rythme. &gt;100% = destination vend plus vite." data-i18n="col_velocity">Vélocité</th>
+              <th class="px-3 py-2 text-center" data-i18n="col_status">Statut</th>
+              <th class="px-3 py-2 text-center" data-i18n="col_action">Action</th>
             </tr>
           </thead>
           <tbody id="transfersBody" class="divide-y divide-gray-100"></tbody>
@@ -1095,6 +1102,12 @@ const TRANSLATIONS = {
     transfers_size_plus: n => `+${n} taille${n > 1 ? 's' : ''}`,
     transfers_unit: qty => `${qty} unité${qty > 1 ? 's' : ''}`,
     transfers_models_count: (g, v) => `${g} modèle${g > 1 ? 's' : ''} recommandé${g > 1 ? 's' : ''} (${v} variante${v > 1 ? 's' : ''})`,
+    transfers_show_dismissed:'Afficher masqués',
+    transfers_recently_tx:'Récemment transféré',
+    transfers_dismissed_badge:'Masqué',
+    transfers_dismiss_30d:'30 jours', transfers_dismiss_90d:'90 jours', transfers_dismiss_perm:'Permanent',
+    transfers_restore:'Restaurer',
+    col_value:'Valeur', col_velocity:'Vélocité', col_status:'Statut', col_action:'Action',
   },
   en: {
     loading:'Loading…', lastSync:'Last sync',
@@ -1299,6 +1312,12 @@ const TRANSLATIONS = {
     transfers_size_plus: n => `+${n} size${n > 1 ? 's' : ''}`,
     transfers_unit: qty => `${qty} unit${qty > 1 ? 's' : ''}`,
     transfers_models_count: (g, v) => `${g} style${g > 1 ? 's' : ''} recommended (${v} variant${v > 1 ? 's' : ''})`,
+    transfers_show_dismissed:'Show dismissed',
+    transfers_recently_tx:'Recently transferred',
+    transfers_dismissed_badge:'Dismissed',
+    transfers_dismiss_30d:'30 days', transfers_dismiss_90d:'90 days', transfers_dismiss_perm:'Permanent',
+    transfers_restore:'Restore',
+    col_value:'Value', col_velocity:'Velocity', col_status:'Status', col_action:'Action',
   },
 };
 
@@ -2486,81 +2505,180 @@ var SizesTab = (function() {
 // TransfersTab — Stock dormant / transferts recommandés (accordéon par modèle)
 // ─────────────────────────────────────────────────────────────────────────────
 var TransfersTab = (function() {
-  var transfersData = [];
-  var expandedGroups = new Set(); // key = matrix_id + '|' + dormant_shop_id
-  var catLoaded = false;
+  var transfersData  = [];
+  var expandedGroups = new Set(); // key = matrix_id
+  var catLoaded  = false;
   var shopLoaded = false;
+  var sortState  = { col: 'total_value', dir: 'desc' };
 
   function dormantLabel(days) {
     if (days == null) return '<span class="text-gray-400 italic">' + t('transfers_never') + '</span>';
     return '<span class="text-red-600 font-semibold">' + days + 'j</span>';
   }
 
+  function fmtC(n) {
+    if (n == null) return '<span class="text-gray-300">—</span>';
+    return '$ ' + Number(n).toLocaleString('fr-CA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+
+  function velocityBadge(dest, src) {
+    if (!src) return '<span class="text-gray-300">—</span>';
+    var ratio = dest / src;
+    var pct   = Math.round(ratio * 100);
+    var cls   = ratio >= 1.5 ? 'text-green-700 font-semibold' : ratio >= 0.5 ? 'text-yellow-700' : 'text-red-600';
+    return '<span class="' + cls + '">' + pct + '%</span>';
+  }
+
   function groupData(rows) {
     var groups = {};
     rows.forEach(function(r) {
-      var key = r.matrix_id + '|' + r.dormant_shop_id;
+      var key = String(r.matrix_id);
       if (!groups[key]) {
         groups[key] = {
-          key: key,
-          matrix_id: r.matrix_id,
-          manufacturer: r.manufacturer || '—',
-          category: r.category || '—',
-          dormant_shop: r.dormant_shop,
-          dormant_shop_id: r.dormant_shop_id,
-          dormant_last_sale: r.dormant_last_sale,
-          days_dormant: r.days_dormant,
-          active_shop: r.active_shop,
-          active_sold_30d: r.active_sold_30d,
-          total_qty: 0,
-          items: []
+          key: key, matrix_id: r.matrix_id,
+          manufacturer: r.manufacturer || '—', category: r.category || '—',
+          total_qty: 0, total_value: 0, days_dormant: 0,
+          active_sold_30d: 0, sold_90d_dest: 0, sold_90d_src: 0,
+          any_recently_transferred: false, any_dismissed: false,
+          dormant_shops_idx: {}, active_shops_idx: {}, items: []
         };
       }
-      groups[key].total_qty += r.qty;
-      groups[key].items.push(r);
+      var g = groups[key];
+      g.total_qty   += (r.qty || 0);
+      g.total_value += (r.qty || 0) * (r.default_price || 0);
+      // days_dormant: null means "never sold in 90d" = most dormant = overrides any number
+      if (r.days_dormant == null) {
+        g.days_dormant = null;
+      } else if (g.days_dormant !== null && r.days_dormant > g.days_dormant) {
+        g.days_dormant = r.days_dormant;
+      }
+      g.active_sold_30d += (r.active_sold_30d   || 0);
+      g.sold_90d_dest   += (r.sold_90d_destination || 0);
+      g.sold_90d_src    += (r.sold_90d_source    || 0);
+      if (r.recently_transferred_date) g.any_recently_transferred = true;
+      if (r.dismissed_at)              g.any_dismissed = true;
+      g.dormant_shops_idx[r.dormant_shop_id] = r.dormant_shop;
+      g.active_shops_idx[r.active_shop_id]   = r.active_shop;
+      g.items.push(r);
+    });
+    Object.values(groups).forEach(function(g) {
+      g.dormant_shops = Object.entries(g.dormant_shops_idx).map(function(e) { return { id: e[0], name: e[1] }; });
+      g.active_shops  = Object.entries(g.active_shops_idx).map(function(e) { return { id: e[0], name: e[1] }; });
     });
     return Object.values(groups);
+  }
+
+  function sortGroups(groups) {
+    var col = sortState.col, dir = sortState.dir === 'asc' ? 1 : -1;
+    return groups.slice().sort(function(a, b) {
+      var av, bv;
+      if (col === 'description') {
+        av = (a.items[0] && a.items[0].description) || ''; bv = (b.items[0] && b.items[0].description) || '';
+        return dir * av.localeCompare(bv);
+      }
+      if (col === 'manufacturer') return dir * (a.manufacturer || '').localeCompare(b.manufacturer || '');
+      if (col === 'days_dormant') {
+        av = a.days_dormant != null ? a.days_dormant : 9999;
+        bv = b.days_dormant != null ? b.days_dormant : 9999;
+      } else if (col === 'velocity') {
+        av = a.sold_90d_src > 0 ? a.sold_90d_dest / a.sold_90d_src : 0;
+        bv = b.sold_90d_src > 0 ? b.sold_90d_dest / b.sold_90d_src : 0;
+      } else {
+        av = a[col] != null ? a[col] : 0;
+        bv = b[col] != null ? b[col] : 0;
+      }
+      return dir * (av - bv);
+    });
+  }
+
+  function renderSortArrows() {
+    document.querySelectorAll('#tab-transfers thead th[data-sort]').forEach(function(th) {
+      var col = th.dataset.sort;
+      var sp  = th.querySelector('.sort-arrow');
+      if (!sp) { sp = document.createElement('span'); sp.className = 'sort-arrow ml-0.5'; th.appendChild(sp); }
+      if (sortState.col === col) {
+        sp.innerHTML = sortState.dir === 'asc'
+          ? '<span class="text-blue-500">↑</span>'
+          : '<span class="text-blue-500">↓</span>';
+      } else {
+        sp.innerHTML = '<span class="text-gray-300">↕</span>';
+      }
+    });
   }
 
   function render(groups) {
     var body  = document.getElementById('transfersBody');
     var empty = document.getElementById('transfersEmpty');
-    if (!groups) groups = groupData(transfersData);
+    renderSortArrows();
 
-    if (groups.length === 0) {
+    if (!groups || groups.length === 0) {
       body.innerHTML = '';
       empty.classList.remove('hidden');
       return;
     }
     empty.classList.add('hidden');
 
-    var html = '';
-    groups.forEach(function(g) {
-      var isOpen = expandedGroups.has(g.key);
-      var modelName = g.items[0] ? escHtml(g.items[0].description) : '—';
-      var nTailles  = g.items.length;
-      html += '<tr class="tr-group cursor-pointer hover:bg-amber-50 transition-colors" data-key="' + g.key + '">' +
+    var sorted = sortGroups(groups);
+    var html   = '';
+    sorted.forEach(function(g) {
+      var isOpen       = expandedGroups.has(g.key);
+      var modelName    = (g.items[0] && g.items[0].description) ? escHtml(g.items[0].description) : '—';
+      var nItems       = g.items.length;
+      var dormantNames = g.dormant_shops.map(function(s) { return escHtml(s.name); }).join(', ');
+      var activeNames  = g.active_shops.map(function(s) { return escHtml(s.name); }).join(', ');
+      var statusHtml   = '';
+      if (g.any_recently_transferred) statusHtml += '<span class="inline-block bg-blue-100 text-blue-700 rounded px-1 py-0.5 text-[10px] mr-0.5">' + t('transfers_recently_tx') + '</span>';
+      if (g.any_dismissed)            statusHtml += '<span class="inline-block bg-gray-200 text-gray-500 rounded px-1 py-0.5 text-[10px]">' + t('transfers_dismissed_badge') + '</span>';
+
+      html += '<tr class="tr-group cursor-pointer hover:bg-amber-50 transition-colors" data-key="' + escHtml(g.key) + '">' +
         '<td class="px-3 py-2 text-gray-400 text-center">' + (isOpen ? '▾' : '▸') + '</td>' +
-        '<td class="px-3 py-2 font-medium max-w-[320px] truncate" title="' + modelName + '">' + modelName +
-          (nTailles > 1 ? ' <span class="text-gray-400 font-normal">' + t('transfers_size_plus')(nTailles - 1) + '</span>' : '') + '</td>' +
+        '<td class="px-3 py-2 font-medium max-w-[240px] truncate" title="' + modelName + '">' + modelName +
+          (nItems > 1 ? ' <span class="text-gray-400 font-normal">' + t('transfers_size_plus')(nItems - 1) + '</span>' : '') + '</td>' +
         '<td class="px-3 py-2 text-gray-600">' + escHtml(g.manufacturer) + '</td>' +
-        '<td class="px-3 py-2 text-gray-500 max-w-[130px] truncate" title="' + escHtml(g.category) + '">' + escHtml(g.category) + '</td>' +
-        '<td class="px-3 py-2 text-amber-700 font-medium">' + escHtml(g.dormant_shop) + '</td>' +
+        '<td class="px-3 py-2 text-gray-500 max-w-[110px] truncate" title="' + escHtml(g.category) + '">' + escHtml(g.category) + '</td>' +
+        '<td class="px-3 py-2 text-amber-700 font-medium max-w-[130px] truncate" title="' + dormantNames + '">' + dormantNames + '</td>' +
         '<td class="px-3 py-2 text-right font-semibold">' + g.total_qty + '</td>' +
+        '<td class="px-3 py-2 text-right text-gray-700 whitespace-nowrap">' + fmtC(g.total_value) + '</td>' +
         '<td class="px-3 py-2 text-right">' + dormantLabel(g.days_dormant) + '</td>' +
-        '<td class="px-3 py-2 text-green-700 font-medium">' + escHtml(g.active_shop) + '</td>' +
+        '<td class="px-3 py-2 text-green-700 font-medium max-w-[130px] truncate" title="' + activeNames + '">' + activeNames + '</td>' +
         '<td class="px-3 py-2 text-right text-green-700">' + (g.active_sold_30d || 0) + '</td>' +
+        '<td class="px-3 py-2 text-right">' + velocityBadge(g.sold_90d_dest, g.sold_90d_src) + '</td>' +
+        '<td class="px-3 py-2 text-center text-[10px]">' + (statusHtml || '<span class="text-gray-200">—</span>') + '</td>' +
+        '<td class="px-3 py-2"></td>' +
         '</tr>';
 
       if (isOpen) {
         g.items.forEach(function(item) {
-          var sizeLabel = item.size ? '<span class="inline-block bg-gray-200 text-gray-700 rounded px-1.5 py-0.5 text-[10px] font-semibold mr-1">' + escHtml(item.size) + '</span>' : '';
-          html += '<tr class="bg-gray-50 text-gray-500">' +
+          var sz       = item.size ? '<span class="inline-block bg-gray-200 text-gray-700 rounded px-1.5 py-0.5 text-[10px] font-semibold mr-1">' + escHtml(item.size) + '</span>' : '';
+          var dimCls   = item.dismissed_at ? ' opacity-50' : '';
+          var idAttr   = escHtml(item.item_id + '|' + item.dormant_shop_id + '|' + item.active_shop_id);
+          var actionHtml = item.dismissed_at
+            ? '<button class="btn-restore text-[10px] text-blue-600 underline" data-ids="' + idAttr + '">' + t('transfers_restore') + '</button>'
+            : '<span class="inline-flex gap-0.5">' +
+              '<button class="btn-dismiss text-[10px] text-gray-400 hover:text-orange-600 border border-gray-200 rounded px-1.5 py-0.5" data-ids="' + idAttr + '" data-dur="30d">30j</button>' +
+              '<button class="btn-dismiss text-[10px] text-gray-400 hover:text-orange-600 border border-gray-200 rounded px-1.5 py-0.5" data-ids="' + idAttr + '" data-dur="90d">90j</button>' +
+              '<button class="btn-dismiss text-[10px] text-gray-400 hover:text-red-500 border border-gray-200 rounded px-1.5 py-0.5" data-ids="' + idAttr + '" data-dur="permanent">∞</button>' +
+              '</span>';
+          var recentBadge  = item.recently_transferred_date
+            ? '<span class="inline-block bg-blue-100 text-blue-700 rounded px-1 py-0.5 text-[10px]" title="' + escHtml(String(item.recently_transferred_date)) + '">' + t('transfers_recently_tx') + '</span>'
+            : '';
+          var dismissBadge = item.dismissed_at
+            ? '<span class="inline-block bg-gray-200 text-gray-500 rounded px-1 py-0.5 text-[10px]">' + t('transfers_dismissed_badge') + '</span>'
+            : '';
+          html += '<tr class="bg-gray-50 text-gray-500' + dimCls + '">' +
             '<td></td>' +
-            '<td class="px-3 py-1.5 pl-8 max-w-[320px] truncate" title="' + escHtml(item.description) + '">' + sizeLabel + escHtml(item.description) + '</td>' +
-            '<td colspan="4"></td>' +
+            '<td class="px-3 py-1.5 pl-8 max-w-[240px] truncate" title="' + escHtml(item.description) + '">' + sz + escHtml(item.description) + '</td>' +
+            '<td></td><td></td>' +
+            '<td class="px-3 py-1.5 text-amber-700">' + escHtml(item.dormant_shop) + '</td>' +
             '<td class="px-3 py-1.5 text-right font-semibold text-gray-700">' + t('transfers_unit')(item.qty) + '</td>' +
-            '<td colspan="2"></td>' +
+            '<td class="px-3 py-1.5 text-right text-gray-600 whitespace-nowrap">' + fmtC((item.qty || 0) * (item.default_price || 0)) + '</td>' +
+            '<td></td>' +
+            '<td class="px-3 py-1.5 text-green-700">' + escHtml(item.active_shop) +
+              '<br><span class="text-[10px] text-gray-400">Dest: ' + (item.stock_destination || 0) + '</span></td>' +
+            '<td></td>' +
+            '<td class="px-3 py-1.5 text-right">' + velocityBadge(item.sold_90d_destination, item.sold_90d_source) + '</td>' +
+            '<td class="px-3 py-1.5 text-center">' + (recentBadge || dismissBadge || '<span class="text-gray-200">—</span>') + '</td>' +
+            '<td class="px-3 py-1.5 text-center">' + actionHtml + '</td>' +
             '</tr>';
         });
       }
@@ -2570,13 +2688,58 @@ var TransfersTab = (function() {
     body.querySelectorAll('.tr-group').forEach(function(tr) {
       tr.addEventListener('click', function() {
         var key = this.dataset.key;
-        if (expandedGroups.has(key)) expandedGroups.delete(key);
-        else expandedGroups.add(key);
-        var shopId = document.getElementById('transfersShopFilter').value;
-        var filtered = shopId ? transfersData.filter(function(t) { return String(t.active_shop_id) === shopId; }) : transfersData;
-        render(groupData(filtered));
+        if (expandedGroups.has(key)) expandedGroups.delete(key); else expandedGroups.add(key);
+        applyFilter();
       });
     });
+
+    body.querySelectorAll('.btn-dismiss').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var ids = this.dataset.ids.split('|');
+        callDismiss(ids[0], ids[1], ids[2], this.dataset.dur);
+      });
+    });
+
+    body.querySelectorAll('.btn-restore').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var ids = this.dataset.ids.split('|');
+        callRestore(ids[0], ids[1], ids[2]);
+      });
+    });
+  }
+
+  async function callDismiss(item_id, from_shop_id, to_shop_id, duration) {
+    try {
+      var r = await apiFetch(BASE + '/api/transfers/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id, from_shop_id, to_shop_id, duration })
+      });
+      if (!r.ok) throw new Error('Erreur serveur');
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function callRestore(item_id, from_shop_id, to_shop_id) {
+    try {
+      var r = await apiFetch(BASE + '/api/transfers/dismiss?' +
+        new URLSearchParams({ item_id, from_shop_id, to_shop_id }).toString(), { method: 'DELETE' });
+      if (!r.ok) throw new Error('Erreur serveur');
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  function applyFilter() {
+    var shopId   = document.getElementById('transfersShopFilter').value;
+    var filtered = shopId
+      ? transfersData.filter(function(r) { return String(r.active_shop_id) === shopId; })
+      : transfersData;
+    var groups = groupData(filtered);
+    document.getElementById('transfersCount').textContent =
+      groups.length > 0 ? t('transfers_models_count')(groups.length, filtered.length) : '';
+    render(groups);
   }
 
   async function load() {
@@ -2585,20 +2748,21 @@ var TransfersTab = (function() {
     document.getElementById('transfersBody').innerHTML = '';
     expandedGroups.clear();
 
-    var days       = parseInt(document.getElementById('transfersDays').value) || 14;
-    var minStock   = parseInt(document.getElementById('transfersMinStock').value) || 1;
-    var cat        = document.getElementById('transfersCatFilter').value;
-    var excludeNos = document.getElementById('transfersExcludeNos').checked;
+    var days          = parseInt(document.getElementById('transfersDays').value)    || 14;
+    var minStock      = parseInt(document.getElementById('transfersMinStock').value) || 1;
+    var cat           = document.getElementById('transfersCatFilter').value;
+    var excludeNos    = document.getElementById('transfersExcludeNos').checked;
+    var showDismissed = document.getElementById('transfersShowDismissed').checked;
     var p = new URLSearchParams({ days_dormant: days, min_stock: minStock });
     if (cat) p.set('category', cat);
-    if (excludeNos) p.set('exclude_nos', '1');
+    if (excludeNos)    p.set('exclude_nos',    '1');
+    if (showDismissed) p.set('show_dismissed', '1');
 
     try {
       var r = await apiFetch(BASE + '/api/transfers?' + p.toString());
       var d = await r.json();
       transfersData = d.transfers || [];
 
-      // Populate dropdowns once from loaded data
       if (!shopLoaded && transfersData.length) {
         var shops = [...new Set(transfersData.map(function(t) { return JSON.stringify({ id: t.active_shop_id, name: t.active_shop }); }))]
           .map(function(s) { return JSON.parse(s); })
@@ -2611,43 +2775,36 @@ var TransfersTab = (function() {
       }
       if (!catLoaded && transfersData.length) {
         var cats = [...new Set(transfersData.map(function(t) { return t.category; }).filter(Boolean))].sort();
-        var sel = document.getElementById('transfersCatFilter');
+        var sel  = document.getElementById('transfersCatFilter');
         cats.forEach(function(c) {
           var opt = document.createElement('option'); opt.value = c; opt.textContent = c; sel.appendChild(opt);
         });
         catLoaded = true;
       }
 
-      // Client-side shop filter
-      var shopId = document.getElementById('transfersShopFilter').value;
-      var filtered = shopId
-        ? transfersData.filter(function(t) { return String(t.active_shop_id) === shopId; })
-        : transfersData;
-
-      var groups = groupData(filtered);
-      document.getElementById('transfersCount').textContent =
-        groups.length > 0 ? t('transfers_models_count')(groups.length, filtered.length) : '';
-      render(groups);
+      applyFilter();
     } catch (e) {
       document.getElementById('transfersBody').innerHTML =
-        '<tr><td colspan="9" class="text-center py-8 text-red-500">' + e.message + '</td></tr>';
+        '<tr><td colspan="13" class="text-center py-8 text-red-500">' + e.message + '</td></tr>';
     }
     showLoader('transfers', false);
   }
 
   function init() {
     document.getElementById('transfersApplyBtn').addEventListener('click', load);
+    document.getElementById('transfersShowDismissed').addEventListener('change', load);
     document.getElementById('transfersShopFilter').addEventListener('change', function() {
       if (!transfersData.length) return;
-      var shopId = this.value;
-      var filtered = shopId
-        ? transfersData.filter(function(t) { return String(t.active_shop_id) === shopId; })
-        : transfersData;
-      var groups = groupData(filtered);
-      document.getElementById('transfersCount').textContent =
-        groups.length > 0 ? t('transfers_models_count')(groups.length, filtered.length) : '';
       expandedGroups.clear();
-      render(groups);
+      applyFilter();
+    });
+    document.querySelectorAll('#tab-transfers thead th[data-sort]').forEach(function(th) {
+      th.addEventListener('click', function() {
+        var col = this.dataset.sort;
+        if (sortState.col === col) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+        else { sortState.col = col; sortState.dir = 'desc'; }
+        applyFilter();
+      });
     });
   }
 

@@ -949,6 +949,19 @@ async function runMigrations() {
     )
   `);
 
+  // transfer_recommendations_dismissed — dismissal per (tenant, item, from_shop, to_shop)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS transfer_recommendations_dismissed (
+      tenant_id    TEXT NOT NULL,
+      item_id      TEXT NOT NULL,
+      from_shop_id TEXT NOT NULL,
+      to_shop_id   TEXT NOT NULL,
+      dismissed_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      dismissed_until DATE,
+      PRIMARY KEY (tenant_id, item_id, from_shop_id, to_shop_id)
+    )
+  `);
+
   console.log('[migration] Schema up to date');
 }
 
@@ -1200,9 +1213,10 @@ app.get('/api/nos', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/transfers', async (req, res, next) => {
   try {
-    const daysDormant = parseInt(req.query.days_dormant ?? '14', 10);
-    const minStock    = parseInt(req.query.min_stock    ?? '1',  10);
-    const params      = [daysDormant, minStock];
+    const daysDormant   = parseInt(req.query.days_dormant ?? '14', 10);
+    const minStock      = parseInt(req.query.min_stock    ?? '1',  10);
+    const showDismissed = req.query.show_dismissed === '1';
+    const params        = [daysDormant, minStock];
 
     const nosFilter = req.query.exclude_nos === '1'
       ? "AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')" : '';
@@ -1210,6 +1224,9 @@ app.get('/api/transfers', async (req, res, next) => {
     if (req.query.category) { params.push(req.query.category); catFilter = `AND p.category = $${params.length}`; }
     params.push(req.tenantId);
     const tidN = params.length;
+
+    const dismissedFilter = showDismissed ? '' :
+      `AND (trd.dismissed_at IS NULL OR (trd.dismissed_until IS NOT NULL AND trd.dismissed_until < CURRENT_DATE))`;
 
     const { rows } = await pool.query(`
       WITH
@@ -1247,7 +1264,7 @@ app.get('/api/transfers', async (req, res, next) => {
           AND p.matrix_id IS NOT NULL AND p.archived = false
         JOIN matrix_ever_sold mes ON mes.matrix_id = p.matrix_id AND mes.shop_id = i.shop_id
         LEFT JOIN matrix_last_sale mls ON mls.matrix_id = p.matrix_id AND mls.shop_id = i.shop_id
-        WHERE i.qty_on_hand > 0
+        WHERE i.qty_on_hand > 0 AND i.shop_id != 0
           AND (mls.last_sale_date IS NULL OR mls.last_sale_date < now() - (interval '1 day' * $1))
         GROUP BY p.matrix_id, i.shop_id, mls.last_sale_date
       ),
@@ -1277,10 +1294,26 @@ app.get('/api/transfers', async (req, res, next) => {
         FROM dormant_matrix dm
         JOIN active_matrix am ON am.matrix_id = dm.matrix_id AND am.shop_id != dm.shop_id
         ORDER BY dm.matrix_id, dm.shop_id, am.last_sale_date DESC
+      ),
+      -- 90-day sales per item per shop (for velocity comparison)
+      sales_90d AS (
+        SELECT item_id, shop_id, SUM(qty)::int AS units_90d
+        FROM sale_lines
+        WHERE completed_time >= now() - interval '90 days' AND completed_time IS NOT NULL
+        GROUP BY item_id, shop_id
+      ),
+      -- Recent completed transfers in last 30 days (recently-transferred badge)
+      recent_transfers AS (
+        SELECT item_id::text, from_shop_id::text, to_shop_id::text,
+               MAX(transfer_date)::date AS last_tx_date
+        FROM transfers
+        WHERE transfer_received = true AND transfer_date >= now() - interval '30 days'
+          AND tenant_id = $${tidN}
+        GROUP BY item_id, from_shop_id, to_shop_id
       )
       SELECT
         p.item_id, p.description, p.manufacturer, p.category,
-        p.matrix_id,
+        p.matrix_id, p.default_price,
         COALESCE(
           CASE WHEN p.raw->'ItemAttributes'->>'attribute1' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute1' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute1' END,
           CASE WHEN p.raw->'ItemAttributes'->>'attribute2' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute2' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute2' END,
@@ -1288,9 +1321,14 @@ app.get('/api/transfers', async (req, res, next) => {
         ) AS size,
         sh_d.name  AS dormant_shop,  ba.dormant_shop_id,
         ba.dormant_last_sale,        ba.days_dormant,
-        i.qty_on_hand::int           AS qty,
+        i.qty_on_hand::int                       AS qty,
         sh_a.name  AS active_shop,   ba.active_shop_id,
-        ba.active_last_sale,         ba.units_sold_30d AS active_sold_30d
+        ba.active_last_sale,         ba.units_sold_30d AS active_sold_30d,
+        COALESCE(i_dest.qty_on_hand, 0)::int     AS stock_destination,
+        COALESCE(s_dest.units_90d, 0)::int       AS sold_90d_destination,
+        COALESCE(s_src.units_90d,  0)::int       AS sold_90d_source,
+        rt.last_tx_date                           AS recently_transferred_date,
+        trd.dismissed_until, trd.dismissed_at
       FROM best_active ba
       JOIN products p  ON p.matrix_id = ba.matrix_id AND p.archived = false AND p.tenant_id = $${tidN}
       JOIN item_ever_sold ies ON ies.item_id = p.item_id AND ies.shop_id = ba.active_shop_id
@@ -1298,13 +1336,68 @@ app.get('/api/transfers', async (req, res, next) => {
         AND i.qty_on_hand >= $2
       JOIN shops sh_d ON sh_d.shop_id = ba.dormant_shop_id
       JOIN shops sh_a ON sh_a.shop_id = ba.active_shop_id
+      LEFT JOIN inventory i_dest ON i_dest.item_id = p.item_id AND i_dest.shop_id = ba.active_shop_id
+      LEFT JOIN sales_90d s_dest ON s_dest.item_id = p.item_id AND s_dest.shop_id = ba.active_shop_id
+      LEFT JOIN sales_90d s_src  ON s_src.item_id  = p.item_id AND s_src.shop_id  = ba.dormant_shop_id
+      LEFT JOIN recent_transfers rt ON rt.item_id = p.item_id::text
+           AND rt.from_shop_id = ba.dormant_shop_id::text AND rt.to_shop_id = ba.active_shop_id::text
+      LEFT JOIN transfer_recommendations_dismissed trd
+        ON trd.tenant_id = $${tidN} AND trd.item_id = p.item_id::text
+        AND trd.from_shop_id = ba.dormant_shop_id::text AND trd.to_shop_id = ba.active_shop_id::text
       WHERE NOT (p.default_cost = 0 AND p.default_price = 0)
         AND p.description NOT ILIKE '%shopify%'
         ${nosFilter} ${catFilter}
-      ORDER BY ba.days_dormant ASC NULLS LAST, p.manufacturer, p.matrix_id, p.description
+        ${dismissedFilter}
+      ORDER BY (i.qty_on_hand * p.default_price) DESC NULLS LAST, p.manufacturer, p.matrix_id, p.description
     `, params);
 
     res.json({ days_dormant: daysDormant, min_stock: minStock, count: rows.length, transfers: rows });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/transfers/dismiss — dismiss a transfer recommendation
+// Body: { item_id, from_shop_id, to_shop_id, duration } ('30d'|'90d'|'permanent')
+// ---------------------------------------------------------------------------
+app.post('/api/transfers/dismiss', async (req, res, next) => {
+  try {
+    const { item_id, from_shop_id, to_shop_id, duration } = req.body ?? {};
+    if (!item_id || !from_shop_id || !to_shop_id || !duration)
+      return res.status(400).json({ error: 'Missing required fields' });
+
+    let dismissed_until = null;
+    if (duration === '30d')           dismissed_until = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+    else if (duration === '90d')      dismissed_until = new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0];
+    else if (duration !== 'permanent') return res.status(400).json({ error: 'Invalid duration' });
+
+    await pool.query(`
+      INSERT INTO transfer_recommendations_dismissed
+        (tenant_id, item_id, from_shop_id, to_shop_id, dismissed_at, dismissed_until)
+      VALUES ($1, $2, $3, $4, now(), $5)
+      ON CONFLICT (tenant_id, item_id, from_shop_id, to_shop_id)
+      DO UPDATE SET dismissed_at = now(), dismissed_until = EXCLUDED.dismissed_until
+    `, [req.tenantId, String(item_id), String(from_shop_id), String(to_shop_id), dismissed_until]);
+
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/transfers/dismiss — restore a dismissed transfer recommendation
+// Query: ?item_id=&from_shop_id=&to_shop_id=
+// ---------------------------------------------------------------------------
+app.delete('/api/transfers/dismiss', async (req, res, next) => {
+  try {
+    const { item_id, from_shop_id, to_shop_id } = req.query;
+    if (!item_id || !from_shop_id || !to_shop_id)
+      return res.status(400).json({ error: 'Missing required fields' });
+
+    await pool.query(`
+      DELETE FROM transfer_recommendations_dismissed
+      WHERE tenant_id = $1 AND item_id = $2 AND from_shop_id = $3 AND to_shop_id = $4
+    `, [req.tenantId, String(item_id), String(from_shop_id), String(to_shop_id)]);
+
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 
