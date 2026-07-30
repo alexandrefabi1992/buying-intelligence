@@ -2285,6 +2285,8 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
       SELECT
         p.item_id, p.matrix_id, p.manufacturer, p.category,
         p.default_cost, p.default_price,
+        p.description AS item_description,
+        im.description AS matrix_description,
         COALESCE(s.sold,      0)::int  AS sold,
         COALESCE(st.stock,    0)::int  AS stock,
         COALESCE(s.revenue,   0)       AS revenue,
@@ -2305,6 +2307,7 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
       LEFT JOIN item_attribute_sets ias
         ON  ias.attribute_set_id = (p.raw->'ItemAttributes'->>'itemAttributeSetID')
         AND ias.tenant_id = p.tenant_id
+      LEFT JOIN item_matrices im ON im.tenant_id = p.tenant_id AND im.matrix_id = p.matrix_id
       LEFT JOIN sales_by_item  s   ON s.item_id   = p.item_id
       LEFT JOIN stock_by_item  st  ON st.item_id  = p.item_id
       LEFT JOIN transfers_in   ti  ON ti.item_id  = p.item_id
@@ -2317,6 +2320,7 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
     matrix_base AS (
       SELECT
         matrix_id,
+        COALESCE(MAX(matrix_description), MIN(item_description)) AS description_modele,
         (ARRAY_AGG(manufacturer ORDER BY item_id ASC))[1] AS manufacturer,
         (ARRAY_AGG(category     ORDER BY item_id ASC))[1] AS category,
         CASE WHEN SUM(received_supplier) > 0
@@ -2356,6 +2360,7 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
     const en_stock  = r.tailles_en_stock ?? [];
     return {
       matrix_id:            r.matrix_id,
+      description_modele:   r.description_modele ?? null,
       manufacturer:         r.manufacturer,
       category:             r.category,
       st_pct:               st,
