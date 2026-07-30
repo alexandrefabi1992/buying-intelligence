@@ -5004,10 +5004,12 @@ const AdminPanel = (() => {
   .ai-msg.assistant ul, .ai-msg.assistant ol { margin: 4px 0 6px 16px; padding: 0; }
   .ai-msg.assistant li { margin-bottom: 2px; }
   .ai-msg.assistant strong { font-weight: 600; }
-  .ai-msg.assistant table { border-collapse: collapse; font-size: 12px; margin: 6px 0; width: 100%; }
-  .ai-msg.assistant th, .ai-msg.assistant td { border: 1px solid #cbd5e1; padding: 4px 8px; text-align: left; }
+  .ai-msg.assistant .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 6px 0; }
+  .ai-msg.assistant table { border-collapse: collapse; font-size: 12px; width: max-content; min-width: 100%; }
+  .ai-msg.assistant th, .ai-msg.assistant td { border: 1px solid #cbd5e1; padding: 4px 8px; text-align: left; white-space: nowrap; word-break: normal; }
   .ai-msg.assistant th { background: #e2e8f0; font-weight: 600; }
   .ai-msg.assistant tr:nth-child(even) td { background: #f8fafc; }
+  .ai-msg.has-table { max-width: 96%; }
   .ai-msg.assistant h1, .ai-msg.assistant h2, .ai-msg.assistant h3 { font-weight: 600; margin: 6px 0 4px; font-size: 14px; }
   .ai-msg.thinking { background: #f8fafc; color: #94a3b8; align-self: flex-start; font-style: italic; font-size: 12px; display: flex; align-items: center; gap: 8px; }
   .ai-msg.thinking::before { content: ''; display: inline-block; width: 10px; height: 10px; border: 2px solid #cbd5e1; border-top-color: #6366f1; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
@@ -5168,11 +5170,24 @@ const AdminPanel = (() => {
     showSuggestions();
   });
 
+  function renderMarkdown(content) {
+    const html = marked.parse(content);
+    // Wrap every <table> in a scrollable container so wide tables don't crush cell widths
+    return html.replace(/<table(\s|>)/g, '<div class="tbl-wrap"><table$1').replace(/<\/table>/g, '</table></div>');
+  }
+
+  function applyMarkdown(div, content) {
+    if (typeof marked === 'undefined') { div.textContent = content; return; }
+    div.innerHTML = renderMarkdown(content);
+    if (div.querySelector('table')) div.classList.add('has-table');
+    else div.classList.remove('has-table');
+  }
+
   function appendMsg(role, content) {
     const div = document.createElement('div');
     div.className = `ai-msg ${role}`;
-    if (role === 'assistant' && typeof marked !== 'undefined') {
-      div.innerHTML = marked.parse(content);
+    if (role === 'assistant') {
+      applyMarkdown(div, content);
     } else {
       div.textContent = content;
     }
@@ -5241,11 +5256,7 @@ const AdminPanel = (() => {
               msgs.appendChild(assistantDiv);
             }
             fullText += event.text;
-            if (typeof marked !== 'undefined') {
-              assistantDiv.innerHTML = marked.parse(fullText);
-            } else {
-              assistantDiv.textContent = fullText;
-            }
+            applyMarkdown(assistantDiv, fullText);
             msgs.scrollTop = msgs.scrollHeight;
           } else if (event.type === 'error') {
             removeThinking();
