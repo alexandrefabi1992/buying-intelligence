@@ -4979,10 +4979,13 @@ const AdminPanel = (() => {
     background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.15); display: flex; flex-direction: column;
     z-index: 1000; transform: scale(0.95) translateY(8px); opacity: 0;
-    transition: transform 0.2s ease, opacity 0.2s ease; pointer-events: none;
+    transition: transform 0.2s ease, opacity 0.2s ease, width 0.2s ease, height 0.2s ease; pointer-events: none;
   }
+  #ai-chat-panel.wide { width: 720px; height: 80vh; }
   @media (max-width: 520px) {
     #ai-chat-panel { width: calc(100vw - 16px); right: 8px; bottom: 78px; height: 75vh; }
+    #ai-chat-panel.wide { width: calc(100vw - 16px); }
+    #ai-expand-btn { display: none; }
   }
   #ai-chat-panel.open { transform: scale(1) translateY(0); opacity: 1; pointer-events: all; }
   #ai-chat-btn {
@@ -5056,6 +5059,7 @@ const AdminPanel = (() => {
     </div>
     <div class="flex items-center gap-2">
       <button id="ai-history-btn">⏱ Historique</button>
+      <button id="ai-expand-btn" class="text-[10px] text-gray-400 hover:text-gray-600" title="Agrandir le panneau">⤢</button>
       <button id="ai-clear" class="text-[10px] text-gray-400 hover:text-gray-600" title="Nouvelle conversation">↺ Nouveau</button>
       <button id="ai-close" class="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
     </div>
@@ -5161,6 +5165,13 @@ const AdminPanel = (() => {
 
   btn.addEventListener('click', togglePanel);
   closeBtn.addEventListener('click', () => { open = false; panel.classList.remove('open'); });
+
+  const expandBtn = document.getElementById('ai-expand-btn');
+  expandBtn.addEventListener('click', () => {
+    const wide = panel.classList.toggle('wide');
+    expandBtn.textContent = wide ? '⤡' : '⤢';
+    expandBtn.title = wide ? 'Réduire le panneau' : 'Agrandir le panneau';
+  });
 
   clearBtn.addEventListener('click', () => {
     history = [];
