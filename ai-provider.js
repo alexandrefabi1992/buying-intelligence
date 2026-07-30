@@ -56,8 +56,8 @@ const TOOL_DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        period:       { type: 'string',  description: 'Période relative. Valeurs: "1y" "2y" "3y" "4y" "5y" "6m" "3m" "1m" "4w" "8w" "10w" "12w" "30d" "ytd" "last_year". Si season est fourni, omettre period pour utiliser les dates de la saison.' },
-        season:       { type: 'string',  description: 'Code de saison (ex: p26, a25). Filtre par tag de saison ET définit la période de vente. Privilégier season plutôt que period pour les questions sur une saison.' },
+        period:       { type: 'string',  description: 'Période relative. Valeurs sémantiques: today, yesterday, last_7_days, last_14_days, last_30_days, last_90_days, last_week (lun–dim sem. précédente), this_week, this_month, last_month, this_year, last_4_weeks, last_12_weeks. Forme objet: {"from":"YYYY-MM-DD","to":"YYYY-MM-DD"}. Legacy: 1y, 6m, 30d, ytd, last_year. Si season est fourni et period absent, utilise les dates de la saison.' },
+        season:       { type: 'string',  description: 'Code de saison (ex: p26, a25). Filtre par tag de saison ET définit la période de vente si period absent. Privilégier season pour les questions sur une saison.' },
         manufacturer: { type: 'string',  description: 'Nom de la marque (optionnel)' },
         category:     { type: 'string',  description: 'Type de produit Lightspeed (optionnel). Ex: "Chandail", "Pantalon", "Femme/Hauts/Chandail". Quand fourni sans manufacturer : retourne le top des marques dans cette catégorie.' },
         shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel). Ex: "Saint-Bruno", "Fan Club".' },
@@ -141,8 +141,8 @@ const TOOL_DEFS = [
         exclude_tags:       { type: 'array', items: { type: 'string' }, maxItems: 10, description: 'Balises à exclure (AND) — retourne les produits qui n\'ont AUCUN de ces tags. Ex: ["nos", "solde"]. Accepte aussi une seule valeur.' },
         description_search: { type: 'string', description: 'Mot-clé dans la description : couleur (ex: "BLEU", "BLANC", "MARINE"), coupe (ex: "SLIM", "CONTEMPORAIN"), style (ex: "TUXEDO", "TWILL"). Jamais pour le genre ni le type de produit.' },
         shop_id:            { type: 'string', description: 'ID de la boutique (optionnel)' },
-        period:             { type: 'string', description: 'Période relative, ex: "1y", "2y", "ytd", "last_year", "6m"' },
-        season:             { type: 'string', description: 'Code de saison (ex: p26, a25) — si la question porte sur une saison' },
+        period:             { type: 'string', description: 'Période relative. Valeurs sémantiques: today, yesterday, last_7_days, last_14_days, last_30_days, last_90_days, last_week (lun–dim sem. précédente), this_week, this_month, last_month, this_year, last_4_weeks, last_12_weeks. Forme objet: {"from":"YYYY-MM-DD","to":"YYYY-MM-DD"}. Legacy: 1y, 6m, 30d, ytd, last_year.' },
+        season:             { type: 'string', description: 'Code de saison (ex: p26, a25). Filtre par tag ET définit la période si period absent. Combinable avec period.' },
       },
       required: [],
     },
@@ -161,6 +161,7 @@ const TOOL_DEFS = [
         exclude_tags:       { type: 'array', items: { type: 'string' }, maxItems: 10, description: 'Balises à exclure (AND) — produits n\'ayant AUCUN de ces tags. Ex: ["nos", "solde"].' },
         description_search: { type: 'string',  description: 'Mot-clé dans la description : couleur (ex: "BLEU", "BLANC"), coupe (ex: "SLIM", "CONTEMPORAIN"), style (ex: "TUXEDO"). Jamais pour le genre ni le type de produit.' },
         shop_id:            { type: 'string',  description: 'ID de la boutique (optionnel)' },
+        period:             { type: 'string',  description: 'Accepté mais ignoré — le stock est toujours le snapshot actuel. Valeurs: last_7_days, last_30_days, last_week, this_month, etc.' },
       },
       required: [],
     },
@@ -177,7 +178,8 @@ const TOOL_DEFS = [
         genre:        { type: 'string',  description: '"Homme" ou "Femme"' },
         tags:         { type: 'array', items: { type: 'string' }, maxItems: 10, description: 'Balises à inclure (AND) — produits ayant TOUS ces tags. Ex: ["p26", "consigne"].' },
         exclude_tags: { type: 'array', items: { type: 'string' }, maxItems: 10, description: 'Balises à exclure (AND) — produits n\'ayant AUCUN de ces tags. Ex: ["nos", "solde"].' },
-        season:       { type: 'string',  description: 'Code saison pour la période de vente, ex: "p26", "a25"' },
+        season:       { type: 'string',  description: 'Code saison pour la période de vente, ex: "p26", "a25". Filtre par tag ET définit les dates si period absent.' },
+        period:       { type: 'string',  description: 'Période relative. Valeurs: today, yesterday, last_7_days, last_14_days, last_30_days, last_90_days, last_week, this_week, this_month, last_month, this_year, last_4_weeks, last_12_weeks. Combinable avec season pour cibler une fenêtre dans une saison.' },
         shop_id:      { type: 'string',  description: 'ID boutique (optionnel)' },
         sort:         { type: 'string',  enum: ['st_desc', 'st_asc', 'sold_desc'], description: 'Tri: st_desc = meilleures performances, st_asc = pires performances (flop), sold_desc = plus vendu' },
         limit:        { type: 'integer', description: 'Nombre max de variantes (défaut: 200, max: 500). Augmenter si AVERTISSEMENT données tronquées.' },
@@ -244,8 +246,8 @@ const TOOL_DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        season:       { type: 'string', description: 'Code de saison (ex: p26). Filtre par tag de saison ET définit la période.' },
-        period:       { type: 'string', description: 'Période relative, ex: "1y", "ytd", "6m"' },
+        season:       { type: 'string', description: 'Code de saison (ex: p26). Filtre par tag de saison ET définit la période si period absent.' },
+        period:       { type: 'string', description: 'Période relative. Valeurs: today, yesterday, last_7_days, last_14_days, last_30_days, last_90_days, last_week, this_week, this_month, last_month, this_year, last_4_weeks, last_12_weeks. Legacy: 1y, 6m, ytd, last_year.' },
         date_from:    { type: 'string', description: 'Date de début ISO (YYYY-MM-DD)' },
         date_to:      { type: 'string', description: 'Date de fin ISO (YYYY-MM-DD)' },
         manufacturer: { type: 'string', description: 'Filtrer par marque (optionnel)' },
@@ -321,7 +323,8 @@ const TOOL_DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        season:  { type: 'string', description: 'Code de saison (ex: p26). Sans season : fenêtre 12 semaines glissantes.' },
+        season:  { type: 'string', description: 'Code de saison (ex: p26). Filtre par tag ET définit la période si period absent. Sans season ni period : 12 semaines glissantes.' },
+        period:  { type: 'string', description: 'Période relative. Valeurs: today, yesterday, last_7_days, last_14_days, last_30_days, last_90_days, last_week, this_week, this_month, last_month, this_year, last_4_weeks, last_12_weeks. Combinable avec season.' },
         shop_id: { type: 'string', description: 'Nom ou ID de la boutique (optionnel)' },
         manufacturer: { type: 'string',  description: 'Filtrer sur une marque spécifique (optionnel). Utiliser quand l\'utilisateur demande "toute la marque [X]" pour une seule saison.' },
         sort_by:      { type: 'string', enum: ['st', 'revenue', 'stock_dormant', 'units_sold', 'margin'], description: "Critère de tri. 'st'=sell-through, 'revenue'=chiffre d'affaires, 'stock_dormant'=stock invendu, 'units_sold'=unités vendues, 'margin'=marge brute. Défaut: 'st'" },
@@ -355,7 +358,8 @@ const TOOL_DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        season:       { type: 'string',  description: 'Code de saison (ex: p26). Sans season : 12 semaines glissantes.' },
+        season:       { type: 'string',  description: 'Code de saison (ex: p26). Filtre par tag ET définit la période si period absent. Sans season ni period : 12 semaines glissantes.' },
+        period:       { type: 'string',  description: 'Période relative. Valeurs: today, yesterday, last_7_days, last_14_days, last_30_days, last_90_days, last_week, this_week, this_month, last_month, this_year, last_4_weeks, last_12_weeks. Combinable avec season.' },
         shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel)' },
         min_st:       { type: 'number',  description: 'ST minimum en % (ex: 80 pour ST ≥ 80%)' },
         max_st:       { type: 'number',  description: 'ST maximum en % (ex: 35 pour ST ≤ 35%)' },
@@ -473,6 +477,26 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
 - TAGS : "tags" (tableau, max 10) filtre les produits qui ont TOUS les tags listés — logique AND. Ex: tags=["p26","consigne"] → uniquement les produits avec les deux tags. "exclude_tags" (tableau, max 10) exclut les produits ayant N'IMPORTE LEQUEL de ces tags. Ex: exclude_tags=["nos","solde"] → aucun NOS ni solde. Les deux paramètres sont combinables simultanément.
 - PARSING DES TAGS : quand l'utilisateur dit "tager X", "tagé X", "tagué X", "avec le tag X", "avec la balise X", "tagged X", "with tag X", "labelled X", "étiquetté X" — extraire X comme tag et NE JAMAIS l'inclure dans le nom de la marque. Ex: "Part Two tager p26" → manufacturer="Part Two", tags=["p26"]. Ex: "Eton tagged p25 slim" → manufacturer="Eton", tags=["p25"], description_search="slim".
 - QUESTIONS DE CLARIFICATION : UNE SEULE question, UNIQUEMENT si l'info manquante est BLOQUANTE. JAMAIS demander la couleur, la boutique ou la période.
+- PÉRIODES — PARSING LANGAGE NATUREL : convertir toujours les expressions temporelles de l'utilisateur en valeur "period" avant d'appeler un outil. Table de correspondance (non exhaustive) :
+  | Expression utilisateur | Valeur period |
+  |---|---|
+  | "la semaine dernière", "last week", "la semaine passée" | last_week |
+  | "cette semaine", "this week", "depuis lundi" | this_week |
+  | "aujourd'hui", "today" | today |
+  | "hier", "yesterday" | yesterday |
+  | "les 7 derniers jours", "les 7 jours", "last 7 days" | last_7_days |
+  | "les 14 derniers jours", "les 2 dernières semaines" | last_14_days |
+  | "les 30 derniers jours", "le mois passé glissant" | last_30_days |
+  | "les 90 derniers jours", "les 3 derniers mois glissants" | last_90_days |
+  | "ce mois-ci", "this month", "en juillet", "en [mois actuel]" | this_month |
+  | "le mois dernier", "last month", "en [mois précédent]" | last_month |
+  | "cette année", "since January", "depuis janvier", "depuis le début de l'année", "YTD" | this_year |
+  | "les 4 dernières semaines" | last_4_weeks |
+  | "les 12 dernières semaines" | last_12_weeks |
+  | "il y a X semaines" → calculer { from, to } manuellement | objet {from, to} |
+  Règle last_week : TOUJOURS lundi–dimanche de la SEMAINE CALENDAIRE PRÉCÉDENTE — pas les 7 derniers jours.
+  Si l'utilisateur mentionne une SAISON ET une période (ex: "ventes Brax en P26 la semaine dernière"), passer les DEUX : season="p26" ET period="last_week".
+  Si l'expression est ambiguë ("récemment", "depuis quelque temps") : utiliser last_30_days sans demander de précision.
 - FORMAT DES TABLEAUX : le panneau de chat est étroit. Limiter les tableaux à 5 colonnes MAXIMUM. Choisir les colonnes selon la question posée, jamais toutes les données disponibles. Pour get_restock_recommendations, les 5 colonnes par défaut sont : Marque | Modèle | Urgence | Ventes manquées | Transfert. Les détails secondaires (ST%, stock actuel, unités manquantes, valeur réassort, catégorie, tailles à réassortir) vont dans une liste à puces sous le tableau, uniquement pour les 3 premières lignes, ou sur demande explicite. Si l'utilisateur demande plus de colonnes ou un détail précis, les fournir. Sinon, rester à 5.
 - RÉASSORT (get_restock_recommendations) : quand l'outil retourne des modèles avec transfert_possible: 'complet' ou 'partiel', TOUJOURS le mentionner explicitement — un transfert est moins coûteux qu'une commande fournisseur ('partiel' = stock insuffisant mais exploitable). Utiliser valeur_ventes_manquees_estimee (revenu perdu) comme chiffre principal. Quand nb_marques_sans_delai > 0 dans le résultat, ajouter EN FIN DE RÉPONSE : "⚠️ [nb] marque(s) sans délai fournisseur configuré — configurer les délais dans Paramètres améliorerait la précision des recommandations." JAMAIS omettre cette note si nb_marques_sans_delai > 0.
 - TERMES DE PAIEMENT / ESCOMPTES : pour toute question sur les escomptes fournisseur, les termes de paiement, "devrais-je payer [marque] rapidement", "est-ce rentable de prendre l'escompte", "quel est le rendement de l'escompte", "quelle marque a les meilleurs termes" → utiliser get_payment_terms_analysis. Si le résultat contient termes_non_configures=true : le DIRE explicitement — JAMAIS inventer un escompte ou supposer que les termes sont standard.

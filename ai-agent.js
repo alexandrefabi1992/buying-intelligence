@@ -206,43 +206,137 @@ async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { poo
   };
 }
 
+const MONTH_FR = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
+
+// resolvePeriod — convert a period value to { from, to, label }.
+// Accepts:
+//   • semantic strings  : 'last_week', 'this_month', 'last_30_days', etc.
+//   • explicit object   : { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
+//   • legacy numerics   : '1y', '6m', '30d', 'ytd', 'last_year' (for backward compat)
+// Returns:
+//   { from, to, label }  on success
+//   { erreur }           for invalid/unrecognised values (caller must surface to user)
+//   null                 if period is null/undefined
 function resolvePeriod(period) {
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10);
-  const p = (period ?? '').toLowerCase().trim();
-  const yMatch = p.match(/^(\d+)\s*y(?:ear)?s?$/);
-  const mMatch = p.match(/^(\d+)\s*m(?:onth)?s?$/);
-  const wMatch = p.match(/^(\d+)\s*w(?:eek)?s?$/);
-  const dMatch = p.match(/^(\d+)\s*d(?:ay)?s?$/);
-  if (yMatch) { const d = new Date(now); d.setFullYear(d.getFullYear() - +yMatch[1]); return [d.toISOString().slice(0,10), today]; }
-  if (mMatch) { const d = new Date(now); d.setMonth(d.getMonth() - +mMatch[1]);       return [d.toISOString().slice(0,10), today]; }
-  if (wMatch) { const d = new Date(now); d.setDate(d.getDate() - +wMatch[1] * 7);     return [d.toISOString().slice(0,10), today]; }
-  if (dMatch) { const d = new Date(now); d.setDate(d.getDate() - +dMatch[1]);          return [d.toISOString().slice(0,10), today]; }
-  if (p === 'ytd')       return [`${now.getFullYear()}-01-01`, today];
-  if (p === 'last_year') return [`${now.getFullYear()-1}-01-01`, `${now.getFullYear()-1}-12-31`];
-  return null;
+  if (!period) return null;
+
+  // --- Explicit date object ---
+  if (typeof period === 'object') {
+    const { from, to } = period;
+    if (!from || !to)
+      return { erreur: 'L\'objet period doit avoir les champs "from" et "to" (format YYYY-MM-DD).' };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(from)) || !/^\d{4}-\d{2}-\d{2}$/.test(String(to)))
+      return { erreur: `Les dates period.from/to doivent être au format YYYY-MM-DD. Reçu : from=${from}, to=${to}.` };
+    const d1 = new Date(from), d2 = new Date(to);
+    if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return { erreur: `Dates invalides : from=${from}, to=${to}.` };
+    if (d2 < d1) return { erreur: `La date "to" (${to}) est antérieure à "from" (${from}).` };
+    const label = `du ${d1.getUTCDate()} ${MONTH_FR[d1.getUTCMonth()]} ${d1.getUTCFullYear()} au ${d2.getUTCDate()} ${MONTH_FR[d2.getUTCMonth()]} ${d2.getUTCFullYear()}`;
+    return { from: String(from), to: String(to), label };
+  }
+
+  const now     = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const p       = String(period).toLowerCase().trim();
+
+  // --- Semantic strings ---
+  if (p === 'today')
+    return { from: todayStr, to: todayStr, label: 'aujourd\'hui' };
+
+  if (p === 'yesterday') {
+    const d = new Date(now); d.setDate(d.getDate() - 1);
+    const s = d.toISOString().slice(0, 10);
+    return { from: s, to: s, label: 'hier' };
+  }
+  if (p === 'last_7_days') {
+    const d = new Date(now); d.setDate(d.getDate() - 7);
+    return { from: d.toISOString().slice(0, 10), to: todayStr, label: 'les 7 derniers jours' };
+  }
+  if (p === 'last_14_days') {
+    const d = new Date(now); d.setDate(d.getDate() - 14);
+    return { from: d.toISOString().slice(0, 10), to: todayStr, label: 'les 14 derniers jours' };
+  }
+  if (p === 'last_30_days') {
+    const d = new Date(now); d.setDate(d.getDate() - 30);
+    return { from: d.toISOString().slice(0, 10), to: todayStr, label: 'les 30 derniers jours' };
+  }
+  if (p === 'last_90_days') {
+    const d = new Date(now); d.setDate(d.getDate() - 90);
+    return { from: d.toISOString().slice(0, 10), to: todayStr, label: 'les 90 derniers jours' };
+  }
+  if (p === 'last_week') {
+    // Monday–Sunday of the previous calendar week (ISO)
+    const dow = now.getDay(); // 0=Sun … 6=Sat
+    const daysToThisMonday = dow === 0 ? 6 : dow - 1;
+    const thisMonday = new Date(now); thisMonday.setDate(now.getDate() - daysToThisMonday);
+    const lastMonday = new Date(thisMonday); lastMonday.setDate(thisMonday.getDate() - 7);
+    const lastSunday = new Date(lastMonday); lastSunday.setDate(lastMonday.getDate() + 6);
+    return { from: lastMonday.toISOString().slice(0, 10), to: lastSunday.toISOString().slice(0, 10), label: 'la semaine dernière' };
+  }
+  if (p === 'this_week') {
+    const dow = now.getDay();
+    const daysToMonday = dow === 0 ? 6 : dow - 1;
+    const thisMonday = new Date(now); thisMonday.setDate(now.getDate() - daysToMonday);
+    return { from: thisMonday.toISOString().slice(0, 10), to: todayStr, label: 'cette semaine' };
+  }
+  if (p === 'this_month') {
+    const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    return { from: firstDay, to: todayStr, label: 'ce mois-ci' };
+  }
+  if (p === 'last_month') {
+    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const last  = new Date(now.getFullYear(), now.getMonth(), 0);
+    return { from: first.toISOString().slice(0, 10), to: last.toISOString().slice(0, 10), label: 'le mois dernier' };
+  }
+  if (p === 'this_year')
+    return { from: `${now.getFullYear()}-01-01`, to: todayStr, label: 'cette année' };
+  if (p === 'last_4_weeks') {
+    const d = new Date(now); d.setDate(d.getDate() - 28);
+    return { from: d.toISOString().slice(0, 10), to: todayStr, label: 'les 4 dernières semaines' };
+  }
+  if (p === 'last_12_weeks') {
+    const d = new Date(now); d.setDate(d.getDate() - 84);
+    return { from: d.toISOString().slice(0, 10), to: todayStr, label: 'les 12 dernières semaines' };
+  }
+
+  // --- Legacy numeric patterns (backward compat — keep working for existing callers) ---
+  const yMatch = p.match(/^(\d+)y(?:ear)?s?$/);
+  const mMatch = p.match(/^(\d+)m(?:onth)?s?$/);
+  const wMatch = p.match(/^(\d+)w(?:eek)?s?$/);
+  const dMatch = p.match(/^(\d+)d(?:ay)?s?$/);
+  if (yMatch) { const d = new Date(now); d.setFullYear(d.getFullYear() - +yMatch[1]); return { from: d.toISOString().slice(0,10), to: todayStr, label: `les ${yMatch[1]} dernière(s) année(s)` }; }
+  if (mMatch) { const d = new Date(now); d.setMonth(d.getMonth() - +mMatch[1]);       return { from: d.toISOString().slice(0,10), to: todayStr, label: `les ${mMatch[1]} dernier(s) mois` }; }
+  if (wMatch) { const d = new Date(now); d.setDate(d.getDate() - +wMatch[1] * 7);     return { from: d.toISOString().slice(0,10), to: todayStr, label: `les ${wMatch[1]} dernière(s) semaine(s)` }; }
+  if (dMatch) { const d = new Date(now); d.setDate(d.getDate() - +dMatch[1]);          return { from: d.toISOString().slice(0,10), to: todayStr, label: `les ${dMatch[1]} dernier(s) jour(s)` }; }
+  if (p === 'ytd')       return { from: `${now.getFullYear()}-01-01`,           to: todayStr,                          label: 'depuis le début de l\'année' };
+  if (p === 'last_year') return { from: `${now.getFullYear()-1}-01-01`,          to: `${now.getFullYear()-1}-12-31`,    label: 'l\'année dernière' };
+
+  // --- Unknown value → explicit error (never a silent fallback) ---
+  return { erreur: `Période "${period}" non reconnue. Valeurs acceptées : today, yesterday, last_7_days, last_14_days, last_30_days, last_90_days, last_week, this_week, this_month, last_month, this_year, last_4_weeks, last_12_weeks, ou un objet { from: "YYYY-MM-DD", to: "YYYY-MM-DD" }.` };
 }
 
 async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, date_from, date_to, period, tags, exclude_tags, total_only = false }, { pool, getSeasonsConfig }) {
   shop_id = await resolveShopId(shop_id, pool);
   let from = date_from, to = date_to;
-  let seasonTag = null;
+  let seasonTag = null, periodLabel = null;
 
-  // period shorthand takes priority over raw dates
+  // period sets the date window; season only sets dates as a fallback when period absent
   if (period) {
     const resolved = resolvePeriod(period);
-    if (resolved) [from, to] = resolved;
+    if (resolved?.erreur) return { erreur: resolved.erreur };
+    from = resolved.from; to = resolved.to; periodLabel = resolved.label;
   }
 
   if (season) {
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
     if (!s) return { erreur: `Saison "${season}" non trouvée.` };
-    // Use reception_from (not sell_from) to capture pre-season sales of tagged items
+    // Use reception_from to capture pre-season sales of tagged items; only override dates if period absent
     if (!from) { from = s.reception_from; to = s.sell_to; }
-    seasonTag = s.tag_pattern ?? s.code;
+    seasonTag = s.tag_pattern ?? s.code;  // season → tag filter only
   }
-  if (!from) return { erreur: 'Fournir "period" (ex: "4y", "10w", "6m", "ytd") ou "season" ou "date_from".' };
+  if (!from) return { erreur: 'Fournir "period" (ex: "last_30_days", "last_week", "this_month") ou "season" ou "date_from".' };
+
+  const periodeLabel = periodLabel ?? (season ? `Saison ${season.toUpperCase()} (${from} → ${to})` : `${from} → ${to}`);
 
   const conditions = ['sl.completed_time BETWEEN $1 AND $2'];
   const params     = [from, to ?? new Date().toISOString()];
@@ -293,7 +387,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
 
     return {
       categorie: category,
-      periode:   { de: from, a: to },
+      periode:   { de: from, a: to, label: periodeLabel },
       filtre:    { boutique: shop_id ?? 'toutes', saison: season ?? null },
       nb_marques_total:    nb_marques,
       nb_marques_affiches: rows.length,
@@ -329,7 +423,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
     const totUnites = rows.reduce((s, r) => s + parseInt(r.unites          ?? 0), 0);
 
     return {
-      periode:  { de: from, a: to },
+      periode:  { de: from, a: to, label: periodeLabel },
       par_boutique: rows.map(r => ({
         boutique:      r.boutique,
         unites:        Number(r.unites),
@@ -375,7 +469,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
   const nb_total   = rows[0] ? Number(rows[0].nb_lignes_total)  : 0;
 
   return {
-    periode: { de: from, a: to },
+    periode: { de: from, a: to, label: periodeLabel },
     nb_lignes_total:    nb_total,
     nb_lignes_affiches: rows.length,
     resultats: rows.map(r => ({
@@ -393,7 +487,12 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
   };
 }
 
-async function toolGetStockByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id }, { pool }) {
+async function toolGetStockByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period }, { pool }) {
+  if (period) {
+    const resolved = resolvePeriod(period);
+    if (resolved?.erreur) return { erreur: resolved.erreur };
+    // period is accepted but stock is always the current snapshot — no date filter applied
+  }
   shop_id = await resolveShopId(shop_id, pool);
   const conditions = ['p.archived = false'];
   const params     = [];
@@ -479,16 +578,26 @@ function buildSizeCondition(size, params) {
 
 async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
   shop_id = await resolveShopId(shop_id, pool);
-  let from, to;
+  let from, to, periodLabel = null;
+
   if (period) {
     const resolved = resolvePeriod(period);
-    if (resolved) [from, to] = resolved;
+    if (resolved?.erreur) return { erreur: resolved.erreur };
+    from = resolved.from; to = resolved.to; periodLabel = resolved.label;
   }
-  if (season && !from) {
+  if (season) {
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
-    if (s) { from = s.sell_from; to = s.sell_to; }
+    if (s) {
+      if (!from) { from = s.sell_from; to = s.sell_to; }  // dates only when period absent
+      // season → tag filter (inject into tags array)
+      const pattern = s.tag_pattern ?? s.code;
+      const existing = normalizeTags(tags);
+      if (!existing.some(t => t.toLowerCase() === pattern.toLowerCase())) tags = [...existing, pattern];
+    }
   }
+
+  const label = periodLabel ?? (season ? `Saison ${season.toUpperCase()} (${from ?? '?'} → ${to ?? '?'})` : (from ? `${from} → ${to}` : 'toutes dates'));
 
   const conditions = ['sl.qty > 0'];
   const params     = [];
@@ -535,7 +644,8 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
   const nb_total     = rows[0] ? Number(rows[0].nb_articles_total): 0;
 
   return {
-    filtre: { marque: manufacturer, taille: size, recherche: description_search, de: from, a: to },
+    periode: { de: from ?? null, a: to ?? null, label },
+    filtre: { marque: manufacturer, taille: size, recherche: description_search },
     total_unites_vendues:   total_qty,
     total_ventes_brutes:    fmtMoney(total_ventes),
     nb_articles_total:      nb_total,
@@ -700,21 +810,28 @@ async function toolSearchBrands({ query }, { pool }) {
   return { resultats: rows.map(r => ({ marque: r.manufacturer, nb_articles: Number(r.nb_articles) })) };
 }
 
-async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tags, exclude_tags, season, shop_id, sort = 'st_desc', limit = 200 }, { pool, getSeasonsConfig }) {
+async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tags, exclude_tags, season, shop_id, period, sort = 'st_desc', limit = 200 }, { pool, getSeasonsConfig }) {
   shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
-  let from, to;
+  let from, to, periodLabel = null;
 
-  // Resolve date range: prefer reception_from (= start of season life) over sell_from.
-  // Also inject the season tag so only items tagged for this season are included —
-  // matching Lightspeed's "Stocks reçus" filter which uses the season tag, not just dates.
+  // period sets the date window; season provides the tag filter and dates-as-fallback
+  if (period) {
+    const resolved = resolvePeriod(period);
+    if (resolved?.erreur) return { erreur: resolved.erreur };
+    from = resolved.from; to = resolved.to; periodLabel = resolved.label;
+  }
+
   if (season) {
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
     if (s) {
-      from = s.reception_from ?? s.sell_from;
-      to   = s.sell_to < today ? s.sell_to : today;
-      // Auto-inject season tag unless caller already provided a tag override
+      // Only set dates from season if period wasn't provided
+      if (!from) {
+        from = s.reception_from ?? s.sell_from;
+        to   = s.sell_to < today ? s.sell_to : today;
+      }
+      // Always inject season tag (matching Lightspeed "Stocks reçus" filter)
       const pattern = s.tag_pattern ?? s.code;
       const existingTags = normalizeTags(tags);
       if (!existingTags.some(t => t.toLowerCase() === pattern.toLowerCase())) {
@@ -722,7 +839,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
       }
     }
   }
-  // If tags contain a season-like code (e.g. "p26"), auto-resolve its reception_from
+  // If tags contain a season-like code (e.g. "p26"), auto-resolve its reception_from as fallback
   if (!from && tags?.length) {
     const seasons = await getSeasonsConfig();
     for (const t of normalizeTags(tags)) {
@@ -734,6 +851,8 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
     const d = new Date(); d.setFullYear(d.getFullYear() - 1);
     from = d.toISOString().slice(0, 10); to = today;
   }
+
+  const periodeLabel = periodLabel ?? (season ? `Saison ${season.toUpperCase()} (${from} → ${to})` : `${from} → ${to}`);
 
   // No archived filter on products — archived items were still received and sold.
   // Convention: archived = false only for inventory queries, not sales.
@@ -888,7 +1007,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   const displayRows = rows.slice(0, Math.min(limit, rows.length));
 
   return {
-    periode:              { de: from, a: to },
+    periode:              { de: from, a: to, label: periodeLabel },
     filtre:               { marque: manufacturer, categorie: category, genre, tags, exclude_tags, taille: size, saison: season },
     tri:                  sort,
     formule_calcul:       'recu_fournisseur = vendu + stock_actuel + transferts_sortants - transferts_entrants. IMPORTANT: stock_actuel est EXCLUSIF des transferts_sortants (ces unités ont déjà quitté la boutique et sont déduites de linventaire). Ne jamais dire que le stock "inclut" les transferts sortants.',
@@ -1200,22 +1319,25 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
 async function toolGetSalesByCategory({ season, period, date_from, date_to, manufacturer, shop_id }, { pool, getSeasonsConfig }) {
   shop_id = await resolveShopId(shop_id, pool);
   let from = date_from, to = date_to;
-  let seasonTag = null;
+  let seasonTag = null, periodLabel = null;
 
   if (period) {
     const resolved = resolvePeriod(period);
-    if (resolved) [from, to] = resolved;
+    if (resolved?.erreur) return { erreur: resolved.erreur };
+    from = resolved.from; to = resolved.to; periodLabel = resolved.label;
   }
 
   if (season) {
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
     if (!s) return { erreur: `Saison "${season}" non trouvée.` };
-    if (!from) { from = s.reception_from; to = s.sell_to; }
+    if (!from) { from = s.reception_from; to = s.sell_to; }  // dates only when period absent
     seasonTag = s.tag_pattern ?? s.code;
   }
 
-  if (!from) return { erreur: 'Fournir "period", "season" ou "date_from".' };
+  if (!from) return { erreur: 'Fournir "period" (ex: "last_30_days", "this_month") ou "season" ou "date_from".' };
+
+  const periodeLabel = periodLabel ?? (season ? `Saison ${season.toUpperCase()} (${from} → ${to})` : `${from} → ${to}`);
 
   const conditions = [
     'sl.completed_time BETWEEN $1 AND $2',
@@ -1251,7 +1373,7 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
   const nb_cat_total = rows[0] ? Number(rows[0].nb_categories_total) : 0;
 
   return {
-    periode:    { de: from, a: to },
+    periode:    { de: from, a: to, label: periodeLabel },
     filtre:     { marque: manufacturer ?? 'toutes', boutique: shop_id ?? 'toutes', saison: season },
     nb_categories_total:    nb_cat_total,
     nb_categories_affiches: rows.length,
@@ -1917,26 +2039,39 @@ async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, sho
 // ---------------------------------------------------------------------------
 // toolGetBrandRanking — classement des marques par ST, revenue, stock dormant.
 // ---------------------------------------------------------------------------
-async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20, include_nos = false, manufacturer, max_st, min_st }, { pool, getSeasonsConfig, tenantId }) {
+async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20, include_nos = false, manufacturer, max_st, min_st, period }, { pool, getSeasonsConfig, tenantId }) {
   shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
   limit = Math.min(Math.max(1, parseInt(limit) || 20), 50);
 
-  let stFrom, stTo, seasonCode = null, seasonTag = null;
+  let stFrom, stTo, seasonCode = null, seasonTag = null, periodLabel = null;
+
+  // period sets the date window; season provides tag filter and dates-as-fallback
+  if (period) {
+    const resolved = resolvePeriod(period);
+    if (resolved?.erreur) return { erreur: resolved.erreur };
+    stFrom = resolved.from; stTo = resolved.to; periodLabel = resolved.label;
+  }
 
   if (season) {
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
     if (!s) return { erreur: `Saison "${season}" introuvable dans la configuration.` };
-    stFrom = s.reception_from ?? s.sell_from;
-    stTo   = s.sell_to < today ? s.sell_to : today;
+    if (!stFrom) {
+      stFrom = s.reception_from ?? s.sell_from;
+      stTo   = s.sell_to < today ? s.sell_to : today;
+    }
     seasonCode = s.code.toUpperCase();
-    seasonTag  = s.tag_pattern ?? s.code;
-  } else {
+    seasonTag  = !include_nos ? (s.tag_pattern ?? s.code) : null;
+  }
+
+  if (!stFrom) {
     const d = new Date(); d.setDate(d.getDate() - 84);
     stFrom = d.toISOString().slice(0, 10); stTo = today;
-    seasonCode = 'Dernières 12 semaines';
+    seasonCode = seasonCode ?? 'Dernières 12 semaines';
   }
+
+  const periodeLabel = periodLabel ?? (season ? `Saison ${seasonCode} (${stFrom} → ${stTo})` : `${stFrom} → ${stTo}`);
 
   const sortExprMap = {
     st:            `CASE WHEN SUM(received_supplier) > 0 THEN SUM(sold)::float / SUM(received_supplier) ELSE 0 END`,
@@ -1954,7 +2089,7 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
   const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
   const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
   const tenantIdx = (params.push(tenantId), params.length);
-  const tagIdx  = (seasonTag && !include_nos) ? (params.push(`%${seasonTag}%`), params.length) : null;
+  const tagIdx  = seasonTag ? (params.push(`%${seasonTag}%`), params.length) : null;
   const tagCond = tagIdx ? `AND p.tags ILIKE $${tagIdx}` : '';
   const mfrIdx  = manufacturer ? (params.push(`%${manufacturer}%`), params.length) : null;
   const mfrCond = mfrIdx ? `AND p.manufacturer ILIKE $${mfrIdx}` : '';
@@ -2066,7 +2201,7 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
     : `${mfrLabel} (12 semaines glissantes)`;
 
   return {
-    periode:        { de: stFrom, a: stTo },
+    periode:        { de: stFrom, a: stTo, label: periodeLabel },
     saison:         seasonCode,
     boutique:       shopName,
     tri:            sort_by,
@@ -2196,7 +2331,7 @@ async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id
 // toolGetItemsByCriteria — modèles filtrés par ST, stock, ventes, marque.
 // Agrégation au niveau matrice (matrix_id = un modèle = toutes ses variantes).
 // ---------------------------------------------------------------------------
-async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_stock, max_stock, has_sales, manufacturer, sort_by = 'st', limit = 50 }, { pool, getSeasonsConfig, tenantId }) {
+async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_stock, max_stock, has_sales, manufacturer, sort_by = 'st', limit = 50, period }, { pool, getSeasonsConfig, tenantId }) {
   if (min_st == null && max_st == null && min_stock == null && max_stock == null && has_sales == null && !manufacturer) {
     return { erreur: 'Spécifiez au moins un critère de filtre (min_st, max_st, min_stock, max_stock, has_sales, ou manufacturer).' };
   }
@@ -2205,21 +2340,30 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
   const today = new Date().toISOString().slice(0, 10);
   limit = Math.min(Math.max(1, parseInt(limit) || 50), 200);
 
-  let stFrom, stTo, seasonCode = null, seasonTag = null;
+  let stFrom, stTo, seasonCode = null, seasonTag = null, periodLabel = null;
+
+  if (period) {
+    const resolved = resolvePeriod(period);
+    if (resolved?.erreur) return { erreur: resolved.erreur };
+    stFrom = resolved.from; stTo = resolved.to; periodLabel = resolved.label;
+  }
 
   if (season) {
     const seasons = await getSeasonsConfig();
     const s = seasons.find(x => x.code === season.toLowerCase());
     if (!s) return { erreur: `Saison "${season}" introuvable dans la configuration.` };
-    stFrom = s.reception_from ?? s.sell_from;
-    stTo   = s.sell_to < today ? s.sell_to : today;
+    if (!stFrom) { stFrom = s.reception_from ?? s.sell_from; stTo = s.sell_to < today ? s.sell_to : today; }
     seasonCode = s.code.toUpperCase();
     seasonTag  = s.tag_pattern ?? s.code;
-  } else {
+  }
+
+  if (!stFrom) {
     const d = new Date(); d.setDate(d.getDate() - 84);
     stFrom = d.toISOString().slice(0, 10); stTo = today;
-    seasonCode = 'Personnalisée';
+    seasonCode = seasonCode ?? 'Personnalisée';
   }
+
+  const periodeLabel = periodLabel ?? (season ? `Saison ${seasonCode} (${stFrom} → ${stTo})` : `${stFrom} → ${stTo}`);
 
   const sortExprMap = {
     st:            'st_pct',
@@ -2379,7 +2523,7 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
   });
 
   return {
-    periode:     { de: stFrom, a: stTo },
+    periode:     { de: stFrom, a: stTo, label: periodeLabel },
     saison:      seasonCode,
     boutique:    shopName,
     criteres:    { min_st, max_st, min_stock, max_stock, has_sales: has_sales ?? null, manufacturer: manufacturer ?? null },
