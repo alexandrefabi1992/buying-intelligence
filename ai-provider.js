@@ -369,6 +369,23 @@ const TOOL_DEFS = [
       required: [],
     },
   },
+  {
+    name: 'get_restock_recommendations',
+    description: "Identifie les modèles qui vont tomber en rupture avant la fin de saison — ST élevé et couverture de stock insuffisante. Retourne les unités manquantes, les tailles à réassortir en priorité, si le stock existe dans une autre boutique (transfert plutôt qu'achat), et la date limite de commande selon le délai fournisseur. Utiliser pour : 'quoi réassortir', 'qu'est-ce qui va manquer', 'quelles ruptures à venir', 'quoi recommander en urgence'.",
+    parameters: {
+      type: 'object',
+      properties: {
+        season:                  { type: 'string',  description: 'Code saison obligatoire, ex: p26, a26' },
+        shop_id:                 { type: 'string',  description: 'Nom ou ID de la boutique (optionnel — sans filtre: toutes boutiques agrégées)' },
+        manufacturer:            { type: 'string',  description: 'Filtrer par marque (optionnel)' },
+        min_st:                  { type: 'number',  description: 'ST minimum en % pour inclure un modèle (défaut: 70). Ex: 80 pour les modèles très bien vendus.' },
+        max_semaines_couverture: { type: 'number',  description: 'Couverture max en semaines (optionnel). Ex: 4 = seulement les modèles avec moins de 4 semaines de stock.' },
+        include_nos:             { type: 'boolean', description: 'Si true, inclut aussi les articles NOS (permanents, sans tag saison). Défaut: false.' },
+        limit:                   { type: 'integer', description: 'Nombre maximum de modèles (1-100, défaut: 30).' },
+      },
+      required: ['season'],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -456,6 +473,7 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
 - TAGS : "tags" (tableau, max 10) filtre les produits qui ont TOUS les tags listés — logique AND. Ex: tags=["p26","consigne"] → uniquement les produits avec les deux tags. "exclude_tags" (tableau, max 10) exclut les produits ayant N'IMPORTE LEQUEL de ces tags. Ex: exclude_tags=["nos","solde"] → aucun NOS ni solde. Les deux paramètres sont combinables simultanément.
 - PARSING DES TAGS : quand l'utilisateur dit "tager X", "tagé X", "tagué X", "avec le tag X", "avec la balise X", "tagged X", "with tag X", "labelled X", "étiquetté X" — extraire X comme tag et NE JAMAIS l'inclure dans le nom de la marque. Ex: "Part Two tager p26" → manufacturer="Part Two", tags=["p26"]. Ex: "Eton tagged p25 slim" → manufacturer="Eton", tags=["p25"], description_search="slim".
 - QUESTIONS DE CLARIFICATION : UNE SEULE question, UNIQUEMENT si l'info manquante est BLOQUANTE. JAMAIS demander la couleur, la boutique ou la période.
+- RÉASSORT (get_restock_recommendations) : quand l'outil retourne des modèles avec transfert_possible: true, TOUJOURS le mentionner explicitement — un transfert est moins coûteux qu'une commande fournisseur. Quand nb_marques_sans_delai > 0 dans le résultat, ajouter EN FIN DE RÉPONSE : "⚠️ [nb] marque(s) sans délai fournisseur configuré — configurer les délais dans Paramètres améliorerait la précision des recommandations." JAMAIS omettre cette note si nb_marques_sans_delai > 0.
 - TERMES DE PAIEMENT / ESCOMPTES : pour toute question sur les escomptes fournisseur, les termes de paiement, "devrais-je payer [marque] rapidement", "est-ce rentable de prendre l'escompte", "quel est le rendement de l'escompte", "quelle marque a les meilleurs termes" → utiliser get_payment_terms_analysis. Si le résultat contient termes_non_configures=true : le DIRE explicitement — JAMAIS inventer un escompte ou supposer que les termes sont standard.
 
 GUIDE DES SECTIONS DE L'APPLICATION

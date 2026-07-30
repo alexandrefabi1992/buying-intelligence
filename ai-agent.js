@@ -2389,6 +2389,327 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
 }
 
 // ---------------------------------------------------------------------------
+// toolGetRestockRecommendations — modèles à risque de rupture avant fin saison
+// ---------------------------------------------------------------------------
+async function toolGetRestockRecommendations(
+  { season, shop_id, manufacturer, min_st = 70, max_semaines_couverture = null, include_nos = false, limit = 30 },
+  { pool, getSeasonsConfig, tenantId }
+) {
+  if (!season) return { erreur: 'Le paramètre "season" est obligatoire.' };
+  season  = season.toLowerCase();
+  limit   = Math.min(Math.max(1, parseInt(limit) || 30), 100);
+  min_st  = Number(min_st ?? 70);
+
+  shop_id = await resolveShopId(shop_id, pool);
+
+  // Season config
+  const seasons = await getSeasonsConfig();
+  const s = seasons.find(x => x.code === season);
+  if (!s) return { erreur: `Saison "${season}" non trouvée dans la configuration.` };
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (today > s.sell_to) {
+    return { erreur: `La saison ${season.toUpperCase()} est terminée — aucun réassort pertinent.` };
+  }
+
+  const stFrom    = s.reception_from ?? s.sell_from;
+  const stTo      = s.sell_to < today ? s.sell_to : today;
+  const seasonTag = s.tag_pattern ?? s.code;
+  const semaines_restantes = (new Date(s.sell_to) - new Date(today)) / (7 * 24 * 3600 * 1000);
+
+  // Lead times and shop name in parallel
+  const [ltRes, shopRes] = await Promise.all([
+    pool.query(`SELECT value FROM app_settings WHERE tenant_id = $1 AND key = 'nos_lead_times'`, [tenantId]),
+    shop_id ? pool.query('SELECT name FROM shops WHERE shop_id = $1', [shop_id]) : Promise.resolve({ rows: [] }),
+  ]);
+  const leadTimes = ltRes.rows[0]?.value ?? {};
+  const shopName  = shop_id ? (shopRes.rows[0]?.name ?? String(shop_id)) : 'Toutes boutiques';
+
+  // SQL params
+  const params = [stFrom, stTo]; // $1 $2
+
+  const shopIdx         = shop_id ? (params.push(shop_id), params.length) : null;
+  const shopSaleCond    = shopIdx ? `AND sl2.shop_id    = $${shopIdx}` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id  = $${shopIdx}` : '';
+  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
+  const vel4wShopCond   = shopIdx ? `AND slv.shop_id = $${shopIdx}` : '';
+
+  const tenantIdx    = (params.push(tenantId), params.length);
+  const seasonTagIdx = (params.push(`%${seasonTag}%`), params.length);
+  const tagCond      = !include_nos ? `AND p.tags ILIKE $${seasonTagIdx}` : '';
+  const mfrIdx       = manufacturer ? (params.push(`%${manufacturer}%`), params.length) : null;
+  const mfrCond      = mfrIdx ? `AND p.manufacturer ILIKE $${mfrIdx}` : '';
+  const minStIdx     = (params.push(min_st), params.length);
+
+  const { rows } = await pool.query(`
+    WITH
+    sales_by_item AS (
+      SELECT sl2.item_id, SUM(sl2.qty)::int AS sold
+      FROM sale_lines sl2
+      WHERE sl2.completed_time BETWEEN $1 AND $2 ${shopSaleCond}
+      GROUP BY sl2.item_id
+    ),
+    velocity_4w AS (
+      SELECT slv.item_id, (SUM(slv.qty)::numeric / 4) AS vel
+      FROM sale_lines slv
+      WHERE slv.completed_time >= now() - interval '4 weeks'
+        AND slv.completed_time <= now()
+        ${vel4wShopCond}
+      GROUP BY slv.item_id
+    ),
+    stock_by_item AS (
+      SELECT inv.item_id, SUM(inv.qty_on_hand)::int AS stock
+      FROM inventory inv
+      JOIN products px ON px.item_id = inv.item_id AND px.archived = false
+      ${shopStockWhere}
+      GROUP BY inv.item_id
+    ),
+    transfers_in AS (
+      SELECT t.item_id, SUM(t.qty_received)::int AS qty_in
+      FROM transfers t
+      WHERE ${transferInCond} AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
+    transfers_out AS (
+      SELECT t.item_id,
+        SUM(CASE WHEN t.transfer_received THEN t.qty_received ELSE t.qty_sent END)::int AS qty_out
+      FROM transfers t
+      WHERE ${transferOutCond} AND t.transfer_date BETWEEN $1 AND $2
+      GROUP BY t.item_id
+    ),
+    item_base AS (
+      SELECT
+        p.item_id, p.matrix_id, p.manufacturer, p.category,
+        COALESCE(p.default_cost, 0)::numeric AS default_cost,
+        p.description AS item_description,
+        im.description AS matrix_description,
+        ias.size_axis,
+        CASE ias.size_axis
+          WHEN 1 THEN p.raw->'ItemAttributes'->>'attribute1'
+          WHEN 2 THEN p.raw->'ItemAttributes'->>'attribute2'
+          WHEN 3 THEN p.raw->'ItemAttributes'->>'attribute3'
+          ELSE NULL
+        END AS taille,
+        (p.tags ILIKE $${seasonTagIdx})  AS has_season_tag,
+        COALESCE(s.sold,     0)::int     AS sold,
+        COALESCE(st.stock,   0)::int     AS stock,
+        COALESCE(v.vel,      0)::numeric AS vel_4w,
+        COALESCE(ti.qty_in,  0)::int     AS transferred_in,
+        COALESCE(to2.qty_out,0)::int     AS transferred_out,
+        GREATEST(0,
+          COALESCE(s.sold,0) + COALESCE(st.stock,0)
+          + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)
+        )::int AS received_supplier
+      FROM products p
+      LEFT JOIN item_attribute_sets ias
+        ON  ias.attribute_set_id = (p.raw->'ItemAttributes'->>'itemAttributeSetID')
+        AND ias.tenant_id = p.tenant_id
+      LEFT JOIN item_matrices im ON im.tenant_id = p.tenant_id AND im.matrix_id = p.matrix_id
+      LEFT JOIN sales_by_item  s    ON s.item_id    = p.item_id
+      LEFT JOIN velocity_4w    v    ON v.item_id    = p.item_id
+      LEFT JOIN stock_by_item  st   ON st.item_id   = p.item_id
+      LEFT JOIN transfers_in   ti   ON ti.item_id   = p.item_id
+      LEFT JOIN transfers_out  to2  ON to2.item_id  = p.item_id
+      WHERE p.tenant_id = $${tenantIdx}
+        AND p.archived = false
+        ${tagCond} ${mfrCond}
+        AND (
+          GREATEST(0, COALESCE(s.sold,0) + COALESCE(st.stock,0)
+                   + COALESCE(to2.qty_out,0) - COALESCE(ti.qty_in,0)) > 0
+          OR COALESCE(st.stock, 0) > 0
+        )
+    ),
+    matrix_base AS (
+      SELECT
+        matrix_id,
+        COALESCE(MAX(matrix_description), MIN(item_description)) AS description_modele,
+        (ARRAY_AGG(manufacturer ORDER BY item_id))[1]            AS manufacturer,
+        (ARRAY_AGG(category     ORDER BY item_id))[1]            AS category,
+        CASE WHEN SUM(received_supplier) > 0
+          THEN ROUND(SUM(sold)::numeric / SUM(received_supplier) * 100, 1)
+          ELSE 0 END                      AS st_pct,
+        SUM(sold)::int                    AS units_sold,
+        SUM(received_supplier)::int       AS units_received,
+        SUM(stock)::int                   AS stock_actuel,
+        ROUND(SUM(vel_4w)::numeric, 4)    AS velocite_4sem,
+        MAX(default_cost)::numeric(12,2)  AS unit_cost,
+        BOOL_OR(has_season_tag)           AS has_season_tag,
+        JSON_AGG(JSON_BUILD_OBJECT(
+          'taille',            COALESCE(taille, 'N/A'),
+          'sold',              sold,
+          'stock',             stock,
+          'received_supplier', received_supplier
+        )) AS variantes_json
+      FROM item_base
+      WHERE matrix_id IS NOT NULL AND matrix_id != '0'
+      GROUP BY matrix_id
+    )
+    SELECT *
+    FROM matrix_base
+    WHERE st_pct >= $${minStIdx}
+      AND velocite_4sem > 0
+    ORDER BY velocite_4sem * GREATEST(unit_cost, 0) DESC NULLS LAST
+    LIMIT 500
+  `, params);
+
+  // JS post-processing: compute derived metrics and apply remaining filters
+  const NOS_HORIZON = 8;
+  const recommended = [];
+
+  for (const r of rows) {
+    const stock_actuel  = Number(r.stock_actuel);
+    const velocite_4sem = Number(r.velocite_4sem);
+    const type_article  = (include_nos && !r.has_season_tag) ? 'nos' : 'collection';
+    const horizon       = type_article === 'nos' ? NOS_HORIZON : semaines_restantes;
+
+    const semaines_couverture = Math.round(stock_actuel / velocite_4sem * 10) / 10;
+    if (semaines_couverture >= horizon) continue;
+    if (max_semaines_couverture !== null && semaines_couverture > Number(max_semaines_couverture)) continue;
+
+    const unites_manquantes = Math.max(0, Math.round(velocite_4sem * horizon) - stock_actuel);
+    if (unites_manquantes === 0) continue;
+
+    const unit_cost       = Number(r.unit_cost ?? 0);
+    const valeur_reassort = Math.round(unites_manquantes * unit_cost * 100) / 100;
+
+    // Tailles à réassortir — aggregate by size first, then apply criteria
+    const variantes   = Array.isArray(r.variantes_json) ? r.variantes_json : [];
+    const taille_agg  = {};
+    for (const v of variantes) {
+      const key = v.taille ?? 'N/A';
+      if (!taille_agg[key]) taille_agg[key] = { sold: 0, stock: 0, received_supplier: 0 };
+      taille_agg[key].sold              += Number(v.sold);
+      taille_agg[key].stock             += Number(v.stock);
+      taille_agg[key].received_supplier += Number(v.received_supplier);
+    }
+    const tailles_a_reassortir = [];
+    for (const [taille, d] of Object.entries(taille_agg)) {
+      const st_v = d.received_supplier > 0 ? Math.round(d.sold / d.received_supplier * 100) : 0;
+      if ((d.stock === 0 && d.sold > 0) || (d.stock <= 1 && st_v >= 80)) {
+        tailles_a_reassortir.push({ taille, vendu: d.sold, stock: d.stock, st_pct: st_v });
+      }
+    }
+    tailles_a_reassortir.sort((a, b) => b.vendu - a.vendu);
+
+    // Lead time
+    const mfr            = r.manufacturer;
+    const delai_semaines = leadTimes[mfr] != null ? Number(leadTimes[mfr]) : null;
+    const delai_manquant = delai_semaines === null;
+    let   commande_utile = null, date_limite_commande = null;
+
+    if (!delai_manquant) {
+      if (type_article === 'collection') {
+        commande_utile = delai_semaines < semaines_restantes;
+        const dlDate = new Date(s.sell_to);
+        dlDate.setDate(dlDate.getDate() - Math.round(delai_semaines * 7));
+        date_limite_commande = dlDate.toISOString().slice(0, 10);
+      } else {
+        commande_utile       = true;
+        date_limite_commande = null;
+      }
+    }
+
+    recommended.push({
+      matrix_id:              r.matrix_id,
+      description_modele:     r.description_modele ?? null,
+      manufacturer:           r.manufacturer,
+      category:               r.category,
+      type_article,
+      st_pct:                 Number(r.st_pct),
+      units_sold:             Number(r.units_sold),
+      units_received:         Number(r.units_received),
+      stock_actuel,
+      velocite_4sem:          Math.round(velocite_4sem * 100) / 100,
+      semaines_couverture,
+      unites_manquantes,
+      valeur_reassort,
+      delai_semaines,
+      delai_manquant,
+      commande_utile,
+      date_limite_commande,
+      transfert_possible:     null, // filled below
+      stock_autres_boutiques: null, // filled below
+      tailles_a_reassortir,
+    });
+  }
+
+  // Sort by valeur_reassort desc, take top N
+  recommended.sort((a, b) => b.valeur_reassort - a.valeur_reassort);
+  const topN = recommended.slice(0, limit);
+
+  // Stock in other shops (batch query when shop_id provided)
+  if (shop_id && topN.length > 0) {
+    const matrixIds = topN.map(m => m.matrix_id);
+    const { rows: stockOther } = await pool.query(`
+      SELECT
+        p.matrix_id,
+        i.shop_id,
+        sh.name                                           AS boutique,
+        SUM(i.qty_on_hand)::int                           AS qty,
+        COALESCE(SUM(sl_loc.sold_local), 0)::int          AS sold_local
+      FROM inventory i
+      JOIN products p  ON p.item_id  = i.item_id
+                       AND p.archived = false
+                       AND p.tenant_id = $1
+      JOIN shops    sh ON sh.shop_id = i.shop_id
+      LEFT JOIN (
+        SELECT sl.item_id, sl.shop_id, SUM(sl.qty)::int AS sold_local
+        FROM sale_lines sl
+        WHERE sl.completed_time BETWEEN $2 AND $3
+        GROUP BY sl.item_id, sl.shop_id
+      ) sl_loc ON sl_loc.item_id = p.item_id AND sl_loc.shop_id = i.shop_id
+      WHERE p.matrix_id = ANY($4)
+        AND i.shop_id  != $5
+        AND i.shop_id  != '0'
+        AND i.qty_on_hand > 0
+      GROUP BY p.matrix_id, i.shop_id, sh.name
+      HAVING SUM(i.qty_on_hand) > 0
+      ORDER BY p.matrix_id, SUM(i.qty_on_hand) DESC
+    `, [tenantId, stFrom, stTo, matrixIds, shop_id]);
+
+    const otherMap = {};
+    for (const r of stockOther) {
+      if (!otherMap[r.matrix_id]) otherMap[r.matrix_id] = [];
+      const qty  = Number(r.qty);
+      const sold = Number(r.sold_local);
+      otherMap[r.matrix_id].push({
+        boutique:     r.boutique,
+        shop_id:      r.shop_id,
+        qty,
+        st_pct_local: (sold + qty) > 0 ? Math.round(sold / (sold + qty) * 1000) / 10 : 0,
+      });
+    }
+
+    for (const m of topN) {
+      const autres   = otherMap[m.matrix_id] ?? [];
+      const totalQty = autres.reduce((sum, b) => sum + b.qty, 0);
+      m.stock_autres_boutiques = autres;
+      m.transfert_possible     = totalQty >= m.unites_manquantes;
+    }
+  }
+
+  // Build summary fields
+  const marquesSansDelai = new Set(topN.filter(m => m.delai_manquant).map(m => m.manufacturer));
+  const valeur_reassort_estimee = Math.round(
+    topN.reduce((sum, m) => sum + (m.valeur_reassort ?? 0), 0) * 100
+  ) / 100;
+
+  return {
+    periode:                   { de: stFrom, a: s.sell_to },
+    saison:                    season.toUpperCase(),
+    boutique:                  shopName,
+    semaines_restantes_saison: Math.round(semaines_restantes * 10) / 10,
+    scope_produits:            include_nos ? `Collection ${season.toUpperCase()} + NOS` : `Collection ${season.toUpperCase()}`,
+    criteres:                  { min_st, max_semaines_couverture: max_semaines_couverture ?? null, manufacturer: manufacturer ?? null },
+    nb_modeles:                topN.length,
+    nb_marques_sans_delai:     marquesSansDelai.size,
+    valeur_reassort_estimee,
+    modeles:                   topN,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Tool dispatcher
 // ---------------------------------------------------------------------------
 async function dispatchTool(name, args, ctx) {
@@ -2417,6 +2738,7 @@ async function dispatchTool(name, args, ctx) {
     case 'get_brand_ranking':               return await toolGetBrandRanking(args, ctx);
     case 'get_season_comparison':           return await toolGetSeasonComparison(args, ctx);
     case 'get_items_by_criteria':           return await toolGetItemsByCriteria(args, ctx);
+    case 'get_restock_recommendations':    return await toolGetRestockRecommendations(args, ctx);
     default:                                return { erreur: `Outil inconnu: ${name}` };
   }
 }
@@ -2585,6 +2907,7 @@ const TOOL_LABELS = {
   get_brand_ranking:            'Classement des marques (analytique)',
   get_season_comparison:        'Comparaison de deux saisons',
   get_items_by_criteria:        'Recherche de modèles par critères',
+  get_restock_recommendations:  'Recommandations de réassort',
 };
 
 // ---------------------------------------------------------------------------
