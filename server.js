@@ -1264,7 +1264,7 @@ app.get('/api/transfers', async (req, res, next) => {
           AND p.matrix_id IS NOT NULL AND p.archived = false
         JOIN matrix_ever_sold mes ON mes.matrix_id = p.matrix_id AND mes.shop_id = i.shop_id
         LEFT JOIN matrix_last_sale mls ON mls.matrix_id = p.matrix_id AND mls.shop_id = i.shop_id
-        WHERE i.qty_on_hand > 0 AND i.shop_id != 0
+        WHERE i.qty_on_hand > 0 AND i.shop_id != '0'
           AND (mls.last_sale_date IS NULL OR mls.last_sale_date < now() - (interval '1 day' * $1))
         GROUP BY p.matrix_id, i.shop_id, mls.last_sale_date
       ),
