@@ -185,7 +185,7 @@ async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { poo
       COUNT(DISTINCT p.item_id)          AS references_distinctes
     FROM sale_lines sl
     JOIN products p ON p.item_id = sl.item_id
-    WHERE sl.completed_time >= $1 AND sl.completed_time < $2::date + interval '1 day'
+    WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date
       AND p.manufacturer IS NOT NULL AND p.manufacturer != ''
       ${shopFilter}
     GROUP BY p.manufacturer
@@ -338,7 +338,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
 
   const periodeLabel = periodLabel ?? (season ? `Saison ${season.toUpperCase()} (${from} → ${to})` : `${from} → ${to}`);
 
-  const conditions = ["sl.completed_time >= $1 AND sl.completed_time < $2::date + interval '1 day'"];
+  const conditions = ["(sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date"];
   const params     = [from, to ?? new Date().toISOString()];
 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
@@ -602,8 +602,8 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
   const conditions = ['sl.qty != 0'];
   const params     = [];
 
-  if (from) { conditions.push(`sl.completed_time >= $${params.length + 1}`); params.push(from); }
-  if (to)   { conditions.push(`sl.completed_time < $${params.length + 1}::date + interval '1 day'`); params.push(to); }
+  if (from) { conditions.push(`(sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${params.length + 1}::date`); params.push(from); }
+  if (to)   { conditions.push(`(sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${params.length + 1}::date`); params.push(to); }
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
   if (category)     { conditions.push(`p.category ILIKE $${params.length + 1}`);      params.push(`%${category}%`); }
   if (genre)        {
@@ -779,7 +779,7 @@ async function toolGetTopPerformers({ season, metric, order = 'desc', limit = 10
       SUM(sl.qty * p.default_cost)::numeric(12,2) AS cout_ventes
     FROM sale_lines sl
     JOIN products p ON p.item_id = sl.item_id
-    WHERE sl.completed_time >= $1 AND sl.completed_time < $2::date + interval '1 day'
+    WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date
       AND p.manufacturer IS NOT NULL ${shopFilter}
     GROUP BY p.manufacturer
     ORDER BY cout_ventes ${dir} NULLS LAST
@@ -887,7 +887,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
     WITH sales_by_item AS (
       SELECT sl2.item_id, SUM(sl2.qty) AS sold
       FROM sale_lines sl2
-      WHERE sl2.completed_time >= $1 AND sl2.completed_time < $2::date + interval '1 day'
+      WHERE (sl2.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl2.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date
         ${shopSaleCond}
       GROUP BY sl2.item_id
     ),
@@ -1258,7 +1258,7 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
     const seasonTag = s.tag_pattern ?? s.code;
     // reception_from → sell_to matches Lightspeed "Ventes par Marque" methodology:
     // start from when items arrive (reception_from), end at sell_to.
-    const conds  = ["sl.completed_time >= $1 AND sl.completed_time < $2::date + interval '1 day'", `p.tags ILIKE $3`];
+    const conds  = ["(sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date", `p.tags ILIKE $3`];
     const params = [s.reception_from ?? s.sell_from, s.sell_to, `%${seasonTag}%`];
 
     if (manufacturer) { conds.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
@@ -1340,7 +1340,7 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
   const periodeLabel = periodLabel ?? (season ? `Saison ${season.toUpperCase()} (${from} → ${to})` : `${from} → ${to}`);
 
   const conditions = [
-    "sl.completed_time >= $1 AND sl.completed_time < $2::date + interval '1 day'",
+    "(sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date",
     "p.category IS NOT NULL",
     "p.category != ''",
   ];
@@ -1722,7 +1722,7 @@ async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, 
     WITH sales_by_item AS (
       SELECT sl2.item_id, SUM(sl2.qty) AS sold
       FROM sale_lines sl2
-      WHERE sl2.completed_time >= $1 AND sl2.completed_time < $2::date + interval '1 day' ${shopSaleCond}
+      WHERE (sl2.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl2.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date ${shopSaleCond}
       GROUP BY sl2.item_id
     ),
     stock_by_item AS (
@@ -1883,7 +1883,7 @@ async function toolGetProductByDescription({ terme, season, shop_id }, { pool, g
     WITH sales_by_item AS (
       SELECT sl2.item_id, SUM(sl2.qty) AS sold
       FROM sale_lines sl2
-      WHERE sl2.completed_time >= $1 AND sl2.completed_time < $2::date + interval '1 day' ${shopSaleCond}
+      WHERE (sl2.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl2.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date ${shopSaleCond}
       GROUP BY sl2.item_id
     ),
     stock_by_item AS (
@@ -1962,7 +1962,7 @@ async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, sho
              SUM(sl2.qty) AS sold,
              SUM(sl2.qty * sl2.unit_price - COALESCE(sl2.discount, 0)) AS revenue
       FROM sale_lines sl2
-      WHERE sl2.completed_time >= $1 AND sl2.completed_time < $2::date + interval '1 day' ${shopSaleCond}
+      WHERE (sl2.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl2.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date ${shopSaleCond}
       GROUP BY sl2.item_id
     ),
     stock_by_item AS (
@@ -2103,7 +2103,7 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
              SUM(sl2.qty) AS sold,
              SUM(sl2.qty * sl2.unit_price - COALESCE(sl2.discount, 0)) AS revenue
       FROM sale_lines sl2
-      WHERE sl2.completed_time >= $1 AND sl2.completed_time < $2::date + interval '1 day' ${shopSaleCond}
+      WHERE (sl2.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl2.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date ${shopSaleCond}
       GROUP BY sl2.item_id
     ),
     stock_by_item AS (
@@ -2402,7 +2402,7 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
              SUM(sl2.qty * sl2.unit_price - COALESCE(sl2.discount, 0)) AS revenue,
              MAX(sl2.completed_time) AS last_sale_date
       FROM sale_lines sl2
-      WHERE sl2.completed_time >= $1 AND sl2.completed_time < $2::date + interval '1 day' ${shopSaleCond}
+      WHERE (sl2.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl2.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date ${shopSaleCond}
       GROUP BY sl2.item_id
     ),
     stock_by_item AS (
@@ -2591,7 +2591,7 @@ async function toolGetRestockRecommendations(
     sales_by_item AS (
       SELECT sl2.item_id, SUM(sl2.qty)::int AS sold
       FROM sale_lines sl2
-      WHERE sl2.completed_time >= $1 AND sl2.completed_time < $2::date + interval '1 day' ${shopSaleCond}
+      WHERE (sl2.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl2.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date ${shopSaleCond}
       GROUP BY sl2.item_id
     ),
     velocity_4w AS (
@@ -2807,7 +2807,7 @@ async function toolGetRestockRecommendations(
       LEFT JOIN (
         SELECT sl.item_id, sl.shop_id, SUM(sl.qty)::int AS sold_local
         FROM sale_lines sl
-        WHERE sl.completed_time >= $2 AND sl.completed_time < $3::date + interval '1 day'
+        WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $2::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $3::date
         GROUP BY sl.item_id, sl.shop_id
       ) sl_loc ON sl_loc.item_id = p.item_id AND sl_loc.shop_id = i.shop_id
       WHERE p.matrix_id = ANY($4)
@@ -2958,7 +2958,7 @@ async function toolGetPricingAnalysis({
         SUM(CASE WHEN COALESCE((sl.raw->>'discountPercent')::numeric, 0) >= 0.50
               THEN sl.qty ELSE 0 END)::int                            AS p50p
       FROM sale_lines sl
-      WHERE sl.completed_time >= $1 AND sl.completed_time < $2::date + interval '1 day'
+      WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date
         AND sl.qty != 0
         AND COALESCE((sl.raw->>'discountPercent')::numeric, 0) < 1
         ${shopSaleCond}

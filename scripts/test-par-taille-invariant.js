@@ -464,7 +464,8 @@ async function main() {
         SELECT SUM(sl.qty) AS total
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
-        WHERE sl.completed_time >= $1 AND sl.completed_time < $2::date + interval '1 day'
+        WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date
+          AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date
           AND p.category IS NOT NULL
           AND p.category != ''
       `,
@@ -487,7 +488,8 @@ async function main() {
         FROM sale_lines sl
         JOIN products p  ON p.item_id  = sl.item_id
         JOIN shops    sh ON sh.shop_id = sl.shop_id
-        WHERE sl.completed_time >= $1 AND sl.completed_time < $2::date + interval '1 day'
+        WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date
+          AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date
           AND p.category ILIKE $3
           AND p.manufacturer IS NOT NULL
       `,
@@ -549,7 +551,8 @@ async function main() {
       JOIN products p ON p.item_id = sl.item_id
       WHERE p.manufacturer ILIKE $1
         AND sl.qty != 0
-        AND sl.completed_time BETWEEN $2 AND $3
+        AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $2::date
+        AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $3::date
     `, ['%Brax%', svResult.periode.de, svResult.periode.a]);
     const indRevenue = parseFloat(rows[0]?.total ?? 0);
 
@@ -587,16 +590,16 @@ async function main() {
   if (!rCrossStock) anyFailed = true;
 
   // --- PricingAnalysis: Brax 12 months reference values ---
-  // brut=398494.13, net=350632.13, revenu_perdu=47862.00 (verified against raw SQL)
+  // brut=398752.13, net=350761.13, revenu_perdu=47991 (updated for AT TIME ZONE fix)
   const rPricingBrax = await (async () => {
     const label = '[PricingAnalysis] Brax 1y — brut/net/revenu_perdu reference values';
     const result = await toolGetPricingAnalysis({ manufacturer: 'Brax', period: '1y' }, ctx);
     if (result.erreur) { console.error(`FAIL ${label} — tool error: ${result.erreur}`); return false; }
     const brax = result.marques[0];
     if (!brax) { console.error(`FAIL ${label} — Brax not in results`); return false; }
-    const ok = Math.abs(brax.brut - 398494.13) < 1 &&
-               Math.abs(brax.net  - 350632.13) < 1 &&
-               Math.abs(brax.revenu_perdu - 47862.00) < 1;
+    const ok = Math.abs(brax.brut - 398752.13) < 1 &&
+               Math.abs(brax.net  - 350761.13) < 1 &&
+               Math.abs(brax.revenu_perdu - 47991) < 1;
     if (!ok) {
       console.error(`FAIL ${label} — brut=${brax.brut} net=${brax.net} rev_perdu=${brax.revenu_perdu}`);
       return false;
@@ -653,11 +656,8 @@ async function main() {
     const { rows: direct } = await pool.query(`
       SELECT SUM(sl.qty)::int AS unites
       FROM sale_lines sl
-      LEFT JOIN products p ON p.item_id = sl.item_id
-      JOIN shops sh ON sh.shop_id = sl.shop_id
       WHERE sl.shop_id = '8'
-        AND sl.completed_time >= '2026-07-31'
-        AND sl.completed_time < '2026-08-01'
+        AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date = '2026-07-31'
     `);
     const expected = direct[0].unites ?? 0;
     if (expected === 0) {
@@ -681,6 +681,65 @@ async function main() {
     return true;
   })();
   if (!rDateBoundary) anyFailed = true;
+
+  // --- TimezoneBoundary: evening sale (20h-minuit local) on last day must be included ---
+  // Regression for AT TIME ZONE fix: a sale at 21h local = UTC 01h next-day was excluded
+  // when queries used raw UTC comparisons. Now using AT TIME ZONE 'America/Toronto'.
+  const rTzBoundary = await (async () => {
+    const label = '[TimezoneBoundary] evening sale (20h-minuit local) included in its local date';
+    // Find any sale in UTC 00:00-03:59 (= 20h-23:59 America/Toronto) in the last 12 months
+    const { rows: sample } = await pool.query(`
+      SELECT
+        sl.shop_id,
+        (sl.completed_time AT TIME ZONE 'America/Toronto')::date AS local_date,
+        SUM(sl.qty)::int AS unites
+      FROM sale_lines sl
+      WHERE EXTRACT(HOUR FROM sl.completed_time) < 4
+        AND sl.completed_time > now() - interval '12 months'
+        AND sl.qty > 0
+      GROUP BY sl.shop_id, (sl.completed_time AT TIME ZONE 'America/Toronto')::date
+      ORDER BY local_date DESC
+      LIMIT 1
+    `);
+    if (!sample.length) {
+      console.log(`SKIP ${label} — no evening sales in last 12 months`);
+      return true;
+    }
+    const { shop_id, local_date, unites: expected } = sample[0];
+    const dateStr = local_date instanceof Date
+      ? local_date.toISOString().slice(0, 10)
+      : String(local_date).slice(0, 10);
+
+    // Direct check: AT TIME ZONE query (what our queries now do)
+    const { rows: direct } = await pool.query(`
+      SELECT SUM(sl.qty)::int AS unites
+      FROM sale_lines sl
+      WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date = $1::date
+        AND sl.shop_id = $2
+        AND EXTRACT(HOUR FROM sl.completed_time) < 4
+        AND sl.qty > 0
+    `, [dateStr, shop_id]);
+    const directUnits = direct[0].unites ?? 0;
+
+    const result = await toolGetSalesAnalysis({
+      date_from:  dateStr,
+      date_to:    dateStr,
+      shop_id,
+      total_only: true,
+    }, ctx);
+    if (result.erreur) { console.error(`FAIL ${label} — tool error: ${result.erreur}`); return false; }
+    const toolUnits = result.total?.unites ?? 0;
+
+    // Tool must return >= directUnits (evening sales included in the day's total)
+    if (toolUnits < directUnits) {
+      console.error(`FAIL ${label} — tool=${toolUnits} < evening_units=${directUnits} for ${dateStr} shop ${shop_id}`);
+      console.error(`  Evening sales (UTC hour<4) are not being counted in their local date.`);
+      return false;
+    }
+    console.log(`PASS ${label} — ${dateStr} shop ${shop_id}: evening_units=${directUnits} included in tool total=${toolUnits} ✅`);
+    return true;
+  })();
+  if (!rTzBoundary) anyFailed = true;
 
   await pool.end();
 
