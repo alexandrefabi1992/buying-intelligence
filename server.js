@@ -2152,7 +2152,7 @@ app.get('/api/admin/revenue-diag', async (req, res, next) => {
       WHERE p.manufacturer ILIKE $1
         AND p.tags ILIKE $2
         AND sl.completed_time >= $3::date
-        AND sl.completed_time <= ${toParam}::date
+        AND sl.completed_time < ${toParam}::date + interval '1 day'
         AND sl.qty > 0
         AND sl.completed_time IS NOT NULL
         ${shopCond}
@@ -2184,7 +2184,7 @@ app.get('/api/admin/revenue-check', async (req, res, next) => {
         ROUND(SUM(COALESCE((sl.raw->>'calcLineDiscount')::numeric,0)),2)::float8            AS sum_discounts,
         ROUND(SUM((sl.raw->>'calcTotal')::numeric - COALESCE((sl.raw->>'calcTax1')::numeric,0) - COALESCE((sl.raw->>'calcTax2')::numeric,0)),2)::float8 AS calctotal_pretax
       FROM sale_lines sl
-      WHERE sl.completed_time BETWEEN $1 AND $2
+      WHERE sl.completed_time >= $1 AND sl.completed_time < $2::date + interval '1 day'
         AND sl.qty IS NOT NULL
     `, [from, to]);
     res.json({ periode: { from, to }, ...rows[0] });
@@ -2250,7 +2250,7 @@ app.get('/api/admin/season-gap-diag', async (req, res, next) => {
       pool.query(`
         SELECT
           CASE WHEN sl.completed_time >= ${ shopId ? '$4' : '$3' }::date
-                AND sl.completed_time <= ${ shopId ? '$5' : '$4' }::date
+                AND sl.completed_time < ${ shopId ? '$5' : '$4' }::date + interval '1 day'
                THEN 'pendant_saison'
                ELSE 'hors_saison'
           END                                        AS period,
@@ -2818,7 +2818,7 @@ app.get('/api/admin/explain', async (req, res, next) => {
         SELECT sl.item_id, SUM(sl.qty) AS units_sold_season
         FROM sale_lines sl
         WHERE sl.completed_time >= '2025-02-01'::date
-          AND sl.completed_time <= '2025-09-30'::date
+          AND sl.completed_time < '2025-10-01'::date
           AND sl.qty > 0
           AND sl.completed_time IS NOT NULL
         GROUP BY sl.item_id
@@ -3379,7 +3379,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
       FROM sale_lines sl
       JOIN products p ON p.item_id = sl.item_id
       WHERE sl.completed_time >= $${coSalesFromIdx}::date
-        AND sl.completed_time <= $${coSalesToIdx}::date
+        AND sl.completed_time < $${coSalesToIdx}::date + interval '1 day'
         AND sl.completed_time IS NOT NULL
         AND p.tags ILIKE $${coSalesTagIdx}
         AND p.tags NOT ILIKE '%nos%'
@@ -3458,7 +3458,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE sl.completed_time >= $${slFromIdx}::date
-          AND sl.completed_time <= $${slToIdx}::date
+          AND sl.completed_time < $${slToIdx}::date + interval '1 day'
           AND sl.completed_time IS NOT NULL
           AND p.tags ILIKE $${slTagIdx}
           AND p.tags NOT ILIKE '%nos%'
@@ -3521,7 +3521,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
                 FROM sale_lines sl
                 JOIN products p ON p.item_id = sl.item_id
                 WHERE sl.completed_time >= $${rwFromIdx}::date
-                  AND sl.completed_time <= $${rwToIdx}::date
+                  AND sl.completed_time < $${rwToIdx}::date + interval '1 day'
                   AND sl.completed_time IS NOT NULL
                   AND p.tags ILIKE $${rwTagIdx}
                   AND p.tags NOT ILIKE '%nos%'
@@ -4082,7 +4082,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       q1Promise = pool.query(`
         SELECT
           COUNT(DISTINCT CASE WHEN p.tags ILIKE $5
-                              AND sl.completed_time >= $3::date AND sl.completed_time <= $4::date
+                              AND sl.completed_time >= $3::date AND sl.completed_time < $4::date + interval '1 day'
                              THEN sl.item_id END)::int AS active_items,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks'
                          THEN sl.qty ELSE 0 END) / 12.0, 1)::float8   AS weekly_velocity,
@@ -4091,10 +4091,10 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           ROUND(SUM(CASE WHEN p.tags ILIKE $5
                          THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_tag,
           ROUND(SUM(CASE WHEN p.tags ILIKE $5
-                          AND sl.completed_time >= $3::date AND sl.completed_time <= $4::date
+                          AND sl.completed_time >= $3::date AND sl.completed_time < $4::date + interval '1 day'
                          THEN sl.qty ELSE 0 END), 0)::float8           AS units_sold_tag_period,
           ROUND(SUM(CASE WHEN p.tags ILIKE $5
-                          AND sl.completed_time >= $3::date AND sl.completed_time <= $4::date
+                          AND sl.completed_time >= $3::date AND sl.completed_time < $4::date + interval '1 day'
                          THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_tag_period,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks' AND p.tags ILIKE $5
                          THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_12w
@@ -4111,7 +4111,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       q1Promise = pool.query(`
         SELECT
           COUNT(DISTINCT CASE WHEN p.tags ILIKE $4
-                              AND sl.completed_time >= $2::date AND sl.completed_time <= $3::date
+                              AND sl.completed_time >= $2::date AND sl.completed_time < $3::date + interval '1 day'
                              THEN sl.item_id END)::int AS active_items,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks'
                          THEN sl.qty ELSE 0 END) / 12.0, 1)::float8   AS weekly_velocity,
@@ -4120,10 +4120,10 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           ROUND(SUM(CASE WHEN p.tags ILIKE $4
                          THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_tag,
           ROUND(SUM(CASE WHEN p.tags ILIKE $4
-                          AND sl.completed_time >= $2::date AND sl.completed_time <= $3::date
+                          AND sl.completed_time >= $2::date AND sl.completed_time < $3::date + interval '1 day'
                          THEN sl.qty ELSE 0 END), 0)::float8           AS units_sold_tag_period,
           ROUND(SUM(CASE WHEN p.tags ILIKE $4
-                          AND sl.completed_time >= $2::date AND sl.completed_time <= $3::date
+                          AND sl.completed_time >= $2::date AND sl.completed_time < $3::date + interval '1 day'
                          THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_tag_period,
           ROUND(SUM(CASE WHEN sl.completed_time >= now() - INTERVAL '12 weeks' AND p.tags ILIKE $4
                          THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8 AS revenue_12w
@@ -4450,7 +4450,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           WHERE p.manufacturer ILIKE $${i.mfr}
             AND p.tags ILIKE $${i.tag}
             AND sl.completed_time >= $${i.from}::date
-            AND sl.completed_time <= $${i.to}::date
+            AND sl.completed_time < $${i.to}::date + interval '1 day'
             AND p.tenant_id = $${i.tid}
             ${shopSale}
           GROUP BY 1
@@ -4475,7 +4475,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $${xn.i.mfr}
           AND sl.completed_time >= $${xn.i.from}::date
-          AND sl.completed_time <= $${xn.i.to}::date
+          AND sl.completed_time < $${xn.i.to}::date + interval '1 day'
           AND p.tenant_id = $${xn.i.tid}
           ${xn.shopSale}
       `, xn.params));
@@ -4924,7 +4924,7 @@ function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam, t
       FROM sale_lines sl
       JOIN season_items si ON si.item_id = sl.item_id
       WHERE sl.completed_time >= '${seasonFrom}'::date
-        AND sl.completed_time <= LEAST('${seasonTo}'::date, CURRENT_DATE)
+        AND sl.completed_time < LEAST('${seasonTo}'::date, CURRENT_DATE) + interval '1 day'
         AND sl.completed_time IS NOT NULL
         ${shopCondSL}
     ),
@@ -5146,7 +5146,7 @@ app.get('/api/velocity/articles', async (req, res, next) => {
         JOIN products p ON p.item_id = sl.item_id
         WHERE sl.item_id = ANY($1)
           AND sl.completed_time >= '${season.from}'::date
-          AND sl.completed_time <= LEAST('${season.to}'::date, CURRENT_DATE)
+          AND sl.completed_time < LEAST('${season.to}'::date, CURRENT_DATE) + interval '1 day'
           AND sl.completed_time IS NOT NULL
           ${shopCondSL}
       ),
