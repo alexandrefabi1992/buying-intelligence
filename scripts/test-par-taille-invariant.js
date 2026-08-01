@@ -528,6 +528,62 @@ async function main() {
   })();
   if (!r9) anyFailed = true;
 
+  // --- Cross-tool revenue check ---
+  // toolGetSalesByVariant.total_ventes_net must match an independent NET revenue SQL
+  // for the same brand and period. Catches BRUT vs NET formula divergence (was +13.7%).
+  console.log('');
+  const rCrossRevenue = await (async () => {
+    const label = '[Cross-Revenue] SalesByVariant.total_ventes_net == independent NET SQL — Brax 1y';
+    const svResult = await toolGetSalesByVariant({ manufacturer: 'Brax', period: '1y' }, ctx);
+    if (svResult.erreur) { console.error(`FAIL ${label} — tool error: ${svResult.erreur}`); return false; }
+
+    const parseM = s => parseFloat(String(s).replace('$', '').replace(/\s/g, '').replace(',', '.'));
+    const svRevenue = parseM(svResult.total_ventes_net ?? 0);
+
+    const { rows } = await pool.query(`
+      SELECT ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price)
+               - COALESCE(sl.discount, 0)), 2) AS total
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE p.manufacturer ILIKE $1
+        AND sl.qty != 0
+        AND sl.completed_time BETWEEN $2 AND $3
+    `, ['%Brax%', svResult.periode.de, svResult.periode.a]);
+    const indRevenue = parseFloat(rows[0]?.total ?? 0);
+
+    const delta = Math.abs(svRevenue - indRevenue);
+    if (delta > 1) {
+      console.error(`FAIL ${label} — SalesByVariant=${svRevenue} ≠ independent=${indRevenue} (Δ=${delta.toFixed(2)})`);
+      return false;
+    }
+    console.log(`PASS ${label} — ${svRevenue.toFixed(2)} ✅`);
+    return true;
+  })();
+  if (!rCrossRevenue) anyFailed = true;
+
+  // --- Cross-tool stock check ---
+  // toolGetSellthroughBySize.total_stock_actuel_en_boutique must equal
+  // toolGetStockByVariant.total_unites for the same brand.
+  // Both exclude shop_id='0' — divergence exposes a phantom-stock regression.
+  const rCrossStock = await (async () => {
+    const label = '[Cross-Stock] SellthroughBySize.total_stock == StockByVariant.total_unites — Brax';
+    const [stResult, svResult] = await Promise.all([
+      toolGetSellthroughBySize({ manufacturer: 'Brax' }, ctx),
+      toolGetStockByVariant({ manufacturer: 'Brax' }, ctx),
+    ]);
+
+    const stStock = stResult.total_stock_actuel_en_boutique;
+    const svStock = svResult.total_unites;
+
+    if (stStock !== svStock) {
+      console.error(`FAIL ${label} — SellthroughBySize=${stStock} ≠ StockByVariant=${svStock} (phantom regression?)`);
+      return false;
+    }
+    console.log(`PASS ${label} — both=${stStock} ✅`);
+    return true;
+  })();
+  if (!rCrossStock) anyFailed = true;
+
   await pool.end();
 
   if (anyFailed) {

@@ -621,10 +621,10 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
       p.description,
       p.manufacturer,
       SUM(sl.qty)                          AS qty_vendue,
-      ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price)), 2) AS ventes_brutes,
+      ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0)), 2) AS ventes_net,
       ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2) AS cout_ventes,
       SUM(SUM(sl.qty))                     OVER () AS total_qty_all,
-      SUM(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price))) OVER () AS total_ventes_all,
+      SUM(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0))) OVER () AS total_ventes_all,
       COUNT(*)                             OVER () AS nb_articles_total
     FROM sale_lines sl
     JOIN products p ON p.item_id = sl.item_id
@@ -647,13 +647,13 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
     periode: { de: from ?? null, a: to ?? null, label },
     filtre: { marque: manufacturer, taille: size, recherche: description_search },
     total_unites_vendues:   total_qty,
-    total_ventes_brutes:    fmtMoney(total_ventes),
+    total_ventes_net:       fmtMoney(total_ventes),
     nb_articles_total:      nb_total,
     nb_articles_affiches:   rows.length,
     articles: rows.map(r => ({
-      description:   r.description,
-      qty_vendue:    Number(r.qty_vendue),
-      ventes_brutes: fmtMoney(r.ventes_brutes),
+      description: r.description,
+      qty_vendue:  Number(r.qty_vendue),
+      ventes_net:  fmtMoney(r.ventes_net),
     })),
   };
 }
@@ -871,7 +871,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   const shopIdx        = shop_id ? params.length + 1 : null;
   if (shop_id) params.push(shop_id);
   const shopSaleCond   = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
+  const shopStockWhere = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : "WHERE inv.shop_id != '0'";
 
   const orderBy = sort === 'st_asc'    ? 'st_pct ASC  NULLS LAST, sold DESC'
                : sort === 'sold_desc' ? 'sold DESC, st_pct DESC'
@@ -1713,7 +1713,7 @@ async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, 
   const tagIdx  = seasonTag ? (params.push(`%${seasonTag}%`), params.length) : null;
 
   const shopSaleCond   = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
+  const shopStockWhere = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : "WHERE inv.shop_id != '0'";
   const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
   const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
   const tagCond         = tagIdx  ? `AND p.tags ILIKE $${tagIdx}`  : '';
@@ -1876,7 +1876,7 @@ async function toolGetProductByDescription({ terme, season, shop_id }, { pool, g
   const tagIdx  = seasonTag ? (params.push(`%${seasonTag}%`), params.length) : null;
 
   const shopSaleCond   = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere = shopIdx ? `AND inv.shop_id = $${shopIdx}` : '';
+  const shopStockWhere = shopIdx ? `AND inv.shop_id = $${shopIdx}` : "AND inv.shop_id != '0'";
   const tagCond        = tagIdx  ? `AND p.tags ILIKE $${tagIdx}`  : '';
 
   const { rows } = await pool.query(`
@@ -1945,7 +1945,7 @@ async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, sho
 
   const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
   const shopSaleCond    = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : "WHERE inv.shop_id != '0'";
   const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
   const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
 
@@ -2085,7 +2085,7 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
   const params = [stFrom, stTo]; // $1 $2
   const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
   const shopSaleCond    = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : "WHERE inv.shop_id != '0'";
   const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
   const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
   const tenantIdx = (params.push(tenantId), params.length);
@@ -2376,7 +2376,7 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
   const params = [stFrom, stTo]; // $1 $2
   const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
   const shopSaleCond    = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : "WHERE inv.shop_id != '0'";
   const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
   const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
   const tenantIdx = (params.push(tenantId), params.length);
@@ -2574,7 +2574,7 @@ async function toolGetRestockRecommendations(
 
   const shopIdx         = shop_id ? (params.push(shop_id), params.length) : null;
   const shopSaleCond    = shopIdx ? `AND sl2.shop_id    = $${shopIdx}` : '';
-  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id  = $${shopIdx}` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id  = $${shopIdx}` : "WHERE inv.shop_id != '0'";
   const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
   const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
   const vel4wShopCond   = shopIdx ? `AND slv.shop_id = $${shopIdx}` : '';

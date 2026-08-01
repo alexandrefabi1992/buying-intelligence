@@ -3999,7 +3999,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     const tIdx   = p.length; // $3 or $2
     const tenantCondP = `AND p.tenant_id = $${tIdx}`;
     const slS    = hasShop ? 'AND sl.shop_id = $2'     : '';
-    const invJ   = hasShop ? 'AND i.shop_id  = $2'     : '';
+    const invJ   = hasShop ? 'AND i.shop_id  = $2'     : "AND i.shop_id != '0'";
     const stCTE  = `
       st AS (
         SELECT i.item_id,
@@ -4179,7 +4179,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
                          THEN (p.default_price - p.default_cost) / p.default_price * 100
                          ELSE NULL END), 1)::float8 AS avg_margin_pct
         FROM products p
-        LEFT JOIN inventory i ON i.item_id = p.item_id
+        LEFT JOIN inventory i ON i.item_id = p.item_id AND i.shop_id != '0'
         WHERE p.manufacturer ILIKE $1 AND p.archived = false AND p.tenant_id = $3
       `, [mfr, seasonTag, req.tenantId]);
     }
@@ -4391,7 +4391,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       const params    = hasShop ? [mfr, shopId, hTag, req.tenantId] : [mfr, hTag, req.tenantId];
       const [mi, si, ti, di] = hasShop ? [1, 2, 3, 4] : [1, null, 2, 3];
       const shopSale  = hasShop ? `AND sl.shop_id = $${si}` : '';
-      const shopInv2  = hasShop ? `AND inv2.shop_id = $${si}` : '';
+      const shopInv2  = hasShop ? `AND inv2.shop_id = $${si}` : "AND inv2.shop_id != '0'";
 
       const transfersCte = hasShop ? `
         transfers_cte AS (
