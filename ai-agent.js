@@ -318,12 +318,22 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
   shop_id = await resolveShopId(shop_id, pool);
   let from = date_from, to = date_to;
   let seasonTag = null, periodLabel = null;
+  let avertissementPeriode = null;
 
-  // period sets the date window; season only sets dates as a fallback when period absent
+  // Explicit date_from/date_to take priority. If period is also given and resolves to
+  // a different window, we keep the explicit dates and surface a warning so the caller
+  // (chatbot user) sees the conflict rather than getting silently different data.
   if (period) {
     const resolved = resolvePeriod(period);
     if (resolved?.erreur) return { erreur: resolved.erreur };
-    from = resolved.from; to = resolved.to; periodLabel = resolved.label;
+    if (date_from || date_to) {
+      if (resolved.from !== date_from || resolved.to !== date_to) {
+        avertissementPeriode = `Les paramètres period="${period}" (${resolved.from} → ${resolved.to}) et date_from/date_to (${date_from ?? '?'} → ${date_to ?? '?'}) se contredisent. Les dates explicites ont été utilisées.`;
+      }
+      // Keep explicit dates as-is (from/to already set above).
+    } else {
+      from = resolved.from; to = resolved.to; periodLabel = resolved.label;
+    }
   }
 
   if (season) {
@@ -388,6 +398,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
     return {
       categorie: category,
       periode:   { de: from, a: to, label: periodeLabel },
+      ...(avertissementPeriode && { avertissement_periode: avertissementPeriode }),
       filtre:    { boutique: shop_id ?? 'toutes', saison: season ?? null },
       nb_marques_total:    nb_marques,
       nb_marques_affiches: rows.length,
@@ -424,6 +435,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
 
     return {
       periode:  { de: from, a: to, label: periodeLabel },
+      ...(avertissementPeriode && { avertissement_periode: avertissementPeriode }),
       par_boutique: rows.map(r => ({
         boutique:      r.boutique,
         unites:        Number(r.unites),
@@ -470,6 +482,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
 
   return {
     periode: { de: from, a: to, label: periodeLabel },
+    ...(avertissementPeriode && { avertissement_periode: avertissementPeriode }),
     nb_lignes_total:    nb_total,
     nb_lignes_affiches: rows.length,
     resultats: rows.map(r => ({
@@ -1320,11 +1333,20 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
   shop_id = await resolveShopId(shop_id, pool);
   let from = date_from, to = date_to;
   let seasonTag = null, periodLabel = null;
+  let avertissementPeriode = null;
 
+  // Explicit date_from/date_to take priority. If period is also given and resolves to
+  // a different window, keep the explicit dates and surface a warning.
   if (period) {
     const resolved = resolvePeriod(period);
     if (resolved?.erreur) return { erreur: resolved.erreur };
-    from = resolved.from; to = resolved.to; periodLabel = resolved.label;
+    if (date_from || date_to) {
+      if (resolved.from !== date_from || resolved.to !== date_to) {
+        avertissementPeriode = `Les paramètres period="${period}" (${resolved.from} → ${resolved.to}) et date_from/date_to (${date_from ?? '?'} → ${date_to ?? '?'}) se contredisent. Les dates explicites ont été utilisées.`;
+      }
+    } else {
+      from = resolved.from; to = resolved.to; periodLabel = resolved.label;
+    }
   }
 
   if (season) {
@@ -1374,6 +1396,7 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
 
   return {
     periode:    { de: from, a: to, label: periodeLabel },
+    ...(avertissementPeriode && { avertissement_periode: avertissementPeriode }),
     filtre:     { marque: manufacturer ?? 'toutes', boutique: shop_id ?? 'toutes', saison: season },
     nb_categories_total:    nb_cat_total,
     nb_categories_affiches: rows.length,
@@ -3237,7 +3260,11 @@ async function runAgentLoop(messages, ctx) {
   const liveContext = `
 
 DATE ACTUELLE : ${today}
-RÈGLE ABSOLUE SUR LES DATES : utilise TOUJOURS le paramètre "period" pour les périodes relatives — jamais date_from/date_to calculées de ta tête.
+RÈGLE SUR LES DATES :
+- Périodes RELATIVES (ex: "la semaine dernière", "les 30 derniers jours", "ce mois-ci") → utiliser le paramètre "period".
+- MOIS NOMMÉ passé (ex: "juillet 2026", "en mars 2024", "au mois de janvier") → utiliser date_from et date_to EXPLICITES. Ne jamais passer "period" en même temps — les deux ensemble déclenchent un avertissement et les dates gagnent.
+  Ex: "juillet 2026" → date_from="2026-07-01", date_to="2026-07-31"
+  Ex: "en mars 2024" → date_from="2024-03-01", date_to="2024-03-31"
 Correspondances period : "4y"=4 ans, "3y"=3 ans, "2y"=2 ans, "1y"=1 an, "6m"=6 mois, "3m"=3 mois, "10w"=10 semaines, "ytd"=cette année, "last_year"=l'an dernier.
 
 BOUTIQUES DISPONIBLES : ${shopNames}

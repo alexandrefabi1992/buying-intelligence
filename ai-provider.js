@@ -56,7 +56,9 @@ const TOOL_DEFS = [
     parameters: {
       type: 'object',
       properties: {
-        period:       { type: 'string',  description: 'Période relative. Valeurs sémantiques: today, yesterday, last_7_days, last_14_days, last_30_days, last_90_days, last_week (lun–dim sem. précédente), this_week, this_month, last_month, this_year, last_4_weeks, last_12_weeks. Forme objet: {"from":"YYYY-MM-DD","to":"YYYY-MM-DD"}. Legacy: 1y, 6m, 30d, ytd, last_year. Si season est fourni et period absent, utilise les dates de la saison.' },
+        period:       { type: 'string',  description: 'Période RELATIVE. Valeurs sémantiques: today, yesterday, last_7_days, last_14_days, last_30_days, last_90_days, last_week (lun–dim sem. précédente), this_week, this_month, last_month, this_year, last_4_weeks, last_12_weeks. Legacy: 1y, 6m, 30d, ytd, last_year. Si season est fourni et period absent, utilise les dates de la saison. Pour un MOIS NOMMÉ passé (ex: "juillet 2026"), utiliser plutôt date_from/date_to — ne pas mélanger avec period.' },
+        date_from:    { type: 'string', description: 'Date de début ISO (YYYY-MM-DD). À utiliser pour un mois nommé passé (ex: "juillet 2026" → date_from="2026-07-01"). Prioritaire sur period.' },
+        date_to:      { type: 'string', description: 'Date de fin ISO (YYYY-MM-DD). À utiliser avec date_from pour un mois nommé passé (ex: date_to="2026-07-31").' },
         season:       { type: 'string',  description: 'Code de saison (ex: p26, a25). Filtre par tag de saison ET définit la période de vente si period absent. Privilégier season pour les questions sur une saison.' },
         manufacturer: { type: 'string',  description: 'Nom de la marque (optionnel)' },
         category:     { type: 'string',  description: 'Type de produit Lightspeed (optionnel). Ex: "Chandail", "Pantalon", "Femme/Hauts/Chandail". Quand fourni sans manufacturer : retourne le top des marques dans cette catégorie.' },
@@ -509,8 +511,8 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
   | "les 14 derniers jours", "les 2 dernières semaines" | last_14_days |
   | "les 30 derniers jours", "le mois passé glissant" | last_30_days |
   | "les 90 derniers jours", "les 3 derniers mois glissants" | last_90_days |
-  | "ce mois-ci", "this month", "en juillet", "en [mois actuel]" | this_month |
-  | "le mois dernier", "last month", "en [mois précédent]" | last_month |
+  | "ce mois-ci", "this month", "le mois courant" | this_month |
+  | "le mois dernier", "last month", "le mois passé" | last_month |
   | "cette année", "since January", "depuis janvier", "depuis le début de l'année", "YTD" | this_year |
   | "les 4 dernières semaines" | last_4_weeks |
   | "les 12 dernières semaines" | last_12_weeks |
@@ -518,6 +520,12 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
   Règle last_week : TOUJOURS lundi–dimanche de la SEMAINE CALENDAIRE PRÉCÉDENTE — pas les 7 derniers jours.
   Si l'utilisateur mentionne une SAISON ET une période (ex: "ventes Brax en P26 la semaine dernière"), passer les DEUX : season="p26" ET period="last_week".
   Si l'expression est ambiguë ("récemment", "depuis quelque temps") : utiliser last_30_days sans demander de précision.
+- PÉRIODES — MOIS NOMMÉ : quand l'utilisateur nomme un mois précis ('en juillet', 'en juillet 2026', 'au mois de mars', 'in July 2026'), passer TOUJOURS date_from et date_to explicites, JAMAIS period.
+  Ex: "juillet 2026" → date_from="2026-07-01", date_to="2026-07-31"
+  Ex: "en mars 2024" → date_from="2024-03-01", date_to="2024-03-31"
+  Ex: "au mois de janvier 2025" → date_from="2025-01-01", date_to="2025-01-31"
+  Cas mois sans année : si le mois nommé est le mois COURANT, utiliser period="this_month" ; sinon (mois passé implicite), utiliser l'année qui rend le mois le plus récent (année courante si le mois est déjà passé cette année, sinon année précédente) et passer date_from/date_to.
+  JAMAIS mélanger period et date_from/date_to — les deux ensemble sur des fenêtres différentes déclenchent un avertissement côté outil et les dates explicites gagnent.
 - FORMAT DES TABLEAUX : le panneau de chat est étroit. Limiter les tableaux à 5 colonnes MAXIMUM. Choisir les colonnes selon la question posée, jamais toutes les données disponibles. Pour get_restock_recommendations, les 5 colonnes par défaut sont : Marque | Modèle | Urgence | Ventes manquées | Transfert. Les détails secondaires (ST%, stock actuel, unités manquantes, valeur réassort, catégorie, tailles à réassortir) vont dans une liste à puces sous le tableau, uniquement pour les 3 premières lignes, ou sur demande explicite. Si l'utilisateur demande plus de colonnes ou un détail précis, les fournir. Sinon, rester à 5.
 - RÉASSORT (get_restock_recommendations) : quand l'outil retourne des modèles avec transfert_possible: 'complet' ou 'partiel', TOUJOURS le mentionner explicitement — un transfert est moins coûteux qu'une commande fournisseur ('partiel' = stock insuffisant mais exploitable). Utiliser valeur_ventes_manquees_estimee (revenu perdu) comme chiffre principal. Quand nb_marques_sans_delai > 0 dans le résultat, ajouter EN FIN DE RÉPONSE : "⚠️ [nb] marque(s) sans délai fournisseur configuré — configurer les délais dans Paramètres améliorerait la précision des recommandations." JAMAIS omettre cette note si nb_marques_sans_delai > 0.
 - MARGE : quand l'utilisateur demande la marge d'une marque, préciser TOUJOURS s'il s'agit de la marge théorique (prix catalogue, ce qu'affiche la page marque) ou de la marge réelle après remises (get_pricing_analysis). Si l'écart dépasse 5 points, le signaler explicitement — c'est une information décisionnelle importante. Les paliers de remise distinguent deux profils : une marque soldée uniformément vs une marque vendue au prix plein avec liquidation partielle. Mentionner le profil quand c'est pertinent ("vendue principalement au plein prix" si ≥ 70% en palier 0%, "liquidation agressive" si ≥ 40% en palier 50%+).
