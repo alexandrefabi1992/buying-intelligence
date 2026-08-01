@@ -464,7 +464,7 @@ async function main() {
         SELECT SUM(sl.qty) AS total
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
-        WHERE sl.completed_time BETWEEN $1 AND $2
+        WHERE sl.completed_time >= $1 AND sl.completed_time < $2::date + interval '1 day'
           AND p.category IS NOT NULL
           AND p.category != ''
       `,
@@ -487,7 +487,7 @@ async function main() {
         FROM sale_lines sl
         JOIN products p  ON p.item_id  = sl.item_id
         JOIN shops    sh ON sh.shop_id = sl.shop_id
-        WHERE sl.completed_time BETWEEN $1 AND $2
+        WHERE sl.completed_time >= $1 AND sl.completed_time < $2::date + interval '1 day'
           AND p.category ILIKE $3
           AND p.manufacturer IS NOT NULL
       `,
@@ -644,6 +644,43 @@ async function main() {
     return true;
   })();
   if (!rPricingExclusion) anyFailed = true;
+
+  // --- DateBoundary: single-day query must include the full day, not just midnight ---
+  // Regression for the BETWEEN/<=date truncation bug: before fix, date_to='2026-07-31'
+  // was evaluated as '2026-07-31 00:00:00Z', returning 0 rows for any same-day range.
+  const rDateBoundary = await (async () => {
+    const label = '[DateBoundary] date_to boundary includes full last day (not just midnight)';
+    const { rows: direct } = await pool.query(`
+      SELECT SUM(sl.qty)::int AS unites
+      FROM sale_lines sl
+      LEFT JOIN products p ON p.item_id = sl.item_id
+      JOIN shops sh ON sh.shop_id = sl.shop_id
+      WHERE sl.shop_id = '8'
+        AND sl.completed_time >= '2026-07-31'
+        AND sl.completed_time < '2026-08-01'
+    `);
+    const expected = direct[0].unites ?? 0;
+    if (expected === 0) {
+      console.log(`SKIP ${label} — no sale_lines on 2026-07-31 for shop 8`);
+      return true;
+    }
+    const result = await toolGetSalesAnalysis({
+      date_from: '2026-07-31',
+      date_to:   '2026-07-31',
+      shop_id:   '8',
+      total_only: true,
+    }, ctx);
+    if (result.erreur) { console.error(`FAIL ${label} — tool error: ${result.erreur}`); return false; }
+    const got = result.total?.unites ?? 0;
+    if (got !== expected) {
+      console.error(`FAIL ${label} — tool=${got} units, direct DB=${expected}`);
+      console.error(`  If tool=0 and direct>0: date boundary is still truncating the last day.`);
+      return false;
+    }
+    console.log(`PASS ${label} — 2026-07-31 shop 8: tool=${got} === direct=${expected} ✅`);
+    return true;
+  })();
+  if (!rDateBoundary) anyFailed = true;
 
   await pool.end();
 
