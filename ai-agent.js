@@ -2863,6 +2863,262 @@ async function toolGetRestockRecommendations(
 }
 
 // ---------------------------------------------------------------------------
+// toolGetPricingAnalysis — analyse des remises et de la marge réelle par marque.
+// Compare la marge théorique (prix catalogue) à la marge effectivement réalisée
+// après remises. Exclut les lignes à 100% de remise (layaway/gratuités).
+// ---------------------------------------------------------------------------
+async function toolGetPricingAnalysis({
+  manufacturer,
+  season,
+  period,
+  shop_id,
+  category,
+  min_lignes = 20,
+  sort_by = 'taux_remise',
+  limit = 25,
+}, { pool, getSeasonsConfig, tenantId }) {
+  shop_id = await resolveShopId(shop_id, pool);
+  const today = new Date().toISOString().slice(0, 10);
+  limit     = Math.min(Math.max(1, parseInt(limit)     || 25), 50);
+  min_lignes = Math.max(1, parseInt(min_lignes) || 20);
+
+  let dateFrom, dateTo, seasonCode = null, seasonTag = null, periodLabel = null;
+
+  if (period) {
+    const resolved = resolvePeriod(period);
+    if (resolved?.erreur) return { erreur: resolved.erreur };
+    dateFrom = resolved.from; dateTo = resolved.to; periodLabel = resolved.label;
+  }
+
+  if (season) {
+    const seasons = await getSeasonsConfig();
+    const s = seasons.find(x => x.code === season.toLowerCase());
+    if (!s) return { erreur: `Saison "${season}" introuvable dans la configuration.` };
+    if (!dateFrom) {
+      dateFrom = s.sell_from;
+      dateTo   = s.sell_to < today ? s.sell_to : today;
+    }
+    seasonCode = s.code.toUpperCase();
+    seasonTag  = s.tag_pattern ?? s.code;
+  }
+
+  if (!dateFrom) {
+    const d = new Date(); d.setFullYear(d.getFullYear() - 1);
+    dateFrom = d.toISOString().slice(0, 10);
+    dateTo   = today;
+  }
+
+  const periodeLabel = periodLabel ?? (season
+    ? `Saison ${seasonCode} (${dateFrom} → ${dateTo})`
+    : `${dateFrom} → ${dateTo}`);
+
+  const params = [dateFrom, dateTo];
+  const shopIdx     = shop_id    ? (params.push(shop_id),             params.length) : null;
+  const tenantIdx   =              (params.push(tenantId),            params.length);
+  const tagIdx      = seasonTag  ? (params.push(`%${seasonTag}%`),    params.length) : null;
+  const mfrIdx      = manufacturer ? (params.push(`%${manufacturer}%`), params.length) : null;
+  const catIdx      = category   ? (params.push(`%${category}%`),     params.length) : null;
+
+  const shopSaleCond = shopIdx ? `AND sl.shop_id = $${shopIdx}` : '';
+  const tagCond      = tagIdx  ? `AND p.tags ILIKE $${tagIdx}`  : '';
+  const mfrCond      = mfrIdx  ? `AND p.manufacturer ILIKE $${mfrIdx}` : '';
+  const catCond      = catIdx  ? `AND p.category ILIKE $${catIdx}`     : '';
+
+  const { rows } = await pool.query(`
+    WITH sales_cte AS (
+      SELECT
+        sl.item_id,
+        SUM(sl.qty)::int                                              AS total_qty,
+        COUNT(*)::int                                                  AS nb_lignes,
+        SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric,
+              sl.qty * sl.unit_price))                                AS brut,
+        SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric,
+              sl.qty * sl.unit_price)
+          - COALESCE(sl.discount, 0))                                 AS net,
+        SUM(CASE WHEN COALESCE(sl.discount, 0) > 0
+              THEN sl.qty ELSE 0 END)::int                            AS qty_remisee,
+        SUM(CASE WHEN COALESCE(sl.discount, 0) > 0
+              THEN COALESCE((sl.raw->>'discountPercent')::numeric, 0)
+                   * sl.qty
+              ELSE 0 END)                                              AS disc_pct_wsum,
+        SUM(CASE WHEN COALESCE((sl.raw->>'discountPercent')::numeric, 0) = 0
+              THEN sl.qty ELSE 0 END)::int                            AS p0,
+        SUM(CASE WHEN COALESCE((sl.raw->>'discountPercent')::numeric, 0) > 0
+              AND  COALESCE((sl.raw->>'discountPercent')::numeric, 0) < 0.20
+              THEN sl.qty ELSE 0 END)::int                            AS p1_19,
+        SUM(CASE WHEN COALESCE((sl.raw->>'discountPercent')::numeric, 0) >= 0.20
+              AND  COALESCE((sl.raw->>'discountPercent')::numeric, 0) < 0.30
+              THEN sl.qty ELSE 0 END)::int                            AS p20_29,
+        SUM(CASE WHEN COALESCE((sl.raw->>'discountPercent')::numeric, 0) >= 0.30
+              AND  COALESCE((sl.raw->>'discountPercent')::numeric, 0) < 0.40
+              THEN sl.qty ELSE 0 END)::int                            AS p30_39,
+        SUM(CASE WHEN COALESCE((sl.raw->>'discountPercent')::numeric, 0) >= 0.40
+              AND  COALESCE((sl.raw->>'discountPercent')::numeric, 0) < 0.50
+              THEN sl.qty ELSE 0 END)::int                            AS p40_49,
+        SUM(CASE WHEN COALESCE((sl.raw->>'discountPercent')::numeric, 0) >= 0.50
+              THEN sl.qty ELSE 0 END)::int                            AS p50p
+      FROM sale_lines sl
+      WHERE sl.completed_time BETWEEN $1 AND $2
+        AND sl.qty != 0
+        AND COALESCE((sl.raw->>'discountPercent')::numeric, 0) < 1
+        ${shopSaleCond}
+      GROUP BY sl.item_id
+    )
+    SELECT
+      p.manufacturer,
+      SUM(sc.total_qty)::int                                              AS unites_vendues,
+      SUM(sc.nb_lignes)::int                                              AS nb_lignes,
+      ROUND(SUM(sc.brut)::numeric, 2)                                    AS brut,
+      ROUND(SUM(sc.net)::numeric, 2)                                     AS net,
+      ROUND(SUM(sc.total_qty * COALESCE(p.default_cost, 0))::numeric, 2) AS cout,
+      SUM(sc.qty_remisee)::int                                            AS unites_remisees,
+      SUM(sc.disc_pct_wsum)                                               AS disc_pct_wsum,
+      SUM(CASE WHEN p.default_price > 0
+            THEN sc.total_qty * (p.default_price - COALESCE(p.default_cost, 0))
+                 / p.default_price * 100
+            ELSE 0 END)                                                   AS marge_th_num,
+      SUM(CASE WHEN p.default_price > 0 THEN sc.total_qty ELSE 0 END)    AS marge_th_den,
+      ROUND(AVG(p.default_price)::numeric, 2)                            AS prix_moyen_catalogue,
+      SUM(sc.p0)::int    AS p0,
+      SUM(sc.p1_19)::int AS p1_19,
+      SUM(sc.p20_29)::int AS p20_29,
+      SUM(sc.p30_39)::int AS p30_39,
+      SUM(sc.p40_49)::int AS p40_49,
+      SUM(sc.p50p)::int  AS p50p
+    FROM sales_cte sc
+    JOIN products p ON p.item_id = sc.item_id
+      AND p.tenant_id = $${tenantIdx}
+      ${tagCond}
+      ${mfrCond}
+      ${catCond}
+    WHERE p.manufacturer IS NOT NULL AND p.manufacturer != ''
+    GROUP BY p.manufacturer
+    ORDER BY p.manufacturer
+  `, params);
+
+  // Compute derived fields per brand; filter, sort, and slice in JS so global
+  // totaux can be computed across ALL qualifying brands before the limit is applied.
+  const brandData = rows.map(r => {
+    const unites   = Number(r.unites_vendues);
+    const nb_l     = Number(r.nb_lignes);
+    const brut     = Number(r.brut);
+    const net      = Number(r.net);
+    const cout     = Number(r.cout);
+    const remisees = Number(r.unites_remisees);
+    const dw       = Number(r.disc_pct_wsum);
+    const mth_n    = Number(r.marge_th_num);
+    const mth_d    = Number(r.marge_th_den);
+    const prix_cat = Number(r.prix_moyen_catalogue);
+
+    const marge_theorique_pct  = mth_d > 0 ? Math.round(mth_n / mth_d * 10) / 10 : null;
+    const revenu_perdu         = Math.round((brut - net) * 100) / 100;
+    const taux_remise_moyen    = brut > 0 ? Math.round((brut - net) / brut * 100 * 10) / 10 : 0;
+    const taux_remise_sur_remises = remisees > 0 ? Math.round(dw / remisees * 100 * 10) / 10 : 0;
+    const pct_unites_remisees  = unites > 0 ? Math.round(remisees / unites * 100 * 10) / 10 : 0;
+    const marge_reelle_pct     = net > 0 ? Math.round((net - cout) / net * 100 * 10) / 10 : 0;
+    const ecart_marge_points   = marge_theorique_pct != null
+      ? Math.round((marge_theorique_pct - marge_reelle_pct) * 10) / 10 : null;
+    const prix_moyen_encaisse  = unites > 0 ? Math.round(net / unites * 100) / 100 : null;
+    const ecart_prix_pct       = prix_cat > 0 && prix_moyen_encaisse != null
+      ? Math.round((prix_moyen_encaisse - prix_cat) / prix_cat * 100 * 10) / 10 : null;
+
+    const paliers_raw = [
+      { palier: '0%',     qty: Number(r.p0)    },
+      { palier: '1-19%',  qty: Number(r.p1_19) },
+      { palier: '20-29%', qty: Number(r.p20_29) },
+      { palier: '30-39%', qty: Number(r.p30_39) },
+      { palier: '40-49%', qty: Number(r.p40_49) },
+      { palier: '50%+',   qty: Number(r.p50p)  },
+    ];
+    const paliers = paliers_raw
+      .filter(p => p.qty > 0)
+      .map(p => ({
+        palier:     p.palier,
+        unites:     p.qty,
+        pct_unites: unites > 0 ? Math.round(p.qty / unites * 100 * 10) / 10 : 0,
+      }));
+
+    return {
+      manufacturer: r.manufacturer,
+      nb_lignes:    nb_l,
+      unites_vendues: unites,
+      brut,
+      net,
+      cout,
+      revenu_perdu,
+      taux_remise_moyen,
+      taux_remise_sur_remises,
+      pct_unites_remisees,
+      marge_theorique_pct,
+      marge_reelle_pct,
+      ecart_marge_points,
+      prix_moyen_catalogue: prix_cat,
+      prix_moyen_encaisse,
+      ecart_prix_pct,
+      paliers,
+      _mth_n: mth_n,
+      _mth_d: mth_d,
+    };
+  });
+
+  const included         = brandData.filter(b => b.nb_lignes >= min_lignes);
+  const nb_marques_exclues = brandData.length - included.length;
+
+  const sortFn = {
+    taux_remise:  (a, b) => b.taux_remise_moyen  - a.taux_remise_moyen,
+    marge_reelle: (a, b) => b.marge_reelle_pct   - a.marge_reelle_pct,
+    ecart_marge:  (a, b) => (b.ecart_marge_points ?? 0) - (a.ecart_marge_points ?? 0),
+    revenu_perdu: (a, b) => b.revenu_perdu        - a.revenu_perdu,
+  }[sort_by] ?? ((a, b) => b.taux_remise_moyen - a.taux_remise_moyen);
+  included.sort(sortFn);
+
+  const marques = included.slice(0, limit).map(({ _mth_n, _mth_d, ...rest }) => rest);
+
+  // Global totals over all qualifying brands (before limit slice)
+  const totBrut = included.reduce((s, b) => s + b.brut, 0);
+  const totNet  = included.reduce((s, b) => s + b.net,  0);
+  const totCout = included.reduce((s, b) => s + b.cout, 0);
+  const totMthN = included.reduce((s, b) => s + b._mth_n, 0);
+  const totMthD = included.reduce((s, b) => s + b._mth_d, 0);
+
+  const marge_theorique_global = totMthD > 0 ? Math.round(totMthN / totMthD * 10) / 10 : null;
+  const marge_reelle_global    = totNet  > 0 ? Math.round((totNet - totCout) / totNet * 100 * 10) / 10 : 0;
+  const ecart_marge_global     = marge_theorique_global != null
+    ? Math.round((marge_theorique_global - marge_reelle_global) * 10) / 10 : null;
+
+  let shopName = 'Toutes boutiques';
+  if (shop_id) {
+    const { rows: sr } = await pool.query('SELECT name FROM shops WHERE shop_id = $1', [shop_id]);
+    shopName = sr[0]?.name ?? String(shop_id);
+  }
+
+  const mfrLabel = manufacturer ?? 'toutes les marques';
+  const scope_produits = seasonTag
+    ? `Collection ${seasonCode} — ${mfrLabel}`
+    : mfrLabel;
+
+  return {
+    periode:          { de: dateFrom, a: dateTo, label: periodeLabel },
+    saison:           seasonCode,
+    boutique:         shopName,
+    scope_produits,
+    nb_marques:       marques.length,
+    nb_marques_exclues,
+    seuil_min_lignes: min_lignes,
+    totaux: {
+      brut:                     Math.round(totBrut * 100) / 100,
+      net:                      Math.round(totNet  * 100) / 100,
+      revenu_perdu:             Math.round((totBrut - totNet) * 100) / 100,
+      taux_remise_moyen_global: totBrut > 0 ? Math.round((totBrut - totNet) / totBrut * 100 * 10) / 10 : 0,
+      marge_theorique_pct:      marge_theorique_global,
+      marge_reelle_pct:         marge_reelle_global,
+      ecart_marge_points:       ecart_marge_global,
+    },
+    marques,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Tool dispatcher
 // ---------------------------------------------------------------------------
 async function dispatchTool(name, args, ctx) {
@@ -2892,6 +3148,7 @@ async function dispatchTool(name, args, ctx) {
     case 'get_season_comparison':           return await toolGetSeasonComparison(args, ctx);
     case 'get_items_by_criteria':           return await toolGetItemsByCriteria(args, ctx);
     case 'get_restock_recommendations':    return await toolGetRestockRecommendations(args, ctx);
+    case 'get_pricing_analysis':            return await toolGetPricingAnalysis(args, ctx);
     default:                                return { erreur: `Outil inconnu: ${name}` };
   }
 }
@@ -3167,4 +3424,5 @@ module.exports = {
   toolGetBrandRanking,
   toolGetSeasonComparison,
   toolGetItemsByCriteria,
+  toolGetPricingAnalysis,
 };

@@ -390,6 +390,24 @@ const TOOL_DEFS = [
       required: ['season'],
     },
   },
+  {
+    name: 'get_pricing_analysis',
+    description: "Analyse des remises et de la marge réelle par marque. Compare la marge théorique (prix catalogue) à la marge effectivement réalisée après remises. Retourne le taux de remise moyen, la fréquence des soldes, la distribution par palier de remise (0%, 1-19%, 20-29%, 30-39%, 40-49%, 50%+), et le revenu laissé en remises. Utiliser pour : 'quelle marque je solde le plus', 'ma vraie marge par marque', 'combien je perds en remises', 'quelles marques sont vraiment rentables', 'écart entre marge théorique et réelle'.",
+    parameters: {
+      type: 'object',
+      properties: {
+        manufacturer: { type: 'string',  description: 'Filtrer sur une marque spécifique (optionnel)' },
+        season:       { type: 'string',  description: 'Code de saison (ex: p26). Filtre par tag ET définit la période si period absent.' },
+        period:       { type: 'string',  description: 'Période relative (today, last_7_days, last_30_days, this_month, last_month, this_year, last_12_weeks…). Sans period ni season : 12 derniers mois.' },
+        shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel)' },
+        category:     { type: 'string',  description: 'Filtrer par catégorie de produit (optionnel)' },
+        min_lignes:   { type: 'integer', description: 'Seuil minimum de lignes de vente pour inclure une marque (défaut: 20). Augmenter pour une meilleure significativité statistique.' },
+        sort_by:      { type: 'string',  enum: ['taux_remise', 'marge_reelle', 'ecart_marge', 'revenu_perdu'], description: "Critère de tri. 'taux_remise'=marques les plus soldées (défaut), 'marge_reelle'=meilleure marge réelle, 'ecart_marge'=plus grand écart marge théo/réelle, 'revenu_perdu'=plus grand montant en remises." },
+        limit:        { type: 'integer', description: 'Nombre de marques à retourner (1-50, défaut: 25)' },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -502,6 +520,7 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
   Si l'expression est ambiguë ("récemment", "depuis quelque temps") : utiliser last_30_days sans demander de précision.
 - FORMAT DES TABLEAUX : le panneau de chat est étroit. Limiter les tableaux à 5 colonnes MAXIMUM. Choisir les colonnes selon la question posée, jamais toutes les données disponibles. Pour get_restock_recommendations, les 5 colonnes par défaut sont : Marque | Modèle | Urgence | Ventes manquées | Transfert. Les détails secondaires (ST%, stock actuel, unités manquantes, valeur réassort, catégorie, tailles à réassortir) vont dans une liste à puces sous le tableau, uniquement pour les 3 premières lignes, ou sur demande explicite. Si l'utilisateur demande plus de colonnes ou un détail précis, les fournir. Sinon, rester à 5.
 - RÉASSORT (get_restock_recommendations) : quand l'outil retourne des modèles avec transfert_possible: 'complet' ou 'partiel', TOUJOURS le mentionner explicitement — un transfert est moins coûteux qu'une commande fournisseur ('partiel' = stock insuffisant mais exploitable). Utiliser valeur_ventes_manquees_estimee (revenu perdu) comme chiffre principal. Quand nb_marques_sans_delai > 0 dans le résultat, ajouter EN FIN DE RÉPONSE : "⚠️ [nb] marque(s) sans délai fournisseur configuré — configurer les délais dans Paramètres améliorerait la précision des recommandations." JAMAIS omettre cette note si nb_marques_sans_delai > 0.
+- MARGE : quand l'utilisateur demande la marge d'une marque, préciser TOUJOURS s'il s'agit de la marge théorique (prix catalogue, ce qu'affiche la page marque) ou de la marge réelle après remises (get_pricing_analysis). Si l'écart dépasse 5 points, le signaler explicitement — c'est une information décisionnelle importante. Les paliers de remise distinguent deux profils : une marque soldée uniformément vs une marque vendue au prix plein avec liquidation partielle. Mentionner le profil quand c'est pertinent ("vendue principalement au plein prix" si ≥ 70% en palier 0%, "liquidation agressive" si ≥ 40% en palier 50%+).
 - TERMES DE PAIEMENT / ESCOMPTES : pour toute question sur les escomptes fournisseur, les termes de paiement, "devrais-je payer [marque] rapidement", "est-ce rentable de prendre l'escompte", "quel est le rendement de l'escompte", "quelle marque a les meilleurs termes" → utiliser get_payment_terms_analysis. Si le résultat contient termes_non_configures=true : le DIRE explicitement — JAMAIS inventer un escompte ou supposer que les termes sont standard.
 
 GUIDE DES SECTIONS DE L'APPLICATION

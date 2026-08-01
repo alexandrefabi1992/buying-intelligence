@@ -14,6 +14,8 @@ const {
   toolGetSalesByVariant,
   toolGetSalesByCategory,
   toolGetSalesAnalysis,
+  toolGetBrandRanking,
+  toolGetPricingAnalysis,
 } = require('../ai-agent');
 
 const DB_URL = process.env.DATABASE_URL;
@@ -37,7 +39,7 @@ async function buildCtx() {
     );
     return rows.length && Array.isArray(rows[0].value) ? rows[0].value : [];
   };
-  return { pool, getSeasonsConfig };
+  return { pool, getSeasonsConfig, tenantId: TENANT };
 }
 
 const sumField = (arr, field) => arr.reduce((s, x) => s + Number(x[field] ?? 0), 0);
@@ -583,6 +585,65 @@ async function main() {
     return true;
   })();
   if (!rCrossStock) anyFailed = true;
+
+  // --- PricingAnalysis: Brax 12 months reference values ---
+  // brut=398494.13, net=350632.13, revenu_perdu=47862.00 (verified against raw SQL)
+  const rPricingBrax = await (async () => {
+    const label = '[PricingAnalysis] Brax 1y — brut/net/revenu_perdu reference values';
+    const result = await toolGetPricingAnalysis({ manufacturer: 'Brax', period: '1y' }, ctx);
+    if (result.erreur) { console.error(`FAIL ${label} — tool error: ${result.erreur}`); return false; }
+    const brax = result.marques[0];
+    if (!brax) { console.error(`FAIL ${label} — Brax not in results`); return false; }
+    const ok = Math.abs(brax.brut - 398494.13) < 1 &&
+               Math.abs(brax.net  - 350632.13) < 1 &&
+               Math.abs(brax.revenu_perdu - 47862.00) < 1;
+    if (!ok) {
+      console.error(`FAIL ${label} — brut=${brax.brut} net=${brax.net} rev_perdu=${brax.revenu_perdu}`);
+      return false;
+    }
+    console.log(`PASS ${label} — brut=${brax.brut} net=${brax.net} rev_perdu=${brax.revenu_perdu} ✅`);
+    return true;
+  })();
+  if (!rPricingBrax) anyFailed = true;
+
+  // --- PricingAnalysis: BYLYSE palier 50%+ must be the dominant bracket (spec: 55.3% avg discount) ---
+  const rPricingBylyse = await (async () => {
+    const label = '[PricingAnalysis] BYLYSE — palier 50%+ dominant (liquidation profile)';
+    const result = await toolGetPricingAnalysis({ manufacturer: 'BYLYSE', period: '1y', min_lignes: 1 }, ctx);
+    if (result.erreur) { console.error(`FAIL ${label} — tool error: ${result.erreur}`); return false; }
+    const bylyse = result.marques[0];
+    if (!bylyse) { console.error(`FAIL ${label} — BYLYSE not in results`); return false; }
+    const p50 = bylyse.paliers.find(p => p.palier === '50%+');
+    const pct50 = p50 ? p50.pct_unites : 0;
+    // BYLYSE is in liquidation: ≥ 70% of units should be in 50%+ bracket (known: ~81%)
+    if (pct50 < 70) {
+      console.error(`FAIL ${label} — palier 50%+ only ${pct50}% of units, expected ≥ 70%`);
+      return false;
+    }
+    // taux_remise_sur_remises should be around 55.3% (±2 points for data drift)
+    const taux = bylyse.taux_remise_sur_remises;
+    if (Math.abs(taux - 55.3) > 5) {
+      console.error(`FAIL ${label} — taux_remise_sur_remises=${taux}%, expected ~55.3%`);
+      return false;
+    }
+    console.log(`PASS ${label} — palier50+=${pct50}%, taux_sur_remises=${taux}% ✅`);
+    return true;
+  })();
+  if (!rPricingBylyse) anyFailed = true;
+
+  // --- PricingAnalysis: min_lignes exclusion (Orientique has 19 lines, must be excluded at default 20) ---
+  const rPricingExclusion = await (async () => {
+    const label = '[PricingAnalysis] min_lignes exclusion — Orientique (19 lines) excluded at min_lignes=20';
+    const result = await toolGetPricingAnalysis({ manufacturer: 'Orientique', min_lignes: 20 }, ctx);
+    if (result.erreur) { console.error(`FAIL ${label} — tool error: ${result.erreur}`); return false; }
+    const found   = result.marques.some(m => /orientique/i.test(m.manufacturer));
+    const counted = result.nb_marques_exclues >= 1;
+    if (found) { console.error(`FAIL ${label} — Orientique appeared in results despite < 20 lines`); return false; }
+    if (!counted) { console.error(`FAIL ${label} — nb_marques_exclues=${result.nb_marques_exclues}, expected ≥ 1`); return false; }
+    console.log(`PASS ${label} — excluded correctly, nb_marques_exclues=${result.nb_marques_exclues} ✅`);
+    return true;
+  })();
+  if (!rPricingExclusion) anyFailed = true;
 
   await pool.end();
 
