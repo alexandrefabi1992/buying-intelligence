@@ -599,7 +599,7 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
 
   const label = periodLabel ?? (season ? `Saison ${season.toUpperCase()} (${from ?? '?'} → ${to ?? '?'})` : (from ? `${from} → ${to}` : 'toutes dates'));
 
-  const conditions = ['sl.qty > 0'];
+  const conditions = ['sl.qty != 0'];
   const params     = [];
 
   if (from) { conditions.push(`sl.completed_time >= $${params.length + 1}`); params.push(from); }
@@ -2198,7 +2198,7 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
     ? `Collection ${seasonCode} uniquement — ${mfrLabel} (articles taggés ${seasonTag})`
     : include_nos && seasonTag
     ? `${mfrLabel} incluant NOS (tous articles vendus du ${stFrom} au ${stTo})`
-    : `${mfrLabel} (12 semaines glissantes)`;
+    : `${mfrLabel} (${periodeLabel})`;
 
   return {
     periode:        { de: stFrom, a: stTo, label: periodeLabel },

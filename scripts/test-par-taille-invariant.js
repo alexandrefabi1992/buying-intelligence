@@ -441,7 +441,7 @@ async function main() {
         SELECT SUM(sl.qty) AS total
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
-        WHERE sl.qty > 0
+        WHERE sl.qty != 0
           AND p.manufacturer ILIKE $1
       `,
       independentParams: ['%Brax%'],
