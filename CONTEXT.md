@@ -788,3 +788,78 @@ Sets 3 et 7 ont `size_axis=NULL` de façon intentionnelle : ce sont des sets cou
 `size_axis` / `color_axis` configurés manuellement **ne doivent jamais être écrasés** par
 le sync automatique. Le `COALESCE(size_axis, $detected)` dans l'UPDATE garantit cela.
 Toute modification future de `syncItemAttributeSets` doit préserver cette règle.
+
+---
+
+## Fuseau horaire hardcodé `'America/Toronto'` — août 2026
+
+### Contexte
+
+Les ventes stockées dans `sale_lines.completed_time` sont des `TIMESTAMPTZ` en UTC (envoyées par Lightspeed avec offset `+00:00`). Les boutiques opèrent en heure locale Québec (`America/Toronto`, UTC-4/-5). Sans conversion, une vente à 21h le 31 juillet locale est stockée `2026-08-01 01:00:00Z` et compte pour le mauvais jour dans toute requête filtrant par date.
+
+### Convention de comparaison des dates
+
+**RÈGLE ABSOLUE** — pour toute comparaison de `completed_time` (ou autre `TIMESTAMPTZ`) contre une date de calendrier, utiliser **toujours** ce pattern :
+
+```sql
+(sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $from::date
+AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $to::date
+```
+
+**Anti-patterns interdits** (ont causé des bugs historiques) :
+
+```sql
+-- ❌ BETWEEN sur TIMESTAMPTZ : `$to` cast à minuit UTC → toute la journée est tronquée
+WHERE sl.completed_time BETWEEN $from AND $to
+
+-- ❌ Comparaison brute UTC : les ventes 20h–minuit locale (= UTC 00-04h du lendemain)
+--    sont attribuées à la mauvaise date de saison/mois
+WHERE sl.completed_time >= $from AND sl.completed_time < $to::date + interval '1 day'
+
+-- ❌ EXTRACT sans AT TIME ZONE : le mois retourné est UTC, pas local
+WHERE EXTRACT(MONTH FROM sl.completed_time) = 7
+```
+
+### Où est-ce hardcodé
+
+`'America/Toronto'` apparaît **50 fois** dans `ai-agent.js` (16×) et `server.js` (34×), à chaque comparaison de date sur `sale_lines`. C'est la valeur exacte stockée dans `shops.time_zone` pour les 6 boutiques (récupérée depuis l'API Lightspeed).
+
+### Multi-tenant hors Québec (dette technique)
+
+Pour un futur tenant dans un autre fuseau, il faudra remplacer la constante par une jointure dynamique :
+
+```sql
+-- Version multi-timezone
+JOIN shops sh ON sh.shop_id = sl.shop_id
+WHERE (sl.completed_time AT TIME ZONE sh.time_zone)::date >= $from::date
+```
+
+Cette version force un `Seq Scan` (l'index sur `completed_time` ne peut plus être utilisé) — sur notre volume actuel (175K lignes), c'est ~20 % plus lent que la version hardcodée mais reste acceptable (<150 ms sur requête 12 mois).
+
+### Performance (2026-08-01, sale_lines = 175 771 lignes, 296 MB)
+
+| Approche | Plan | Temps médian |
+|---|---|---|
+| UTC brut (`sl.completed_time >= $from AND <  $to + 1d`) | Index Scan | 87 ms |
+| AT TIME ZONE sur colonne (actuel) | Index Scan | 144 ms (+65 %) |
+| Idem + index fonctionnel `((AT TZ Toronto)::date)` | Bitmap Index Scan | 266 ms (pire) |
+
+L'index fonctionnel a été testé (build 215 ms, 1240 kB) puis retiré : le planner choisit `Bitmap Index Scan` qui, sur une fenêtre de 12 mois couvrant ~90 % des lignes, est plus lent que le scan de l'index existant sur `completed_time`. Sur un dataset plus large ou des fenêtres plus étroites, le compromis pourrait changer — à réévaluer si `sale_lines` dépasse ~5 M lignes.
+
+### Convention `period` vs `date_from`/`date_to`
+
+Les outils chatbot exposent deux paramètres pour la fenêtre temporelle :
+- `period` (relatif : `last_month`, `this_week`, `last_30_days`…) — résolu côté serveur qui connaît `now()`
+- `date_from` + `date_to` (dates ISO explicites)
+
+Quand l'utilisateur emploie un **mot relatif** (`dernier`, `précédent`, `passé`, `courant`, `ce`, `cette`), le modèle doit utiliser `period`. Quand il **nomme un mois** (`juillet 2026`, `en mars 2024`), il doit utiliser `date_from`/`date_to`. Le system prompt (section `PÉRIODES` dans `ai-provider.js`) contient la règle complète avec exemples contrastés.
+
+Si les deux paramètres arrivent ensemble avec des fenêtres différentes, les outils `toolGetSalesAnalysis` et `toolGetSalesByCategory` privilégient les dates explicites et retournent `avertissement_periode` dans la réponse — le silence était le bug initial (juillet 2026 régression du 1er août).
+
+### Tests de non-régression
+
+Trois tests dans `scripts/test-par-taille-invariant.js` protègent ces conventions :
+- `[DateBoundary]` — le dernier jour d'une plage est inclus (pas juste minuit UTC)
+- `[TimezoneBoundary]` — une vente 20h-minuit locale est comptée pour son jour local, pas UTC
+- `[PeriodConflict]` — dates explicites gagnent quand `period` conflictuel
+- `[PeriodLastMonth]` — `resolvePeriod('last_month')` retourne bien le mois calendaire précédent

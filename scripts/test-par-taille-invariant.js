@@ -589,21 +589,34 @@ async function main() {
   })();
   if (!rCrossStock) anyFailed = true;
 
-  // --- PricingAnalysis: Brax 12 months reference values ---
-  // brut=399199.13, net=351059.13, revenu_perdu=48140 (verified against raw SQL 2026-08-01)
-  // Values drift daily as the 1y window rolls forward — update after intentional changes.
+  // --- PricingAnalysis: Brax 12 months brut/net/revenu_perdu match live SQL baseline ---
+  // Baseline queried fresh each run — no hardcoded refs (the 1y rolling window drifts hourly).
   const rPricingBrax = await (async () => {
-    const label = '[PricingAnalysis] Brax 1y — brut/net/revenu_perdu reference values';
+    const label = '[PricingAnalysis] Brax 1y — brut/net/revenu_perdu match live SQL';
     const result = await toolGetPricingAnalysis({ manufacturer: 'Brax', period: '1y' }, ctx);
     if (result.erreur) { console.error(`FAIL ${label} — tool error: ${result.erreur}`); return false; }
     const brax = result.marques[0];
     if (!brax) { console.error(`FAIL ${label} — Brax not in results`); return false; }
-    // Tolerance widened to $500 to absorb daily drift from the rolling 1y window.
-    const ok = Math.abs(brax.brut - 399199.13) < 500 &&
-               Math.abs(brax.net  - 351059.13) < 500 &&
-               Math.abs(brax.revenu_perdu - 48140) < 500;
+    const from = result.periode.de, to = result.periode.a;
+    const { rows: base } = await pool.query(`
+      SELECT
+        ROUND(SUM(sl.qty * sl.unit_price)::numeric, 2)                             AS brut,
+        ROUND(SUM(sl.qty * sl.unit_price - COALESCE(sl.discount, 0))::numeric, 2)  AS net,
+        ROUND(SUM(COALESCE(sl.discount, 0))::numeric, 2)                           AS rev_perdu
+      FROM sale_lines sl
+      JOIN products p ON p.item_id = sl.item_id
+      WHERE p.manufacturer ILIKE '%Brax%'
+        AND sl.qty != 0
+        AND COALESCE((sl.raw->>'discountPercent')::numeric, 0) < 1
+        AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date
+        AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date
+    `, [from, to]);
+    const ok = Math.abs(brax.brut - parseFloat(base[0].brut)) < 5 &&
+               Math.abs(brax.net  - parseFloat(base[0].net))  < 5 &&
+               Math.abs(brax.revenu_perdu - parseFloat(base[0].rev_perdu)) < 5;
     if (!ok) {
-      console.error(`FAIL ${label} — brut=${brax.brut} net=${brax.net} rev_perdu=${brax.revenu_perdu}`);
+      console.error(`FAIL ${label} — tool: brut=${brax.brut} net=${brax.net} rev_perdu=${brax.revenu_perdu}`);
+      console.error(`  live SQL: brut=${base[0].brut} net=${base[0].net} rev_perdu=${base[0].rev_perdu}`);
       return false;
     }
     console.log(`PASS ${label} — brut=${brax.brut} net=${brax.net} rev_perdu=${brax.revenu_perdu} ✅`);
@@ -783,6 +796,28 @@ async function main() {
     return true;
   })();
   if (!rPeriodConflict) anyFailed = true;
+
+  // --- PeriodLastMonth: period='last_month' must resolve to previous calendar month ---
+  // Regression 2026-08-01: AI calculated dates itself (juin instead of juillet).
+  // resolvePeriod('last_month') on today's date should give the previous calendar month.
+  const rLastMonth = await (async () => {
+    const label = '[PeriodLastMonth] period="last_month" resolves to previous calendar month';
+    const now = new Date();
+    const expectedFrom = `${now.getFullYear()}-${String(now.getMonth() || 12).padStart(2, '0')}-01`;
+    const lastDayPrev = new Date(now.getFullYear(), now.getMonth(), 0);
+    const expectedTo = `${lastDayPrev.getFullYear()}-${String(lastDayPrev.getMonth() + 1).padStart(2, '0')}-${String(lastDayPrev.getDate()).padStart(2, '0')}`;
+
+    const result = await toolGetSalesAnalysis({ period: 'last_month', total_only: true }, ctx);
+    if (result.erreur) { console.error(`FAIL ${label} — tool error: ${result.erreur}`); return false; }
+    const got = result.periode;
+    if (got.de !== expectedFrom || got.a !== expectedTo) {
+      console.error(`FAIL ${label} — got ${got.de} → ${got.a}, expected ${expectedFrom} → ${expectedTo}`);
+      return false;
+    }
+    console.log(`PASS ${label} — ${got.de} → ${got.a} ✅`);
+    return true;
+  })();
+  if (!rLastMonth) anyFailed = true;
 
   await pool.end();
 

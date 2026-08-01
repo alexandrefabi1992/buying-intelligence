@@ -3260,12 +3260,13 @@ async function runAgentLoop(messages, ctx) {
   const liveContext = `
 
 DATE ACTUELLE : ${today}
-RÈGLE SUR LES DATES :
-- Périodes RELATIVES (ex: "la semaine dernière", "les 30 derniers jours", "ce mois-ci") → utiliser le paramètre "period".
-- MOIS NOMMÉ passé (ex: "juillet 2026", "en mars 2024", "au mois de janvier") → utiliser date_from et date_to EXPLICITES. Ne jamais passer "period" en même temps — les deux ensemble déclenchent un avertissement et les dates gagnent.
-  Ex: "juillet 2026" → date_from="2026-07-01", date_to="2026-07-31"
-  Ex: "en mars 2024" → date_from="2024-03-01", date_to="2024-03-31"
-Correspondances period : "4y"=4 ans, "3y"=3 ans, "2y"=2 ans, "1y"=1 an, "6m"=6 mois, "3m"=3 mois, "10w"=10 semaines, "ytd"=cette année, "last_year"=l'an dernier.
+RÈGLE SUR LES DATES — Distinguer MOT RELATIF ("dernier/précédent/passé/courant/ce/cette") vs NOM DE MOIS ("janvier/février/…/décembre") :
+- Mot RELATIF → utiliser "period", NE JAMAIS calculer les dates soi-même. Le serveur connaît la date d'aujourd'hui.
+  "le mois dernier"/"le mois précédent" → period="last_month"  |  "ce mois-ci" → period="this_month"
+  "la semaine dernière" → period="last_week"  |  "les 30 derniers jours" → period="last_30_days"
+- Nom de MOIS explicite → utiliser date_from + date_to.
+  "juillet 2026" → date_from="2026-07-01", date_to="2026-07-31"
+Formats period legacy : "4y"=4 ans, "3y"=3 ans, "2y"=2 ans, "1y"=1 an, "6m"=6 mois, "3m"=3 mois, "10w"=10 semaines, "ytd"=cette année, "last_year"=l'an dernier.
 
 BOUTIQUES DISPONIBLES : ${shopNames}
 Quand l'utilisateur mentionne une boutique (même en abrégé), utilise le nom exact ci-dessus dans shop_id.
