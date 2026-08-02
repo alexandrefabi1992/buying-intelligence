@@ -63,19 +63,44 @@ function fmtPct(v) {
 // Helper: resolve shop name → numeric shop_id.
 // Accepts a numeric ID (returned as-is) or a partial name (ILIKE lookup).
 // ---------------------------------------------------------------------------
+// Custom error signalling that a user-provided shop_id could not be resolved.
+// executeTool catches this and returns a structured error to the model, so the
+// user gets an explicit "Boutique introuvable" instead of silently seeing data
+// aggregated across all shops (previous behavior returned null → no shop filter).
+class ShopNotFoundError extends Error {
+  constructor(shop_id, availableShops, suggestions) {
+    super(`Boutique "${shop_id}" introuvable.`);
+    this.name = 'ShopNotFoundError';
+    this.shop_id = shop_id;
+    this.availableShops = availableShops;
+    this.suggestions = suggestions;
+  }
+}
+
 async function resolveShopId(shop_id, pool) {
   if (!shop_id) return null;
   if (/^\d+$/.test(String(shop_id))) {
-    // Verify the numeric ID actually exists
     const { rows } = await pool.query("SELECT shop_id FROM shops WHERE shop_id = $1", [shop_id]);
     if (rows.length) return shop_id;
-    return null;
+  } else {
+    const { rows } = await pool.query(
+      "SELECT shop_id FROM shops WHERE name ILIKE $1 LIMIT 1",
+      [`%${shop_id}%`]
+    );
+    if (rows[0]) return rows[0].shop_id;
   }
-  const { rows } = await pool.query(
-    "SELECT shop_id FROM shops WHERE name ILIKE $1 LIMIT 1",
-    [`%${shop_id}%`]
-  );
-  return rows[0]?.shop_id ?? null;
+  // Unknown shop — throw with suggestions so the caller can build an explicit error
+  const [{ rows: all }, { rows: sim }] = await Promise.all([
+    pool.query("SELECT name FROM shops ORDER BY name"),
+    pool.query(`
+      SELECT name, max(similarity(lower(name), lower($1))) AS sim
+      FROM shops
+      GROUP BY name
+      HAVING max(similarity(lower(name), lower($1))) > 0.15
+      ORDER BY sim DESC LIMIT 3
+    `, [String(shop_id)]),
+  ]);
+  throw new ShopNotFoundError(shop_id, all.map(r => r.name), sim.map(r => r.name));
 }
 
 // ---------------------------------------------------------------------------
@@ -132,8 +157,7 @@ async function findSimilarManufacturers(pool, manufacturer) {
 }
 
 // Shared early-return for "brand not found" across tools that filter by manufacturer.
-// Call this after the main query when rows.length === 0 && manufacturer was provided.
-// Returns the marque_introuvable object, or null if the brand actually exists (no data for the filters).
+// Kept for backward compat; new code paths use validateFilters at the top of the tool.
 async function buildBrandNotFoundResult(pool, manufacturer) {
   const exists = await checkManufacturerExists(pool, manufacturer);
   if (exists) return null;
@@ -141,6 +165,110 @@ async function buildBrandNotFoundResult(pool, manufacturer) {
     marque_introuvable: true,
     marque_cherchee:    manufacturer,
     suggestions:        await findSimilarManufacturers(pool, manufacturer),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Category existence checks (mirror of manufacturer helpers). Uses pg_trgm.
+// ---------------------------------------------------------------------------
+async function checkCategoryExists(pool, category) {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM products WHERE category ILIKE $1 LIMIT 1`,
+    [`%${category}%`]
+  );
+  return rows.length > 0;
+}
+
+async function findSimilarCategories(pool, category) {
+  const { rows } = await pool.query(`
+    SELECT category, max(similarity(lower(category), lower($1))) AS sim
+    FROM products
+    WHERE category IS NOT NULL AND category != ''
+    GROUP BY category
+    HAVING max(similarity(lower(category), lower($1))) > 0.15
+    ORDER BY sim DESC LIMIT 5
+  `, [String(category)]);
+  return rows.map(r => r.category);
+}
+
+// ---------------------------------------------------------------------------
+// validateFilters — one-stop validation for manufacturer/category/shop_id/season.
+// Returns null if all filters are valid, or a structured error object that the
+// tool must return unchanged. The model then sees {erreur, filtre_invalide, ...}
+// and can suggest corrections to the user instead of presenting bogus zeros.
+// ---------------------------------------------------------------------------
+async function validateFilters({ manufacturer, category, shop_id, season }, { pool, getSeasonsConfig }) {
+  // shop_id — reuse throwing resolveShopId, convert to structured response
+  if (shop_id) {
+    try { await resolveShopId(shop_id, pool); }
+    catch (e) {
+      if (e instanceof ShopNotFoundError) {
+        return {
+          erreur:                e.message,
+          filtre_invalide:       'shop_id',
+          valeur_fournie:        e.shop_id,
+          suggestions:           e.suggestions,
+          boutiques_disponibles: e.availableShops,
+        };
+      }
+      throw e;
+    }
+  }
+
+  // season — check against config; list valid codes as suggestions
+  if (season) {
+    const seasonsCfg = await getSeasonsConfig();
+    if (!seasonsCfg.find(s => s.code === String(season).toLowerCase())) {
+      return {
+        erreur:          `Saison "${season}" introuvable dans la configuration.`,
+        filtre_invalide: 'season',
+        valeur_fournie:  season,
+        suggestions:     seasonsCfg.map(s => s.code),
+      };
+    }
+  }
+
+  // manufacturer — existence + pg_trgm suggestions on typo
+  if (manufacturer) {
+    const exists = await checkManufacturerExists(pool, manufacturer);
+    if (!exists) {
+      return {
+        erreur:          `Marque "${manufacturer}" introuvable.`,
+        filtre_invalide: 'manufacturer',
+        valeur_fournie:  manufacturer,
+        suggestions:     await findSimilarManufacturers(pool, manufacturer),
+      };
+    }
+  }
+
+  // category — same treatment via pg_trgm
+  if (category) {
+    const exists = await checkCategoryExists(pool, category);
+    if (!exists) {
+      return {
+        erreur:          `Catégorie "${category}" introuvable.`,
+        filtre_invalide: 'category',
+        valeur_fournie:  category,
+        suggestions:     await findSimilarCategories(pool, category),
+      };
+    }
+  }
+
+  return null;
+}
+
+// Signal a legitimate "no data" case (all filters valid, query returned 0 rows).
+// Distinguishes real zero from invalid-filter zero so the model can communicate
+// the truth honestly ("no data for this combo" vs "your filter is wrong").
+function emptyResultResponse(filtres_appliques, message) {
+  const cleaned = {};
+  for (const [k, v] of Object.entries(filtres_appliques)) {
+    if (v !== null && v !== undefined && v !== '') cleaned[k] = v;
+  }
+  return {
+    resultat_vide:      true,
+    message:            message ?? 'Aucune donnée ne correspond à cette combinaison de filtres.',
+    filtres_appliques:  cleaned,
   };
 }
 
@@ -315,6 +443,8 @@ function resolvePeriod(period) {
 }
 
 async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, date_from, date_to, period, tags, exclude_tags, total_only = false }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   shop_id = await resolveShopId(shop_id, pool);
   let from = date_from, to = date_to;
   let seasonTag = null, periodLabel = null;
@@ -500,7 +630,9 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
   };
 }
 
-async function toolGetStockByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period }, { pool }) {
+async function toolGetStockByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   if (period) {
     const resolved = resolvePeriod(period);
     if (resolved?.erreur) return { erreur: resolved.erreur };
@@ -590,6 +722,8 @@ function buildSizeCondition(size, params) {
 }
 
 async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   shop_id = await resolveShopId(shop_id, pool);
   let from, to, periodLabel = null;
 
@@ -671,7 +805,9 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
   };
 }
 
-async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = false }, { pool }) {
+async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = false }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   shop_id = await resolveShopId(shop_id, pool);
   const conditions = ['p.archived = false', 'i.qty_on_hand > 0'];
   const params     = [];
@@ -824,6 +960,8 @@ async function toolSearchBrands({ query }, { pool }) {
 }
 
 async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tags, exclude_tags, season, shop_id, period, sort = 'st_desc', limit = 200 }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
   let from, to, periodLabel = null;
@@ -1046,7 +1184,9 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   };
 }
 
-async function toolGetCategories({ manufacturer }, { pool }) {
+async function toolGetCategories({ manufacturer }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   const conditions = ['p.category IS NOT NULL', "p.category != ''", 'p.archived = false'];
   const params     = [];
 
@@ -1088,7 +1228,9 @@ async function toolGetCategories({ manufacturer }, { pool }) {
   };
 }
 
-async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1, receiving_shop_id, category, exclude_nos = false }, { pool }) {
+async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1, receiving_shop_id, category, exclude_nos = false }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ category, shop_id: receiving_shop_id }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   const params = [days_dormant, min_stock];
   const nosFilter = exclude_nos ? "AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')" : '';
   let catFilter = '';
@@ -1195,7 +1337,9 @@ async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1
   };
 }
 
-async function toolGetMatrixInfo({ manufacturer, description_search, category, shop_id }, { pool }) {
+async function toolGetMatrixInfo({ manufacturer, description_search, category, shop_id }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   shop_id = await resolveShopId(shop_id, pool);
   const conditions = ['p.archived = false', 'p.matrix_id IS NOT NULL'];
   const params = [];
@@ -1259,6 +1403,8 @@ async function toolGetSeasonsList(_, { getSeasonsConfig }) {
 }
 
 async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   shop_id = await resolveShopId(shop_id, pool);
   const allSeasons = await getSeasonsConfig();
 
@@ -1330,6 +1476,8 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
 }
 
 async function toolGetSalesByCategory({ season, period, date_from, date_to, manufacturer, shop_id }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   shop_id = await resolveShopId(shop_id, pool);
   let from = date_from, to = date_to;
   let seasonTag = null, periodLabel = null;
@@ -1415,7 +1563,9 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
 // get_inventory_at_date — snapshot d'inventaire à une date donnée
 // Retourne une erreur explicite si la date est antérieure au premier snapshot.
 // ---------------------------------------------------------------------------
-async function toolGetInventoryAtDate({ date, shop_id, manufacturer }, { pool }) {
+async function toolGetInventoryAtDate({ date, shop_id, manufacturer }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   shop_id = await resolveShopId(shop_id, pool);
 
   const { rows: meta } = await pool.query(
@@ -1493,7 +1643,9 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer }, { pool })
 // ---------------------------------------------------------------------------
 // get_payment_terms_analysis — analyse des termes de paiement fournisseur
 // ---------------------------------------------------------------------------
-async function toolGetPaymentTermsAnalysis({ manufacturer }, { pool, tenantId }) {
+async function toolGetPaymentTermsAnalysis({ manufacturer }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   const { rows: capRow } = await pool.query(
     `SELECT value FROM app_settings WHERE tenant_id = $1 AND key = 'cost_of_capital'`,
     [tenantId],
@@ -1714,6 +1866,8 @@ async function toolResolveSearchTerm({ terme }, { pool, tenantId }) {
 // Même logique que toolGetSellthroughBySize mais filtré par matrix_id.
 // ---------------------------------------------------------------------------
 async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ shop_id, season }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   if (!matrix_id) return { erreur: 'matrix_id is required' };
   shop_id = await resolveShopId(shop_id, pool);
 
@@ -1877,6 +2031,8 @@ async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, 
 // Utiliser quand resolved_type='description' (matrix_matches > 1).
 // ---------------------------------------------------------------------------
 async function toolGetProductByDescription({ terme, season, shop_id }, { pool, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ shop_id, season }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   if (!terme) return { erreur: 'terme is required' };
   shop_id = await resolveShopId(shop_id, pool);
 
@@ -2063,6 +2219,8 @@ async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, sho
 // toolGetBrandRanking — classement des marques par ST, revenue, stock dormant.
 // ---------------------------------------------------------------------------
 async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20, include_nos = false, manufacturer, max_st, min_st, period }, { pool, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
   limit = Math.min(Math.max(1, parseInt(limit) || 20), 50);
@@ -2252,6 +2410,8 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
 // Utilise computeSeasonMetrics en parallèle pour éviter la duplication SQL.
 // ---------------------------------------------------------------------------
 async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id, include_nos = false, comparable_window = true }, { pool, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   if (!season1 || !season2) return { erreur: 'season1 et season2 sont obligatoires.' };
   shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
@@ -2355,6 +2515,8 @@ async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id
 // Agrégation au niveau matrice (matrix_id = un modèle = toutes ses variantes).
 // ---------------------------------------------------------------------------
 async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_stock, max_stock, has_sales, manufacturer, sort_by = 'st', limit = 50, period }, { pool, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   if (min_st == null && max_st == null && min_stock == null && max_stock == null && has_sales == null && !manufacturer) {
     return { erreur: 'Spécifiez au moins un critère de filtre (min_st, max_st, min_stock, max_stock, has_sales, ou manufacturer).' };
   }
@@ -2563,6 +2725,8 @@ async function toolGetRestockRecommendations(
   { pool, getSeasonsConfig, tenantId }
 ) {
   if (!season) return { erreur: 'Le paramètre "season" est obligatoire.' };
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   season  = season.toLowerCase();
   limit   = Math.min(Math.max(1, parseInt(limit) || 30), 100);
   min_st  = Number(min_st ?? 70);
@@ -2900,6 +3064,8 @@ async function toolGetPricingAnalysis({
   sort_by = 'taux_remise',
   limit = 25,
 }, { pool, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, getSeasonsConfig });
+  if (invalid) return invalid;
   shop_id = await resolveShopId(shop_id, pool);
   const today = new Date().toISOString().slice(0, 10);
   limit     = Math.min(Math.max(1, parseInt(limit)     || 25), 50);
@@ -3198,6 +3364,22 @@ function relaxArgs(name, args) {
   return null;
 }
 
+// Detect responses where all data-carrying list fields are empty AND no explicit
+// signal is already present. Returns the name of the empty field, or null.
+function findSilentEmptyField(result) {
+  if (!result || typeof result !== 'object') return null;
+  if (result.erreur || result.resultat_vide || result.marque_introuvable
+      || result.filtre_invalide || result.avertissement || result.resolved_type === 'not_found') return null;
+  const listFields = ['marques', 'articles', 'variantes', 'lignes', 'categories',
+                      'stock', 'classement', 'resultats', 'matrices', 'modeles',
+                      'recommandations', 'par_boutique'];
+  const emptyFields = listFields.filter(f => Array.isArray(result[f]) && result[f].length === 0);
+  // Only signal silent-empty if EVERY list field present is empty (no partial data)
+  const nonEmptyLists = listFields.filter(f => Array.isArray(result[f]) && result[f].length > 0);
+  if (emptyFields.length && !nonEmptyLists.length) return emptyFields[0];
+  return null;
+}
+
 async function executeTool(name, args, ctx) {
   try {
     const result = await dispatchTool(name, args, ctx);
@@ -3215,8 +3397,32 @@ async function executeTool(name, args, ctx) {
       }
     }
 
+    // Silent-empty → resultat_vide. Filters are already validated by validateFilters,
+    // so an empty response here means "valid filters, no matching data" (real zero).
+    const emptyField = findSilentEmptyField(result);
+    if (emptyField) {
+      const filters = {};
+      for (const k of ['manufacturer', 'category', 'shop_id', 'season', 'period', 'date_from', 'date_to']) {
+        if (args?.[k] != null && args[k] !== '') filters[k] = args[k];
+      }
+      result.resultat_vide     = true;
+      result.message           = `Aucune donnée ne correspond à cette combinaison de filtres (champ "${emptyField}" vide).`;
+      result.filtres_appliques = filters;
+    }
+
     return result;
   } catch (err) {
+    // Safety net: any tool that calls resolveShopId without going through
+    // validateFilters still gets a structured shop_id error instead of a crash.
+    if (err instanceof ShopNotFoundError) {
+      return {
+        erreur:                err.message,
+        filtre_invalide:       'shop_id',
+        valeur_fournie:        err.shop_id,
+        suggestions:           err.suggestions,
+        boutiques_disponibles: err.availableShops,
+      };
+    }
     console.error(`[ai-agent] Tool "${name}" error:`, err.message);
     return { erreur: `Erreur lors de l'exécution de l'outil "${name}": ${err.message}` };
   }

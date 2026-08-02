@@ -31,13 +31,28 @@ const TENANT = process.env.TENANT_ID || 'valerie-simon';
 
 const pool = new Pool({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
 
+// Fallback defaults — mirror server.js DEFAULT_SEASONS_CONFIG so validateFilters
+// doesn't reject valid season codes when the DB has no seasons_config row.
+const DEFAULT_SEASONS_FALLBACK = [
+  { code:'p23', reception_from:'2022-10-01', sell_from:'2023-02-01', sell_to:'2023-09-30', tag_pattern:'p23' },
+  { code:'a23', reception_from:'2023-05-01', sell_from:'2023-09-01', sell_to:'2024-02-28', tag_pattern:'a23' },
+  { code:'p24', reception_from:'2023-10-01', sell_from:'2024-02-01', sell_to:'2024-09-30', tag_pattern:'p24' },
+  { code:'a24', reception_from:'2024-05-01', sell_from:'2024-09-01', sell_to:'2025-02-28', tag_pattern:'a24' },
+  { code:'p25', reception_from:'2024-10-01', sell_from:'2025-02-01', sell_to:'2025-09-30', tag_pattern:'p25' },
+  { code:'a25', reception_from:'2025-05-01', sell_from:'2025-09-01', sell_to:'2026-02-28', tag_pattern:'a25' },
+  { code:'p26', reception_from:'2025-10-01', sell_from:'2026-02-01', sell_to:'2026-09-30', tag_pattern:'p26' },
+  { code:'a26', reception_from:'2026-05-01', sell_from:'2026-09-01', sell_to:'2027-02-28', tag_pattern:'a26' },
+];
+
 async function buildCtx() {
   const getSeasonsConfig = async () => {
     const { rows } = await pool.query(
       "SELECT value FROM app_settings WHERE key = 'seasons_config' AND tenant_id = $1",
       [TENANT]
     );
-    return rows.length && Array.isArray(rows[0].value) ? rows[0].value : [];
+    return rows.length && Array.isArray(rows[0].value) && rows[0].value.length
+      ? rows[0].value
+      : DEFAULT_SEASONS_FALLBACK;
   };
   return { pool, getSeasonsConfig, tenantId: TENANT };
 }
@@ -506,19 +521,21 @@ async function main() {
   );
   if (!r10) anyFailed = true;
 
-  // --- marque_introuvable (typo detection, 2026-07-27) ---
-  // "Patrick Assarag" (faute de frappe) doit déclencher marque_introuvable: true
-  // avec "Patrick Assaraf" dans les suggestions (pg_trgm similarity > 0.15).
-  // Testé sur toolGetSalesByVariant — la logique buildBrandNotFoundResult est
-  // partagée par les 4 tools, donc un seul cas suffit.
+  // --- Brand-not-found typo detection ---
+  // "Patrick Assarag" (typo) must trigger either the legacy marque_introuvable
+  // flag OR the newer filtre_invalide=manufacturer response (both carry
+  // suggestions). validateFilters intercepts before the tool query now, so the
+  // new pattern is expected in practice.
   console.log('');
   const r9 = await (async () => {
     const label = '[BrandNotFound] "Patrick Assarag" (faute de frappe)';
     const result = await toolGetSalesByVariant({ manufacturer: 'Patrick Assarag' }, ctx);
     let failed = false;
 
-    if (!result.marque_introuvable) {
-      console.error(`FAIL ${label} — marque_introuvable devrait être true, got: ${JSON.stringify(result)}`);
+    const legacy = !!result.marque_introuvable;
+    const newer  = result.filtre_invalide === 'manufacturer';
+    if (!legacy && !newer) {
+      console.error(`FAIL ${label} — expected marque_introuvable OR filtre_invalide=manufacturer, got: ${JSON.stringify(result)}`);
       failed = true;
     }
     if (!result.suggestions?.some(s => s.toLowerCase().includes('assaraf'))) {
@@ -526,7 +543,8 @@ async function main() {
       failed = true;
     }
     if (!failed) {
-      console.log(`PASS ${label} — marque_introuvable=true ✅, suggestions=${JSON.stringify(result.suggestions)} ✅`);
+      const flag = legacy ? 'marque_introuvable' : 'filtre_invalide=manufacturer';
+      console.log(`PASS ${label} — ${flag} ✅, suggestions=${JSON.stringify(result.suggestions)} ✅`);
     }
     return !failed;
   })();

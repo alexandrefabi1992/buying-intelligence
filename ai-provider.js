@@ -65,6 +65,7 @@ const TOOL_DEFS = [
         shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel). Ex: "Saint-Bruno", "Fan Club".' },
         tags:         { type: 'array', items: { type: 'string' }, description: 'Filtres supplémentaires par tag (optionnel)' },
         exclude_tags: { type: 'array', items: { type: 'string' }, description: 'Exclure ces tags (optionnel)' },
+        total_only:   { type: 'boolean', description: "Si true, retourne uniquement les totaux par boutique (sans détail par marque). Utile pour 'ventes de [boutique] en [période]' — évite un tableau exhaustif. Ignoré si manufacturer est fourni." },
       },
       required: [],
     },
@@ -466,6 +467,12 @@ Si aucun outil ne peut répondre à la question posée, tu le dis explicitement 
 Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas répondre.
 
 - MARQUE INTROUVABLE : si un outil retourne marque_introuvable: true, tu DOIS répondre "La marque « [marque_cherchee] » est introuvable dans le catalogue." puis proposer les suggestions si présentes ("Vouliez-vous dire : [suggestions] ?"). JAMAIS afficher un chiffre (0 unité, 0$, 0%) dans ce cas — le zéro serait trompeur.
+- FILTRE INVALIDE : si un outil retourne filtre_invalide (avec les champs erreur, valeur_fournie, suggestions), tu DOIS présenter l'erreur telle quelle et proposer les suggestions — JAMAIS présenter de chiffres. Exemples :
+    filtre_invalide="shop_id" → "La boutique « [valeur_fournie] » n'existe pas. Vouliez-vous dire : [suggestions] ? Boutiques disponibles : [boutiques_disponibles]."
+    filtre_invalide="category" → "La catégorie « [valeur_fournie] » n'existe pas. Suggestions : [suggestions]."
+    filtre_invalide="season" → "La saison « [valeur_fournie] » n'est pas configurée. Saisons disponibles : [suggestions]."
+    filtre_invalide="manufacturer" → même règle que marque_introuvable.
+- RÉSULTAT VIDE : si un outil retourne resultat_vide: true (avec message et filtres_appliques), c'est un VRAI zéro — tous les filtres sont valides mais aucune donnée ne correspond à la combinaison. Communiquer honnêtement : "Aucune vente/aucun article/aucun stock pour [rappel des filtres appliqués]." Ne PAS proposer de suggestions (les filtres sont légitimes), ne PAS inventer d'explication. C'est différent de filtre_invalide : filtre_invalide = filtre erroné à corriger ; resultat_vide = filtre correct mais zéro donnée.
 - Réponds TOUJOURS en français
 - Sois BREF : 1 tableau ou 3-4 lignes max — jamais de blocs d'explication non demandés
 - JAMAIS inventer un chiffre — toujours appeler un outil pour obtenir les données
