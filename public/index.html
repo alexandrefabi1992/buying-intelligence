@@ -868,6 +868,60 @@
         </div>
       </div>
 
+      <!-- Projection ST (saison en cours) -->
+      <div class="mt-6 border-t border-gray-200 pt-5">
+        <h3 class="text-xs font-semibold text-gray-700 mb-1" data-i18n="params_projection_title">Projection ST — saison en cours</h3>
+        <p class="text-xs text-gray-400 mb-3" data-i18n="params_projection_desc">Ajuste la projection ST d'une saison en cours selon le rythme observé (vélocité récente vs historique équivalent). Voir le tooltip sur "P26 : XX% proj" dans l'onglet Budget pour le détail par marque.</p>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-3">
+            <label class="text-xs text-gray-600 w-64 col-tip" data-tip="Écart de rythme (|ratio − 1|) qui déclenche la bascule vers la projection ajustée par vélocité. Sous ce seuil, la méthode historique est conservée (comportement inchangé)."
+                   data-i18n="params_seuil_bascule_lbl">Seuil de bascule (rythme)</label>
+            <input id="projSeuilBascule" type="number" min="0" max="100" step="1" value="5"
+                   class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+            <span class="text-xs text-gray-500">%</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="text-xs text-gray-600 w-64 col-tip" data-tip="Poids donné à la vélocité RÉCENTE dans le mélange. 0.60 = 60% récent + 40% historique. Plus la valeur est élevée, plus les tendances récentes dominent la projection."
+                   data-i18n="params_poids_recent_lbl">Poids vélocité récente</label>
+            <input id="projPoidsRecent" type="number" min="0" max="100" step="5" value="60"
+                   class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+            <span class="text-xs text-gray-500">%</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="text-xs text-gray-600 w-64 col-tip" data-tip="Nombre de semaines utilisées pour calculer la vélocité récente (ventes / semaine). Une valeur plus courte réagit vite aux inflexions ; une valeur plus longue lisse le bruit."
+                   data-i18n="params_fenetre_velocite_lbl">Fenêtre vélocité récente</label>
+            <input id="projFenetreVelocite" type="number" min="1" max="52" step="1" value="8"
+                   class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+            <span class="text-xs text-gray-500" data-i18n="lbl_weeks_short">sem.</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="text-xs text-gray-600 w-64 col-tip" data-tip="Borne PLANCHER de la projection, en fraction du ST historique de la marque. 0.50 = la projection ne peut pas descendre sous 50% du ST historique. Protège contre les projections trop basses sur bruit statistique. Désactivé si ST historique < 10%."
+                   data-i18n="params_borne_plancher_lbl">Borne plancher</label>
+            <input id="projBornePlancher" type="number" min="0" max="200" step="10" value="50"
+                   class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+            <span class="text-xs text-gray-500">% du ST hist.</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="text-xs text-gray-600 w-64 col-tip" data-tip="Borne PLAFOND de la projection, en fraction du ST historique de la marque. 1.50 = la projection ne peut pas dépasser 150% du ST historique (également cap absolu à 100%). Protège contre les projections trop optimistes."
+                   data-i18n="params_borne_plafond_lbl">Borne plafond</label>
+            <input id="projBornePlafond" type="number" min="100" max="500" step="10" value="150"
+                   class="border border-gray-300 rounded px-2 py-1 text-xs w-16 text-center">
+            <span class="text-xs text-gray-500">% du ST hist.</span>
+          </div>
+          <div class="flex gap-2 mt-1">
+            <button id="projConfigApply"
+              class="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+              data-i18n="btn_apply_recalc">Appliquer &amp; Recalculer</button>
+            <button id="projConfigReset"
+              class="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              data-i18n="btn_reset_defaults">Réinitialiser</button>
+          </div>
+          <div id="projConfigError" class="text-xs text-red-600 font-semibold hidden"></div>
+          <div id="projConfigNote"  class="text-xs text-emerald-700 font-semibold hidden"
+               data-i18n="params_applied">Paramètres appliqués — budgets recalculés.</div>
+        </div>
+      </div>
+
       <!-- Délais fournisseur NOS -->
       <div class="mt-6 border-t border-gray-200 pt-5">
         <h3 class="text-xs font-semibold text-gray-700 mb-1" data-i18n="params_lead_times_title">Délais fournisseur NOS (semaines)</h3>
@@ -948,6 +1002,27 @@ const TRANSLATIONS = {
     params_same_rate_lbl:'Même taux pour toutes les boutiques',
     params_recency_lbl:'Facteur de pondération récente',
     params_absent_lbl:'Marques absentes de la saison récente',
+    params_projection_title:'Projection ST — saison en cours',
+    params_projection_desc:'Ajuste la projection ST d\'une saison en cours selon le rythme observé (vélocité récente vs historique équivalent). Voir le tooltip sur "P26 : XX% proj" dans l\'onglet Budget pour le détail par marque.',
+    params_seuil_bascule_lbl:'Seuil de bascule (rythme)',
+    params_poids_recent_lbl:'Poids vélocité récente',
+    params_fenetre_velocite_lbl:'Fenêtre vélocité récente',
+    params_borne_plancher_lbl:'Borne plancher',
+    params_borne_plafond_lbl:'Borne plafond',
+    btn_reset_defaults:'Réinitialiser',
+    proj_tooltip_method:'Méthode',
+    proj_method_historique:'historique',
+    proj_method_velocite:'vélocité ajustée',
+    proj_method_lineaire:'linéaire (nouvelle marque)',
+    proj_tooltip_ratio:'rythme',
+    proj_tooltip_velo_recent:'Vélocité récente',
+    proj_tooltip_velo_hist:'historique',
+    proj_tooltip_projection:'Projection',
+    proj_tooltip_weeks_remaining:'sem. restantes',
+    proj_tooltip_borne_plancher:'⚠ borne plancher appliquée',
+    proj_tooltip_borne_plafond:'⚠ borne plafond appliquée',
+    proj_tooltip_units_added:'u. ajoutées sur',
+    proj_tooltip_hist_anchor:'ST hist. marque',
     params_absent_show:'Afficher avec badge',
     params_absent_hide:'Masquer',
     absent_recent_badge:'Absente en',
@@ -1158,6 +1233,27 @@ const TRANSLATIONS = {
     params_same_rate_lbl:'Apply same rate to all stores',
     params_recency_lbl:'Recency weighting factor',
     params_absent_lbl:'Brands absent from recent season',
+    params_projection_title:'ST Projection — in-progress season',
+    params_projection_desc:'Adjusts the ST projection of an in-progress season based on observed pace (recent velocity vs equivalent historical window). Hover on "P26: XX% proj" in the Budget tab for the per-brand breakdown.',
+    params_seuil_bascule_lbl:'Rhythm switch threshold',
+    params_poids_recent_lbl:'Recent velocity weight',
+    params_fenetre_velocite_lbl:'Recent velocity window',
+    params_borne_plancher_lbl:'Lower bound',
+    params_borne_plafond_lbl:'Upper bound',
+    btn_reset_defaults:'Reset defaults',
+    proj_tooltip_method:'Method',
+    proj_method_historique:'historical',
+    proj_method_velocite:'velocity-adjusted',
+    proj_method_lineaire:'linear (new brand)',
+    proj_tooltip_ratio:'pace',
+    proj_tooltip_velo_recent:'Recent velocity',
+    proj_tooltip_velo_hist:'historical',
+    proj_tooltip_projection:'Projection',
+    proj_tooltip_weeks_remaining:'weeks remaining',
+    proj_tooltip_borne_plancher:'⚠ lower bound applied',
+    proj_tooltip_borne_plafond:'⚠ upper bound applied',
+    proj_tooltip_units_added:'units added over',
+    proj_tooltip_hist_anchor:'Brand hist. ST',
     params_absent_show:'Show with badge',
     params_absent_hide:'Hide',
     absent_recent_badge:'Absent in',
@@ -1785,7 +1881,7 @@ const BudgetTab = (() => {
     return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${bg}">${pct}%</span></td>`;
   }
 
-  function stPctCellDual(avgSt, recentProj, recentYtd, seasonCode, threshold) {
+  function stPctCellDual(avgSt, recentProj, recentYtd, seasonCode, threshold, projDetail) {
     if (avgSt === null || avgSt === undefined) return '<td class="px-3 py-2.5 text-right text-gray-300">—</td>';
     if (avgSt > 1.5) return `<td class="px-3 py-2.5 text-right"><span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-400" title="${escHtml(t('st_na_title'))}">${t('st_nd')}</span></td>`;
     const pct = Math.round(avgSt * 100);
@@ -1800,7 +1896,37 @@ const BudgetTab = (() => {
       const ytdPart = ytdPct !== null && ytdPct !== projPct
         ? ` <span class="text-gray-400">(${ytdPct}% ${t('st_ytd_lbl')})</span>`
         : '';
-      html += `<span class="block text-[10px] text-indigo-500 mt-0.5" title="${escHtml(t('st_projected_tip'))}">${season}: ${projPct}% proj${ytdPart}</span>`;
+      // Build a rich tooltip from projDetail when available; fall back to the generic label
+      let tip = t('st_projected_tip');
+      if (projDetail) {
+        const methodLbl = projDetail.methode === 'historique' ? t('proj_method_historique')
+                        : projDetail.methode === 'velocite_ajustee' ? t('proj_method_velocite')
+                        : projDetail.methode === 'lineaire' ? t('proj_method_lineaire')
+                        : projDetail.methode;
+        const parts = [`${t('proj_tooltip_method')} : ${methodLbl}`];
+        if (projDetail.ratio_rythme != null && projDetail.st_ytd_comparable != null) {
+          parts.push(`${t('proj_tooltip_ratio')} : ${(projDetail.ratio_rythme * 100).toFixed(0)}% vs ${projDetail.comparable_season?.toUpperCase()} (YTD ${projDetail.st_ytd_actuel}% vs ${projDetail.st_ytd_comparable}%)`);
+        }
+        if (projDetail.methode === 'velocite_ajustee' && projDetail.velocite_recente != null) {
+          parts.push(`${t('proj_tooltip_velo_recent')} : ${projDetail.velocite_recente} u./sem · ${t('proj_tooltip_velo_hist')} : ${projDetail.velocite_historique} u./sem`);
+        }
+        if (projDetail.ventes_restantes_projetees != null && projDetail.semaines_restantes != null) {
+          parts.push(`${t('proj_tooltip_projection')} : +${projDetail.ventes_restantes_projetees} ${t('proj_tooltip_units_added')} ${projDetail.semaines_restantes} ${t('proj_tooltip_weeks_remaining')}`);
+        }
+        if (projDetail.borne_appliquee === 'plancher') {
+          parts.push(`${t('proj_tooltip_borne_plancher')} (brut ${projDetail.st_projete_brut}% → ${projDetail.st_projete_final}%)`);
+        } else if (projDetail.borne_appliquee === 'plafond') {
+          parts.push(`${t('proj_tooltip_borne_plafond')} (brut ${projDetail.st_projete_brut}% → ${projDetail.st_projete_final}%)`);
+        }
+        if (projDetail.st_historique_marque != null) {
+          parts.push(`${t('proj_tooltip_hist_anchor')} : ${projDetail.st_historique_marque}%`);
+        }
+        tip = parts.join('\n');
+      }
+      const isVelo   = projDetail?.methode === 'velocite_ajustee';
+      const isBorne  = !!projDetail?.borne_appliquee;
+      const iconMark = isBorne ? ' ⚠' : (isVelo ? ' ●' : '');
+      html += `<span class="block text-[10px] text-indigo-500 mt-0.5 cursor-help" title="${escHtml(tip)}">${season}: ${projPct}% proj${iconMark}${ytdPart}</span>`;
     }
     return `<td class="px-3 py-2.5 text-right">${html}</td>`;
   }
@@ -1898,7 +2024,7 @@ const BudgetTab = (() => {
           <td class="px-3 py-2.5 text-right">${recentRecvHtml}</td>
           <td class="px-3 py-2.5 text-right">${avgRecvHtml}</td>
           <td class="px-3 py-2.5 text-right text-[11px]">${rangeHtml}</td>
-          ${stPctCellDual(m.avg_st, m.recent_st_projected, m.recent_st_ytd, m.recent_season_code, 0.60)}
+          ${stPctCellDual(m.avg_st, m.recent_st_projected, m.recent_st_ytd, m.recent_season_code, 0.60, m.projection_detail)}
           <td class="px-3 py-2.5 text-center">${trendBadge(m.trend)}</td>
           <td class="px-3 py-2.5 text-center">${multHtml}</td>
           <td class="px-3 py-2.5 text-right">${adjHtml}</td>
@@ -4075,8 +4201,56 @@ const ParamsTab = (() => {
     previewEl.textContent = `→ ${pcts.join(' / ')} (${t('params_recency_direction')})`;
   }
 
+  // ── Budget projection config (rhythm-adjusted ST forecast) ──────────
+  const PROJ_DEFAULTS = { seuil_bascule: 0.05, poids_recent: 0.60, fenetre_velocite: 8, borne_plancher: 0.50, borne_plafond: 1.50 };
+
+  async function loadProjectionConfig() {
+    try {
+      const d = await apiFetch(`${BASE}/api/settings/budget-projection`).then(r => r.json());
+      const setPct = (id, v, dflt) => { const el = document.getElementById(id); if (el) el.value = Math.round((v ?? dflt) * 100); };
+      const setNum = (id, v, dflt) => { const el = document.getElementById(id); if (el) el.value = v ?? dflt; };
+      setPct('projSeuilBascule',    d.seuil_bascule,    PROJ_DEFAULTS.seuil_bascule);
+      setPct('projPoidsRecent',     d.poids_recent,     PROJ_DEFAULTS.poids_recent);
+      setNum('projFenetreVelocite', d.fenetre_velocite, PROJ_DEFAULTS.fenetre_velocite);
+      setPct('projBornePlancher',   d.borne_plancher,   PROJ_DEFAULTS.borne_plancher);
+      setPct('projBornePlafond',    d.borne_plafond,    PROJ_DEFAULTS.borne_plafond);
+    } catch (e) { console.warn('[budget-projection] Failed to load:', e.message); }
+  }
+
+  async function saveProjectionConfig() {
+    const errEl = document.getElementById('projConfigError');
+    errEl.classList.add('hidden');
+    const pctToFrac = id => (parseFloat(document.getElementById(id)?.value ?? 0) / 100);
+    const cfg = {
+      seuil_bascule:    pctToFrac('projSeuilBascule'),
+      poids_recent:     pctToFrac('projPoidsRecent'),
+      fenetre_velocite: parseInt(document.getElementById('projFenetreVelocite')?.value ?? 8, 10),
+      borne_plancher:   pctToFrac('projBornePlancher'),
+      borne_plafond:    pctToFrac('projBornePlafond'),
+    };
+    if (cfg.borne_plancher >= cfg.borne_plafond) {
+      errEl.textContent = 'Le plancher doit être strictement inférieur au plafond.';
+      errEl.classList.remove('hidden');
+      return false;
+    }
+    await apiFetch(`${BASE}/api/settings/budget-projection`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg),
+    });
+    return true;
+  }
+
+  function resetProjectionConfig() {
+    document.getElementById('projSeuilBascule').value    = PROJ_DEFAULTS.seuil_bascule * 100;
+    document.getElementById('projPoidsRecent').value     = PROJ_DEFAULTS.poids_recent * 100;
+    document.getElementById('projFenetreVelocite').value = PROJ_DEFAULTS.fenetre_velocite;
+    document.getElementById('projBornePlancher').value   = PROJ_DEFAULTS.borne_plancher * 100;
+    document.getElementById('projBornePlafond').value    = PROJ_DEFAULTS.borne_plafond * 100;
+    document.getElementById('projConfigError').classList.add('hidden');
+  }
+
   async function init() {
-    await Promise.all([loadTiers().then(renderTiersTable), loadBudgetParams()]);
+    await Promise.all([loadTiers().then(renderTiersTable), loadBudgetParams(), loadProjectionConfig()]);
     loadLeadTimes();
 
     document.getElementById('tiersApply').addEventListener('click', async () => {
@@ -4137,6 +4311,34 @@ const ParamsTab = (() => {
         note.classList.remove('hidden');
         setTimeout(() => note.classList.add('hidden'), 3000);
       } catch (e) { console.warn('[budget-params] Failed to apply:', e.message); }
+    });
+
+    document.getElementById('projConfigApply').addEventListener('click', async () => {
+      try {
+        const ok = await saveProjectionConfig();
+        if (!ok) return;
+        if (state.budgetSeas.data.length) {
+          const season = document.getElementById('budgetSeasSeason').value;
+          await BudgetTab.fetchPanel('budgetSeas', '/api/budget/marque', { season });
+          BudgetTab.updateTotals();
+        }
+        const note = document.getElementById('projConfigNote');
+        note.classList.remove('hidden');
+        setTimeout(() => note.classList.add('hidden'), 3000);
+      } catch (e) { console.warn('[budget-projection] Failed to apply:', e.message); }
+    });
+
+    document.getElementById('projConfigReset').addEventListener('click', async () => {
+      if (!confirm('Réinitialiser aux valeurs par défaut ?')) return;
+      resetProjectionConfig();
+      try {
+        await saveProjectionConfig();
+        if (state.budgetSeas.data.length) {
+          const season = document.getElementById('budgetSeasSeason').value;
+          await BudgetTab.fetchPanel('budgetSeas', '/api/budget/marque', { season });
+          BudgetTab.updateTotals();
+        }
+      } catch (e) { console.warn('[budget-projection] Failed to reset:', e.message); }
     });
   }
 

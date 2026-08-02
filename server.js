@@ -138,6 +138,16 @@ const DEFAULT_BUDGET_PARAMS = {
   absent_brand_mode:          'show', // 'show' = afficher avec badge | 'hide' = masquer
 };
 
+// Projection ST — how we forecast the sell-through of an in-progress reference season.
+// See doc block above /api/budget/marque handler for the full algorithm.
+const DEFAULT_BUDGET_PROJECTION_CONFIG = {
+  seuil_bascule:    0.05,  // rhythm gap that triggers velocity-adjusted projection
+  poids_recent:     0.60,  // weight of recent velocity in the blended forecast
+  fenetre_velocite: 8,     // weeks used to compute recent velocity
+  borne_plancher:   0.50,  // lower bound on projected ST, as a fraction of brand's historical ST
+  borne_plafond:    1.50,  // upper bound (also capped at 100% absolute)
+};
+
 async function getTenantConfig(tenantId) {
   try {
     const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'tenant_config' AND tenant_id = $1", [tenantId]);
@@ -162,6 +172,16 @@ async function getBudgetParams(tenantId) {
     }
   } catch {}
   return { ...DEFAULT_BUDGET_PARAMS };
+}
+
+async function getBudgetProjectionConfig(tenantId) {
+  try {
+    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'budget_projection_config' AND tenant_id = $1", [tenantId]);
+    if (rows.length && rows[0].value && typeof rows[0].value === 'object') {
+      return { ...DEFAULT_BUDGET_PROJECTION_CONFIG, ...rows[0].value };
+    }
+  } catch {}
+  return { ...DEFAULT_BUDGET_PROJECTION_CONFIG };
 }
 
 function getReferenceSeasonsFromConfig(targetCode, config, n) {
@@ -3070,6 +3090,40 @@ app.put('/api/settings/budget-params', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/settings/budget-projection — read projection config (rhythm / velocity blending)
+// PUT /api/settings/budget-projection — update projection config
+// ---------------------------------------------------------------------------
+app.get('/api/settings/budget-projection', async (req, res, next) => {
+  try {
+    const cfg = await getBudgetProjectionConfig(req.tenantId);
+    res.json(cfg);
+  } catch (err) { next(err); }
+});
+
+app.put('/api/settings/budget-projection', async (req, res, next) => {
+  try {
+    const cfg = {
+      seuil_bascule:    Math.max(0, Math.min(1,  parseFloat(req.body.seuil_bascule    ?? DEFAULT_BUDGET_PROJECTION_CONFIG.seuil_bascule))),
+      poids_recent:     Math.max(0, Math.min(1,  parseFloat(req.body.poids_recent     ?? DEFAULT_BUDGET_PROJECTION_CONFIG.poids_recent))),
+      fenetre_velocite: Math.max(1, Math.min(52, parseInt(req.body.fenetre_velocite   ?? DEFAULT_BUDGET_PROJECTION_CONFIG.fenetre_velocite, 10))),
+      borne_plancher:   Math.max(0, Math.min(2,  parseFloat(req.body.borne_plancher   ?? DEFAULT_BUDGET_PROJECTION_CONFIG.borne_plancher))),
+      borne_plafond:    Math.max(1, Math.min(5,  parseFloat(req.body.borne_plafond    ?? DEFAULT_BUDGET_PROJECTION_CONFIG.borne_plafond))),
+    };
+    if (cfg.borne_plancher >= cfg.borne_plafond) {
+      return res.status(400).json({ error: 'borne_plancher must be < borne_plafond' });
+    }
+    await pool.query(
+      `INSERT INTO app_settings(tenant_id, key, value, updated_at)
+       VALUES ($1, 'budget_projection_config', $2::jsonb, now())
+       ON CONFLICT(tenant_id, key) DO UPDATE SET value = $2::jsonb, updated_at = now()`,
+      [req.tenantId, JSON.stringify(cfg)]
+    );
+    budgetCache.clear();
+    res.json({ ok: true, ...cfg });
+  } catch (err) { next(err); }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/settings/nos-lead-times  — délais fournisseur par marque (en semaines)
 // PUT /api/settings/nos-lead-times  — sauvegarder
 // ---------------------------------------------------------------------------
@@ -3301,10 +3355,11 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const hit = cacheGet(cacheKey);
     if (hit) return res.json({ ...hit, cached: true });
 
-    const [tiers, seasonsConfig, budgetParams] = await Promise.all([
+    const [tiers, seasonsConfig, budgetParams, projCfg] = await Promise.all([
       getMultiplierTiers(req.tenantId),
       getSeasonsConfig(req.tenantId),
       getBudgetParams(req.tenantId),
+      getBudgetProjectionConfig(req.tenantId),
     ]);
     const { nb_saisons_reference: nbRef, carryover_deduction_rate: globalCoRate,
             use_global_carryover_rate: useGlobal, carryover_rates_by_shop: ratesByShop,
@@ -3393,8 +3448,16 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const ytdSalesMap = {};
     for (const r of coSalesRows) ytdSalesMap[r.manufacturer] = parseFloat(r.sales_cost_ytd ?? 0);
 
-    // For each reference season: compute implied received + units sold
+    // Three-pass season processing:
+    //   Pass 1 — SQL data collection (all reference seasons)
+    //   Pass 2 — compute ST for COMPLETED seasons (simple, no projection)
+    //   Pass 3 — compute ST for IN-PROGRESS seasons with rhythm-adjusted projection
+    // Pass 2 must run before Pass 3 because the projection bounds use the
+    // brand's historical ST (average across completed reference seasons).
     const seasonResults = {};
+    const rawBySeason   = {}; // { code: { irSlMap, irInvMap, soldMap, soldCostMap, isRefInProgress, refSellStart, refSellEnd, allMfrsRef } }
+
+    // ─── PASS 1: SQL data collection ────────────────────────────────────────
     for (const refSeason of refSeasons) {
       const refSellStart = new Date(refSeason.sell_from);
       const refSellEnd   = new Date(refSeason.sell_to);
@@ -3403,24 +3466,19 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const isRefInProgress = todayDate >= refSellStart && todayDate <= refSellEnd;
       const refTag          = `%${refSeason.tag_pattern}%`;
 
-      // Implied received: tagged items sold since reception_from + tagged items in inventory today
       const irSlParams  = [...baseParams, refSeason.reception_from, refTag];
       const irSlFromIdx = irSlParams.length - 1;
       const irSlTagIdx  = irSlParams.length;
       const { rows: irSlRows } = await pool.query(`
-        SELECT
-          COALESCE(p.manufacturer, 'Sans marque')                               AS manufacturer,
-          SUM(sl.qty)::float8                                                    AS qty_sold_all,
-          SUM(sl.qty * COALESCE(p.default_cost, 0))::float8                     AS sold_cost
-        FROM sale_lines sl
-        JOIN products p ON p.item_id = sl.item_id
+        SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+               SUM(sl.qty)::float8 AS qty_sold_all,
+               SUM(sl.qty * COALESCE(p.default_cost, 0))::float8 AS sold_cost
+        FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
         WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${irSlFromIdx}::date
           AND sl.completed_time IS NOT NULL
-          AND p.tags ILIKE $${irSlTagIdx}
-          AND p.tags NOT ILIKE '%nos%'
+          AND p.tags ILIKE $${irSlTagIdx} AND p.tags NOT ILIKE '%nos%'
           ${tenantCond}
-          AND p.category    NOT ILIKE 'Alt%ration%'
-          AND p.description NOT ILIKE '%shopify%'
+          AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
           ${shopCondSL}
         GROUP BY p.manufacturer
       `, irSlParams);
@@ -3428,174 +3486,375 @@ app.get('/api/budget/marque', async (req, res, next) => {
       const irInvParams  = [...baseParams, refTag];
       const irInvTagIdx  = irInvParams.length;
       const { rows: irInvRows } = await pool.query(`
-        SELECT
-          COALESCE(p.manufacturer, 'Sans marque')                                  AS manufacturer,
-          SUM(COALESCE(i.qty_on_hand, 0))::float8                                   AS qty_on_hand,
-          SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8    AS stock_cost
+        SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+               SUM(COALESCE(i.qty_on_hand, 0))::float8 AS qty_on_hand,
+               SUM(COALESCE(i.qty_on_hand, 0) * COALESCE(p.default_cost, 0))::float8 AS stock_cost
         FROM products p
         JOIN inventory i  ON i.item_id  = p.item_id
         JOIN shops     sh ON sh.shop_id = i.shop_id AND sh.tenant_id = p.tenant_id
-        WHERE p.tags ILIKE $${irInvTagIdx}
-          AND p.tags NOT ILIKE '%nos%'
+        WHERE p.tags ILIKE $${irInvTagIdx} AND p.tags NOT ILIKE '%nos%'
           ${tenantCond}
-          AND p.category    NOT ILIKE 'Alt%ration%'
-          AND p.description NOT ILIKE '%shopify%'
+          AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
           AND i.qty_on_hand > 0
           ${shopCondInv}
         GROUP BY p.manufacturer
       `, irInvParams);
 
-      // Units sold DURING season (ST numerator)
       const slParams  = [...baseParams, refSeason.sell_from, refSeason.sell_to, refTag];
       const slFromIdx = slParams.length - 2;
       const slToIdx   = slParams.length - 1;
       const slTagIdx  = slParams.length;
       const { rows: slRows } = await pool.query(`
-        SELECT
-          COALESCE(p.manufacturer, 'Sans marque')                AS manufacturer,
-          SUM(sl.qty)::float8                                     AS units_sold,
-          SUM(sl.qty * COALESCE(p.default_cost, 0))::float8      AS sold_cost
-        FROM sale_lines sl
-        JOIN products p ON p.item_id = sl.item_id
+        SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+               SUM(sl.qty)::float8 AS units_sold,
+               SUM(sl.qty * COALESCE(p.default_cost, 0))::float8 AS sold_cost
+        FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
         WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${slFromIdx}::date
           AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${slToIdx}::date
           AND sl.completed_time IS NOT NULL
-          AND p.tags ILIKE $${slTagIdx}
-          AND p.tags NOT ILIKE '%nos%'
+          AND p.tags ILIKE $${slTagIdx} AND p.tags NOT ILIKE '%nos%'
           ${tenantCond}
-          AND p.category    NOT ILIKE 'Alt%ration%'
-          AND p.description NOT ILIKE '%shopify%'
+          AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
           ${shopCondSL}
         GROUP BY p.manufacturer
       `, slParams);
 
-      const irSlMap    = {};
+      const irSlMap   = {};
       for (const r of irSlRows)  irSlMap[r.manufacturer]  = { qty: parseFloat(r.qty_sold_all ?? 0), cost: parseFloat(r.sold_cost ?? 0) };
-      const irInvMap   = {};
+      const irInvMap  = {};
       for (const r of irInvRows) irInvMap[r.manufacturer] = { qty: parseFloat(r.qty_on_hand ?? 0),  cost: parseFloat(r.stock_cost ?? 0) };
-      const soldMap      = {};
-      const soldCostMap  = {};
+      const soldMap     = {};
+      const soldCostMap = {};
       for (const r of slRows) {
         soldMap[r.manufacturer]     = parseFloat(r.units_sold ?? 0);
         soldCostMap[r.manufacturer] = parseFloat(r.sold_cost  ?? 0);
       }
 
-      const allMfrsRef = new Set([...Object.keys(irSlMap), ...Object.keys(irInvMap)]);
+      rawBySeason[refSeason.code] = {
+        irSlMap, irInvMap, soldMap, soldCostMap,
+        isRefInProgress, refSellStart, refSellEnd,
+        allMfrsRef: new Set([...Object.keys(irSlMap), ...Object.keys(irInvMap)]),
+      };
+    }
+
+    // ─── PASS 2: compute ST for COMPLETED seasons ───────────────────────────
+    for (const refSeason of refSeasons) {
+      const raw = rawBySeason[refSeason.code];
+      if (!raw || raw.isRefInProgress) continue;
       seasonResults[refSeason.code] = {};
-
-      // For in-progress reference seasons: estimate remaining using historical window avg.
-      // projected = YTD actuals + avg(sales during equivalent remaining window in past N seasons).
-      // Brands with no past-season history in that window fall back to linear (÷ completion).
-      let histRemaining  = null;
-      let refElapsedDays = 0;
-      let refCompletion  = 1;
-      if (isRefInProgress) {
-        const refTotalDays   = (refSellEnd - refSellStart) / 86400000;
-        refElapsedDays = Math.max(1, (todayDate - refSellStart) / 86400000);
-        refCompletion  = Math.min(1, refElapsedDays / refTotalDays);
-
-        if (refCompletion > 0.05) {
-          const prevSeasonsForRef    = getReferenceSeasonsFromConfig(refSeason.code, seasonsConfig, nbRef);
-          const completedPrevSeasons = prevSeasonsForRef.filter(s => todayDate > new Date(s.sell_to));
-
-          if (completedPrevSeasons.length > 0) {
-            histRemaining = {};
-            for (const prevSeas of completedPrevSeasons) {
-              const prevSellStart  = new Date(prevSeas.sell_from);
-              const prevSellEnd    = new Date(prevSeas.sell_to);
-              // Map today's position in refSeason to the equivalent date in prevSeas
-              const prevWindowFrom = new Date(prevSellStart.getTime() + refElapsedDays * 86400000);
-              if (prevWindowFrom >= prevSellEnd) continue;
-
-              const prevTag   = `%${prevSeas.tag_pattern}%`;
-              const rwParams  = [...baseParams, prevWindowFrom.toISOString().slice(0, 10), prevSeas.sell_to, prevTag];
-              const rwFromIdx = rwParams.length - 2;
-              const rwToIdx   = rwParams.length - 1;
-              const rwTagIdx  = rwParams.length;
-
-              const { rows: rwRows } = await pool.query(`
-                SELECT
-                  COALESCE(p.manufacturer, 'Sans marque')                AS manufacturer,
-                  SUM(sl.qty * COALESCE(p.default_cost, 0))::float8      AS remaining_cost,
-                  SUM(sl.qty)::float8                                     AS remaining_units
-                FROM sale_lines sl
-                JOIN products p ON p.item_id = sl.item_id
-                WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${rwFromIdx}::date
-                  AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${rwToIdx}::date
-                  AND sl.completed_time IS NOT NULL
-                  AND p.tags ILIKE $${rwTagIdx}
-                  AND p.tags NOT ILIKE '%nos%'
-                  ${tenantCond}
-                  AND p.category    NOT ILIKE 'Alt%ration%'
-                  AND p.description NOT ILIKE '%shopify%'
-                  ${shopCondSL}
-                GROUP BY p.manufacturer
-              `, rwParams);
-
-              for (const r of rwRows) {
-                const m = r.manufacturer;
-                if (!histRemaining[m]) histRemaining[m] = { totalCost: 0, totalUnits: 0, count: 0 };
-                histRemaining[m].totalCost  += parseFloat(r.remaining_cost  ?? 0);
-                histRemaining[m].totalUnits += parseFloat(r.remaining_units ?? 0);
-                histRemaining[m].count++;
-              }
-            }
-          }
-        }
-      }
-
-      for (const mfr of allMfrsRef) {
-        const sl  = irSlMap[mfr]  ?? { qty: 0, cost: 0 };
-        const inv = irInvMap[mfr] ?? { qty: 0, cost: 0 };
-        let impliedUnits = sl.qty + inv.qty;
-        let impliedCost  = sl.cost + inv.cost;
+      for (const mfr of raw.allMfrsRef) {
+        const sl  = raw.irSlMap[mfr]  ?? { qty: 0, cost: 0 };
+        const inv = raw.irInvMap[mfr] ?? { qty: 0, cost: 0 };
+        const impliedUnits = sl.qty + inv.qty;
+        const impliedCost  = sl.cost + inv.cost;
         if (impliedCost <= 0) continue;
-
-        // Capture YTD values before projection
-        const impliedUnitsYtd = impliedUnits;
-        const soldRaw         = soldMap[mfr]     ?? 0;
-        const soldCostRaw     = soldCostMap[mfr] ?? 0;
-        const stYtd           = impliedUnitsYtd >= 5 ? soldRaw / impliedUnitsYtd : null;
-
-        let soldForSt    = soldRaw;
-        let soldCostProj = soldCostRaw;
-        if (isRefInProgress && refCompletion > 0.05) {
-          const rem = histRemaining?.[mfr];
-          if (rem && rem.count > 0) {
-            // Average only over seasons that actually had sales for this brand in remaining window
-            const avgRemCost  = rem.totalCost  / rem.count;
-            const avgRemUnits = rem.totalUnits / rem.count;
-            impliedCost   += avgRemCost;
-            impliedUnits  += avgRemUnits;
-            soldForSt     += avgRemUnits;
-            soldCostProj  += avgRemCost;
-          } else {
-            // No past history for this brand in remaining window → linear fallback
-            impliedCost   = impliedCost  / refCompletion;
-            impliedUnits  = impliedUnits / refCompletion;
-            soldForSt     = soldRaw      / refCompletion;
-            soldCostProj  = soldCostRaw  / refCompletion;
-          }
-        }
-
-        // Budget base = avg(received cost, sold cost) — anchors buying to actual demand.
-        // When ST=100%: same as received. When ST drops: budget naturally dampened.
-        const blendedCost = (impliedCost + soldCostProj) / 2;
-
-        const recv = impliedUnits;
-        const st   = recv >= 5 ? soldForSt / recv : null;
-
+        const soldRaw     = raw.soldMap[mfr]     ?? 0;
+        const soldCostRaw = raw.soldCostMap[mfr] ?? 0;
+        const st          = impliedUnits >= 5 ? soldRaw / impliedUnits : null;
+        const blendedCost = (impliedCost + soldCostRaw) / 2;
         seasonResults[refSeason.code][mfr] = {
-          units_received:    Math.round(recv),
-          units_sold:        Math.round(soldForSt),
+          units_received:    Math.round(impliedUnits),
+          units_sold:        Math.round(soldRaw),
           units_sold_ytd:    Math.round(soldRaw),
           received_cost:     Math.round(blendedCost * 100) / 100,
           received_cost_raw: Math.round(impliedCost * 100) / 100,
-          sold_cost:         Math.round(soldCostProj * 100) / 100,
+          sold_cost:         Math.round(soldCostRaw * 100) / 100,
           st_rate:           st !== null ? Math.round(st * 1000) / 1000 : null,
-          st_rate_ytd:       stYtd !== null ? Math.round(stYtd * 1000) / 1000 : null,
-          st_insufficient:   recv < 5,
-          partial:           isRefInProgress,
+          st_rate_ytd:       st !== null ? Math.round(st * 1000) / 1000 : null,
+          st_insufficient:   impliedUnits < 5,
+          partial:           false,
+        };
+      }
+    }
+
+    // Compute st_historique_marque per brand (avg of completed reference seasons' ST) —
+    // used as anchor for the projection bounds in Pass 3.
+    const stHistoriqueMarque = {};
+    {
+      const allMfrsCompleted = new Set();
+      for (const code of Object.keys(seasonResults)) {
+        Object.keys(seasonResults[code] ?? {}).forEach(m => allMfrsCompleted.add(m));
+      }
+      for (const mfr of allMfrsCompleted) {
+        const sts = refSeasons
+          .filter(s => rawBySeason[s.code] && !rawBySeason[s.code].isRefInProgress)
+          .map(s => seasonResults[s.code]?.[mfr]?.st_rate)
+          .filter(x => x != null);
+        if (sts.length) stHistoriqueMarque[mfr] = sts.reduce((a, b) => a + b, 0) / sts.length;
+      }
+    }
+
+    // ─── PASS 3: compute ST for IN-PROGRESS seasons with rhythm-adjusted projection ─
+    for (const refSeason of refSeasons) {
+      const raw = rawBySeason[refSeason.code];
+      if (!raw || !raw.isRefInProgress) continue;
+
+      const refSellStart = raw.refSellStart;
+      const refSellEnd   = raw.refSellEnd;
+      const refTotalDays = (refSellEnd - refSellStart) / 86400000;
+      const refElapsedDays = Math.max(1, (todayDate - refSellStart) / 86400000);
+      const refCompletion  = Math.min(1, refElapsedDays / refTotalDays);
+      const weeksRemaining = Math.max(0, (refSellEnd - todayDate) / (7 * 86400000));
+      seasonResults[refSeason.code] = {};
+
+      // Fetch histRemaining, histElapsed (from most recent completed prev season), and recentVelocity
+      let histRemaining      = null;
+      let histElapsed        = null;
+      let comparableSeasonCode = null;
+      let recentVelocity     = null;
+
+      if (refCompletion > 0.05) {
+        const prevSeasonsForRef    = getReferenceSeasonsFromConfig(refSeason.code, seasonsConfig, nbRef);
+        const completedPrevSeasons = prevSeasonsForRef.filter(s => todayDate > new Date(s.sell_to));
+
+        // histRemaining — avg sales in equivalent remaining window across all completed prev seasons
+        if (completedPrevSeasons.length > 0) {
+          histRemaining = {};
+          for (const prevSeas of completedPrevSeasons) {
+            const prevSellStart  = new Date(prevSeas.sell_from);
+            const prevSellEnd    = new Date(prevSeas.sell_to);
+            const prevWindowFrom = new Date(prevSellStart.getTime() + refElapsedDays * 86400000);
+            if (prevWindowFrom >= prevSellEnd) continue;
+
+            const prevTag   = `%${prevSeas.tag_pattern}%`;
+            const rwParams  = [...baseParams, prevWindowFrom.toISOString().slice(0, 10), prevSeas.sell_to, prevTag];
+            const rwFromIdx = rwParams.length - 2;
+            const rwToIdx   = rwParams.length - 1;
+            const rwTagIdx  = rwParams.length;
+
+            const { rows: rwRows } = await pool.query(`
+              SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+                     SUM(sl.qty * COALESCE(p.default_cost, 0))::float8 AS remaining_cost,
+                     SUM(sl.qty)::float8 AS remaining_units
+              FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+              WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${rwFromIdx}::date
+                AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${rwToIdx}::date
+                AND sl.completed_time IS NOT NULL
+                AND p.tags ILIKE $${rwTagIdx} AND p.tags NOT ILIKE '%nos%'
+                ${tenantCond}
+                AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
+                ${shopCondSL}
+              GROUP BY p.manufacturer
+            `, rwParams);
+
+            for (const r of rwRows) {
+              const m = r.manufacturer;
+              if (!histRemaining[m]) histRemaining[m] = { totalCost: 0, totalUnits: 0, count: 0 };
+              histRemaining[m].totalCost  += parseFloat(r.remaining_cost  ?? 0);
+              histRemaining[m].totalUnits += parseFloat(r.remaining_units ?? 0);
+              histRemaining[m].count++;
+            }
+          }
+        }
+
+        // histElapsed — from the most recent completed prev season, at the equivalent elapsed date.
+        // Used to compute st_ytd_comparable for the ratio_rythme step.
+        if (completedPrevSeasons.length > 0) {
+          const cmp = completedPrevSeasons[0];
+          comparableSeasonCode = cmp.code;
+          const prevSellStart = new Date(cmp.sell_from);
+          const prevCutoffDt  = new Date(prevSellStart.getTime() + refElapsedDays * 86400000);
+          const prevSellEndDt = new Date(cmp.sell_to);
+          const prevCutoffStr = (prevCutoffDt <= prevSellEndDt ? prevCutoffDt : prevSellEndDt).toISOString().slice(0, 10);
+          const prevTag       = `%${cmp.tag_pattern}%`;
+
+          // Sold during [sell_from, cutoff]
+          const heSoldParams = [...baseParams, cmp.sell_from, prevCutoffStr, prevTag];
+          const heSoldFromIdx = heSoldParams.length - 2;
+          const heSoldToIdx   = heSoldParams.length - 1;
+          const heSoldTagIdx  = heSoldParams.length;
+          const { rows: heSoldRows } = await pool.query(`
+            SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+                   SUM(sl.qty)::float8 AS sold_elapsed
+            FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+            WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${heSoldFromIdx}::date
+              AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${heSoldToIdx}::date
+              AND sl.completed_time IS NOT NULL
+              AND p.tags ILIKE $${heSoldTagIdx} AND p.tags NOT ILIKE '%nos%'
+              ${tenantCond}
+              AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
+              ${shopCondSL}
+            GROUP BY p.manufacturer
+          `, heSoldParams);
+
+          // Received-since-reception up to cutoff (for denominator of st_ytd_comparable)
+          const heRecvParams = [...baseParams, cmp.reception_from, prevCutoffStr, prevTag];
+          const heRecvFromIdx = heRecvParams.length - 2;
+          const heRecvToIdx   = heRecvParams.length - 1;
+          const heRecvTagIdx  = heRecvParams.length;
+          const { rows: heRecvRows } = await pool.query(`
+            SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+                   SUM(sl.qty)::float8 AS recv_elapsed
+            FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+            WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${heRecvFromIdx}::date
+              AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${heRecvToIdx}::date
+              AND sl.completed_time IS NOT NULL
+              AND p.tags ILIKE $${heRecvTagIdx} AND p.tags NOT ILIKE '%nos%'
+              ${tenantCond}
+              AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
+              ${shopCondSL}
+            GROUP BY p.manufacturer
+          `, heRecvParams);
+
+          histElapsed = {};
+          for (const r of heSoldRows) {
+            const m = r.manufacturer;
+            histElapsed[m] = histElapsed[m] ?? { sold: 0, recvElapsed: 0 };
+            histElapsed[m].sold = parseFloat(r.sold_elapsed);
+          }
+          for (const r of heRecvRows) {
+            const m = r.manufacturer;
+            histElapsed[m] = histElapsed[m] ?? { sold: 0, recvElapsed: 0 };
+            histElapsed[m].recvElapsed = parseFloat(r.recv_elapsed);
+          }
+        }
+
+        // recentVelocity — units sold in the last fenetre_velocite weeks of the CURRENT season
+        const velFromDt  = new Date(todayDate.getTime() - projCfg.fenetre_velocite * 7 * 86400000);
+        const velFromStr = velFromDt.toISOString().slice(0, 10);
+        const velToStr   = todayDate.toISOString().slice(0, 10);
+        const refTag     = `%${refSeason.tag_pattern}%`;
+        const rvParams   = [...baseParams, velFromStr, velToStr, refTag];
+        const rvFromIdx  = rvParams.length - 2;
+        const rvToIdx    = rvParams.length - 1;
+        const rvTagIdx   = rvParams.length;
+        const { rows: rvRows } = await pool.query(`
+          SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
+                 SUM(sl.qty)::float8 AS units
+          FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+          WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${rvFromIdx}::date
+            AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${rvToIdx}::date
+            AND sl.completed_time IS NOT NULL
+            AND p.tags ILIKE $${rvTagIdx} AND p.tags NOT ILIKE '%nos%'
+            ${tenantCond}
+            AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
+            ${shopCondSL}
+          GROUP BY p.manufacturer
+        `, rvParams);
+        recentVelocity = {};
+        for (const r of rvRows) recentVelocity[r.manufacturer] = parseFloat(r.units);
+      }
+
+      // Now per-brand projection
+      for (const mfr of raw.allMfrsRef) {
+        const sl  = raw.irSlMap[mfr]  ?? { qty: 0, cost: 0 };
+        const inv = raw.irInvMap[mfr] ?? { qty: 0, cost: 0 };
+        const impliedUnitsYtd = sl.qty + inv.qty;
+        const impliedCostYtd  = sl.cost + inv.cost;
+        if (impliedCostYtd <= 0) continue;
+
+        const soldRaw     = raw.soldMap[mfr]     ?? 0;
+        const soldCostRaw = raw.soldCostMap[mfr] ?? 0;
+        const stYtd       = impliedUnitsYtd >= 5 ? soldRaw / impliedUnitsYtd : null;
+
+        // Step 1: compute ratio_rythme against the most recent completed prev season at equivalent point
+        let ratioRythme = null, stYtdComparable = null;
+        if (histElapsed?.[mfr] && stYtd != null && comparableSeasonCode) {
+          const he = histElapsed[mfr];
+          // Denominator proxy: sold-since-reception up to cutoff + current stock of prev season
+          // (prev-season stock at cutoff isn't retrievable — using current stock is the best available proxy)
+          const prevInv = rawBySeason[comparableSeasonCode]?.irInvMap?.[mfr]?.qty ?? 0;
+          const impliedRecvComparable = he.recvElapsed + prevInv;
+          if (impliedRecvComparable >= 5) {
+            stYtdComparable = he.sold / impliedRecvComparable;
+            if (stYtdComparable > 0) ratioRythme = stYtd / stYtdComparable;
+          }
+        }
+
+        // Step 2: choose projection method
+        const rem = histRemaining?.[mfr];
+        const hasHistRem  = rem && rem.count > 0;
+        const avgRemUnits = hasHistRem ? rem.totalUnits / rem.count : 0;
+        const avgRemCost  = hasHistRem ? rem.totalCost  / rem.count : 0;
+
+        let methode = 'historique';
+        let velRecent = null, velHist = null;
+        let remainingUnits = 0, remainingCost = 0;
+
+        if (ratioRythme != null && Math.abs(ratioRythme - 1) > projCfg.seuil_bascule) {
+          methode = 'velocite_ajustee';
+          const rvUnits = recentVelocity?.[mfr] ?? 0;
+          velRecent = rvUnits / projCfg.fenetre_velocite;
+          velHist   = (hasHistRem && weeksRemaining > 0) ? (avgRemUnits / weeksRemaining) : 0;
+          const velProj = velRecent * projCfg.poids_recent + velHist * (1 - projCfg.poids_recent);
+          remainingUnits = velProj * weeksRemaining;
+          // Cost side: prorate remaining cost by remaining units × historical cost-per-unit
+          const histCostPerUnit = (avgRemUnits > 0) ? (avgRemCost / avgRemUnits) : 0;
+          remainingCost  = remainingUnits * histCostPerUnit;
+        } else if (hasHistRem) {
+          methode = 'historique';
+          remainingUnits = avgRemUnits;
+          remainingCost  = avgRemCost;
+        } else {
+          // Fallback: linear extrapolation when no historical remaining data exists.
+          // Scales BOTH sold and received by 1/completion so the projected ST = stYtd
+          // (the "no information" default that keeps ST identical to the OLD behavior).
+          methode = 'lineaire';
+        }
+
+        // Step 3: compute projected sold / received / ST
+        let soldProj, receivedProj, impliedCostProj, soldCostProj;
+        if (methode === 'lineaire') {
+          soldProj        = soldRaw          / refCompletion;
+          receivedProj    = impliedUnitsYtd  / refCompletion;
+          impliedCostProj = impliedCostYtd   / refCompletion;
+          soldCostProj    = soldCostRaw      / refCompletion;
+          remainingUnits  = soldProj - soldRaw;                 // for the response payload only
+          remainingCost   = soldCostProj - soldCostRaw;
+        } else {
+          soldProj        = soldRaw         + remainingUnits;
+          receivedProj    = impliedUnitsYtd + remainingUnits;
+          impliedCostProj = impliedCostYtd  + remainingCost;
+          soldCostProj    = soldCostRaw     + remainingCost;
+        }
+        const stProjeteBrut = receivedProj >= 5 ? soldProj / receivedProj : null;
+
+        // Step 4: apply bounds using stHistoriqueMarque[mfr].
+        // Guard: if historical ST is very low (< 10%), the anchor isn't meaningful
+        // (e.g., a brand that historically didn't sell) — skip bounds, cap only at 100%.
+        let stProjeteFinal = stProjeteBrut;
+        let borneAppliquee = null;
+        const stHist = stHistoriqueMarque[mfr];
+        const stHistUsable = stHist != null && stHist >= 0.10;
+        if (stProjeteBrut != null && stHistUsable) {
+          const plancher = stHist * projCfg.borne_plancher;
+          const plafond  = Math.min(1.0, stHist * projCfg.borne_plafond);
+          if (stProjeteBrut < plancher) { stProjeteFinal = plancher; borneAppliquee = 'plancher'; }
+          else if (stProjeteBrut > plafond) { stProjeteFinal = plafond; borneAppliquee = 'plafond'; }
+        } else if (stProjeteBrut != null && stProjeteBrut > 1.0) {
+          stProjeteFinal = 1.0;
+          borneAppliquee = 'plafond';
+        }
+
+        const impliedUnitsProj = receivedProj;
+        const blendedCostProj  = (impliedCostProj + soldCostProj) / 2;
+
+        seasonResults[refSeason.code][mfr] = {
+          units_received:    Math.round(impliedUnitsProj),
+          units_sold:        Math.round(soldProj),
+          units_sold_ytd:    Math.round(soldRaw),
+          received_cost:     Math.round(blendedCostProj * 100) / 100,
+          received_cost_raw: Math.round(impliedCostProj * 100) / 100,
+          sold_cost:         Math.round(soldCostProj * 100) / 100,
+          st_rate:           stProjeteFinal != null ? Math.round(stProjeteFinal * 1000) / 1000 : null,
+          st_rate_ytd:       stYtd != null ? Math.round(stYtd * 1000) / 1000 : null,
+          st_insufficient:   impliedUnitsProj < 5,
+          partial:           true,
+          projection_detail: {
+            methode,
+            ratio_rythme:               ratioRythme != null ? Math.round(ratioRythme * 100) / 100 : null,
+            st_ytd_actuel:              stYtd != null ? Math.round(stYtd * 1000) / 10 : null,
+            st_ytd_comparable:          stYtdComparable != null ? Math.round(stYtdComparable * 1000) / 10 : null,
+            comparable_season:          comparableSeasonCode,
+            velocite_recente:           velRecent != null ? Math.round(velRecent * 100) / 100 : null,
+            velocite_historique:        velHist   != null ? Math.round(velHist   * 100) / 100 : null,
+            semaines_restantes:         Math.round(weeksRemaining * 10) / 10,
+            ventes_restantes_projetees: Math.round(remainingUnits),
+            st_projete_brut:            stProjeteBrut  != null ? Math.round(stProjeteBrut  * 1000) / 10 : null,
+            st_projete_final:           stProjeteFinal != null ? Math.round(stProjeteFinal * 1000) / 10 : null,
+            borne_appliquee:            borneAppliquee,
+            st_historique_marque:       stHist != null ? Math.round(stHist * 1000) / 10 : null,
+          },
         };
       }
     }
@@ -3716,6 +3975,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         recent_st_projected:   recentStProjected !== null ? Math.round(recentStProjected * 1000) / 1000 : null,
         recent_season_code:    recentSeasonCode,
         recent_received_cost:  seasons[refSeasons[0]?.code]?.received_cost_raw ?? null,
+        projection_detail:     mostRecentData?.projection_detail ?? null,
         trend,
         low_st_alert:          lowStAlert,
         multiplier:            hyp.multiplier,
