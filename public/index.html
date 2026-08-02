@@ -1892,7 +1892,7 @@ const BudgetTab = (() => {
     const ok  = avgSt >= threshold;
     const mid = avgSt >= threshold * 0.75;
     const bg  = ok ? 'bg-green-50 text-green-700' : mid ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700';
-    let html  = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${bg}" title="${escHtml(t('st_avg_tip'))}">${pct}%</span>`;
+    let html  = `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ${bg} col-tip" data-tip="${escHtml(t('st_avg_tip'))}">${pct}%</span>`;
     if (recentProj !== null && recentProj !== undefined && seasonCode) {
       const projPct = Math.round(recentProj * 100);
       const ytdPct  = recentYtd !== null && recentYtd !== undefined ? Math.round(recentYtd * 100) : null;
@@ -1930,7 +1930,7 @@ const BudgetTab = (() => {
       const isVelo   = projDetail?.methode === 'velocite_ajustee';
       const isBorne  = !!projDetail?.borne_appliquee;
       const iconMark = isBorne ? ' ⚠' : (isVelo ? ' ●' : '');
-      html += `<span class="block text-[10px] text-indigo-500 mt-0.5 cursor-help" title="${escHtml(tip)}">${season}: ${projPct}% proj${iconMark}${ytdPart}</span>`;
+      html += `<span class="block text-[10px] text-indigo-500 mt-0.5 col-tip" data-tip="${escHtml(tip)}">${season}: ${projPct}% proj${iconMark}${ytdPart}</span>`;
     }
     return `<td class="px-3 py-2.5 text-right">${html}</td>`;
   }
