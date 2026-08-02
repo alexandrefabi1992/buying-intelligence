@@ -1832,6 +1832,10 @@ const SHOPS = [
 
 function buildFilterBar() {
   const sel = document.getElementById('budgetShopSel');
+  // Idempotent: keep only the first HTML-defined option ("Toutes les boutiques")
+  // and rebuild the shop list. Guards against duplicate options when initApp
+  // runs twice (initial bootstrap with token + subsequent login in same session).
+  while (sel.options.length > 1) sel.remove(1);
   SHOPS.forEach(({ id, name }) => {
     const opt = document.createElement('option');
     opt.value       = id;
