@@ -761,150 +761,6 @@
       </div>
     </div>
 
-    <!-- ── Import modal — supplier order ingestion (B10) ─────────────── -->
-    <div id="importModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-      <div class="bg-white rounded-2xl shadow-2xl p-6 w-[32rem] max-w-[95vw]">
-        <h3 class="text-sm font-bold text-gray-800 mb-1">
-          <span data-i18n="import_modal_title">Importer une commande fournisseur</span>
-        </h3>
-        <p class="text-xs text-gray-500 mb-4" data-i18n="import_modal_subtitle">
-          Sélectionne le PDF de confirmation de commande. Le module détecte les commandes, crée les articles et matrices manquants, puis les bons de commande dans Lightspeed.
-        </p>
-
-        <div class="space-y-3">
-          <!-- Contextual info (readonly) -->
-          <div class="grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_brand">Marque</label>
-              <div id="importModalBrand" class="border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 font-semibold text-gray-800">—</div>
-            </div>
-            <div>
-              <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_season">Saison</label>
-              <div id="importModalSeason" class="border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 font-semibold text-gray-800">—</div>
-            </div>
-          </div>
-
-          <!-- Shop: locked when the budget is on a specific shop, else selector -->
-          <div>
-            <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_shop">Boutique destinataire</label>
-            <div id="importModalShopLocked" class="border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-semibold text-gray-800 hidden">—</div>
-            <select id="importModalShop" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 hidden">
-              <option value="" data-i18n="import_shop_prompt">— Choisir une boutique —</option>
-            </select>
-            <p id="importModalShopHint" class="text-[10px] text-gray-400 mt-1"></p>
-          </div>
-
-          <!-- PDF picker -->
-          <div>
-            <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_file">Fichier PDF</label>
-            <input id="importModalFile" type="file" accept="application/pdf"
-                   class="w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 file:font-semibold file:cursor-pointer hover:file:bg-gray-100">
-          </div>
-
-          <!-- Feedback / result -->
-          <div id="importModalStatus" class="hidden text-xs rounded-lg px-3 py-2"></div>
-          <div id="importModalResult" class="hidden text-xs bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-3 space-y-1"></div>
-        </div>
-
-        <div class="flex gap-2 mt-5">
-          <button id="importModalSubmit"
-                  class="flex-1 bg-indigo-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  data-i18n="import_btn_upload">Analyser le PDF</button>
-          <button id="importModalClose"
-                  class="flex-1 border border-gray-300 text-gray-600 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors"
-                  data-i18n="btn_close">Fermer</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Preview panel — full-screen overlay (B11) ─────────────────── -->
-    <div id="previewPanel" class="hidden fixed inset-0 bg-gray-50 z-50 overflow-auto">
-      <!-- Sticky header -->
-      <div class="sticky top-0 bg-white border-b border-gray-200 shadow-sm z-10 px-6 py-3 flex items-center gap-4">
-        <button id="previewCloseBtn" class="text-gray-400 hover:text-gray-800 text-xl leading-none" title="Fermer">✕</button>
-        <div class="flex-1 min-w-0">
-          <h2 class="text-sm font-bold text-gray-800 truncate" id="previewHeaderTitle" data-i18n="preview_title">Prévisualisation d'import</h2>
-          <p class="text-[11px] text-gray-500 truncate" id="previewHeaderMeta">—</p>
-        </div>
-        <div id="previewStatusPill" class="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-600 font-semibold hidden">—</div>
-        <button id="previewRefreshBtn"
-          class="text-gray-500 hover:text-indigo-600 text-xs border border-gray-200 rounded-lg px-3 py-1.5 hover:border-indigo-300 hover:bg-indigo-50"
-          data-i18n="preview_refresh_btn">Recharger</button>
-        <button id="previewAbandonBtn"
-          class="text-red-600 hover:text-white hover:bg-red-600 text-xs border border-red-200 rounded-lg px-3 py-1.5 hidden"
-          data-i18n="preview_abandon_btn">Abandonner</button>
-        <button id="previewPushBtn"
-          class="bg-emerald-600 text-white rounded-lg px-5 py-2 text-xs font-semibold hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-          data-i18n="preview_push_btn">Pousser vers Lightspeed</button>
-      </div>
-
-      <!-- Body -->
-      <div class="max-w-7xl mx-auto p-6 space-y-6">
-        <!-- Loading / error message -->
-        <div id="previewMessage" class="hidden text-sm rounded-lg px-4 py-3"></div>
-
-        <!-- Push progress (shown when pushing) -->
-        <div id="previewProgress" class="hidden bg-white border border-indigo-200 rounded-xl px-5 py-4 shadow-sm">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-semibold text-indigo-800">
-              <span data-i18n="preview_progress_lbl">Push en cours</span> — <span id="previewProgressCounts">0/0</span>
-            </span>
-            <span id="previewProgressStatus" class="text-[11px] text-gray-500">—</span>
-          </div>
-          <div class="w-full h-2 bg-indigo-100 rounded-full overflow-hidden">
-            <div id="previewProgressBar" class="h-full bg-indigo-600 transition-all" style="width:0%"></div>
-          </div>
-          <div id="previewProgressErrors" class="mt-3 text-[11px] text-red-700 hidden"></div>
-        </div>
-
-        <!-- Summary tiles -->
-        <div id="previewSummaryTiles" class="grid grid-cols-2 md:grid-cols-5 gap-3"></div>
-
-        <!-- Warnings -->
-        <div id="previewWarnings" class="hidden bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-          <div class="text-xs font-semibold text-amber-800 mb-1" data-i18n="preview_warnings_lbl">Avertissements</div>
-          <ul id="previewWarningsList" class="text-[11px] text-amber-900 space-y-0.5 pl-4 list-disc"></ul>
-        </div>
-
-        <!-- Batches (POs) -->
-        <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
-          <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h3 class="text-xs font-semibold text-gray-700 uppercase" data-i18n="preview_batches_title">Commandes détectées</h3>
-            <span id="previewBatchesCount" class="text-xs text-gray-500">—</span>
-          </div>
-          <div id="previewBatchesList" class="divide-y divide-gray-100"></div>
-        </div>
-
-        <!-- Matrices -->
-        <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
-          <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
-            <h3 class="text-xs font-semibold text-gray-700 uppercase" data-i18n="preview_matrices_title">Matrices &amp; variantes</h3>
-            <div class="flex items-center gap-2 text-[11px]">
-              <label class="text-gray-500"><input type="checkbox" id="previewFilterCreate" class="align-middle" checked> <span data-i18n="preview_flt_create">à créer</span></label>
-              <label class="text-gray-500"><input type="checkbox" id="previewFilterSuffix" class="align-middle" checked> <span data-i18n="preview_flt_suffix">avec suffixe</span></label>
-              <label class="text-gray-500"><input type="checkbox" id="previewFilterComplete" class="align-middle" checked> <span data-i18n="preview_flt_complete">à compléter</span></label>
-            </div>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full text-xs">
-              <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
-                <tr>
-                  <th class="px-3 py-2 text-left">Style</th>
-                  <th class="px-3 py-2 text-left">Couleur</th>
-                  <th class="px-3 py-2 text-left">Description</th>
-                  <th class="px-3 py-2 text-left" data-i18n="preview_col_action">Action</th>
-                  <th class="px-3 py-2 text-left" data-i18n="preview_col_desc_planned">Nom planifié</th>
-                  <th class="px-3 py-2 text-right">Coût</th>
-                  <th class="px-3 py-2 text-right">Détail</th>
-                  <th class="px-3 py-2 text-left" data-i18n="preview_col_variants">Variantes</th>
-                </tr>
-              </thead>
-              <tbody id="previewMatricesBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
 
   </section>
 
@@ -1092,6 +948,152 @@
   </section>
 
 </main>
+
+    <!-- ── Import modal — supplier order ingestion (B10) ─────────────── -->
+    <div id="importModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+      <div class="bg-white rounded-2xl shadow-2xl p-6 w-[32rem] max-w-[95vw]">
+        <h3 class="text-sm font-bold text-gray-800 mb-1">
+          <span data-i18n="import_modal_title">Importer une commande fournisseur</span>
+        </h3>
+        <p class="text-xs text-gray-500 mb-4" data-i18n="import_modal_subtitle">
+          Sélectionne le PDF de confirmation de commande. Le module détecte les commandes, crée les articles et matrices manquants, puis les bons de commande dans Lightspeed.
+        </p>
+
+        <div class="space-y-3">
+          <!-- Contextual info (readonly) -->
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_brand">Marque</label>
+              <div id="importModalBrand" class="border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 font-semibold text-gray-800">—</div>
+            </div>
+            <div>
+              <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_season">Saison</label>
+              <div id="importModalSeason" class="border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 font-semibold text-gray-800">—</div>
+            </div>
+          </div>
+
+          <!-- Shop: locked when the budget is on a specific shop, else selector -->
+          <div>
+            <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_shop">Boutique destinataire</label>
+            <div id="importModalShopLocked" class="border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-semibold text-gray-800 hidden">—</div>
+            <select id="importModalShop" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 hidden">
+              <option value="" data-i18n="import_shop_prompt">— Choisir une boutique —</option>
+            </select>
+            <p id="importModalShopHint" class="text-[10px] text-gray-400 mt-1"></p>
+          </div>
+
+          <!-- PDF picker -->
+          <div>
+            <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_file">Fichier PDF</label>
+            <input id="importModalFile" type="file" accept="application/pdf"
+                   class="w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 file:font-semibold file:cursor-pointer hover:file:bg-gray-100">
+          </div>
+
+          <!-- Feedback / result -->
+          <div id="importModalStatus" class="hidden text-xs rounded-lg px-3 py-2"></div>
+          <div id="importModalResult" class="hidden text-xs bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-3 space-y-1"></div>
+        </div>
+
+        <div class="flex gap-2 mt-5">
+          <button id="importModalSubmit"
+                  class="flex-1 bg-indigo-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  data-i18n="import_btn_upload">Analyser le PDF</button>
+          <button id="importModalClose"
+                  class="flex-1 border border-gray-300 text-gray-600 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors"
+                  data-i18n="btn_close">Fermer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Preview panel — full-screen overlay (B11) ─────────────────── -->
+    <div id="previewPanel" class="hidden fixed inset-0 bg-gray-50 z-50 overflow-auto">
+      <!-- Sticky header -->
+      <div class="sticky top-0 bg-white border-b border-gray-200 shadow-sm z-10 px-6 py-3 flex items-center gap-4">
+        <button id="previewCloseBtn" class="text-gray-400 hover:text-gray-800 text-xl leading-none" title="Fermer">✕</button>
+        <div class="flex-1 min-w-0">
+          <h2 class="text-sm font-bold text-gray-800 truncate" id="previewHeaderTitle" data-i18n="preview_title">Prévisualisation d'import</h2>
+          <p class="text-[11px] text-gray-500 truncate" id="previewHeaderMeta">—</p>
+        </div>
+        <div id="previewStatusPill" class="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-600 font-semibold hidden">—</div>
+        <button id="previewRefreshBtn"
+          class="text-gray-500 hover:text-indigo-600 text-xs border border-gray-200 rounded-lg px-3 py-1.5 hover:border-indigo-300 hover:bg-indigo-50"
+          data-i18n="preview_refresh_btn">Recharger</button>
+        <button id="previewAbandonBtn"
+          class="text-red-600 hover:text-white hover:bg-red-600 text-xs border border-red-200 rounded-lg px-3 py-1.5 hidden"
+          data-i18n="preview_abandon_btn">Abandonner</button>
+        <button id="previewPushBtn"
+          class="bg-emerald-600 text-white rounded-lg px-5 py-2 text-xs font-semibold hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          data-i18n="preview_push_btn">Pousser vers Lightspeed</button>
+      </div>
+
+      <!-- Body -->
+      <div class="max-w-7xl mx-auto p-6 space-y-6">
+        <!-- Loading / error message -->
+        <div id="previewMessage" class="hidden text-sm rounded-lg px-4 py-3"></div>
+
+        <!-- Push progress (shown when pushing) -->
+        <div id="previewProgress" class="hidden bg-white border border-indigo-200 rounded-xl px-5 py-4 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-indigo-800">
+              <span data-i18n="preview_progress_lbl">Push en cours</span> — <span id="previewProgressCounts">0/0</span>
+            </span>
+            <span id="previewProgressStatus" class="text-[11px] text-gray-500">—</span>
+          </div>
+          <div class="w-full h-2 bg-indigo-100 rounded-full overflow-hidden">
+            <div id="previewProgressBar" class="h-full bg-indigo-600 transition-all" style="width:0%"></div>
+          </div>
+          <div id="previewProgressErrors" class="mt-3 text-[11px] text-red-700 hidden"></div>
+        </div>
+
+        <!-- Summary tiles -->
+        <div id="previewSummaryTiles" class="grid grid-cols-2 md:grid-cols-5 gap-3"></div>
+
+        <!-- Warnings -->
+        <div id="previewWarnings" class="hidden bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <div class="text-xs font-semibold text-amber-800 mb-1" data-i18n="preview_warnings_lbl">Avertissements</div>
+          <ul id="previewWarningsList" class="text-[11px] text-amber-900 space-y-0.5 pl-4 list-disc"></ul>
+        </div>
+
+        <!-- Batches (POs) -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
+          <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="text-xs font-semibold text-gray-700 uppercase" data-i18n="preview_batches_title">Commandes détectées</h3>
+            <span id="previewBatchesCount" class="text-xs text-gray-500">—</span>
+          </div>
+          <div id="previewBatchesList" class="divide-y divide-gray-100"></div>
+        </div>
+
+        <!-- Matrices -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
+          <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+            <h3 class="text-xs font-semibold text-gray-700 uppercase" data-i18n="preview_matrices_title">Matrices &amp; variantes</h3>
+            <div class="flex items-center gap-2 text-[11px]">
+              <label class="text-gray-500"><input type="checkbox" id="previewFilterCreate" class="align-middle" checked> <span data-i18n="preview_flt_create">à créer</span></label>
+              <label class="text-gray-500"><input type="checkbox" id="previewFilterSuffix" class="align-middle" checked> <span data-i18n="preview_flt_suffix">avec suffixe</span></label>
+              <label class="text-gray-500"><input type="checkbox" id="previewFilterComplete" class="align-middle" checked> <span data-i18n="preview_flt_complete">à compléter</span></label>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-xs">
+              <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+                <tr>
+                  <th class="px-3 py-2 text-left">Style</th>
+                  <th class="px-3 py-2 text-left">Couleur</th>
+                  <th class="px-3 py-2 text-left">Description</th>
+                  <th class="px-3 py-2 text-left" data-i18n="preview_col_action">Action</th>
+                  <th class="px-3 py-2 text-left" data-i18n="preview_col_desc_planned">Nom planifié</th>
+                  <th class="px-3 py-2 text-right">Coût</th>
+                  <th class="px-3 py-2 text-right">Détail</th>
+                  <th class="px-3 py-2 text-left" data-i18n="preview_col_variants">Variantes</th>
+                </tr>
+              </thead>
+              <tbody id="previewMatricesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
