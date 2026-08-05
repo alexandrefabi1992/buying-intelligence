@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "meta": {
+    "supplier_key": "oui-eurostyle",
+    "target_manufacturer": "Oui",
+    "default_vendor_id": "70",
+    "default_attribute_set_id": "5"
+  },
+  "detection": {
+    "match_all": ["LYS1R", "No\\.?\\s*Commande", "Total\\s*Commande"],
+    "match_any": ["EUROSTYLE", "Steilmann", "Oui"]
+  },
+  "extraction": {
+    "engine": "coordinate",
+    "tolerances": { "y_pt": 3, "x_pt": 8 },
+    "parser": null,
+
+    "file_fields": {
+      "customer_name": {
+        "source": "first_page_text",
+        "regex":  "Facturer\\s+A[^\\d]*([A-Z][A-Z\\s\\-]+)",
+        "group":  1,
+        "transform": "trim"
+      }
+    },
+
+    "orders": {
+      "order_split": {
+        "marker":            "No\\.?\\s*Commande",
+        "split_field":       "po_number",
+        "boundary_strategy": "page_break_on_change"
+      },
+
+      "fields": {
+        "po_number": {
+          "regex":  "No\\.?\\s*Commande\\s*:?\\s*(\\d+)",
+          "flags":  "i",
+          "group":  1
+        },
+        "order_date": {
+          "regex":  "Date\\s*de\\s*Commande\\s*:?\\s*(\\d{2}\\s*/\\s*\\d{2}/\\s*\\d{4})",
+          "flags":  "i",
+          "group":  1,
+          "transform": "date_mdy_to_iso"
+        },
+        "customer_reference": {
+          "regex":  "^LYS1R\\s+\\S+\\s+%?\\s*(.+?)\\s+\\d{2}/\\d{2}/\\d{4}\\s+\\d{2}/\\d{2}/\\d{4}\\b",
+          "group":  1,
+          "transform": "trim"
+        },
+        "delivery_date": {
+          "regex":  "^LYS1R\\s+\\S+\\s+%?\\s*.+?\\s+(\\d{2}/\\d{2}/\\d{4})\\s+\\d{2}/\\d{2}/\\d{4}\\b",
+          "group":  1,
+          "transform": "date_mdy_to_iso"
+        },
+        "cancel_date": {
+          "regex":  "^LYS1R\\s+\\S+\\s+%?\\s*.+?\\s+\\d{2}/\\d{2}/\\d{4}\\s+(\\d{2}/\\d{2}/\\d{4})\\b",
+          "group":  1,
+          "transform": "date_mdy_to_iso"
+        }
+      },
+
+      "is_consignment_from": {
+        "field": "customer_reference",
+        "regex": "consigne|consignment",
+        "flags": "i"
+      },
+
+      "declared_totals_extraction": {
+        "regex": "Total\\s+Commande\\D*(\\d{1,4})\\s+([\\d,]+\\.\\d{2})",
+        "flags": "i",
+        "units_group": 1,
+        "amount_group": 2
+      }
+    },
+
+    "products": {
+      "layout_type": "size_grid",
+
+      "row_header": {
+        "regex": "^(\\d{4,6})\\s*/\\s*(\\S+)\\s*/\\s*(\\d+)\\s+(.+?)$",
+        "fields": {
+          "style_ref":              { "group": 1 },
+          "collection":             { "group": 2 },
+          "color_code":             { "group": 3 },
+          "color_and_description":  { "group": 4, "split": "case_heuristic_with_price_split" }
+        },
+        "trailing_metrics": {
+          "regex": "\\$([\\d,]+\\.\\d{2})\\s+(\\d+)\\s+([\\d,]+\\.\\d{2})\\s+([\\d,]+\\.\\d{2})",
+          "fields": {
+            "retail_price":         { "group": 1, "transform": "decimal" },
+            "total_qty_declared":   { "group": 2, "transform": "int" },
+            "unit_cost":            { "group": 3, "transform": "decimal" },
+            "line_total_declared":  { "group": 4, "transform": "decimal" }
+          }
+        }
+      },
+
+      "size_grid": {
+        "header_prefix": "CA",
+        "header_token_pattern": "\\d{2}|OS",
+        "qty_token_pattern": "\\d+",
+        "qty_max_value": 200,
+        "qty_row": {
+          "position": "next_line_below",
+          "min_y_gap_pt": 3,
+          "max_y_gap_pt": 25
+        }
+      }
+    }
+  }
+}

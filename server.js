@@ -246,7 +246,7 @@ app.use('/api/token',       requireAdmin);
 // Global JWT middleware above already runs requireAuth for /api/*; the
 // mounted routes call requireAuth again defensively (idempotent).
 const { mountImportRoutes } = require('./lib/import-routes');
-mountImportRoutes(app, pool, requireAuth);
+mountImportRoutes(app, pool, requireAuth, requireAdmin);
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/login — email + password → JWT (no auth required)
@@ -1157,6 +1157,31 @@ async function runMigrations() {
   // initial schema minimal; safe on live DBs (IF NOT EXISTS).
   await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS preview_json JSONB`);
   await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS preview_computed_at TIMESTAMPTZ`);
+  // parse_recipes ownership: nullable tenant_id.
+  //   tenant_id = null  → GLOBAL recipe (visible to every tenant)
+  //   tenant_id = 'X'   → PRIVATE to tenant X, invisible to others
+  // New user-created recipes are private by default; promotion to global
+  // is a deliberate admin action via POST /api/import/recipes/:id/promote.
+  await pool.query(`ALTER TABLE parse_recipes ADD COLUMN IF NOT EXISTS tenant_id TEXT REFERENCES tenants(id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_parse_recipes_tenant ON parse_recipes(tenant_id, active)`);
+  // Uniqueness must scope on tenant now — two tenants may each have their
+  // private 'oui-eurostyle' v1 alongside a global one. Drop the old
+  // (supplier_key, version) unique constraint if present and replace with a
+  // tenant-aware one. Uses NULLS NOT DISTINCT so global (tenant_id IS NULL)
+  // is unique across supplier_key/version.
+  const { rows: uniqRows } = await pool.query(`
+    SELECT conname FROM pg_constraint
+    WHERE conrelid = 'parse_recipes'::regclass AND contype = 'u'
+      AND pg_get_constraintdef(oid) = 'UNIQUE (supplier_key, version)'
+  `);
+  for (const r of uniqRows) {
+    await pool.query(`ALTER TABLE parse_recipes DROP CONSTRAINT "${r.conname}"`);
+    console.log(`[migration] Dropped parse_recipes.${r.conname} (superseded by tenant-scoped unique)`);
+  }
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS uniq_parse_recipes_tenant_supplier_version
+    ON parse_recipes (COALESCE(tenant_id, ''), supplier_key, version)
+  `);
   // 'abandoned' is a valid status on both import_files and import_batches:
   // set by POST /files/:file_id/abandon when the user gives up on a
   // partially-pushed file. No CHECK constraint on status, so no ALTER needed.
