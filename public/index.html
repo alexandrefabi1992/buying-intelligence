@@ -5116,7 +5116,7 @@ const RecipeWizard = (() => {
           <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step5_layout')}</span>
           <select id="r_layout_type" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-3 py-2">
             <option value="size_grid" ${p.layout_type === 'size_grid' ? 'selected' : ''}>${t('recipe_step5_layout_grid')}</option>
-            <option value="flat_table" ${p.layout_type === 'flat_table' ? 'selected' : ''} disabled>${t('recipe_step5_layout_flat')} (bientôt)</option>
+            <option value="flat_table" ${p.layout_type === 'flat_table' ? 'selected' : ''}>${t('recipe_step5_layout_flat')}</option>
           </select>
         </label>
 
@@ -5134,37 +5134,95 @@ const RecipeWizard = (() => {
             value="${escHtml(p.row_header.trailing_metrics?.regex || '')}">
         </label>
 
-        <div class="border-t border-gray-200 pt-3" id="r_sg_block">
-          <h4 class="text-xs font-semibold text-gray-700 mb-2">Grille de tailles</h4>
-          <div class="grid grid-cols-3 gap-2">
-            <label class="block text-[11px]">
-              <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step5_size_header')}</span>
-              <input id="r_sg_prefix" type="text" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-2 py-1"
-                value="${escHtml(p.size_grid?.header_prefix || 'CA')}">
-            </label>
-            <label class="block text-[11px]">
-              <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step5_size_pattern')}</span>
-              <input id="r_sg_token" type="text" class="mt-1 w-full font-mono text-xs border border-gray-300 rounded-lg px-2 py-1"
-                value="${escHtml(p.size_grid?.header_token_pattern || '\\d{2}|OS')}">
-            </label>
-            <label class="block text-[11px]">
-              <span class="text-[10px] uppercase font-semibold text-gray-500">Qty max</span>
-              <input id="r_sg_max" type="number" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-2 py-1"
-                value="${p.size_grid?.qty_max_value ?? 200}">
-            </label>
-          </div>
-        </div>
+        <div id="r_layout_specific"></div>
+
+        <details class="border-t border-gray-200 pt-3">
+          <summary class="text-xs font-semibold text-gray-600 cursor-pointer">Configuration avancée (JSON)</summary>
+          <p class="text-[10px] text-gray-500 mt-1 mb-2">Pour les formats multi-lignes (Bugatchi-style), édite directement le bloc "subsequent_lines". Les fichiers simples n'en ont pas besoin.</p>
+          <textarea id="r_advanced_json" class="w-full font-mono text-[11px] border border-gray-300 rounded-lg px-3 py-2 h-40"
+            placeholder='[{"offset":2,"regex":"Style\\s*#:\\s*(\\S+)","fields":{"style_ref":{"group":1}}}]'>${escHtml(JSON.stringify(p.subsequent_lines || [], null, 2))}</textarea>
+        </details>
       </div>`;
-    el('r_layout_type').addEventListener('change', ev => { p.layout_type = ev.target.value; state.testedOk = false; renderStep(); updateFooter(); });
+    el('r_layout_type').addEventListener('change', ev => {
+      p.layout_type = ev.target.value;
+      state.testedOk = false;
+      // Ensure the right sub-config exists
+      if (p.layout_type === 'flat_table' && !p.variants) {
+        p.variants = { line_offset: 0, pattern: '', size_group: 1, qty_group: 2 };
+      }
+      if (p.layout_type === 'size_grid' && !p.size_grid) {
+        p.size_grid = { header_prefix: 'CA', header_token_pattern: '\\d{2}|OS', qty_token_pattern: '\\d+', qty_max_value: 200, qty_row: { position: 'next_line_below', min_y_gap_pt: 3, max_y_gap_pt: 25 } };
+      }
+      renderStep(); updateFooter();
+    });
     el('r_row_regex').addEventListener('input', ev => { p.row_header.regex = ev.target.value; state.testedOk = false; updateFooter(); });
     el('r_trailing_regex').addEventListener('input', ev => {
       p.row_header.trailing_metrics = p.row_header.trailing_metrics || {};
       p.row_header.trailing_metrics.regex = ev.target.value;
       state.testedOk = false; updateFooter();
     });
-    el('r_sg_prefix').addEventListener('input', ev => { p.size_grid.header_prefix = ev.target.value; state.testedOk = false; updateFooter(); });
-    el('r_sg_token').addEventListener('input', ev => { p.size_grid.header_token_pattern = ev.target.value; state.testedOk = false; updateFooter(); });
-    el('r_sg_max').addEventListener('input', ev => { p.size_grid.qty_max_value = Number(ev.target.value) || 200; state.testedOk = false; updateFooter(); });
+    el('r_advanced_json')?.addEventListener('input', ev => {
+      try {
+        const val = JSON.parse(ev.target.value || '[]');
+        if (Array.isArray(val)) { p.subsequent_lines = val; state.testedOk = false; updateFooter(); }
+      } catch { /* ignore parse errors while typing */ }
+    });
+    renderStep5LayoutSpecific(p);
+  }
+
+  function renderStep5LayoutSpecific(p) {
+    const el2 = el('r_layout_specific');
+    if (!el2) return;
+    if (p.layout_type === 'size_grid') {
+      p.size_grid = p.size_grid || {};
+      el2.innerHTML = `
+        <div class="pt-3 border-t border-gray-200">
+          <h4 class="text-xs font-semibold text-gray-700 mb-2">Grille de tailles</h4>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="block text-[11px]"><span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step5_size_header')}</span>
+              <input id="r_sg_prefix" type="text" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-2 py-1" value="${escHtml(p.size_grid.header_prefix || 'CA')}"></label>
+            <label class="block text-[11px]"><span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step5_size_pattern')}</span>
+              <input id="r_sg_token" type="text" class="mt-1 w-full font-mono text-xs border border-gray-300 rounded-lg px-2 py-1" value="${escHtml(p.size_grid.header_token_pattern || '\\d{2}|OS')}"></label>
+            <label class="block text-[11px]"><span class="text-[10px] uppercase font-semibold text-gray-500">Qty max</span>
+              <input id="r_sg_max" type="number" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-2 py-1" value="${p.size_grid.qty_max_value ?? 200}"></label>
+          </div>
+        </div>`;
+      el('r_sg_prefix').addEventListener('input', ev => { p.size_grid.header_prefix = ev.target.value; state.testedOk = false; updateFooter(); });
+      el('r_sg_token').addEventListener('input', ev => { p.size_grid.header_token_pattern = ev.target.value; state.testedOk = false; updateFooter(); });
+      el('r_sg_max').addEventListener('input', ev => { p.size_grid.qty_max_value = Number(ev.target.value) || 200; state.testedOk = false; updateFooter(); });
+    } else if (p.layout_type === 'flat_table') {
+      p.variants = p.variants || { line_offset: 0, pattern: '', size_group: 1, qty_group: 2 };
+      el2.innerHTML = `
+        <div class="pt-3 border-t border-gray-200">
+          <h4 class="text-xs font-semibold text-gray-700 mb-2">Extraction des variantes</h4>
+          <div class="grid grid-cols-4 gap-2 mb-2">
+            <label class="block text-[11px]"><span class="text-[10px] uppercase font-semibold text-gray-500">Ligne (offset)</span>
+              <input id="r_v_line_offset" type="number" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-2 py-1" value="${p.variants.line_offset ?? 0}" title="0 = ligne trigger, 4 = 4e ligne après trigger">
+            </label>
+            <label class="block text-[11px] col-span-3"><span class="text-[10px] uppercase font-semibold text-gray-500">Extraction ligne (optionnel)</span>
+              <input id="r_v_line_regex" type="text" class="mt-1 w-full font-mono text-xs border border-gray-300 rounded-lg px-2 py-1" value="${escHtml(p.variants.extract_from_line_regex || '')}" placeholder="ex. Sizes:\\s*(.+)$">
+            </label>
+          </div>
+          <label class="block text-[11px]"><span class="text-[10px] uppercase font-semibold text-gray-500">Motif variante (répété avec /g)</span>
+            <input id="r_v_pattern" type="text" class="mt-1 w-full font-mono text-xs border border-gray-300 rounded-lg px-2 py-1" value="${escHtml(p.variants.pattern || '')}" placeholder="ex. ([A-Z]+|\\d{1,3}):\\s*(\\d+)">
+          </label>
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <label class="block text-[11px]"><span class="text-[10px] uppercase font-semibold text-gray-500">Groupe taille</span>
+              <input id="r_v_size_group" type="number" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-2 py-1" value="${p.variants.size_group ?? 1}"></label>
+            <label class="block text-[11px]"><span class="text-[10px] uppercase font-semibold text-gray-500">Groupe qty</span>
+              <input id="r_v_qty_group" type="number" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-2 py-1" value="${p.variants.qty_group ?? 2}"></label>
+          </div>
+        </div>`;
+      const bind = (id, key, cast) => el(id)?.addEventListener('input', ev => {
+        p.variants[key] = cast ? cast(ev.target.value) : ev.target.value;
+        state.testedOk = false; updateFooter();
+      });
+      bind('r_v_line_offset', 'line_offset', v => Number(v) || 0);
+      bind('r_v_line_regex',  'extract_from_line_regex');
+      bind('r_v_pattern',     'pattern');
+      bind('r_v_size_group',  'size_group', v => Number(v) || 1);
+      bind('r_v_qty_group',   'qty_group',  v => Number(v) || 2);
+    }
   }
 
   // ─── RIGHT PANEL — extracted lines ──────────────────────────────────
