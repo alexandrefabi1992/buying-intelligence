@@ -1157,6 +1157,22 @@ async function runMigrations() {
   // initial schema minimal; safe on live DBs (IF NOT EXISTS).
   await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS preview_json JSONB`);
   await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS preview_computed_at TIMESTAMPTZ`);
+  // Extraction source — 'recipe' (default, uses parse_recipes) or 'llm'
+  // (operator-triggered fallback when no recipe matches). Distinct paths;
+  // recipe extractions are UNCHANGED — the default is set to 'recipe' so
+  // every existing row is treated as recipe-extracted with no behaviour shift.
+  await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS extraction_source TEXT NOT NULL DEFAULT 'recipe'`);
+  // Raw text extracted from the PDF — persisted only for LLM-extracted files
+  // so the size-mismatch validator can re-run at any time (including on push,
+  // after edits, when re-computing the cached preview). NULL for recipe files.
+  await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS raw_text TEXT`);
+  // recipe_id is NULLable — LLM-extracted files and files awaiting extraction
+  // legitimately have no matching parse_recipes row, and were previously
+  // attached to an arbitrary recipe just to satisfy the NOT NULL constraint
+  // (misleading — a Marc Cain file appeared linked to Oui or Bugatchi).
+  // The FK to parse_recipes(recipe_id) is preserved and accepts NULL by
+  // default (no MATCH FULL clause).
+  await pool.query(`ALTER TABLE import_files ALTER COLUMN recipe_id DROP NOT NULL`);
   // parse_recipes ownership: nullable tenant_id.
   //   tenant_id = null  → GLOBAL recipe (visible to every tenant)
   //   tenant_id = 'X'   → PRIVATE to tenant X, invisible to others

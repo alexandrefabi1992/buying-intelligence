@@ -4442,9 +4442,23 @@ const PreviewPanel = (() => {
     // Matrices
     renderMatricesTable();
 
+    // ═══ Incomplete-extraction banner (blocking) ═════════════════════════
+    // Shown ABOVE the summary tiles when the preview flagged incomplete.
+    // Push button label + color changes to force the user through a
+    // confirmation dialog before continuing.
+    renderIncompleteBanner(d.summary);
+
     // Push button — enabled only if there are selected non-abandoned batches
     const selectable = d.orders.filter(o => o.selected && o.batch_status !== 'abandoned').length;
+    const incomplete = d.summary.incomplete === true;
     el('previewPushBtn').disabled = selectable === 0;
+    if (incomplete) {
+      el('previewPushBtn').textContent = 'Pousser quand même';
+      el('previewPushBtn').className   = 'bg-red-600 text-white rounded-lg px-5 py-2 text-xs font-semibold hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed';
+    } else {
+      el('previewPushBtn').textContent = t('preview_push_btn');
+      el('previewPushBtn').className   = 'bg-emerald-600 text-white rounded-lg px-5 py-2 text-xs font-semibold hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed';
+    }
 
     // Wire batch checkboxes + matrix filters
     wireBatchInputs();
@@ -4457,6 +4471,42 @@ const PreviewPanel = (() => {
     state.filters.create_new         = el('previewFilterCreate').checked;
     state.filters.create_with_suffix = el('previewFilterSuffix').checked;
     state.filters.complete_existing  = el('previewFilterComplete').checked;
+  }
+
+  // Render the incomplete-extraction banner ABOVE summary tiles when
+  // preview.summary.incomplete === true. Uses a red panel with each
+  // triggered reason spelled out (matches the messages assessCompleteness
+  // emits on the backend). Removed when incomplete = false.
+  function renderIncompleteBanner(summary) {
+    // Find or create the banner container just above the summary tiles
+    let el2 = document.getElementById('previewIncompleteBanner');
+    if (summary.incomplete !== true) { if (el2) el2.remove(); return; }
+    if (!el2) {
+      el2 = document.createElement('div');
+      el2.id = 'previewIncompleteBanner';
+      const tilesEl = document.getElementById('previewSummaryTiles');
+      tilesEl.parentNode.insertBefore(el2, tilesEl);
+    }
+    const reasonHtml = (summary.incomplete_reasons || [])
+      .map(r => `<li><code class="text-[10px] bg-red-100 text-red-800 px-1 py-0.5 rounded">${escHtml(r.code)}</code> — ${escHtml(r.description)}</li>`)
+      .join('');
+    const stats = summary.extraction_stats || {};
+    el2.className = 'bg-red-50 border border-red-300 rounded-xl px-5 py-4 text-red-800 shadow-sm';
+    el2.innerHTML = `
+      <div class="flex items-start gap-3">
+        <div class="text-2xl leading-none">⚠</div>
+        <div class="flex-1">
+          <div class="text-sm font-bold mb-1">Extraction incomplète — vérifie la recette avant de continuer</div>
+          <ul class="text-xs list-disc pl-5 space-y-0.5 mb-2">${reasonHtml}</ul>
+          <div class="text-[10px] text-red-700 font-mono">
+            Stats : ${stats.successful || 0} produits OK · ${stats.skipped || 0} ignorés · ${stats.qty_mismatched || 0} qty_mismatch
+            ${stats.units_ratio != null ? ' · ratio unités ' + Math.round(stats.units_ratio * 100) + '%' : ''}
+          </div>
+          <div class="text-[11px] text-red-600 mt-2">
+            Le bouton "Pousser vers Lightspeed" a été remplacé par "Pousser quand même" — un clic te demandera une confirmation explicite et l'action sera loggée.
+          </div>
+        </div>
+      </div>`;
   }
 
   function renderBatch(o) {
@@ -4609,14 +4659,34 @@ const PreviewPanel = (() => {
   async function push() {
     const selectable = state.data.orders.filter(o => o.selected && o.batch_status !== 'abandoned').length;
     if (!selectable) return;
-    if (!confirm(t('preview_push_confirm').replace('{n}', state.data.summary.matrix_count))) return;
+
+    // Incomplete extraction → louder confirmation with reasons repeated
+    const incomplete = state.data.summary.incomplete === true;
+    if (incomplete) {
+      const reasonLines = (state.data.summary.incomplete_reasons || [])
+        .map(r => `  • ${r.description}`).join('\n');
+      const msg = `⚠ EXTRACTION INCOMPLÈTE\n\n${reasonLines}\n\nPousser quand même vers Lightspeed ?\n(Cette action sera loggée pour audit.)`;
+      if (!confirm(msg)) return;
+    } else {
+      if (!confirm(t('preview_push_confirm').replace('{n}', state.data.summary.matrix_count))) return;
+    }
+
     el('previewPushBtn').disabled = true;
     setMessage(null);
     try {
-      const res = await apiFetch(`${BASE}/api/import/files/${state.fileId}/push`, { method: 'POST' });
+      const res = await apiFetch(`${BASE}/api/import/files/${state.fileId}/push`, {
+        method: 'POST',
+        body: JSON.stringify({ force_incomplete: incomplete }),
+      });
       const data = await res.json();
       if (!res.ok) {
-        setMessage('error', data.message || `HTTP ${res.status}`);
+        // Handle the specific extraction_incomplete error (server side gate)
+        if (data.error === 'extraction_incomplete') {
+          const reasons = (data.incomplete_reasons || []).map(r => `  • ${r.description}`).join('\n');
+          setMessage('error', `Extraction incomplète — push refusé.<br/><pre class="text-[10px] mt-1">${escHtml(reasons)}</pre>Utilise le bouton "Pousser quand même" pour forcer.`);
+        } else {
+          setMessage('error', data.message || `HTTP ${res.status}`);
+        }
         el('previewPushBtn').disabled = false;
         return;
       }
