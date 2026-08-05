@@ -944,6 +944,22 @@
         </button>
         <div id="leadTimesNote" class="mt-2 text-xs text-emerald-700 font-semibold hidden" data-i18n="params_lead_times_saved">Délais sauvegardés.</div>
       </div>
+
+      <!-- ── Recettes d'import (S2) ────────────────────────────────── -->
+      <div class="mt-8 border-t border-gray-200 pt-5">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-xs font-semibold text-gray-700" data-i18n="recipes_title">Recettes d'import fournisseurs</h3>
+          <button id="recipeNewBtn"
+            class="text-xs font-semibold text-white bg-indigo-600 rounded-lg px-3 py-1.5 hover:bg-indigo-700 transition-colors"
+            data-i18n="recipes_new_btn">+ Nouvelle recette</button>
+        </div>
+        <p class="text-xs text-gray-400 mb-3" data-i18n="recipes_desc">
+          Une recette décrit comment lire les commandes d'un fournisseur. Chaque recette est privée à ton compte jusqu'à ce qu'un administrateur la rende globale.
+        </p>
+        <div id="recipesList" class="text-xs text-gray-500">
+          <span data-i18n="recipes_loading">Chargement…</span>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -1094,6 +1110,72 @@
       </div>
     </div>
 
+    <!-- ── Recipe Wizard — new supplier onboarding (S2) ────────────── -->
+    <div id="recipeWizard" class="hidden fixed inset-0 bg-gray-50 z-50 overflow-hidden flex flex-col">
+      <!-- Sticky header -->
+      <div class="bg-white border-b border-gray-200 shadow-sm px-6 py-3 flex items-center gap-4 shrink-0">
+        <button id="recipeWizardClose" class="text-gray-400 hover:text-gray-800 text-xl leading-none" title="Fermer">✕</button>
+        <div class="flex-1 min-w-0">
+          <h2 class="text-sm font-bold text-gray-800 truncate" data-i18n="recipe_wizard_title">Nouvelle recette d'import</h2>
+          <p class="text-[11px] text-gray-500 truncate" id="recipeWizardSubtitle">—</p>
+        </div>
+        <!-- Step tabs -->
+        <div class="flex items-center gap-1 text-[11px]">
+          <span class="recipe-step-tab" data-step="1">1. Fichier</span>
+          <span class="text-gray-300">›</span>
+          <span class="recipe-step-tab" data-step="2">2. Marque</span>
+          <span class="text-gray-300">›</span>
+          <span class="recipe-step-tab" data-step="3">3. Commandes</span>
+          <span class="text-gray-300">›</span>
+          <span class="recipe-step-tab" data-step="4">4. Champs</span>
+          <span class="text-gray-300">›</span>
+          <span class="recipe-step-tab" data-step="5">5. Produits</span>
+        </div>
+      </div>
+
+      <!-- Body: left = form (scrollable), right = extracted lines panel -->
+      <div class="flex-1 flex overflow-hidden">
+        <!-- LEFT — step content -->
+        <div id="recipeStepPanel" class="flex-1 overflow-auto p-6"></div>
+
+        <!-- RIGHT — extracted lines viewer -->
+        <div class="w-96 border-l border-gray-200 bg-white overflow-hidden flex flex-col shrink-0">
+          <div class="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+            <h3 class="text-[10px] uppercase font-semibold text-gray-500 tracking-wide" data-i18n="recipe_lines_panel">Lignes extraites</h3>
+            <select id="recipeLinesPageSel" class="text-[10px] border border-gray-200 rounded px-1.5 py-0.5"></select>
+          </div>
+          <div id="recipeLinesList" class="flex-1 overflow-auto text-[11px] font-mono"></div>
+          <div class="px-4 py-2 text-[10px] text-gray-400 border-t border-gray-100" data-i18n="recipe_lines_hint">
+            Clique une ligne pour proposer un regex.
+          </div>
+        </div>
+      </div>
+
+      <!-- Sticky footer -->
+      <div class="bg-white border-t border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
+        <div id="recipeWizardMsg" class="text-xs text-gray-500 flex-1"></div>
+        <div class="flex items-center gap-2">
+          <button id="recipeWizardBack" class="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 disabled:opacity-40" data-i18n="btn_prev" disabled>← Précédent</button>
+          <button id="recipeWizardNext" class="text-xs font-semibold text-white bg-indigo-600 rounded-lg px-3 py-1.5 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed" data-i18n="btn_next">Suivant →</button>
+          <button id="recipeWizardTest" class="text-xs font-semibold text-white bg-amber-600 rounded-lg px-3 py-1.5 hover:bg-amber-700 disabled:bg-gray-300 hidden" data-i18n="recipe_btn_test">Tester la recette</button>
+          <button id="recipeWizardSave" class="text-xs font-semibold text-white bg-emerald-600 rounded-lg px-3 py-1.5 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed hidden" data-i18n="recipe_btn_save" disabled>Sauvegarder la recette</button>
+        </div>
+      </div>
+    </div>
+
+
+<script>
+// Inline CSS for step tabs (Tailwind can't express :has(.active) chain easily here)
+document.head.insertAdjacentHTML('beforeend', '<style>' +
+  '.recipe-step-tab { padding: 4px 10px; border-radius: 6px; font-weight: 600; color: #9ca3af; cursor: default; }' +
+  '.recipe-step-tab.active { background: #eef2ff; color: #4338ca; }' +
+  '.recipe-step-tab.done { color: #059669; }' +
+  '.recipe-line { padding: 4px 12px; border-left: 3px solid transparent; cursor: pointer; white-space: pre; }' +
+  '.recipe-line:hover { background: #f9fafb; border-left-color: #6366f1; }' +
+  '.recipe-line.selected { background: #eef2ff; border-left-color: #4338ca; }' +
+  '</style>');
+</script>
+
 
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1146,6 +1228,67 @@ const TRANSLATIONS = {
     preview_failed:'Push échoué.',
     preview_no_batch_id_warn:'(cache stale — recharger pour éditer)',
     preview_abandon_confirm:'Marquer ce fichier comme abandonné ? Les objets déjà créés dans Lightspeed resteront et devront être nettoyés manuellement.',
+    recipes_title:'Recettes d\'import fournisseurs', recipes_new_btn:'+ Nouvelle recette',
+    recipes_desc:'Une recette décrit comment lire les commandes d\'un fournisseur. Chaque recette est privée à ton compte jusqu\'à ce qu\'un administrateur la rende globale.',
+    recipes_loading:'Chargement…', recipes_empty:'Aucune recette. Clique "+ Nouvelle recette" pour commencer.',
+    recipes_col_supplier:'Fournisseur', recipes_col_manufacturer:'Marque cible', recipes_col_scope:'Portée', recipes_col_version:'Version',
+    recipe_wizard_title:'Nouvelle recette d\'import',
+    recipe_lines_panel:'Lignes extraites', recipe_lines_hint:'Clique une ligne pour proposer un regex.',
+    recipe_btn_test:'Tester la recette', recipe_btn_save:'Sauvegarder la recette',
+    recipe_step1_title:'1. Fichier échantillon',
+    recipe_step1_desc:'Charge un PDF d\'exemple du fournisseur. Le système va analyser sa structure et refuser les fichiers trop complexes.',
+    recipe_step1_upload:'Charger un PDF',
+    recipe_step1_analyzing:'Analyse en cours…',
+    recipe_step1_ok:'PDF analysé : {p} pages, {w} mots extraits, {l} lignes max/page.',
+    recipe_step1_warn:'Attention : {msg}',
+    recipe_step1_blocked:'Ce format nécessite une configuration avancée, contactez le support.',
+    recipe_step2_title:'2. Marque & détection',
+    recipe_step2_desc:'Identifie la marque cible et les motifs qui permettront au système de reconnaître ce format automatiquement.',
+    recipe_step2_supplier_key:'Identifiant fournisseur',
+    recipe_step2_supplier_key_ph:'ex. oui-eurostyle, bugatchi-socks',
+    recipe_step2_manufacturer:'Marque cible dans Lightspeed',
+    recipe_step2_vendor:'Vendor ID Lightspeed',
+    recipe_step2_attribute_set:'Attribute Set',
+    recipe_step2_notes:'Notes (optionnel)',
+    recipe_step2_detection_title:'Règles de détection automatique',
+    recipe_step2_match_all:'Motifs OBLIGATOIRES (tous présents)',
+    recipe_step2_match_any:'Motifs SUFFISANTS (au moins un)',
+    recipe_step2_add_pattern:'+ Ajouter un motif',
+    recipe_step3_title:'3. Multi-commandes',
+    recipe_step3_desc:'La plupart des fichiers contiennent une seule commande. Si ce fournisseur envoie parfois plusieurs commandes dans un même PDF, coche la case.',
+    recipe_step3_toggle:'Ce fichier peut contenir plusieurs commandes',
+    recipe_step3_marker:'Marqueur textuel',
+    recipe_step3_split_field:'Champ discriminant (défini à l\'étape 4)',
+    recipe_step3_boundary:'Stratégie de frontière',
+    recipe_step4_title:'4. Champs par commande',
+    recipe_step4_desc:'Définis quels champs extraire depuis chaque commande. Le regex doit capturer la valeur dans le groupe indiqué.',
+    recipe_step4_add_field:'+ Ajouter un champ',
+    recipe_step4_field_name:'Nom du champ',
+    recipe_step4_field_regex:'Regex',
+    recipe_step4_field_group:'Groupe',
+    recipe_step4_field_transform:'Transform',
+    recipe_step4_totals_title:'Extraction des totaux déclarés',
+    recipe_step4_totals_desc:'Si le PDF affiche un total par commande (unités + montant), le regex ici les extrait.',
+    recipe_step4_consign_title:'Détection de consignation',
+    recipe_step5_title:'5. Produits',
+    recipe_step5_desc:'Comment identifier chaque ligne produit et ses variantes.',
+    recipe_step5_layout:'Type de disposition',
+    recipe_step5_layout_flat:'Table plate (une ligne par variante)',
+    recipe_step5_layout_grid:'Grille de tailles (headers horizontaux, quantités alignées)',
+    recipe_step5_row_regex:'Regex de ligne produit',
+    recipe_step5_trailing:'Regex des métriques de fin (coût, quantité totale, prix)',
+    recipe_step5_size_header:'Préfixe du header de tailles',
+    recipe_step5_size_pattern:'Motif d\'une taille',
+    recipe_regex_suggest_title:'Regex proposé pour cette ligne :',
+    recipe_regex_copy:'Copier',
+    recipe_scope_private:'Privée',
+    recipe_scope_global:'Globale',
+    recipe_test_running:'Test en cours…',
+    recipe_test_ok:'✓ Recette valide : {o} commande(s), {p} produit(s), {u} unités.',
+    recipe_test_err:'✗ Erreur : {code} — {msg}',
+    recipe_save_ok:'Recette sauvegardée : #{id}, version {v}.',
+    recipe_save_locked:'Teste la recette avec succès avant de sauvegarder.',
+    btn_prev:'← Précédent', btn_next:'Suivant →',
     plan_by_shop:'Par boutique', plan_suggested_lbl:'Suggéré :',
     filter_boutiques:'Boutiques',
     btn_apply:'Appliquer', btn_reset:'Réinitialiser',
@@ -1412,6 +1555,67 @@ const TRANSLATIONS = {
     preview_failed:'Push failed.',
     preview_no_batch_id_warn:'(stale cache — refresh to edit)',
     preview_abandon_confirm:'Mark this file as abandoned? Objects already created in Lightspeed will remain and need manual cleanup.',
+    recipes_title:'Supplier import recipes', recipes_new_btn:'+ New recipe',
+    recipes_desc:'A recipe describes how to read a supplier\'s orders. Each recipe is private to your account until an admin promotes it to global.',
+    recipes_loading:'Loading…', recipes_empty:'No recipes yet. Click "+ New recipe" to start.',
+    recipes_col_supplier:'Supplier', recipes_col_manufacturer:'Target brand', recipes_col_scope:'Scope', recipes_col_version:'Version',
+    recipe_wizard_title:'New import recipe',
+    recipe_lines_panel:'Extracted lines', recipe_lines_hint:'Click a line to suggest a regex.',
+    recipe_btn_test:'Test recipe', recipe_btn_save:'Save recipe',
+    recipe_step1_title:'1. Sample file',
+    recipe_step1_desc:'Upload a sample PDF from the supplier. The system will analyze its structure and refuse files it can\'t handle.',
+    recipe_step1_upload:'Upload PDF',
+    recipe_step1_analyzing:'Analyzing…',
+    recipe_step1_ok:'PDF analyzed: {p} pages, {w} words extracted, {l} max lines/page.',
+    recipe_step1_warn:'Notice: {msg}',
+    recipe_step1_blocked:'This format needs advanced configuration, contact support.',
+    recipe_step2_title:'2. Brand & detection',
+    recipe_step2_desc:'Identify the target brand and the patterns that let the system recognize this format automatically.',
+    recipe_step2_supplier_key:'Supplier identifier',
+    recipe_step2_supplier_key_ph:'e.g. oui-eurostyle, bugatchi-socks',
+    recipe_step2_manufacturer:'Target Lightspeed brand',
+    recipe_step2_vendor:'Lightspeed vendor ID',
+    recipe_step2_attribute_set:'Attribute Set',
+    recipe_step2_notes:'Notes (optional)',
+    recipe_step2_detection_title:'Auto-detection rules',
+    recipe_step2_match_all:'REQUIRED patterns (all present)',
+    recipe_step2_match_any:'SUFFICIENT patterns (at least one)',
+    recipe_step2_add_pattern:'+ Add pattern',
+    recipe_step3_title:'3. Multi-order',
+    recipe_step3_desc:'Most files contain a single order. Check the box if this supplier sometimes sends multiple orders in one PDF.',
+    recipe_step3_toggle:'This file may contain multiple orders',
+    recipe_step3_marker:'Text marker',
+    recipe_step3_split_field:'Discriminator field (defined in step 4)',
+    recipe_step3_boundary:'Boundary strategy',
+    recipe_step4_title:'4. Order fields',
+    recipe_step4_desc:'Define which fields to extract from each order. The regex must capture the value in the given group.',
+    recipe_step4_add_field:'+ Add field',
+    recipe_step4_field_name:'Field name',
+    recipe_step4_field_regex:'Regex',
+    recipe_step4_field_group:'Group',
+    recipe_step4_field_transform:'Transform',
+    recipe_step4_totals_title:'Declared totals extraction',
+    recipe_step4_totals_desc:'If the PDF shows a per-order total (units + amount), this regex extracts them.',
+    recipe_step4_consign_title:'Consignment detection',
+    recipe_step5_title:'5. Products',
+    recipe_step5_desc:'How to identify each product row and its variants.',
+    recipe_step5_layout:'Layout type',
+    recipe_step5_layout_flat:'Flat table (one row per variant)',
+    recipe_step5_layout_grid:'Size grid (horizontal headers, aligned quantities)',
+    recipe_step5_row_regex:'Product row regex',
+    recipe_step5_trailing:'Trailing metrics regex (cost, total qty, price)',
+    recipe_step5_size_header:'Size header prefix',
+    recipe_step5_size_pattern:'Size token pattern',
+    recipe_regex_suggest_title:'Suggested regex for this line:',
+    recipe_regex_copy:'Copy',
+    recipe_scope_private:'Private',
+    recipe_scope_global:'Global',
+    recipe_test_running:'Testing…',
+    recipe_test_ok:'✓ Recipe valid: {o} order(s), {p} product(s), {u} units.',
+    recipe_test_err:'✗ Error: {code} — {msg}',
+    recipe_save_ok:'Recipe saved: #{id}, version {v}.',
+    recipe_save_locked:'Test the recipe successfully before saving.',
+    btn_prev:'← Prev', btn_next:'Next →',
     plan_by_shop:'By Store', plan_suggested_lbl:'Suggested:',
     filter_boutiques:'Boutiques',
     btn_apply:'Apply', btn_reset:'Reset',
@@ -4457,6 +4661,661 @@ const PreviewPanel = (() => {
   return { init, open };
 })();
 
+// ────────────────────────────────────────────────────────────────────────
+// RecipeWizard — new supplier onboarding via textual mapping (S2)
+// ────────────────────────────────────────────────────────────────────────
+// 5-step wizard for building a parse_recipes row from a sample PDF:
+//   1. Upload the sample     → POST /recipes/probe → complexity assessment
+//   2. Brand + detection     → recipe.meta + recipe.detection
+//   3. Multi-order toggle    → recipe.extraction.orders.order_split
+//   4. Order fields          → recipe.extraction.orders.fields
+//   5. Products              → recipe.extraction.products
+// Save is LOCKED until a successful /recipes/test round-trip. No escape.
+// Right panel shows extracted lines; click any line to get a regex candidate.
+const RecipeWizard = (() => {
+  const state = {
+    step: 1,
+    probeId: null,
+    filename: null,
+    complexity: null,
+    pages: null,          // wire format from /probe
+    linesCurrentPage: 1,
+    testedOk: false,      // Save gate
+    recipe: initialRecipe(),
+  };
+
+  function initialRecipe() {
+    return {
+      version: 1,
+      meta: {
+        supplier_key: '',
+        target_manufacturer: '',
+        default_vendor_id: '',
+        default_attribute_set_id: '5',
+        notes: '',
+      },
+      detection: { match_all: [], match_any: [] },
+      extraction: {
+        engine: 'coordinate',
+        tolerances: { y_pt: 3, x_pt: 8 },
+        parser: null,
+        file_fields: {},
+        orders: {
+          // order_split omitted by default (mono-order)
+          fields: {
+            po_number:          { regex: '', group: 1 },
+            order_date:         { regex: '', group: 1, transform: 'date_mdy_to_iso' },
+            customer_reference: { regex: '', group: 1 },
+            delivery_date:      { regex: '', group: 1, transform: 'date_mdy_to_iso' },
+            cancel_date:        { regex: '', group: 1, transform: 'date_mdy_to_iso' },
+          },
+          declared_totals_extraction: null,
+          is_consignment_from: null,
+        },
+        products: {
+          layout_type: 'size_grid',
+          row_header: { regex: '', fields: {} },
+          size_grid: {
+            header_prefix: 'CA',
+            header_token_pattern: '\\d{2}|OS',
+            qty_token_pattern: '\\d+',
+            qty_max_value: 200,
+            qty_row: { position: 'next_line_below', min_y_gap_pt: 3, max_y_gap_pt: 25 },
+          },
+        },
+      },
+    };
+  }
+
+  const el = id => document.getElementById(id);
+
+  function show() { el('recipeWizard').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+  function hide() { el('recipeWizard').classList.add('hidden');    document.body.style.overflow = ''; }
+
+  function open() {
+    // Reset state for a fresh wizard
+    state.step = 1; state.probeId = null; state.filename = null;
+    state.complexity = null; state.pages = null; state.linesCurrentPage = 1;
+    state.testedOk = false;
+    state.recipe = initialRecipe();
+    setMsg(null);
+    show();
+    renderStepTabs();
+    renderStep();
+    renderLinesPanel();
+    updateFooter();
+  }
+
+  function setMsg(msg, kind) {
+    const m = el('recipeWizardMsg');
+    if (!msg) { m.textContent = ''; m.className = 'text-xs flex-1 text-gray-500'; return; }
+    m.textContent = msg;
+    m.className = 'text-xs flex-1 ' + (
+      kind === 'error' ? 'text-red-600 font-semibold' :
+      kind === 'ok'    ? 'text-emerald-600 font-semibold' :
+                         'text-gray-600');
+  }
+
+  function renderStepTabs() {
+    document.querySelectorAll('.recipe-step-tab').forEach(tab => {
+      const n = Number(tab.dataset.step);
+      tab.classList.toggle('active', n === state.step);
+      tab.classList.toggle('done',   n < state.step);
+    });
+    el('recipeWizardSubtitle').textContent = state.filename
+      ? `${state.filename} · étape ${state.step}/5`
+      : `Nouvelle recette · étape ${state.step}/5`;
+  }
+
+  function updateFooter() {
+    el('recipeWizardBack').disabled = state.step === 1;
+    // Next disabled at step 1 until probe uploaded and ok
+    let canNext = true;
+    if (state.step === 1) canNext = !!state.probeId && state.complexity?.level !== 'too_complex';
+    if (state.step === 2) canNext = !!state.recipe.meta.supplier_key && !!state.recipe.meta.target_manufacturer;
+    el('recipeWizardNext').disabled = !canNext;
+
+    // Show Next on steps 1-4, Test on step 5, Save always after Test succeeded
+    el('recipeWizardNext').classList.toggle('hidden', state.step === 5);
+    el('recipeWizardTest').classList.toggle('hidden', state.step !== 5);
+    el('recipeWizardSave').classList.toggle('hidden', state.step !== 5);
+    el('recipeWizardSave').disabled = !state.testedOk;
+    el('recipeWizardSave').title = state.testedOk ? '' : t('recipe_save_locked');
+  }
+
+  // ─── STEP RENDER DISPATCHERS ─────────────────────────────────────────
+  function renderStep() {
+    if      (state.step === 1) renderStep1Upload();
+    else if (state.step === 2) renderStep2Meta();
+    else if (state.step === 3) renderStep3MultiOrder();
+    else if (state.step === 4) renderStep4Fields();
+    else if (state.step === 5) renderStep5Products();
+  }
+
+  function renderStep1Upload() {
+    const panel = el('recipeStepPanel');
+    let statusBlock = '';
+    if (state.complexity) {
+      const c = state.complexity;
+      if (c.level === 'too_complex') {
+        statusBlock = `<div class="mt-4 border border-red-200 bg-red-50 rounded-lg px-4 py-3 text-sm text-red-800">
+          <div class="font-bold mb-2">${t('recipe_step1_blocked')}</div>
+          <ul class="text-xs pl-4 list-disc space-y-0.5">
+            ${c.blockers.map(b => `<li><code class="text-[10px] bg-red-100 px-1 rounded">${escHtml(b.code)}</code> ${escHtml(b.msg)}</li>`).join('')}
+          </ul>
+        </div>`;
+      } else {
+        const msg = t('recipe_step1_ok')
+          .replace('{p}', c.stats.pages).replace('{w}', c.stats.totalWords).replace('{l}', c.stats.maxLines);
+        statusBlock = `<div class="mt-4 border border-emerald-200 bg-emerald-50 rounded-lg px-4 py-3 text-sm text-emerald-800">
+          ${escHtml(msg)}
+          ${c.warnings.length ? '<ul class="text-xs pl-4 list-disc mt-2 space-y-0.5">' +
+            c.warnings.map(w => `<li>${escHtml(t('recipe_step1_warn').replace('{msg}', w.msg))}</li>`).join('') +
+            '</ul>' : ''}
+        </div>`;
+      }
+    }
+    panel.innerHTML = `
+      <div class="max-w-2xl">
+        <h3 class="text-sm font-bold text-gray-800 mb-1" data-i18n="recipe_step1_title">1. Fichier échantillon</h3>
+        <p class="text-xs text-gray-500 mb-4" data-i18n="recipe_step1_desc">Charge un PDF d'exemple du fournisseur.</p>
+        <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-indigo-400 hover:bg-indigo-50/30 transition-colors">
+          <input id="recipeStep1File" type="file" accept="application/pdf" class="hidden">
+          <label for="recipeStep1File" class="cursor-pointer">
+            <div class="text-3xl mb-2">📄</div>
+            <div class="text-sm font-semibold text-gray-700">${t('recipe_step1_upload')}</div>
+            <div class="text-[11px] text-gray-400 mt-1">${state.filename || 'PDF fournisseur'}</div>
+          </label>
+        </div>
+        ${statusBlock}
+      </div>`;
+    el('recipeStep1File').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      state.filename = file.name;
+      setMsg(t('recipe_step1_analyzing'));
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(`${BASE}/api/import/recipes/probe`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${getToken()}` },
+          body: fd,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+        state.probeId = data.probe_id;
+        state.complexity = data.complexity;
+        state.pages = data.pages;
+        state.linesCurrentPage = 1;
+        setMsg(null);
+        renderStep();
+        renderLinesPanel();
+        updateFooter();
+      } catch (err) {
+        setMsg(err.message, 'error');
+      }
+    });
+  }
+
+  function renderStep2Meta() {
+    const panel = el('recipeStepPanel');
+    const r = state.recipe;
+    panel.innerHTML = `
+      <div class="max-w-2xl space-y-5">
+        <div>
+          <h3 class="text-sm font-bold text-gray-800 mb-1">${t('recipe_step2_title')}</h3>
+          <p class="text-xs text-gray-500 mb-4">${t('recipe_step2_desc')}</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <label class="block">
+            <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step2_supplier_key')} *</span>
+            <input id="r_supplier_key" type="text" placeholder="${t('recipe_step2_supplier_key_ph')}"
+              class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="${escHtml(r.meta.supplier_key)}">
+          </label>
+          <label class="block">
+            <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step2_manufacturer')} *</span>
+            <input id="r_target_manufacturer" type="text" placeholder="ex. Bugatchi"
+              class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="${escHtml(r.meta.target_manufacturer)}">
+          </label>
+          <label class="block">
+            <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step2_vendor')}</span>
+            <input id="r_default_vendor_id" type="text" placeholder="ex. 70"
+              class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="${escHtml(r.meta.default_vendor_id)}">
+          </label>
+          <label class="block">
+            <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step2_attribute_set')}</span>
+            <select id="r_default_attribute_set_id" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <option value="5" ${r.meta.default_attribute_set_id === '5' ? 'selected' : ''}>5 — Taille/Couleur</option>
+              <option value="7" ${r.meta.default_attribute_set_id === '7' ? 'selected' : ''}>7 — Couleur</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step2_notes')}</span>
+          <textarea id="r_notes" rows="2" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            placeholder="ex. Format Order Confirmation, envoyé par email hebdomadaire">${escHtml(r.meta.notes)}</textarea>
+        </label>
+
+        <div class="border-t border-gray-200 pt-4">
+          <h4 class="text-sm font-semibold text-gray-700 mb-1">${t('recipe_step2_detection_title')}</h4>
+          <p class="text-[11px] text-gray-400 mb-3">Ces motifs permettront au système de reconnaître automatiquement ce format lors des futurs uploads.</p>
+
+          <div class="mb-3">
+            <div class="text-[11px] font-semibold text-gray-600 mb-1">${t('recipe_step2_match_all')}</div>
+            <div id="r_match_all" class="space-y-1">${renderPatternList(r.detection.match_all, 'match_all')}</div>
+            <button class="text-[10px] text-indigo-600 hover:text-indigo-800 mt-1"
+              onclick="RecipeWizard._addPattern('match_all')">${t('recipe_step2_add_pattern')}</button>
+          </div>
+
+          <div>
+            <div class="text-[11px] font-semibold text-gray-600 mb-1">${t('recipe_step2_match_any')}</div>
+            <div id="r_match_any" class="space-y-1">${renderPatternList(r.detection.match_any, 'match_any')}</div>
+            <button class="text-[10px] text-indigo-600 hover:text-indigo-800 mt-1"
+              onclick="RecipeWizard._addPattern('match_any')">${t('recipe_step2_add_pattern')}</button>
+          </div>
+        </div>
+      </div>`;
+
+    // Bind inputs
+    ['supplier_key','target_manufacturer','default_vendor_id','default_attribute_set_id','notes'].forEach(f => {
+      el('r_' + f)?.addEventListener('input', ev => {
+        state.recipe.meta[f] = ev.target.value;
+        updateFooter();
+      });
+    });
+    ['r_match_all','r_match_any'].forEach(id => {
+      el(id)?.addEventListener('input', ev => {
+        if (ev.target.classList.contains('pattern-input')) {
+          const kind = ev.target.dataset.kind;
+          const idx = Number(ev.target.dataset.idx);
+          state.recipe.detection[kind][idx] = ev.target.value;
+        }
+      });
+    });
+  }
+
+  function renderPatternList(patterns, kind) {
+    if (!patterns.length) return '<div class="text-[10px] text-gray-400 italic">Aucun motif.</div>';
+    return patterns.map((p, i) => `
+      <div class="flex items-center gap-2">
+        <input class="pattern-input flex-1 text-[11px] font-mono border border-gray-300 rounded px-2 py-1"
+               data-kind="${kind}" data-idx="${i}" value="${escHtml(p)}">
+        <button class="text-red-400 hover:text-red-600 text-xs" onclick="RecipeWizard._removePattern('${kind}', ${i})">✕</button>
+      </div>`).join('');
+  }
+
+  function _addPattern(kind) {
+    state.recipe.detection[kind].push('');
+    renderStep();
+  }
+  function _removePattern(kind, idx) {
+    state.recipe.detection[kind].splice(idx, 1);
+    renderStep();
+  }
+
+  function renderStep3MultiOrder() {
+    const panel = el('recipeStepPanel');
+    const os = state.recipe.extraction.orders.order_split;
+    const enabled = !!os;
+    panel.innerHTML = `
+      <div class="max-w-2xl space-y-4">
+        <div>
+          <h3 class="text-sm font-bold text-gray-800 mb-1">${t('recipe_step3_title')}</h3>
+          <p class="text-xs text-gray-500 mb-4">${t('recipe_step3_desc')}</p>
+        </div>
+
+        <label class="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+          <input id="r_multi_toggle" type="checkbox" ${enabled ? 'checked' : ''} class="h-4 w-4 accent-indigo-600">
+          <span class="text-sm font-semibold text-gray-700">${t('recipe_step3_toggle')}</span>
+        </label>
+
+        <div id="r_multi_details" class="space-y-3 ${enabled ? '' : 'hidden'}">
+          <label class="block">
+            <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step3_marker')}</span>
+            <input id="r_os_marker" type="text" class="mt-1 w-full font-mono text-xs border border-gray-300 rounded-lg px-3 py-2"
+              value="${escHtml(os?.marker || '')}" placeholder="ex. No\\.?\\s*Commande">
+          </label>
+          <label class="block">
+            <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step3_split_field')}</span>
+            <input id="r_os_split_field" type="text" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-3 py-2"
+              value="${escHtml(os?.split_field || 'po_number')}" placeholder="ex. po_number">
+          </label>
+          <label class="block">
+            <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step3_boundary')}</span>
+            <select id="r_os_boundary" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-3 py-2">
+              <option value="page_break_on_change" ${(os?.boundary_strategy || 'page_break_on_change') === 'page_break_on_change' ? 'selected' : ''}>
+                page_break_on_change — nouvelle commande à chaque page où la valeur change
+              </option>
+            </select>
+          </label>
+        </div>
+      </div>`;
+    el('r_multi_toggle').addEventListener('change', ev => {
+      if (ev.target.checked) {
+        state.recipe.extraction.orders.order_split = {
+          marker: '', split_field: 'po_number', boundary_strategy: 'page_break_on_change',
+        };
+      } else {
+        delete state.recipe.extraction.orders.order_split;
+      }
+      renderStep();
+    });
+    ['marker','split_field','boundary'].forEach(f => {
+      const id = 'r_os_' + f;
+      const key = f === 'boundary' ? 'boundary_strategy' : f;
+      el(id)?.addEventListener('input', ev => {
+        if (state.recipe.extraction.orders.order_split) {
+          state.recipe.extraction.orders.order_split[key] = ev.target.value;
+        }
+      });
+    });
+  }
+
+  function renderStep4Fields() {
+    const panel = el('recipeStepPanel');
+    const fields = state.recipe.extraction.orders.fields;
+    const dt = state.recipe.extraction.orders.declared_totals_extraction;
+    panel.innerHTML = `
+      <div class="max-w-3xl space-y-5">
+        <div>
+          <h3 class="text-sm font-bold text-gray-800 mb-1">${t('recipe_step4_title')}</h3>
+          <p class="text-xs text-gray-500 mb-4">${t('recipe_step4_desc')}</p>
+        </div>
+
+        <div>
+          <div class="grid grid-cols-12 gap-2 mb-1 text-[10px] uppercase font-semibold text-gray-500 tracking-wide">
+            <div class="col-span-3">${t('recipe_step4_field_name')}</div>
+            <div class="col-span-6">${t('recipe_step4_field_regex')}</div>
+            <div class="col-span-1 text-center">Grp</div>
+            <div class="col-span-2">${t('recipe_step4_field_transform')}</div>
+          </div>
+          <div id="r_fields_list" class="space-y-1">${renderFieldsList(fields)}</div>
+          <button class="text-[10px] text-indigo-600 hover:text-indigo-800 mt-1"
+            onclick="RecipeWizard._addField()">${t('recipe_step4_add_field')}</button>
+        </div>
+
+        <div class="border-t border-gray-200 pt-4">
+          <h4 class="text-sm font-semibold text-gray-700 mb-1">${t('recipe_step4_totals_title')}</h4>
+          <p class="text-[11px] text-gray-400 mb-2">${t('recipe_step4_totals_desc')}</p>
+          <input id="r_dt_regex" type="text" class="w-full font-mono text-xs border border-gray-300 rounded-lg px-3 py-2"
+            placeholder="ex. Total\\s+Commande\\D*(\\d+)\\s+([\\d,]+\\.\\d{2})"
+            value="${escHtml(dt?.regex || '')}">
+          <div class="grid grid-cols-3 gap-2 mt-2">
+            <label class="text-[11px] text-gray-600">Groupe unités <input id="r_dt_units_group" type="number" class="ml-1 w-14 border rounded px-1 py-0.5" value="${dt?.units_group ?? 1}"></label>
+            <label class="text-[11px] text-gray-600">Groupe montant <input id="r_dt_amount_group" type="number" class="ml-1 w-14 border rounded px-1 py-0.5" value="${dt?.amount_group ?? 2}"></label>
+            <label class="text-[11px] text-gray-600">Flags <input id="r_dt_flags" type="text" class="ml-1 w-14 border rounded px-1 py-0.5" value="${escHtml(dt?.flags || 'i')}"></label>
+          </div>
+        </div>
+      </div>`;
+    // Bind fields
+    el('r_fields_list').addEventListener('input', ev => {
+      const t = ev.target;
+      const idx = t.dataset.idx;
+      if (idx == null) return;
+      const keys = Object.keys(state.recipe.extraction.orders.fields);
+      const key = keys[Number(idx)];
+      if (!key) return;
+      if (t.dataset.field === 'regex')     state.recipe.extraction.orders.fields[key].regex = t.value;
+      if (t.dataset.field === 'group')     state.recipe.extraction.orders.fields[key].group = Number(t.value) || 1;
+      if (t.dataset.field === 'transform') state.recipe.extraction.orders.fields[key].transform = t.value || undefined;
+    });
+    el('r_dt_regex').addEventListener('input', ev => {
+      if (ev.target.value) {
+        state.recipe.extraction.orders.declared_totals_extraction = state.recipe.extraction.orders.declared_totals_extraction || {};
+        state.recipe.extraction.orders.declared_totals_extraction.regex = ev.target.value;
+        state.recipe.extraction.orders.declared_totals_extraction.units_group  = Number(el('r_dt_units_group').value) || 1;
+        state.recipe.extraction.orders.declared_totals_extraction.amount_group = Number(el('r_dt_amount_group').value) || 2;
+        state.recipe.extraction.orders.declared_totals_extraction.flags        = el('r_dt_flags').value || 'i';
+      } else {
+        state.recipe.extraction.orders.declared_totals_extraction = null;
+      }
+    });
+  }
+
+  function renderFieldsList(fields) {
+    const keys = Object.keys(fields);
+    if (!keys.length) return '<div class="text-[10px] text-gray-400 italic">Aucun champ.</div>';
+    return keys.map((k, i) => {
+      const f = fields[k];
+      return `<div class="grid grid-cols-12 gap-2 items-center">
+        <input class="col-span-3 text-xs border rounded px-2 py-1 bg-gray-50" data-idx="${i}" data-field="name" value="${escHtml(k)}" readonly>
+        <input class="col-span-6 font-mono text-xs border border-gray-300 rounded px-2 py-1" data-idx="${i}" data-field="regex" value="${escHtml(f.regex || '')}" placeholder="regex avec (groupe)">
+        <input class="col-span-1 text-xs border border-gray-300 rounded px-2 py-1 text-center" data-idx="${i}" data-field="group" type="number" value="${f.group ?? 1}">
+        <select class="col-span-2 text-xs border border-gray-300 rounded px-2 py-1" data-idx="${i}" data-field="transform">
+          <option value="" ${!f.transform ? 'selected' : ''}>none</option>
+          <option value="int" ${f.transform === 'int' ? 'selected' : ''}>int</option>
+          <option value="decimal" ${f.transform === 'decimal' ? 'selected' : ''}>decimal</option>
+          <option value="date_mdy_to_iso" ${f.transform === 'date_mdy_to_iso' ? 'selected' : ''}>date_mdy_to_iso</option>
+          <option value="trim" ${f.transform === 'trim' ? 'selected' : ''}>trim</option>
+        </select>
+      </div>`;
+    }).join('');
+  }
+
+  function _addField() {
+    const name = prompt('Nom du nouveau champ (ex. custom_ref) :');
+    if (!name || state.recipe.extraction.orders.fields[name]) return;
+    state.recipe.extraction.orders.fields[name] = { regex: '', group: 1 };
+    renderStep();
+  }
+
+  function renderStep5Products() {
+    const panel = el('recipeStepPanel');
+    const p = state.recipe.extraction.products;
+    panel.innerHTML = `
+      <div class="max-w-3xl space-y-4">
+        <div>
+          <h3 class="text-sm font-bold text-gray-800 mb-1">${t('recipe_step5_title')}</h3>
+          <p class="text-xs text-gray-500 mb-4">${t('recipe_step5_desc')}</p>
+        </div>
+
+        <label class="block">
+          <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step5_layout')}</span>
+          <select id="r_layout_type" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-3 py-2">
+            <option value="size_grid" ${p.layout_type === 'size_grid' ? 'selected' : ''}>${t('recipe_step5_layout_grid')}</option>
+            <option value="flat_table" ${p.layout_type === 'flat_table' ? 'selected' : ''} disabled>${t('recipe_step5_layout_flat')} (bientôt)</option>
+          </select>
+        </label>
+
+        <label class="block">
+          <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step5_row_regex')}</span>
+          <input id="r_row_regex" type="text" class="mt-1 w-full font-mono text-xs border border-gray-300 rounded-lg px-3 py-2"
+            placeholder="ex. ^(\\d{4,6})\\s*/\\s*(\\S+)\\s*/\\s*(\\d+)\\s+(.+?)$"
+            value="${escHtml(p.row_header.regex || '')}">
+        </label>
+
+        <label class="block">
+          <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step5_trailing')}</span>
+          <input id="r_trailing_regex" type="text" class="mt-1 w-full font-mono text-xs border border-gray-300 rounded-lg px-3 py-2"
+            placeholder="ex. \\$([\\d,]+\\.\\d{2})\\s+(\\d+)\\s+([\\d,]+\\.\\d{2})\\s+([\\d,]+\\.\\d{2})"
+            value="${escHtml(p.row_header.trailing_metrics?.regex || '')}">
+        </label>
+
+        <div class="border-t border-gray-200 pt-3" id="r_sg_block">
+          <h4 class="text-xs font-semibold text-gray-700 mb-2">Grille de tailles</h4>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="block text-[11px]">
+              <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step5_size_header')}</span>
+              <input id="r_sg_prefix" type="text" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-2 py-1"
+                value="${escHtml(p.size_grid?.header_prefix || 'CA')}">
+            </label>
+            <label class="block text-[11px]">
+              <span class="text-[10px] uppercase font-semibold text-gray-500">${t('recipe_step5_size_pattern')}</span>
+              <input id="r_sg_token" type="text" class="mt-1 w-full font-mono text-xs border border-gray-300 rounded-lg px-2 py-1"
+                value="${escHtml(p.size_grid?.header_token_pattern || '\\d{2}|OS')}">
+            </label>
+            <label class="block text-[11px]">
+              <span class="text-[10px] uppercase font-semibold text-gray-500">Qty max</span>
+              <input id="r_sg_max" type="number" class="mt-1 w-full text-xs border border-gray-300 rounded-lg px-2 py-1"
+                value="${p.size_grid?.qty_max_value ?? 200}">
+            </label>
+          </div>
+        </div>
+      </div>`;
+    el('r_layout_type').addEventListener('change', ev => { p.layout_type = ev.target.value; state.testedOk = false; renderStep(); updateFooter(); });
+    el('r_row_regex').addEventListener('input', ev => { p.row_header.regex = ev.target.value; state.testedOk = false; updateFooter(); });
+    el('r_trailing_regex').addEventListener('input', ev => {
+      p.row_header.trailing_metrics = p.row_header.trailing_metrics || {};
+      p.row_header.trailing_metrics.regex = ev.target.value;
+      state.testedOk = false; updateFooter();
+    });
+    el('r_sg_prefix').addEventListener('input', ev => { p.size_grid.header_prefix = ev.target.value; state.testedOk = false; updateFooter(); });
+    el('r_sg_token').addEventListener('input', ev => { p.size_grid.header_token_pattern = ev.target.value; state.testedOk = false; updateFooter(); });
+    el('r_sg_max').addEventListener('input', ev => { p.size_grid.qty_max_value = Number(ev.target.value) || 200; state.testedOk = false; updateFooter(); });
+  }
+
+  // ─── RIGHT PANEL — extracted lines ──────────────────────────────────
+  function renderLinesPanel() {
+    const sel = el('recipeLinesPageSel');
+    const list = el('recipeLinesList');
+    if (!state.pages) { sel.innerHTML = ''; list.innerHTML = '<div class="p-4 text-gray-400 text-center">Charge un PDF pour voir les lignes.</div>'; return; }
+    sel.innerHTML = state.pages.map(p => `<option value="${p.pageNum}" ${p.pageNum === state.linesCurrentPage ? 'selected' : ''}>page ${p.pageNum}</option>`).join('');
+    sel.onchange = () => { state.linesCurrentPage = Number(sel.value); renderLinesPanel(); };
+    const page = state.pages.find(p => p.pageNum === state.linesCurrentPage);
+    if (!page) { list.innerHTML = ''; return; }
+    list.innerHTML = page.lines.map((l, i) => `<div class="recipe-line" data-line-idx="${i}" title="y=${l.y0}">${escHtml(l.text)}</div>`).join('');
+    list.onclick = (e) => {
+      const div = e.target.closest('.recipe-line');
+      if (!div) return;
+      list.querySelectorAll('.recipe-line').forEach(x => x.classList.remove('selected'));
+      div.classList.add('selected');
+      const idx = Number(div.dataset.lineIdx);
+      const line = page.lines[idx];
+      suggestRegex(line);
+    };
+  }
+
+  // Given a line, produce a suggested regex candidate by turning digits into
+  // \d+ and dates into MM/DD/YYYY placeholders. Best-effort — user edits it.
+  function suggestRegex(line) {
+    let text = line.text;
+    // Escape regex special chars
+    text = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Common patterns
+    text = text.replace(/\d{2}\\\/\d{2}\\\/\d{4}/g, '(\\d{2}/\\d{2}/\\d{4})');
+    text = text.replace(/(?<!\d)\d+(?!\d)/g, '(\\d+)');
+    setMsg(`${t('recipe_regex_suggest_title')} ${text}`, 'ok');
+    // Copy to clipboard
+    try { navigator.clipboard.writeText(text); } catch {}
+  }
+
+  // ─── NAVIGATION ─────────────────────────────────────────────────────
+  function goStep(n) {
+    if (n < 1 || n > 5) return;
+    state.step = n;
+    setMsg(null);
+    renderStepTabs();
+    renderStep();
+    updateFooter();
+  }
+
+  async function runTest() {
+    setMsg(t('recipe_test_running'));
+    el('recipeWizardTest').disabled = true;
+    try {
+      const res = await apiFetch(`${BASE}/api/import/recipes/test`, {
+        method: 'POST',
+        body: JSON.stringify({ probe_id: state.probeId, recipe: state.recipe }),
+      });
+      const data = await res.json();
+      el('recipeWizardTest').disabled = false;
+      if (data.ok) {
+        const s = data.summary;
+        state.testedOk = true;
+        setMsg(t('recipe_test_ok').replace('{o}', s.orders_count).replace('{p}', s.products_count).replace('{u}', s.declared_units), 'ok');
+      } else {
+        state.testedOk = false;
+        setMsg(t('recipe_test_err').replace('{code}', data.error?.code || '?').replace('{msg}', data.error?.message || ''), 'error');
+      }
+    } catch (e) {
+      state.testedOk = false;
+      setMsg(e.message, 'error');
+      el('recipeWizardTest').disabled = false;
+    }
+    updateFooter();
+  }
+
+  async function save() {
+    if (!state.testedOk) return;
+    try {
+      const res = await apiFetch(`${BASE}/api/import/recipes`, {
+        method: 'POST',
+        body: JSON.stringify({ recipe: state.recipe }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      setMsg(t('recipe_save_ok').replace('{id}', data.recipe.recipe_id).replace('{v}', data.recipe.version), 'ok');
+      // Reload the recipe list after a brief pause
+      setTimeout(() => { hide(); RecipesList.load?.(); }, 1500);
+    } catch (e) {
+      setMsg(e.message, 'error');
+    }
+  }
+
+  function init() {
+    el('recipeWizardClose').addEventListener('click', hide);
+    el('recipeWizardBack').addEventListener('click', () => goStep(state.step - 1));
+    el('recipeWizardNext').addEventListener('click', () => goStep(state.step + 1));
+    el('recipeWizardTest').addEventListener('click', runTest);
+    el('recipeWizardSave').addEventListener('click', save);
+  }
+
+  return { init, open, _addPattern, _removePattern, _addField };
+})();
+
+// ────────────────────────────────────────────────────────────────────────
+// RecipesList — Params section listing (S2)
+// ────────────────────────────────────────────────────────────────────────
+const RecipesList = (() => {
+  async function load() {
+    const container = document.getElementById('recipesList');
+    if (!container) return;
+    try {
+      const res = await apiFetch(`${BASE}/api/import/recipes`);
+      const data = await res.json();
+      const rows = data.recipes || [];
+      if (!rows.length) {
+        container.innerHTML = `<div class="text-[11px] text-gray-400 italic">${t('recipes_empty')}</div>`;
+        return;
+      }
+      container.innerHTML = `
+        <table class="w-full text-xs">
+          <thead class="text-[10px] uppercase font-semibold text-gray-500 tracking-wide">
+            <tr class="border-b border-gray-100">
+              <th class="text-left py-1.5">${t('recipes_col_supplier')}</th>
+              <th class="text-left py-1.5">${t('recipes_col_manufacturer')}</th>
+              <th class="text-center py-1.5">${t('recipes_col_version')}</th>
+              <th class="text-center py-1.5">${t('recipes_col_scope')}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            ${rows.map(r => `
+              <tr class="hover:bg-gray-50">
+                <td class="py-1.5 font-mono">${escHtml(r.supplier_key)}</td>
+                <td class="py-1.5">${escHtml(r.target_manufacturer || '')}</td>
+                <td class="py-1.5 text-center">v${r.version}</td>
+                <td class="py-1.5 text-center">
+                  <span class="text-[10px] px-2 py-0.5 rounded ${r.is_global ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'}">
+                    ${r.is_global ? t('recipe_scope_global') : t('recipe_scope_private')}
+                  </span>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    } catch (e) {
+      container.innerHTML = `<div class="text-[11px] text-red-500">Erreur : ${escHtml(e.message)}</div>`;
+    }
+  }
+  function init() {
+    document.getElementById('recipeNewBtn')?.addEventListener('click', () => RecipeWizard.open());
+    load();
+  }
+  return { init, load };
+})();
+
 // ── Pager ─────────────────────────────────────────────────────────────────
 function renderPager(key, total) {
   const pages = Math.ceil(total / PAGE_SIZE), page = state[key].page;
@@ -5487,6 +6346,8 @@ function initApp() {
     PlanTab.init();
     ImportModal.init();
     PreviewPanel.init();
+    RecipeWizard.init();
+    RecipesList.init();
     TransfersTab.init();
     loadSyncStatus();
     tabLoaded['budget'] = true;
