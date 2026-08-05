@@ -863,3 +863,96 @@ Trois tests dans `scripts/test-par-taille-invariant.js` protègent ces conventio
 - `[TimezoneBoundary]` — une vente 20h-minuit locale est comptée pour son jour local, pas UTC
 - `[PeriodConflict]` — dates explicites gagnent quand `period` conflictuel
 - `[PeriodLastMonth]` — `resolvePeriod('last_month')` retourne bien le mois calendaire précédent
+
+## API Lightspeed — le paramètre `offset` a été retiré (août 2026)
+
+Constaté pendant B5 : `GET /Item.json?offset=100` répond désormais `400 Bad Request` avec
+le message `"The offset parameter is no longer supported. Please use the next and previous
+URLs provided in each response payload to paginate."` — Lightspeed est passé à une
+pagination purement par curseur.
+
+### Comment paginer désormais
+
+Le premier appel se fait sans curseur (juste `limit` et les filtres). La réponse contient
+`@attributes.next` = URL absolue vers la page suivante (avec un paramètre `after=<cursor>`).
+On boucle en suivant `next` jusqu'à ce qu'il soit absent.
+
+```js
+let response = await client.get('/Item.json', { params: { itemMatrixID, limit: 100 } });
+for (;;) {
+  const items = response.Item ?? [];
+  // …traiter la page…
+  const nextUrl = response['@attributes']?.next;
+  if (!nextUrl) break;
+  response = await client.get(nextUrl);   // URL absolue, contient déjà le curseur
+}
+```
+
+**Piège** : `@attributes.next` ne réinjecte PAS les paramètres `load_relations` ni les
+filtres d'origine — il ne transporte que le curseur (`after`), `sort`, et `limit`. Si on
+suit `next` tel quel, on perd les relations chargées. `sync.js` contourne ça avec
+`rebuildUrl()` (sync.js:192) qui reconstruit l'URL en réinjectant les params d'origine
+depuis la requête initiale.
+
+### État du code
+
+- `sync.js` : déjà en cursor-pagination via `after` — pas de régression. La fonction
+  `rebuildUrl()` (sync.js:192) sert de référence.
+- `lib/lightspeed-client.js:listVariantsForMatrix()` : extrait `after` depuis `next` et
+  réémet avec ses `baseParams` d'origine (même approche que `sync.js`). Toute méthode
+  paginée qui charge des `load_relations` ou applique des filtres DOIT faire pareil,
+  sinon les pages ≥2 perdent silencieusement leurs relations/filtres.
+- Aucun autre endroit du repo n'envoyait `offset=…` à l'API (vérifié par grep août 2026).
+
+## Dette connue — matrices vides dans le catalogue (août 2026)
+
+Audit complet exécuté via `scripts/audit-empty-matrices.js` : **792 matrices ItemMatrix
+avec zéro variante** sur 23 442 matrices scannées (3,4 %). Aucune n'a été créée par nos
+outils — elles étaient déjà là avant. Décision explicite : **on ne nettoie pas**. Motifs :
+
+- Elles n'affectent pas les KPIs. Toutes les analyses (budget, ventes, stock) partent de
+  `products` filtrées avec `p.matrix_id IS NOT NULL AND EXISTS variants`, ou joignent
+  `sale_lines`/`inventory` qui n'ont aucune ligne pour ces matrices.
+- Le module d'import (Oui/Eurostyle) sait les gérer : les 2 qui portent un suffixe de
+  saison (`styleRef pXX`/`aXX`) sont **réutilisées automatiquement** par le résolveur
+  au lieu d'être dupliquées ; les 790 bare sont simplement ignorées (le module crée alors
+  une matrice `styleRef aXX` neuve, indépendante).
+- Le nettoyage manuel dans Lightspeed est fastidieux (DELETE en API = archive, pas
+  suppression réelle — voir historique 2026-07 sur task #34).
+
+**Répartition** (top 10 marques) : (sans manufacturer)=92, Oui=47, White Stuff=45,
+Indi & cold=39, Mélissa Nepton=39, Marc Cain=39, Brax=34, Tricotto=26, Coco y Club=26,
+Alison Sheri=25.
+
+**Cas notable** : 92 matrices sans marque assignée du tout. Probablement des créations
+de test anciennes ou des matrices dont le manufacturerID a été retiré. Elles ne sont
+récupérables par aucun mécanisme automatique — laisser dormir.
+
+Ré-exécuter l'audit : `railway run --service Postgres node scripts/audit-empty-matrices.js`.
+
+## Inconnu — modification d'attributs sur variante existante (août 2026)
+
+`PUT /Item/{id}` avec un `ItemAttributes.attribute1` ou `attribute2` modifié n'a **jamais
+été testé**. On ignore si Lightspeed :
+- accepte le changement et le propage (idéal),
+- refuse le changement (les attributs seraient immutables une fois posés),
+- accepte mais garde l'ancien label dans `attribute2Values` de la matrice.
+
+Corollaire : si un jour on veut renommer la couleur d'une variante déjà créée dans
+Lightspeed, ne pas partir du principe qu'un simple PUT suffit. Deux voies éprouvées :
+
+1. **Archive + recréer** (voie confirmée dans B9.5 fix — utilisée pour renommer les
+   variantes `"Dk brown grey black-899"` en `"Brun gris-899"`) : `DELETE /Item/{id}` puis
+   `POST /Item` avec les nouveaux attributs. Impacts en cascade sur les `OrderLine` qui
+   référencent la variante — si le PO est encore modifiable, supprimer et recréer aussi.
+
+2. **PUT à tester d'abord** (voie non validée) : essayer sur une seule variante,
+   observer via `GET /Item/{id}?load_relations=["ItemAttributes"]` si `attribute2` a
+   vraiment changé, et vérifier `GET /ItemMatrix/{id}` pour voir si `attribute2Values`
+   a été mis à jour. Si ces deux sont OK, le PUT devient la voie préférée (moins de
+   dégâts collatéraux).
+
+Contexte du non-test : dans B9.5, la fenêtre était pré-Shopify (aucun tag `add` posé
+encore), donc l'archivage était sans risque de duplication chez Shopify. La voie
+`archive+recréer` était systématiquement plus prudente à ce moment-là — la question du
+PUT n'a jamais été résolue.

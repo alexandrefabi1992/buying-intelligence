@@ -242,6 +242,12 @@ app.use('/api/logs',        requireAdmin);
 app.use('/api/test',        requireAdmin);
 app.use('/api/token',       requireAdmin);
 
+// Supplier order ingestion module (B9) — /api/import/* routes.
+// Global JWT middleware above already runs requireAuth for /api/*; the
+// mounted routes call requireAuth again defensively (idempotent).
+const { mountImportRoutes } = require('./lib/import-routes');
+mountImportRoutes(app, pool, requireAuth);
+
 // ---------------------------------------------------------------------------
 // POST /api/auth/login — email + password → JWT (no auth required)
 // ---------------------------------------------------------------------------
@@ -996,6 +1002,164 @@ async function runMigrations() {
       PRIMARY KEY (tenant_id, matrix_id)
     )
   `);
+
+  // ─── Supplier order ingestion module ─────────────────────────────────
+  //
+  // Two GLOBAL tables (shared across tenants — describe file structure only,
+  // never commercial data). A new tenant automatically benefits from recipes
+  // configured for another. Every row here MUST be free of prices, quantities,
+  // customer names, order numbers.
+  //
+  //   - parse_recipes: how to read a supplier file (regex, coordinates, headers)
+  //   - color_translations: raw supplier color → normalized "Nom-Code"
+  //
+  // Five PER-TENANT tables (all commercial content lives here):
+  //   - brand_vendor_map: default Lightspeed vendor per brand for this tenant
+  //   - import_files: parent for one uploaded PDF/XLSX (holds bytes)
+  //   - import_batches: one row per PO detected in the file
+  //   - import_order_lines: one row per size-quantity within a PO (created/skipped/failed status per line).
+  //     Named import_order_lines (not order_lines) to avoid collision with a hypothetical
+  //     future sync.js mirror of Lightspeed's OrderLine entity.
+  //   - import_queue: single-threaded job queue for API pushes
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS parse_recipes (
+      recipe_id                 SERIAL PRIMARY KEY,
+      supplier_key              TEXT   NOT NULL,     -- 'oui-eurostyle', 'bugatchi', ...
+      version                   INT    NOT NULL,
+      file_kind                 TEXT   NOT NULL,     -- 'pdf' | 'xlsx'
+      detection                 JSONB  NOT NULL,     -- rules to auto-identify this template
+      layout                    JSONB  NOT NULL,     -- structural extraction rules (no values)
+      target_manufacturer       TEXT,                -- brand this recipe produces (e.g. 'Oui')
+      default_attribute_set_id  TEXT DEFAULT '5',
+      notes                     TEXT,
+      active                    BOOLEAN NOT NULL DEFAULT true,
+      created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (supplier_key, version)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_parse_recipes_active ON parse_recipes(active, supplier_key)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS color_translations (
+      supplier_key   TEXT NOT NULL,
+      raw_color      TEXT NOT NULL,      -- 'blue', 'ultra violett' — as extracted
+      normalized     TEXT NOT NULL,      -- 'Bleu', 'Ultra Violett' — capitalized
+      PRIMARY KEY (supplier_key, raw_color)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS brand_vendor_map (
+      tenant_id      TEXT NOT NULL REFERENCES tenants(id),
+      manufacturer   TEXT NOT NULL,       -- 'Oui', 'Bugatchi'
+      vendor_id      TEXT NOT NULL,       -- Lightspeed defaultVendorID, e.g. '70'
+      vendor_name    TEXT,                -- 'EUROSTYLE' — display only
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (tenant_id, manufacturer)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS import_files (
+      file_id           SERIAL PRIMARY KEY,
+      tenant_id         TEXT NOT NULL REFERENCES tenants(id),
+      supplier_key      TEXT NOT NULL,
+      recipe_id         INT  NOT NULL REFERENCES parse_recipes(recipe_id),
+      source_filename   TEXT NOT NULL,
+      source_hash       TEXT NOT NULL,           -- SHA256, anti-double-import
+      source_bytes      BYTEA NOT NULL,          -- original file kept indefinitely
+      uploaded_by       TEXT,
+      uploaded_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+      season_tag        TEXT NOT NULL,           -- 'p27', 'a26' — from active budget at upload time
+      destination_shop_id TEXT NOT NULL,         -- shop selected in the budget UI at upload time
+      target_manufacturer TEXT NOT NULL,         -- brand row the user clicked from (validated)
+      status            TEXT NOT NULL DEFAULT 'parsed',  -- parsed | previewed | pushing | pushed | partial | failed
+      UNIQUE (tenant_id, source_hash)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_import_files_tenant_uploaded ON import_files(tenant_id, uploaded_at DESC)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS import_batches (
+      batch_id            SERIAL PRIMARY KEY,
+      file_id             INT  NOT NULL REFERENCES import_files(file_id) ON DELETE CASCADE,
+      tenant_id           TEXT NOT NULL REFERENCES tenants(id),
+      po_number           TEXT NOT NULL,          -- '0361041' — from PDF
+      customer_reference  TEXT,                   -- 'Urban Romance' — from PDF
+      order_date          DATE,                   -- Date de Commande from PDF
+      delivery_date       DATE,                   -- Date Exp. from PDF
+      cancel_date         DATE,                   -- Date de Canc from PDF
+      unit_count_declared INT,                    -- from 'Total Commande' in PDF
+      amount_declared     NUMERIC(10,2),
+      is_consignment      BOOLEAN NOT NULL DEFAULT false,
+      selected            BOOLEAN NOT NULL DEFAULT true,   -- unchecked = user opted out
+      status              TEXT NOT NULL DEFAULT 'pending', -- pending | pushing | pushed | partial | failed | skipped
+      -- Ordering side (Lightspeed):
+      lightspeed_order_id TEXT,                   -- returned by POST /Order
+      -- Audit
+      approved_by         TEXT,
+      approved_at         TIMESTAMPTZ,
+      pushed_at           TIMESTAMPTZ,
+      errors              JSONB,
+      UNIQUE (tenant_id, po_number)               -- one PO per tenant across all files
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_import_batches_file ON import_batches(file_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_import_batches_tenant_status ON import_batches(tenant_id, status)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS import_order_lines (
+      line_id             SERIAL PRIMARY KEY,
+      batch_id            INT  NOT NULL REFERENCES import_batches(batch_id) ON DELETE CASCADE,
+      tenant_id           TEXT NOT NULL REFERENCES tenants(id),
+      -- Extracted from file:
+      supplier_style_ref  TEXT NOT NULL,          -- '99103'
+      supplier_color_ref  TEXT,                   -- '5400'
+      color_normalized    TEXT,                   -- 'Bleu-5400'
+      size_label          TEXT NOT NULL,          -- '38' or 'OS'
+      qty                 INT  NOT NULL,          -- ordered quantity (becomes OrderLine.quantity)
+      unit_cost           NUMERIC(10,2),
+      unit_price_retail   NUMERIC(10,2),
+      -- Resolved to Lightspeed:
+      matrix_id           TEXT,                   -- filled after matrix ensured (POST or reuse)
+      item_id             TEXT,                   -- filled after variant ensured
+      lightspeed_order_line_id TEXT,              -- filled after POST /OrderLine
+      -- Per-line status for granular resume ('Reprendre' at line 181 of 265):
+      status              TEXT NOT NULL DEFAULT 'pending',
+      -- pending | matrix_ensured | variant_ensured | variant_tagged | ordered | skipped_duplicate | error
+      error_message       TEXT,
+      last_attempted_at   TIMESTAMPTZ
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_import_order_lines_batch  ON import_order_lines(batch_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_import_order_lines_status ON import_order_lines(tenant_id, status) WHERE status NOT IN ('ordered','skipped_duplicate')`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS import_queue (
+      job_id           SERIAL PRIMARY KEY,
+      tenant_id        TEXT NOT NULL REFERENCES tenants(id),
+      file_id          INT  NOT NULL REFERENCES import_files(file_id) ON DELETE CASCADE,
+      owner            TEXT,                       -- user email that queued the job
+      status           TEXT NOT NULL DEFAULT 'queued',  -- queued | running | done | failed
+      queued_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      started_at       TIMESTAMPTZ,
+      finished_at      TIMESTAMPTZ,
+      progress_current INT DEFAULT 0,              -- for UI progress bar
+      progress_total   INT DEFAULT 0,
+      error_message    TEXT
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_import_queue_pending ON import_queue(status, queued_at) WHERE status IN ('queued','running')`);
+
+  // Preview cache — populated on first /preview call, reused on subsequent
+  // calls unless ?refresh=true. Column added after the fact to keep the
+  // initial schema minimal; safe on live DBs (IF NOT EXISTS).
+  await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS preview_json JSONB`);
+  await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS preview_computed_at TIMESTAMPTZ`);
+  // 'abandoned' is a valid status on both import_files and import_batches:
+  // set by POST /files/:file_id/abandon when the user gives up on a
+  // partially-pushed file. No CHECK constraint on status, so no ALTER needed.
 
   console.log('[migration] Schema up to date');
 }

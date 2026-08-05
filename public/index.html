@@ -504,6 +504,9 @@
             <th class="px-4 py-2 text-right cursor-pointer select-none hover:text-gray-700 plan-sort-th" data-sort="diff">
               <span data-i18n="plan_col_diff">Écart</span> <span class="plan-sort-icon text-gray-400" data-icon="diff"></span>
             </th>
+            <th class="px-4 py-2 text-center">
+              <span data-i18n="plan_col_supplier">Fournisseur</span>
+            </th>
             <th class="px-4 py-2"></th>
           </tr>
         </thead>
@@ -758,6 +761,151 @@
       </div>
     </div>
 
+    <!-- ── Import modal — supplier order ingestion (B10) ─────────────── -->
+    <div id="importModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+      <div class="bg-white rounded-2xl shadow-2xl p-6 w-[32rem] max-w-[95vw]">
+        <h3 class="text-sm font-bold text-gray-800 mb-1">
+          <span data-i18n="import_modal_title">Importer une commande fournisseur</span>
+        </h3>
+        <p class="text-xs text-gray-500 mb-4" data-i18n="import_modal_subtitle">
+          Sélectionne le PDF de confirmation de commande. Le module détecte les commandes, crée les articles et matrices manquants, puis les bons de commande dans Lightspeed.
+        </p>
+
+        <div class="space-y-3">
+          <!-- Contextual info (readonly) -->
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_brand">Marque</label>
+              <div id="importModalBrand" class="border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 font-semibold text-gray-800">—</div>
+            </div>
+            <div>
+              <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_season">Saison</label>
+              <div id="importModalSeason" class="border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 font-semibold text-gray-800">—</div>
+            </div>
+          </div>
+
+          <!-- Shop: locked when the budget is on a specific shop, else selector -->
+          <div>
+            <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_shop">Boutique destinataire</label>
+            <div id="importModalShopLocked" class="border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-semibold text-gray-800 hidden">—</div>
+            <select id="importModalShop" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 hidden">
+              <option value="" data-i18n="import_shop_prompt">— Choisir une boutique —</option>
+            </select>
+            <p id="importModalShopHint" class="text-[10px] text-gray-400 mt-1"></p>
+          </div>
+
+          <!-- PDF picker -->
+          <div>
+            <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_file">Fichier PDF</label>
+            <input id="importModalFile" type="file" accept="application/pdf"
+                   class="w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 file:font-semibold file:cursor-pointer hover:file:bg-gray-100">
+          </div>
+
+          <!-- Feedback / result -->
+          <div id="importModalStatus" class="hidden text-xs rounded-lg px-3 py-2"></div>
+          <div id="importModalResult" class="hidden text-xs bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-3 space-y-1"></div>
+        </div>
+
+        <div class="flex gap-2 mt-5">
+          <button id="importModalSubmit"
+                  class="flex-1 bg-indigo-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  data-i18n="import_btn_upload">Analyser le PDF</button>
+          <button id="importModalClose"
+                  class="flex-1 border border-gray-300 text-gray-600 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors"
+                  data-i18n="btn_close">Fermer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Preview panel — full-screen overlay (B11) ─────────────────── -->
+    <div id="previewPanel" class="hidden fixed inset-0 bg-gray-50 z-50 overflow-auto">
+      <!-- Sticky header -->
+      <div class="sticky top-0 bg-white border-b border-gray-200 shadow-sm z-10 px-6 py-3 flex items-center gap-4">
+        <button id="previewCloseBtn" class="text-gray-400 hover:text-gray-800 text-xl leading-none" title="Fermer">✕</button>
+        <div class="flex-1 min-w-0">
+          <h2 class="text-sm font-bold text-gray-800 truncate" id="previewHeaderTitle" data-i18n="preview_title">Prévisualisation d'import</h2>
+          <p class="text-[11px] text-gray-500 truncate" id="previewHeaderMeta">—</p>
+        </div>
+        <div id="previewStatusPill" class="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-600 font-semibold hidden">—</div>
+        <button id="previewRefreshBtn"
+          class="text-gray-500 hover:text-indigo-600 text-xs border border-gray-200 rounded-lg px-3 py-1.5 hover:border-indigo-300 hover:bg-indigo-50"
+          data-i18n="preview_refresh_btn">Recharger</button>
+        <button id="previewAbandonBtn"
+          class="text-red-600 hover:text-white hover:bg-red-600 text-xs border border-red-200 rounded-lg px-3 py-1.5 hidden"
+          data-i18n="preview_abandon_btn">Abandonner</button>
+        <button id="previewPushBtn"
+          class="bg-emerald-600 text-white rounded-lg px-5 py-2 text-xs font-semibold hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          data-i18n="preview_push_btn">Pousser vers Lightspeed</button>
+      </div>
+
+      <!-- Body -->
+      <div class="max-w-7xl mx-auto p-6 space-y-6">
+        <!-- Loading / error message -->
+        <div id="previewMessage" class="hidden text-sm rounded-lg px-4 py-3"></div>
+
+        <!-- Push progress (shown when pushing) -->
+        <div id="previewProgress" class="hidden bg-white border border-indigo-200 rounded-xl px-5 py-4 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-indigo-800">
+              <span data-i18n="preview_progress_lbl">Push en cours</span> — <span id="previewProgressCounts">0/0</span>
+            </span>
+            <span id="previewProgressStatus" class="text-[11px] text-gray-500">—</span>
+          </div>
+          <div class="w-full h-2 bg-indigo-100 rounded-full overflow-hidden">
+            <div id="previewProgressBar" class="h-full bg-indigo-600 transition-all" style="width:0%"></div>
+          </div>
+          <div id="previewProgressErrors" class="mt-3 text-[11px] text-red-700 hidden"></div>
+        </div>
+
+        <!-- Summary tiles -->
+        <div id="previewSummaryTiles" class="grid grid-cols-2 md:grid-cols-5 gap-3"></div>
+
+        <!-- Warnings -->
+        <div id="previewWarnings" class="hidden bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <div class="text-xs font-semibold text-amber-800 mb-1" data-i18n="preview_warnings_lbl">Avertissements</div>
+          <ul id="previewWarningsList" class="text-[11px] text-amber-900 space-y-0.5 pl-4 list-disc"></ul>
+        </div>
+
+        <!-- Batches (POs) -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
+          <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="text-xs font-semibold text-gray-700 uppercase" data-i18n="preview_batches_title">Commandes détectées</h3>
+            <span id="previewBatchesCount" class="text-xs text-gray-500">—</span>
+          </div>
+          <div id="previewBatchesList" class="divide-y divide-gray-100"></div>
+        </div>
+
+        <!-- Matrices -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
+          <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+            <h3 class="text-xs font-semibold text-gray-700 uppercase" data-i18n="preview_matrices_title">Matrices &amp; variantes</h3>
+            <div class="flex items-center gap-2 text-[11px]">
+              <label class="text-gray-500"><input type="checkbox" id="previewFilterCreate" class="align-middle" checked> <span data-i18n="preview_flt_create">à créer</span></label>
+              <label class="text-gray-500"><input type="checkbox" id="previewFilterSuffix" class="align-middle" checked> <span data-i18n="preview_flt_suffix">avec suffixe</span></label>
+              <label class="text-gray-500"><input type="checkbox" id="previewFilterComplete" class="align-middle" checked> <span data-i18n="preview_flt_complete">à compléter</span></label>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-xs">
+              <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+                <tr>
+                  <th class="px-3 py-2 text-left">Style</th>
+                  <th class="px-3 py-2 text-left">Couleur</th>
+                  <th class="px-3 py-2 text-left">Description</th>
+                  <th class="px-3 py-2 text-left" data-i18n="preview_col_action">Action</th>
+                  <th class="px-3 py-2 text-left" data-i18n="preview_col_desc_planned">Nom planifié</th>
+                  <th class="px-3 py-2 text-right">Coût</th>
+                  <th class="px-3 py-2 text-right">Détail</th>
+                  <th class="px-3 py-2 text-left" data-i18n="preview_col_variants">Variantes</th>
+                </tr>
+              </thead>
+              <tbody id="previewMatricesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </section>
 
   <!-- ── PARAMÈTRES ────────────────────────────────────────────────── -->
@@ -961,6 +1109,41 @@ const TRANSLATIONS = {
     plan_title:'Création de budget', plan_saved:'✓ Sauvegardé',
     plan_total_suggested:'budget suggéré', plan_total_planned:'planifié', plan_total_diff:'écart',
     plan_col_suggested:'Budget suggéré', plan_col_planned:'Total planifié', plan_col_diff:'Écart', plan_col_actions:'',
+    plan_col_supplier:'Fournisseur',
+    plan_import_supplier_btn:'Importer', plan_import_supplier_title:'Importer une confirmation de commande fournisseur',
+    import_modal_title:'Importer une commande fournisseur',
+    import_modal_subtitle:'Sélectionne le PDF de confirmation de commande. Le module détecte les commandes, crée les articles et matrices manquants, puis les bons de commande dans Lightspeed.',
+    import_lbl_brand:'Marque', import_lbl_season:'Saison', import_lbl_shop:'Boutique destinataire', import_lbl_file:'Fichier PDF',
+    import_shop_prompt:'— Choisir une boutique —',
+    import_shop_hint_locked:'Verrouillé par le contexte du budget (une seule boutique active).',
+    import_shop_hint_pick:'Le budget est en mode "Toutes les boutiques" — précise la boutique du BC.',
+    import_btn_upload:'Analyser le PDF', import_btn_uploading:'Analyse en cours…',
+    import_err_no_file:'Sélectionne un fichier PDF.',
+    import_err_no_shop:'Choisis une boutique destinataire.',
+    import_err_no_season:'Aucune saison sélectionnée dans le budget actif.',
+    import_ok_parsed:'PDF analysé — {n} commande(s) détectée(s) :',
+    import_next_step:'Ouvrir la prévisualisation',
+    btn_close:'Fermer',
+    preview_title:'Prévisualisation d\'import',
+    preview_refresh_btn:'Recharger', preview_abandon_btn:'Abandonner',
+    preview_push_btn:'Pousser vers Lightspeed', preview_push_confirm:'Confirmer le push de {n} lignes ?',
+    preview_batches_title:'Commandes détectées',
+    preview_matrices_title:'Matrices & variantes',
+    preview_warnings_lbl:'Avertissements',
+    preview_progress_lbl:'Push en cours',
+    preview_flt_create:'à créer', preview_flt_suffix:'avec suffixe', preview_flt_complete:'à compléter',
+    preview_col_action:'Action', preview_col_desc_planned:'Nom planifié', preview_col_variants:'Variantes',
+    preview_tile_matrices:'matrices', preview_tile_new:'nouvelles', preview_tile_suffix:'avec suffixe',
+    preview_tile_complete:'à compléter', preview_tile_variants:'variantes',
+    preview_action_new:'CRÉER (bare)', preview_action_suffix:'CRÉER (suffixe)', preview_action_complete:'COMPLÉTER',
+    preview_batch_selected:'Inclure ce PO', preview_batch_frozen:'PO déjà poussé — verrouillé',
+    preview_batch_abandoned:'PO abandonné',
+    preview_loading:'Chargement de la prévisualisation…', preview_err:'Erreur : {msg}',
+    preview_pushed:'Push terminé.',
+    preview_partial:'Push terminé avec {n} erreur(s). Utilise "Reprendre" pour retenter.',
+    preview_failed:'Push échoué.',
+    preview_no_batch_id_warn:'(cache stale — recharger pour éditer)',
+    preview_abandon_confirm:'Marquer ce fichier comme abandonné ? Les objets déjà créés dans Lightspeed resteront et devront être nettoyés manuellement.',
     plan_by_shop:'Par boutique', plan_suggested_lbl:'Suggéré :',
     filter_boutiques:'Boutiques',
     btn_apply:'Appliquer', btn_reset:'Réinitialiser',
@@ -1192,6 +1375,41 @@ const TRANSLATIONS = {
     plan_title:'Budget Creation', plan_saved:'✓ Saved',
     plan_total_suggested:'suggested budget', plan_total_planned:'planned', plan_total_diff:'variance',
     plan_col_suggested:'Suggested Budget', plan_col_planned:'Total Planned', plan_col_diff:'Variance', plan_col_actions:'',
+    plan_col_supplier:'Supplier',
+    plan_import_supplier_btn:'Import', plan_import_supplier_title:'Import a supplier order confirmation',
+    import_modal_title:'Import supplier order',
+    import_modal_subtitle:'Pick the order confirmation PDF. The module detects orders, creates missing items and matrices, then the POs in Lightspeed.',
+    import_lbl_brand:'Brand', import_lbl_season:'Season', import_lbl_shop:'Destination shop', import_lbl_file:'PDF file',
+    import_shop_prompt:'— Pick a shop —',
+    import_shop_hint_locked:'Locked by the active budget context (single-shop mode).',
+    import_shop_hint_pick:'Budget is in "All shops" mode — pick the PO shop.',
+    import_btn_upload:'Analyze PDF', import_btn_uploading:'Analyzing…',
+    import_err_no_file:'Pick a PDF file.',
+    import_err_no_shop:'Pick a destination shop.',
+    import_err_no_season:'No season selected in the active budget.',
+    import_ok_parsed:'PDF parsed — {n} order(s) detected:',
+    import_next_step:'Open preview',
+    btn_close:'Close',
+    preview_title:'Import preview',
+    preview_refresh_btn:'Refresh', preview_abandon_btn:'Abandon',
+    preview_push_btn:'Push to Lightspeed', preview_push_confirm:'Confirm push of {n} lines?',
+    preview_batches_title:'Detected orders',
+    preview_matrices_title:'Matrices & variants',
+    preview_warnings_lbl:'Warnings',
+    preview_progress_lbl:'Pushing',
+    preview_flt_create:'create', preview_flt_suffix:'w/ suffix', preview_flt_complete:'complete',
+    preview_col_action:'Action', preview_col_desc_planned:'Planned name', preview_col_variants:'Variants',
+    preview_tile_matrices:'matrices', preview_tile_new:'new', preview_tile_suffix:'w/ suffix',
+    preview_tile_complete:'to complete', preview_tile_variants:'variants',
+    preview_action_new:'CREATE (bare)', preview_action_suffix:'CREATE (suffix)', preview_action_complete:'COMPLETE',
+    preview_batch_selected:'Include this PO', preview_batch_frozen:'PO already pushed — locked',
+    preview_batch_abandoned:'PO abandoned',
+    preview_loading:'Loading preview…', preview_err:'Error: {msg}',
+    preview_pushed:'Push complete.',
+    preview_partial:'Push completed with {n} error(s). Use "Resume" to retry.',
+    preview_failed:'Push failed.',
+    preview_no_batch_id_warn:'(stale cache — refresh to edit)',
+    preview_abandon_confirm:'Mark this file as abandoned? Objects already created in Lightspeed will remain and need manual cleanup.',
     plan_by_shop:'By Store', plan_suggested_lbl:'Suggested:',
     filter_boutiques:'Boutiques',
     btn_apply:'Apply', btn_reset:'Reset',
@@ -3193,6 +3411,12 @@ const PlanTab = (() => {
           <td class="px-4 py-2.5 text-right text-gray-500">${suggestedCell}</td>
           <td class="px-4 py-2.5 text-right font-semibold text-indigo-700">${totalPlan > 0 ? fmtC(totalPlan) : '<span class="text-gray-300">—</span>'}</td>
           <td class="px-4 py-2.5 text-right">${diffHtml}</td>
+          <td class="px-4 py-2.5 text-center">
+            <button class="plan-import-btn text-gray-400 hover:text-indigo-600 text-xs px-2 py-1 rounded border border-transparent hover:border-indigo-200 hover:bg-indigo-50 transition-colors"
+                    title="${t('plan_import_supplier_title')}" data-mfr="${escHtml(mfr)}">
+              ↑ ${t('plan_import_supplier_btn')}
+            </button>
+          </td>
           <td class="px-4 py-2.5 text-right">
             ${m._manual
               ? `<span class="flex items-center justify-end gap-0.5">
@@ -3204,7 +3428,7 @@ const PlanTab = (() => {
           </td>
         </tr>
         <tr class="plan-detail hidden" data-mfr="${escHtml(mfr)}">
-          <td colspan="5" class="px-6 py-4 bg-gray-50 border-t border-gray-100">
+          <td colspan="6" class="px-6 py-4 bg-gray-50 border-t border-gray-100">
             ${renderDropsBlock(mfr, effectiveSuggested)}
           </td>
         </tr>`);
@@ -3262,6 +3486,7 @@ const PlanTab = (() => {
         if (e.target.closest('.plan-exclude-btn'))    return;
         if (e.target.closest('.plan-suggested-input')) return;
         if (e.target.closest('.plan-suggested-reset')) return;
+        if (e.target.closest('.plan-import-btn'))      return;
         const mfr    = row.dataset.mfr;
         const detail = document.querySelector(`.plan-detail[data-mfr="${CSS.escape(mfr)}"]`);
         const toggle = row.querySelector('.plan-toggle');
@@ -3679,6 +3904,555 @@ const PlanTab = (() => {
   }
 
   return { load, init };
+})();
+
+// ────────────────────────────────────────────────────────────────────────
+// ImportModal — supplier order ingestion (B10)
+// ────────────────────────────────────────────────────────────────────────
+// Opens from a click on any .plan-import-btn in the Création de budget table.
+// Pre-fills brand + season from context; user picks shop + PDF, then Analyse
+// posts multipart to /api/import/upload. On success shows batch summary and
+// a placeholder for the preview view (B11).
+const ImportModal = (() => {
+  const state = { brand: null, season: null, fileId: null };
+
+  function el(id) { return document.getElementById(id); }
+  function show()  { el('importModal').classList.remove('hidden'); }
+  function hide()  { el('importModal').classList.add('hidden'); }
+
+  function reset() {
+    el('importModalFile').value = '';
+    el('importModalStatus').classList.add('hidden');
+    el('importModalStatus').className = 'text-xs rounded-lg px-3 py-2 hidden';
+    el('importModalStatus').textContent = '';
+    el('importModalResult').classList.add('hidden');
+    el('importModalResult').innerHTML = '';
+    el('importModalSubmit').disabled = false;
+    el('importModalSubmit').textContent = t('import_btn_upload');
+    state.fileId = null;
+  }
+
+  function setStatus(kind, msg) {
+    const s = el('importModalStatus');
+    s.className = 'text-xs rounded-lg px-3 py-2 ' + (
+      kind === 'error' ? 'bg-red-50 border border-red-200 text-red-700' :
+      kind === 'info'  ? 'bg-blue-50 border border-blue-200 text-blue-700' :
+                         'bg-emerald-50 border border-emerald-200 text-emerald-700'
+    );
+    s.textContent = msg;
+    s.classList.remove('hidden');
+  }
+
+  function showShopLocked(shopId, shopName) {
+    state.shopId = shopId;
+    el('importModalShopLocked').textContent = `${shopId} — ${shopName}`;
+    el('importModalShopLocked').classList.remove('hidden');
+    el('importModalShop').classList.add('hidden');
+    el('importModalShopHint').textContent = t('import_shop_hint_locked');
+  }
+
+  function showShopPicker() {
+    state.shopId = null;
+    const sel = el('importModalShop');
+    while (sel.options.length > 1) sel.remove(1);
+    SHOPS.forEach(({ id, name }) => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = `${id} — ${name}`;
+      sel.appendChild(opt);
+    });
+    sel.value = '';
+    el('importModalShopLocked').classList.add('hidden');
+    el('importModalShop').classList.remove('hidden');
+    el('importModalShopHint').textContent = t('import_shop_hint_pick');
+  }
+
+  function open(brand) {
+    reset();
+    state.brand = brand;
+    // Season from the planSeason selector — required
+    const seasonSel = el('planSeason');
+    state.season = seasonSel?.value || null;
+    el('importModalBrand').textContent  = brand || '—';
+    el('importModalSeason').textContent = state.season || '—';
+    // Shop: locked if budget is on a single shop, else selector
+    const planShopVal = el('planShopSel')?.value || '';
+    const shopRow = SHOPS.find(s => s.id === planShopVal);
+    if (planShopVal && shopRow) showShopLocked(shopRow.id, shopRow.name);
+    else                        showShopPicker();
+    if (!state.season) setStatus('error', t('import_err_no_season'));
+    show();
+  }
+
+  async function submit() {
+    const file = el('importModalFile').files[0];
+    if (!file)          return setStatus('error', t('import_err_no_file'));
+    if (!state.season)  return setStatus('error', t('import_err_no_season'));
+    // Shop: from the locked context if present, else from the selector.
+    const shopId = state.shopId || el('importModalShop').value;
+    if (!shopId)        return setStatus('error', t('import_err_no_shop'));
+
+    el('importModalSubmit').disabled = true;
+    el('importModalSubmit').textContent = t('import_btn_uploading');
+    el('importModalStatus').classList.add('hidden');
+    el('importModalResult').classList.add('hidden');
+
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('season_tag', state.season);
+      fd.append('destination_shop_id', shopId);
+      fd.append('target_manufacturer', state.brand);
+      // Use fetch directly — apiFetch sets Content-Type: json which breaks multipart.
+      const token = getToken();
+      const res = await fetch(`${BASE}/api/import/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // Structured error → friendlier message
+        const msg = ({
+          brand_mismatch:   `Le PDF concerne "${data.pdf_brand ?? '?'}", pas "${state.brand}".`,
+          duplicate_file:   `Ce fichier a déjà été importé (file_id ${data.existing_file_id}).`,
+          unrecognized_format: 'Format de fichier non reconnu — aucun gabarit ne matche.',
+          parse_failed:     `Erreur d'analyse : ${data.message ?? ''}`,
+          no_file:          'Aucun fichier reçu.',
+          missing_field:    data.message ?? 'Champ obligatoire manquant.',
+        })[data.error] || data.message || `HTTP ${res.status}`;
+        setStatus('error', msg);
+        el('importModalSubmit').disabled = false;
+        el('importModalSubmit').textContent = t('import_btn_upload');
+        return;
+      }
+
+      // Success — render batches
+      state.fileId = data.file_id;
+      const rendered = t('import_ok_parsed').replace('{n}', data.batches.length);
+      const rows = data.batches.map(b => {
+        const cons = b.is_consignment ? ' <span class="text-amber-600 font-semibold">[consignation]</span>' : '';
+        const amt  = b.amount_declared != null ? `${Number(b.amount_declared).toFixed(2)} $` : '—';
+        return `<li class="text-gray-700">
+          <span class="font-semibold">PO ${b.po_number}</span>
+          — ${b.customer_reference || '<span class="text-gray-400">(sans référence)</span>'}
+          — ${b.unit_count_declared ?? '?'} u / ${amt}${cons}
+        </li>`;
+      }).join('');
+      const warn = (data.warnings && data.warnings.length)
+        ? `<div class="mt-2 text-amber-700 text-[11px]">${data.warnings.length} avertissement(s) — voir preview.</div>`
+        : '';
+      el('importModalResult').innerHTML = `
+        <div class="font-semibold text-emerald-800 mb-1">${rendered}</div>
+        <ul class="pl-4 list-disc space-y-0.5">${rows}</ul>
+        ${warn}
+        <div class="mt-3 pt-2 border-t border-emerald-200">
+          <span class="text-gray-500">file_id: ${data.file_id}</span> —
+          <button id="importGoToPreview"
+            class="text-indigo-600 hover:text-indigo-800 font-semibold underline">
+            ${t('import_next_step')}
+          </button>
+        </div>`;
+      el('importModalResult').classList.remove('hidden');
+      el('importModalSubmit').disabled = true;
+      el('importModalSubmit').textContent = t('import_btn_upload');
+
+      // Open PreviewPanel for the newly-uploaded file. Fresh compute so the
+      // preview reflects any translations/settings changes since last upload.
+      el('importGoToPreview').addEventListener('click', () => {
+        hide();
+        PreviewPanel.open(state.fileId, { refresh: true });
+      });
+    } catch (e) {
+      setStatus('error', `Erreur réseau : ${e.message}`);
+      el('importModalSubmit').disabled = false;
+      el('importModalSubmit').textContent = t('import_btn_upload');
+    }
+  }
+
+  function init() {
+    // Delegated listener — fires for any .plan-import-btn even after re-renders.
+    document.getElementById('planBody')?.addEventListener('click', e => {
+      const btn = e.target.closest('.plan-import-btn');
+      if (!btn) return;
+      e.stopPropagation();
+      open(btn.dataset.mfr);
+    });
+    el('importModalClose')?.addEventListener('click', hide);
+    el('importModalSubmit')?.addEventListener('click', submit);
+    // Click outside → close
+    el('importModal')?.addEventListener('click', e => {
+      if (e.target === el('importModal')) hide();
+    });
+  }
+
+  return { init, open };
+})();
+
+// ────────────────────────────────────────────────────────────────────────
+// PreviewPanel — full-screen import preview + push (B11)
+// ────────────────────────────────────────────────────────────────────────
+// open(fileId, opts?) fetches the preview JSON and renders POs, matrices, and
+// a push CTA. Batches are toggleable via PATCH; PO status ≥ 'pushing' locks
+// the checkbox. Push button POSTs /push and polls /progress every 3s until
+// terminal (done | failed). Abandon posts /abandon; the resulting cleanup
+// list is displayed inline.
+const PreviewPanel = (() => {
+  const state = {
+    fileId:    null,
+    data:      null,
+    pushing:   false,
+    jobId:     null,
+    pollTimer: null,
+    filters:   { create_new: true, create_with_suffix: true, complete_existing: true },
+  };
+
+  const el = id => document.getElementById(id);
+
+  const ACTION_CLS = {
+    create_new:        'bg-emerald-100 text-emerald-800',
+    create_with_suffix:'bg-indigo-100 text-indigo-800',
+    complete_existing: 'bg-amber-100 text-amber-800',
+    error:             'bg-red-100 text-red-700',
+  };
+
+  function actionLabel(action) {
+    return {
+      create_new:         t('preview_action_new'),
+      create_with_suffix: t('preview_action_suffix'),
+      complete_existing:  t('preview_action_complete'),
+      error:              'ERROR',
+    }[action] || action;
+  }
+
+  function show() { el('previewPanel').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+  function hide() { el('previewPanel').classList.add('hidden');    document.body.style.overflow = ''; stopPolling(); }
+  function stopPolling() { if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; } }
+
+  function setMessage(kind, msg) {
+    const m = el('previewMessage');
+    if (!msg) { m.classList.add('hidden'); return; }
+    m.className = 'text-sm rounded-lg px-4 py-3 ' + (
+      kind === 'error' ? 'bg-red-50 border border-red-200 text-red-700' :
+      kind === 'ok'    ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' :
+                         'bg-blue-50 border border-blue-200 text-blue-700');
+    m.innerHTML = msg;
+    m.classList.remove('hidden');
+  }
+
+  function setStatusPill(text, kind = 'gray') {
+    const p = el('previewStatusPill');
+    p.textContent = text;
+    p.className = 'text-xs px-3 py-1 rounded-full font-semibold ' + ({
+      gray:   'bg-gray-100 text-gray-600',
+      indigo: 'bg-indigo-100 text-indigo-700',
+      green:  'bg-emerald-100 text-emerald-700',
+      amber:  'bg-amber-100 text-amber-800',
+      red:    'bg-red-100 text-red-700',
+    }[kind] || 'bg-gray-100 text-gray-600');
+    p.classList.remove('hidden');
+  }
+
+  async function open(fileId, opts = {}) {
+    stopPolling();
+    state.fileId = fileId;
+    state.data   = null;
+    state.pushing = false;
+    state.jobId   = null;
+    show();
+    el('previewProgress').classList.add('hidden');
+    el('previewAbandonBtn').classList.add('hidden');
+    setMessage('info', t('preview_loading'));
+    el('previewSummaryTiles').innerHTML  = '';
+    el('previewBatchesList').innerHTML   = '';
+    el('previewMatricesBody').innerHTML  = '';
+    el('previewWarnings').classList.add('hidden');
+    el('previewStatusPill').classList.add('hidden');
+
+    try {
+      const url = `${BASE}/api/import/files/${fileId}/preview${opts.refresh ? '?refresh=true' : ''}`;
+      const res = await apiFetch(url);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || `HTTP ${res.status}`);
+      }
+      state.data = await res.json();
+      setMessage(null);
+      render();
+
+      // If the file was already pushed / partial / failed, reflect that
+      if (['pushed','partial','failed','abandoned','pushing'].some(s => (state.data?.file?.status || '') === s)) {
+        // (we don't fetch file status via /preview — expose via a separate call below)
+      }
+      // Fetch fresh progress once so we know if a job is running
+      await refreshProgress();
+    } catch (e) {
+      setMessage('error', t('preview_err').replace('{msg}', escHtml(e.message)));
+    }
+  }
+
+  function render() {
+    const d = state.data;
+    if (!d) return;
+    // Header
+    el('previewHeaderTitle').textContent =
+      `${t('preview_title')} — ${d.target_manufacturer || '?'} · ${d.season_tag || '?'}`;
+    const totLines = d.orders.reduce((s, o) => s + (o.lines?.length || 0), 0);
+    el('previewHeaderMeta').textContent =
+      `file_id ${state.fileId} · ${d.orders.length} PO · ${d.summary.matrix_count} matrices · ${totLines} lignes`;
+    // Enable abandon after preview loaded (still hidden while pushing; will show
+    // if push finishes with error or partial state)
+    el('previewAbandonBtn').classList.add('hidden');
+
+    // Summary tiles
+    const s = d.summary;
+    const tiles = [
+      { label: t('preview_tile_matrices'),   value: s.matrix_count,               cls: 'bg-gray-100 text-gray-800' },
+      { label: t('preview_tile_new'),        value: s.counters.create_new || 0,   cls: 'bg-emerald-100 text-emerald-800' },
+      { label: t('preview_tile_suffix'),     value: s.counters.create_with_suffix || 0, cls: 'bg-indigo-100 text-indigo-800' },
+      { label: t('preview_tile_complete'),   value: s.counters.complete_existing || 0,  cls: 'bg-amber-100 text-amber-800' },
+      { label: t('preview_tile_variants'),   value: s.variants_to_create,         cls: 'bg-white border border-gray-200 text-gray-700' },
+    ];
+    el('previewSummaryTiles').innerHTML = tiles.map(t => `
+      <div class="${t.cls} rounded-xl px-4 py-3 text-center">
+        <div class="text-2xl font-bold">${t.value}</div>
+        <div class="text-[10px] uppercase font-semibold tracking-wide opacity-70 mt-0.5">${escHtml(t.label)}</div>
+      </div>`).join('');
+
+    // Warnings
+    if (d.warnings && d.warnings.length) {
+      el('previewWarnings').classList.remove('hidden');
+      el('previewWarningsList').innerHTML = d.warnings.slice(0, 10)
+        .map(w => `<li><code class="text-[10px] bg-amber-100 px-1 rounded">${escHtml(w.code)}</code> ${escHtml(w.message)}</li>`).join('');
+    } else {
+      el('previewWarnings').classList.add('hidden');
+    }
+
+    // Batches
+    el('previewBatchesCount').textContent = `${d.orders.filter(o => o.selected).length} / ${d.orders.length} sélectionné(s)`;
+    el('previewBatchesList').innerHTML = d.orders.map(o => renderBatch(o)).join('');
+
+    // Matrices
+    renderMatricesTable();
+
+    // Push button — enabled only if there are selected non-abandoned batches
+    const selectable = d.orders.filter(o => o.selected && o.batch_status !== 'abandoned').length;
+    el('previewPushBtn').disabled = selectable === 0;
+
+    // Wire batch checkboxes + matrix filters
+    wireBatchInputs();
+    ['previewFilterCreate','previewFilterSuffix','previewFilterComplete'].forEach(id => {
+      el(id).onchange = () => { syncFiltersFromDom(); renderMatricesTable(); };
+    });
+  }
+
+  function syncFiltersFromDom() {
+    state.filters.create_new         = el('previewFilterCreate').checked;
+    state.filters.create_with_suffix = el('previewFilterSuffix').checked;
+    state.filters.complete_existing  = el('previewFilterComplete').checked;
+  }
+
+  function renderBatch(o) {
+    const locked = ['pushing','pushed','partial','abandoned'].includes(o.batch_status);
+    const abandoned = o.batch_status === 'abandoned';
+    const missingId = o.batch_id == null;
+    const consChip = o.is_consignment ? `<span class="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">consignation</span>` : '';
+    const orderIdChip = o.lightspeed_order_id ? `<span class="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">LS Order #${escHtml(o.lightspeed_order_id)}</span>` : '';
+    const statusChip = o.batch_status ? `<span class="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">${escHtml(o.batch_status)}</span>` : '';
+    const amt = o.amount_declared != null ? `${Number(o.amount_declared).toFixed(2)} $` : '—';
+    const staleWarn = missingId ? `<span class="text-[10px] text-amber-700 ml-2">${escHtml(t('preview_no_batch_id_warn'))}</span>` : '';
+    const disableAttr = (locked || missingId) ? 'disabled' : '';
+    return `
+      <div class="px-5 py-3 flex items-center gap-4 hover:bg-gray-50 ${abandoned ? 'opacity-60' : ''}">
+        <input type="checkbox" class="preview-batch-cb h-4 w-4 accent-indigo-600" ${disableAttr}
+               ${o.selected ? 'checked' : ''} data-batch-id="${o.batch_id ?? ''}" data-po="${escHtml(o.po_number)}"
+               title="${escHtml(locked ? t('preview_batch_frozen') : t('preview_batch_selected'))}">
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold text-gray-800">
+            PO ${escHtml(o.po_number)}
+            <span class="text-gray-500 font-normal">— ${escHtml(o.customer_reference || '')}</span>
+            ${staleWarn}
+          </div>
+          <div class="text-[11px] text-gray-500 flex items-center gap-2 flex-wrap mt-0.5">
+            <span>livraison ${escHtml(o.delivery_date || '—')}</span>
+            <span>·</span>
+            <span>annulation ${escHtml(o.cancel_date || '—')}</span>
+            <span>·</span>
+            <span>${o.unit_count_declared ?? '?'} u / ${amt}</span>
+            ${consChip} ${statusChip} ${orderIdChip}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function wireBatchInputs() {
+    document.querySelectorAll('.preview-batch-cb').forEach(cb => {
+      cb.addEventListener('change', async () => {
+        const batchId = cb.dataset.batchId;
+        const selected = cb.checked;
+        if (!batchId) return;
+        try {
+          const res = await apiFetch(`${BASE}/api/import/batches/${batchId}`, {
+            method: 'PATCH', body: JSON.stringify({ selected }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.message || `HTTP ${res.status}`);
+          }
+          // Reflect in local state
+          const o = state.data.orders.find(x => String(x.batch_id) === String(batchId));
+          if (o) o.selected = selected;
+          const selectable = state.data.orders.filter(x => x.selected && x.batch_status !== 'abandoned').length;
+          el('previewBatchesCount').textContent = `${selectable} / ${state.data.orders.length} sélectionné(s)`;
+          el('previewPushBtn').disabled = selectable === 0;
+        } catch (e) {
+          cb.checked = !selected;
+          setMessage('error', e.message);
+        }
+      });
+    });
+  }
+
+  function renderMatricesTable() {
+    const rows = state.data.matrices.filter(m =>
+      (state.filters.create_new         && m.action === 'create_new') ||
+      (state.filters.create_with_suffix && m.action === 'create_with_suffix') ||
+      (state.filters.complete_existing  && m.action === 'complete_existing') ||
+      m.action === 'error'
+    );
+    el('previewMatricesBody').innerHTML = rows.map(m => {
+      const actCls = ACTION_CLS[m.action] || 'bg-gray-100 text-gray-700';
+      const create = m.variants_to_create || [];
+      const already = m.variants_already_present || [];
+      const posN = m.pos_referenced?.length || 1;
+      const createStr = create.map(v => `${escHtml(v.size)}×${v.qty_across_pos}`).join(' ');
+      const alreadyStr = already.length ? `<span class="text-gray-400 text-[10px]">déjà : ${already.map(v => escHtml(v.size)).join(',')}</span>` : '';
+      const reuseStr = m.reused_matrix_id ? `<span class="text-[10px] text-indigo-600">→ #${escHtml(m.reused_matrix_id)}</span>` : '';
+      return `
+        <tr class="border-t border-gray-100">
+          <td class="px-3 py-2 font-semibold text-gray-800">${escHtml(m.style_ref)}</td>
+          <td class="px-3 py-2 text-gray-700">${escHtml(m.color_normalized)}</td>
+          <td class="px-3 py-2 text-gray-500">${escHtml(m.description || '')}</td>
+          <td class="px-3 py-2"><span class="text-[10px] font-semibold px-2 py-0.5 rounded ${actCls}">${escHtml(actionLabel(m.action))}</span></td>
+          <td class="px-3 py-2 text-gray-700">${escHtml(m.matrix_description_planned || '')} ${reuseStr}</td>
+          <td class="px-3 py-2 text-right text-gray-600">${m.unit_cost ?? '—'}</td>
+          <td class="px-3 py-2 text-right text-gray-600">${m.retail_price ?? '—'}</td>
+          <td class="px-3 py-2 text-[11px] text-gray-700">${createStr}${create.length && already.length ? ' ' : ''}${alreadyStr} ${posN > 1 ? `<span class="text-[10px] text-indigo-500 ml-1">×${posN}PO</span>` : ''}</td>
+        </tr>`;
+    }).join('') || `<tr><td colspan="8" class="px-3 py-8 text-center text-gray-400">Aucun résultat avec les filtres actuels.</td></tr>`;
+  }
+
+  async function refreshProgress() {
+    if (!state.fileId) return;
+    try {
+      const res = await apiFetch(`${BASE}/api/import/files/${state.fileId}/progress`);
+      if (!res.ok) return;
+      const p = await res.json();
+      updateProgress(p);
+      if (['queued','running'].includes(p.status)) {
+        state.pushing = true;
+        el('previewPushBtn').disabled = true;
+        startPolling();
+      }
+    } catch { /* no active job — OK */ }
+  }
+
+  function updateProgress(p) {
+    el('previewProgress').classList.remove('hidden');
+    const pct = p.total > 0 ? Math.min(100, Math.round(100 * p.current / p.total)) : 0;
+    el('previewProgressBar').style.width = pct + '%';
+    el('previewProgressCounts').textContent =
+      `${p.current}/${p.total}  (ok=${p.counts?.ordered || 0}, err=${p.counts?.error || 0})`;
+    el('previewProgressStatus').textContent = p.status;
+
+    if (p.recent_errors && p.recent_errors.length) {
+      el('previewProgressErrors').classList.remove('hidden');
+      el('previewProgressErrors').innerHTML = '<span class="font-semibold">Erreurs récentes :</span> ' +
+        p.recent_errors.slice(0, 5).map(e =>
+          `<div class="pl-2 mt-0.5">L${e.line_id} ${escHtml(e.style)}/${escHtml(e.color)}/${escHtml(e.size)}: ${escHtml((e.error_message||'').slice(0, 200))}</div>`
+        ).join('');
+    } else {
+      el('previewProgressErrors').classList.add('hidden');
+    }
+
+    if (['done','failed','partial'].includes(p.status)) {
+      stopPolling();
+      state.pushing = false;
+      if (p.status === 'done') { setStatusPill('DONE', 'green'); setMessage('ok', t('preview_pushed')); }
+      else if (p.status === 'partial' || (p.status === 'failed' && p.counts?.error > 0)) {
+        setStatusPill(p.status.toUpperCase(), 'amber');
+        setMessage('error', t('preview_partial').replace('{n}', p.counts?.error || 0));
+        el('previewAbandonBtn').classList.remove('hidden');
+      } else {
+        setStatusPill('FAILED', 'red');
+        setMessage('error', t('preview_failed'));
+        el('previewAbandonBtn').classList.remove('hidden');
+      }
+      el('previewPushBtn').disabled = false;
+    } else if (state.pushing) {
+      setStatusPill('RUNNING', 'indigo');
+    }
+  }
+
+  function startPolling() {
+    stopPolling();
+    state.pollTimer = setInterval(refreshProgress, 3000);
+  }
+
+  async function push() {
+    const selectable = state.data.orders.filter(o => o.selected && o.batch_status !== 'abandoned').length;
+    if (!selectable) return;
+    if (!confirm(t('preview_push_confirm').replace('{n}', state.data.summary.matrix_count))) return;
+    el('previewPushBtn').disabled = true;
+    setMessage(null);
+    try {
+      const res = await apiFetch(`${BASE}/api/import/files/${state.fileId}/push`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage('error', data.message || `HTTP ${res.status}`);
+        el('previewPushBtn').disabled = false;
+        return;
+      }
+      state.jobId = data.queue_job_id;
+      state.pushing = true;
+      setStatusPill('RUNNING', 'indigo');
+      updateProgress({ current: 0, total: data.lines_to_process, status: 'running', counts: {} });
+      startPolling();
+    } catch (e) {
+      setMessage('error', e.message);
+      el('previewPushBtn').disabled = false;
+    }
+  }
+
+  async function abandon() {
+    if (!confirm(t('preview_abandon_confirm'))) return;
+    try {
+      const res = await apiFetch(`${BASE}/api/import/files/${state.fileId}/abandon`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) { setMessage('error', data.message || `HTTP ${res.status}`); return; }
+      const list = (arr, label, formatter) => arr.length
+        ? `<div class="mt-1"><b>${label}:</b> ${arr.slice(0, 20).map(formatter).join(', ')}${arr.length > 20 ? ` + ${arr.length - 20} more` : ''}</div>`
+        : '';
+      const summary = data.cleanup_needed || {};
+      setMessage('info',
+        `<div class="font-semibold mb-1">Fichier abandonné. À nettoyer manuellement dans Lightspeed :</div>
+         ${list(summary.orders || [], 'Orders', o => `#${o.order_id} (${o.po_number})`)}
+         ${list(summary.matrices || [], 'Matrices', m => `#${m.matrix_id} (${m.style_ref})`)}
+         ${list(summary.items || [], 'Items', i => `#${i.item_id}`)}`);
+      setStatusPill('ABANDONED', 'red');
+      el('previewAbandonBtn').classList.add('hidden');
+    } catch (e) { setMessage('error', e.message); }
+  }
+
+  function init() {
+    el('previewCloseBtn')?.addEventListener('click', hide);
+    el('previewRefreshBtn')?.addEventListener('click', () => open(state.fileId, { refresh: true }));
+    el('previewPushBtn')?.addEventListener('click', push);
+    el('previewAbandonBtn')?.addEventListener('click', abandon);
+  }
+
+  return { init, open };
 })();
 
 // ── Pager ─────────────────────────────────────────────────────────────────
@@ -4709,6 +5483,8 @@ function initApp() {
 
     SizesTab.init();
     PlanTab.init();
+    ImportModal.init();
+    PreviewPanel.init();
     TransfersTab.init();
     loadSyncStatus();
     tabLoaded['budget'] = true;
