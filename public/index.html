@@ -4381,7 +4381,9 @@ const PreviewPanel = (() => {
       const res = await apiFetch(url);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || `HTTP ${res.status}`);
+        const err = new Error(data.message || `HTTP ${res.status}`);
+        err.code = data.error;
+        throw err;
       }
       state.data = await res.json();
       setMessage(null);
@@ -4394,7 +4396,63 @@ const PreviewPanel = (() => {
       // Fetch fresh progress once so we know if a job is running
       await refreshProgress();
     } catch (e) {
-      setMessage('error', t('preview_err').replace('{msg}', escHtml(e.message)));
+      if (e.code === 'awaiting_extraction') {
+        renderAwaitingExtraction();
+      } else {
+        setMessage('error', t('preview_err').replace('{msg}', escHtml(e.message)));
+      }
+    }
+  }
+
+  // File uploaded but no recipe matched — offer manual LLM extraction.
+  // Hides the standard action buttons and shows a single CTA card.
+  function renderAwaitingExtraction() {
+    el('previewRefreshBtn').classList.add('hidden');
+    el('previewPushBtn').classList.add('hidden');
+    el('previewAbandonBtn').classList.add('hidden');
+    setStatusPill('En attente d\'extraction', 'amber');
+    const m = el('previewMessage');
+    m.className = 'rounded-xl px-6 py-8 bg-white border border-gray-200 shadow-sm';
+    m.innerHTML = `
+      <div class="max-w-2xl mx-auto text-center">
+        <div class="text-4xl mb-3">📄</div>
+        <h3 class="text-base font-semibold text-gray-900 mb-2">Aucune recette ne correspond à ce fichier</h3>
+        <p class="text-xs text-gray-600 mb-5 leading-relaxed">
+          Ce PDF ne correspond à aucune recette d'extraction connue.
+          L'extraction par IA peut analyser n'importe quel format de bon de commande.<br>
+          <span class="text-gray-500">⏱ Compter 30 à 60 secondes.</span>
+        </p>
+        <button id="extractLlmBtn"
+          class="bg-indigo-600 text-white rounded-lg px-6 py-3 text-sm font-semibold hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-flex items-center gap-2">
+          <span>✨</span> Extraire avec l'IA
+        </button>
+        <div id="extractLlmStatus" class="text-xs text-gray-500 mt-3 hidden"></div>
+      </div>`;
+    m.classList.remove('hidden');
+    el('extractLlmBtn').onclick = extractWithLlm;
+  }
+
+  async function extractWithLlm() {
+    const btn    = el('extractLlmBtn');
+    const status = el('extractLlmStatus');
+    if (!btn) return;
+    btn.disabled    = true;
+    btn.innerHTML   = '<span class="inline-block animate-spin">⟳</span> Extraction en cours…';
+    status.textContent = 'Analyse du PDF, détection des tailles, appel du modèle…';
+    status.classList.remove('hidden');
+    try {
+      const res  = await apiFetch(`${BASE}/api/import/files/${state.fileId}/extract-llm`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);
+      // Re-open the preview — it will fetch the freshly-cached preview_json
+      el('previewRefreshBtn').classList.remove('hidden');
+      el('previewPushBtn').classList.remove('hidden');
+      await open(state.fileId);
+    } catch (e) {
+      btn.disabled    = false;
+      btn.innerHTML   = '<span>✨</span> Réessayer l\'extraction';
+      status.className = 'text-xs text-red-600 mt-3';
+      status.textContent = 'Échec : ' + e.message;
     }
   }
 
