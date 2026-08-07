@@ -4849,8 +4849,9 @@ const PreviewPanel = (() => {
     setMessage(null);
     try {
       const res = await apiFetch(`${BASE}/api/import/files/${state.fileId}/push`, {
-        method: 'POST',
-        body: JSON.stringify({ force_incomplete: incomplete }),
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ force_incomplete: incomplete }),
       });
       const data = await res.json();
       if (!res.ok) {
