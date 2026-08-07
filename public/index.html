@@ -4546,14 +4546,41 @@ const PreviewPanel = (() => {
           <span class="text-gray-500">⏱ Compter 30 à 60 secondes.</span>
         </p>
         ${prevErrHtml}
-        <button id="extractLlmBtn"
-          class="bg-indigo-600 text-white rounded-lg px-6 py-3 text-sm font-semibold hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-flex items-center gap-2">
-          <span>✨</span> ${previousError ? 'Réessayer l\'extraction' : 'Extraire avec l\'IA'}
-        </button>
+        <div class="flex gap-2 justify-center items-center">
+          <button id="extractLlmBtn"
+            class="bg-indigo-600 text-white rounded-lg px-6 py-3 text-sm font-semibold hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-flex items-center gap-2">
+            <span>✨</span> ${previousError ? 'Réessayer l\'extraction' : 'Extraire avec l\'IA'}
+          </button>
+          <button id="extractLlmCancelBtn"
+            class="hidden border border-red-300 text-red-700 rounded-lg px-4 py-3 text-xs font-semibold hover:bg-red-600 hover:text-white"
+            title="Annule l'extraction en cours (le job serveur peut continuer à tourner mais son résultat sera ignoré)">
+            Annuler
+          </button>
+        </div>
         <div id="extractLlmStatus" class="text-xs text-gray-500 mt-3 hidden"></div>
       </div>`;
     m.classList.remove('hidden');
     el('extractLlmBtn').onclick = extractWithLlm;
+    el('extractLlmCancelBtn').onclick = cancelExtraction;
+  }
+
+  // Cancel the in-flight extraction: bumps openGen so any pending poll
+  // aborts silently, then POSTs to /reset-extraction so the backend
+  // status returns to 'awaiting_extraction'. The Node background task
+  // may still be running; when it eventually tries to UPDATE the file,
+  // it may race with a subsequent extraction — that's acceptable since
+  // both would produce equivalent output.
+  async function cancelExtraction() {
+    const fileId = state.fileId;
+    if (!fileId) return;
+    state.openGen++; // supersede any active poll
+    try {
+      await apiFetch(`${BASE}/api/import/files/${fileId}/reset-extraction`, { method: 'POST' });
+    } catch { /* best-effort */ }
+    // Re-open panel — /preview will now return 400 awaiting_extraction
+    // and renderAwaitingExtraction will surface the "annulée manuellement"
+    // error message so the operator sees the reset happened.
+    await open(fileId);
   }
 
   // Triggered from the "Ré-extraire IA" header button on an already-
@@ -4574,6 +4601,7 @@ const PreviewPanel = (() => {
     const gen = state.openGen;
     btn.disabled    = true;
     btn.innerHTML   = '<span class="inline-block animate-spin">⟳</span> Extraction en cours…';
+    el('extractLlmCancelBtn').classList.remove('hidden');
     status.className = 'text-xs text-gray-500 mt-3';
     status.textContent = 'Démarrage de l\'extraction…';
     status.classList.remove('hidden');
