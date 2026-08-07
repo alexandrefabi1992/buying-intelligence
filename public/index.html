@@ -4343,9 +4343,13 @@ const ImportModal = (() => {
 
       // Open PreviewPanel for the newly-uploaded file. Fresh compute so the
       // preview reflects any translations/settings changes since last upload.
+      // Capture fileId BEFORE hide() — hide() calls reset() which nulls
+      // state.fileId, and passing null to PreviewPanel.open turns the URL
+      // into /files/null/preview -> 500 (integer parse error server-side).
+      const capturedFileId = state.fileId;
       el('importGoToPreview').addEventListener('click', () => {
         hide();
-        PreviewPanel.open(state.fileId, { refresh: true });
+        PreviewPanel.open(capturedFileId, { refresh: true });
       });
     } catch (e) {
       setStatus('error', `Erreur réseau : ${e.message}`);
@@ -4454,6 +4458,10 @@ const PreviewPanel = (() => {
   }
 
   async function open(fileId, opts = {}) {
+    if (fileId == null || fileId === 'null' || fileId === '') {
+      console.error('[preview] open() called with invalid fileId:', fileId);
+      return;
+    }
     const gen = ++state.openGen;
     // Also disable the refresh button while a fetch is in flight so the
     // operator can't spam-click and pile up concurrent open() calls.
