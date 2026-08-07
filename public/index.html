@@ -4587,6 +4587,16 @@ const PreviewPanel = (() => {
   function render() {
     const d = state.data;
     if (!d) return;
+    // Defensive: if the /preview response is missing the expected shape
+    // (can happen with a stale browser JS after a backend deploy — the
+    // server might have returned a 202 async-extraction envelope that the
+    // old client mistook for full preview data), bail cleanly with a
+    // hint to reload.
+    if (!Array.isArray(d.orders)) {
+      setMessage('error', 'Preview inattendue (pas de commandes). Recharge la page (Cmd+Shift+R) — le backend a peut-être été redéployé.');
+      console.warn('[preview] unexpected response shape', d);
+      return;
+    }
     // Header
     el('previewHeaderTitle').textContent =
       `${t('preview_title')} — ${d.target_manufacturer || '?'} · ${d.season_tag || '?'}`;
