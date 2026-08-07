@@ -1037,6 +1037,9 @@
         <button id="previewAbandonBtn"
           class="text-red-600 hover:text-white hover:bg-red-600 text-xs border border-red-200 rounded-lg px-3 py-1.5 hidden"
           data-i18n="preview_abandon_btn">Abandonner</button>
+        <button id="previewDeleteBtn"
+          class="text-red-600 hover:text-white hover:bg-red-600 text-xs border border-red-200 rounded-lg px-3 py-1.5"
+          title="Supprimer ce fichier définitivement">🗑 Supprimer</button>
         <button id="previewPushBtn"
           class="bg-emerald-600 text-white rounded-lg px-5 py-2 text-xs font-semibold hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
           data-i18n="preview_push_btn">Pousser vers Lightspeed</button>
@@ -4232,14 +4235,32 @@ const ImportModal = (() => {
               Une entrée existe déjà pour ce PDF (file_id ${data.existing_file_id}).
               Tu peux la rouvrir pour reprendre le travail là où tu l'avais laissé.
             </div>
-            <button id="dupOpenExisting"
-              class="bg-indigo-600 text-white rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-indigo-700">
-              Ouvrir la prévisualisation existante
-            </button>`;
+            <div class="flex gap-2 flex-wrap">
+              <button id="dupOpenExisting"
+                class="bg-indigo-600 text-white rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-indigo-700">
+                Ouvrir la prévisualisation existante
+              </button>
+              <button id="dupDeleteExisting"
+                class="border border-red-300 text-red-700 rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-red-600 hover:text-white"
+                title="Supprime l'ancien fichier puis relance l'import du même PDF">
+                🗑 Supprimer et ré-importer
+              </button>
+            </div>`;
           s.classList.remove('hidden');
           el('dupOpenExisting').onclick = () => {
             hide();
             PreviewPanel.open(data.existing_file_id);
+          };
+          el('dupDeleteExisting').onclick = async () => {
+            if (!confirm(`Supprimer l'import existant (file_id ${data.existing_file_id}) puis re-uploader ?\n\nCette action est irréversible.`)) return;
+            const delRes = await apiFetch(`${BASE}/api/import/files/${data.existing_file_id}`, { method: 'DELETE' });
+            const delData = await delRes.json().catch(() => ({}));
+            if (!delRes.ok) {
+              s.innerHTML = `<div class="text-red-700">Suppression impossible : ${escHtml(delData.message || 'HTTP ' + delRes.status)}</div>`;
+              return;
+            }
+            // Retry the original upload — click the submit button again
+            submit();
           };
           el('importModalSubmit').disabled = false;
           el('importModalSubmit').textContent = t('import_btn_upload');
@@ -4784,6 +4805,24 @@ const PreviewPanel = (() => {
     }
   }
 
+  async function deleteFile() {
+    if (!state.fileId) return;
+    if (!confirm(`Supprimer définitivement ce fichier d'import (file_id ${state.fileId}) ?\n\nCette action est irréversible et efface le PDF, les commandes détectées et les extractions. Rien n'est touché dans Lightspeed.`)) return;
+    try {
+      const res = await apiFetch(`${BASE}/api/import/files/${state.fileId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data.error === 'cannot_delete_pushed') {
+          setMessage('error', 'Impossible de supprimer : ce fichier a déjà été poussé vers Lightspeed. Utilise "Abandonner" pour marquer les commandes à nettoyer.');
+        } else {
+          setMessage('error', data.message || `HTTP ${res.status}`);
+        }
+        return;
+      }
+      hide();
+    } catch (e) { setMessage('error', e.message); }
+  }
+
   async function abandon() {
     if (!confirm(t('preview_abandon_confirm'))) return;
     try {
@@ -4809,6 +4848,7 @@ const PreviewPanel = (() => {
     el('previewRefreshBtn')?.addEventListener('click', () => open(state.fileId, { refresh: true }));
     el('previewPushBtn')?.addEventListener('click', push);
     el('previewAbandonBtn')?.addEventListener('click', abandon);
+    el('previewDeleteBtn')?.addEventListener('click', deleteFile);
   }
 
   return { init, open };
