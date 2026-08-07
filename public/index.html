@@ -4130,7 +4130,14 @@ const ImportModal = (() => {
 
   function el(id) { return document.getElementById(id); }
   function show()  { el('importModal').classList.remove('hidden'); }
-  function hide()  { el('importModal').classList.add('hidden'); }
+  // hide() also resets state so the next open() starts clean. Without this,
+  // the "PDF analysé — file_id X" success banner and the disabled submit
+  // button persist across close/reopen cycles — misleading after the user
+  // has deleted file X in the PreviewPanel.
+  function hide()  {
+    el('importModal').classList.add('hidden');
+    reset();
+  }
 
   function reset() {
     el('importModalFile').value = '';
@@ -4357,6 +4364,16 @@ const ImportModal = (() => {
     });
     el('importModalClose')?.addEventListener('click', hide);
     el('importModalSubmit')?.addEventListener('click', submit);
+    // If the operator picks a different PDF after a prior upload succeeded,
+    // clear the stale success banner + re-enable submit so they can upload
+    // the new file without having to close+reopen the modal.
+    el('importModalFile')?.addEventListener('change', () => {
+      el('importModalResult').classList.add('hidden');
+      el('importModalResult').innerHTML = '';
+      el('importModalStatus').classList.add('hidden');
+      el('importModalSubmit').disabled = false;
+      state.fileId = null;
+    });
     // Click outside → close
     el('importModal')?.addEventListener('click', e => {
       if (e.target === el('importModal')) hide();
