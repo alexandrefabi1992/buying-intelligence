@@ -4280,33 +4280,54 @@ const ImportModal = (() => {
         return;
       }
 
-      // Success — render batches
+      // Success — render batches. Two paths:
+      //  (a) recipe matched   → batches[] populated, show PO summary
+      //  (b) LLM needed       → batches=[], needs_llm_extraction=true
       state.fileId = data.file_id;
-      const rendered = t('import_ok_parsed').replace('{n}', data.batches.length);
-      const rows = data.batches.map(b => {
-        const cons = b.is_consignment ? ' <span class="text-amber-600 font-semibold">[consignation]</span>' : '';
-        const amt  = b.amount_declared != null ? `${Number(b.amount_declared).toFixed(2)} $` : '—';
-        return `<li class="text-gray-700">
-          <span class="font-semibold">PO ${b.po_number}</span>
-          — ${b.customer_reference || '<span class="text-gray-400">(sans référence)</span>'}
-          — ${b.unit_count_declared ?? '?'} u / ${amt}${cons}
-        </li>`;
-      }).join('');
-      const warn = (data.warnings && data.warnings.length)
-        ? `<div class="mt-2 text-amber-700 text-[11px]">${data.warnings.length} avertissement(s) — voir preview.</div>`
-        : '';
-      el('importModalResult').innerHTML = `
-        <div class="font-semibold text-emerald-800 mb-1">${rendered}</div>
-        <ul class="pl-4 list-disc space-y-0.5">${rows}</ul>
-        ${warn}
-        <div class="mt-3 pt-2 border-t border-emerald-200">
-          <span class="text-gray-500">file_id: ${data.file_id}</span> —
-          <button id="importGoToPreview"
-            class="text-indigo-600 hover:text-indigo-800 font-semibold underline">
-            ${t('import_next_step')}
-          </button>
-        </div>`;
-      el('importModalResult').classList.remove('hidden');
+      const box = el('importModalResult');
+      if (data.needs_llm_extraction) {
+        box.className = 'text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-3 space-y-1';
+        box.innerHTML = `
+          <div class="font-semibold text-amber-900 mb-1">📄 Fichier prêt — extraction IA requise</div>
+          <div class="text-[11px] text-amber-800 mb-2">
+            Aucune recette existante ne reconnaît ce PDF (${(data.attempted_recipes || []).length} testée(s)).
+            Ouvre la prévisualisation pour lancer l'extraction par IA (30–60 secondes).
+          </div>
+          <div class="pt-2 border-t border-amber-200">
+            <span class="text-gray-500">file_id: ${data.file_id}</span> —
+            <button id="importGoToPreview"
+              class="text-indigo-600 hover:text-indigo-800 font-semibold underline">
+              Ouvrir la prévisualisation →
+            </button>
+          </div>`;
+      } else {
+        box.className = 'text-xs bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-3 space-y-1';
+        const rendered = t('import_ok_parsed').replace('{n}', data.batches.length);
+        const rows = data.batches.map(b => {
+          const cons = b.is_consignment ? ' <span class="text-amber-600 font-semibold">[consignation]</span>' : '';
+          const amt  = b.amount_declared != null ? `${Number(b.amount_declared).toFixed(2)} $` : '—';
+          return `<li class="text-gray-700">
+            <span class="font-semibold">PO ${b.po_number}</span>
+            — ${b.customer_reference || '<span class="text-gray-400">(sans référence)</span>'}
+            — ${b.unit_count_declared ?? '?'} u / ${amt}${cons}
+          </li>`;
+        }).join('');
+        const warn = (data.warnings && data.warnings.length)
+          ? `<div class="mt-2 text-amber-700 text-[11px]">${data.warnings.length} avertissement(s) — voir preview.</div>`
+          : '';
+        box.innerHTML = `
+          <div class="font-semibold text-emerald-800 mb-1">${rendered}</div>
+          <ul class="pl-4 list-disc space-y-0.5">${rows}</ul>
+          ${warn}
+          <div class="mt-3 pt-2 border-t border-emerald-200">
+            <span class="text-gray-500">file_id: ${data.file_id}</span> —
+            <button id="importGoToPreview"
+              class="text-indigo-600 hover:text-indigo-800 font-semibold underline">
+              ${t('import_next_step')}
+            </button>
+          </div>`;
+      }
+      box.classList.remove('hidden');
       el('importModalSubmit').disabled = true;
       el('importModalSubmit').textContent = t('import_btn_upload');
 
