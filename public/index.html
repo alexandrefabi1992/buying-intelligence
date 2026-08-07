@@ -4378,6 +4378,12 @@ const PreviewPanel = (() => {
     pushing:   false,
     jobId:     null,
     pollTimer: null,
+    // Generation counter — incremented on every open() call. Any async
+    // continuation (fetch resolution, extraction poll iteration) that no
+    // longer matches state.openGen has been superseded and must bail
+    // before touching state.data or the DOM. Prevents the race where a
+    // slow first open() overwrites the render of a faster second open().
+    openGen:   0,
     filters:   { create_new: true, create_with_suffix: true, complete_existing: true },
   };
 
@@ -4428,6 +4434,11 @@ const PreviewPanel = (() => {
   }
 
   async function open(fileId, opts = {}) {
+    const gen = ++state.openGen;
+    // Also disable the refresh button while a fetch is in flight so the
+    // operator can't spam-click and pile up concurrent open() calls.
+    const refreshBtn = el('previewRefreshBtn');
+    refreshBtn.disabled = true;
     stopPolling();
     state.fileId = fileId;
     state.data   = null;
@@ -4446,6 +4457,7 @@ const PreviewPanel = (() => {
     try {
       const url = `${BASE}/api/import/files/${fileId}/preview${opts.refresh ? '?refresh=true' : ''}`;
       const res = await apiFetch(url);
+      if (gen !== state.openGen) return; // superseded by a newer open()
       // Extraction still running server-side (async pattern) — render the
       // awaiting card with a live status and start polling in place of
       // waiting for the operator to click "Extraire avec l'IA" again.
@@ -4459,11 +4471,13 @@ const PreviewPanel = (() => {
         status.textContent = 'Reprise du suivi d\'une extraction en cours…';
         status.classList.remove('hidden');
         try {
-          await pollExtractionUntilDone(status);
+          await pollExtractionUntilDone(status, gen);
+          if (gen !== state.openGen) return; // superseded
           el('previewRefreshBtn').classList.remove('hidden');
           el('previewPushBtn').classList.remove('hidden');
           await open(state.fileId);
         } catch (e) {
+          if (gen !== state.openGen) return; // superseded, silent
           btn.disabled = false;
           btn.innerHTML = '<span>✨</span> Réessayer l\'extraction';
           status.className = 'text-xs text-red-600 mt-3';
@@ -4473,12 +4487,15 @@ const PreviewPanel = (() => {
       }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        if (gen !== state.openGen) return;
         const err = new Error(data.message || `HTTP ${res.status}`);
         err.code = data.error;
         err.last_extraction_error = data.last_extraction_error;
         throw err;
       }
-      state.data = await res.json();
+      const responseData = await res.json();
+      if (gen !== state.openGen) return; // superseded
+      state.data = responseData;
       setMessage(null);
       render();
 
@@ -4489,11 +4506,14 @@ const PreviewPanel = (() => {
       // Fetch fresh progress once so we know if a job is running
       await refreshProgress();
     } catch (e) {
+      if (gen !== state.openGen) return; // superseded
       if (e.code === 'awaiting_extraction') {
         renderAwaitingExtraction(e.last_extraction_error);
       } else {
         setMessage('error', t('preview_err').replace('{msg}', escHtml(e.message)));
       }
+    } finally {
+      if (gen === state.openGen) refreshBtn.disabled = false;
     }
   }
 
@@ -4535,6 +4555,8 @@ const PreviewPanel = (() => {
     const btn    = el('extractLlmBtn');
     const status = el('extractLlmStatus');
     if (!btn) return;
+    // Snapshot the generation so an intervening open() aborts our poll.
+    const gen = state.openGen;
     btn.disabled    = true;
     btn.innerHTML   = '<span class="inline-block animate-spin">⟳</span> Extraction en cours…';
     status.className = 'text-xs text-gray-500 mt-3';
@@ -4546,12 +4568,15 @@ const PreviewPanel = (() => {
       // to awaiting_extraction with a persisted error).
       const res  = await apiFetch(`${BASE}/api/import/files/${state.fileId}/extract-llm`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
+      if (gen !== state.openGen) return;
       if (!res.ok && res.status !== 202) throw new Error(data.message || data.error || `HTTP ${res.status}`);
-      await pollExtractionUntilDone(status);
+      await pollExtractionUntilDone(status, gen);
+      if (gen !== state.openGen) return;
       el('previewRefreshBtn').classList.remove('hidden');
       el('previewPushBtn').classList.remove('hidden');
       await open(state.fileId);
     } catch (e) {
+      if (gen !== state.openGen) return;
       btn.disabled    = false;
       btn.innerHTML   = '<span>✨</span> Réessayer l\'extraction';
       status.className = 'text-xs text-red-600 mt-3';
@@ -4560,19 +4585,27 @@ const PreviewPanel = (() => {
   }
 
   // Poll /preview until extraction terminates. Elapsed timer displayed so
-  // the user has visual feedback that things are still moving.
-  async function pollExtractionUntilDone(statusEl) {
+  // the user has visual feedback that things are still moving. `gen` is
+  // the caller's openGen snapshot — the poll aborts if a newer open() has
+  // superseded us (returns silently so the caller can bail cleanly).
+  async function pollExtractionUntilDone(statusEl, gen) {
     const startedAt = Date.now();
     const maxWaitMs = 180000; // 3 minutes hard ceiling
     for (;;) {
+      if (gen !== undefined && gen !== state.openGen) {
+        // Superseded — no error, caller checks gen after we return
+        return;
+      }
       if (Date.now() - startedAt > maxWaitMs) {
         throw new Error('Timeout après 3 min — extraction toujours en cours côté serveur ; recharger la page dans quelques instants.');
       }
       const secs = Math.round((Date.now() - startedAt) / 1000);
       statusEl.textContent = `Extraction en cours… ${secs}s`;
       await new Promise(r => setTimeout(r, 3000));
+      if (gen !== undefined && gen !== state.openGen) return;
       const res  = await apiFetch(`${BASE}/api/import/files/${state.fileId}/preview`);
       const data = await res.json().catch(() => ({}));
+      if (gen !== undefined && gen !== state.openGen) return;
       if (res.status === 202 && data.status === 'extracting') continue;
       if (res.ok) return; // done — preview available
       // Any other non-ok → treat as failure. If awaiting_extraction with
