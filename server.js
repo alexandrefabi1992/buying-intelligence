@@ -1166,6 +1166,10 @@ async function runMigrations() {
   // so the size-mismatch validator can re-run at any time (including on push,
   // after edits, when re-computing the cached preview). NULL for recipe files.
   await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS raw_text TEXT`);
+  // Async LLM extraction — 'extracting' status is set while the background
+  // job runs, and last_extraction_error persists the failure message across
+  // page reloads so the operator can see what went wrong without re-running.
+  await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS last_extraction_error TEXT`);
   // recipe_id is NULLable — LLM-extracted files and files awaiting extraction
   // legitimately have no matching parse_recipes row, and were previously
   // attached to an arbitrary recipe just to satisfy the NOT NULL constraint

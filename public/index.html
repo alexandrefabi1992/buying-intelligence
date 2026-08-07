@@ -4446,10 +4446,36 @@ const PreviewPanel = (() => {
     try {
       const url = `${BASE}/api/import/files/${fileId}/preview${opts.refresh ? '?refresh=true' : ''}`;
       const res = await apiFetch(url);
+      // Extraction still running server-side (async pattern) — render the
+      // awaiting card with a live status and start polling in place of
+      // waiting for the operator to click "Extraire avec l'IA" again.
+      if (res.status === 202) {
+        renderAwaitingExtraction();
+        const btn    = el('extractLlmBtn');
+        const status = el('extractLlmStatus');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="inline-block animate-spin">⟳</span> Extraction en cours…';
+        status.className = 'text-xs text-gray-500 mt-3';
+        status.textContent = 'Reprise du suivi d\'une extraction en cours…';
+        status.classList.remove('hidden');
+        try {
+          await pollExtractionUntilDone(status);
+          el('previewRefreshBtn').classList.remove('hidden');
+          el('previewPushBtn').classList.remove('hidden');
+          await open(state.fileId);
+        } catch (e) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>✨</span> Réessayer l\'extraction';
+          status.className = 'text-xs text-red-600 mt-3';
+          status.textContent = 'Échec : ' + e.message;
+        }
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const err = new Error(data.message || `HTTP ${res.status}`);
         err.code = data.error;
+        err.last_extraction_error = data.last_extraction_error;
         throw err;
       }
       state.data = await res.json();
@@ -4464,7 +4490,7 @@ const PreviewPanel = (() => {
       await refreshProgress();
     } catch (e) {
       if (e.code === 'awaiting_extraction') {
-        renderAwaitingExtraction();
+        renderAwaitingExtraction(e.last_extraction_error);
       } else {
         setMessage('error', t('preview_err').replace('{msg}', escHtml(e.message)));
       }
@@ -4473,13 +4499,18 @@ const PreviewPanel = (() => {
 
   // File uploaded but no recipe matched — offer manual LLM extraction.
   // Hides the standard action buttons and shows a single CTA card.
-  function renderAwaitingExtraction() {
+  function renderAwaitingExtraction(previousError) {
     el('previewRefreshBtn').classList.add('hidden');
     el('previewPushBtn').classList.add('hidden');
     el('previewAbandonBtn').classList.add('hidden');
     setStatusPill('En attente d\'extraction', 'amber');
     const m = el('previewMessage');
     m.className = 'rounded-xl px-6 py-8 bg-white border border-gray-200 shadow-sm';
+    const prevErrHtml = previousError
+      ? `<div class="max-w-2xl mx-auto text-left bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-xs text-red-800 mb-4">
+           <b>Tentative précédente échouée :</b><br>${escHtml(previousError)}
+         </div>`
+      : '';
     m.innerHTML = `
       <div class="max-w-2xl mx-auto text-center">
         <div class="text-4xl mb-3">📄</div>
@@ -4489,9 +4520,10 @@ const PreviewPanel = (() => {
           L'extraction par IA peut analyser n'importe quel format de bon de commande.<br>
           <span class="text-gray-500">⏱ Compter 30 à 60 secondes.</span>
         </p>
+        ${prevErrHtml}
         <button id="extractLlmBtn"
           class="bg-indigo-600 text-white rounded-lg px-6 py-3 text-sm font-semibold hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-flex items-center gap-2">
-          <span>✨</span> Extraire avec l'IA
+          <span>✨</span> ${previousError ? 'Réessayer l\'extraction' : 'Extraire avec l\'IA'}
         </button>
         <div id="extractLlmStatus" class="text-xs text-gray-500 mt-3 hidden"></div>
       </div>`;
@@ -4505,13 +4537,17 @@ const PreviewPanel = (() => {
     if (!btn) return;
     btn.disabled    = true;
     btn.innerHTML   = '<span class="inline-block animate-spin">⟳</span> Extraction en cours…';
-    status.textContent = 'Analyse du PDF, détection des tailles, appel du modèle…';
+    status.className = 'text-xs text-gray-500 mt-3';
+    status.textContent = 'Démarrage de l\'extraction…';
     status.classList.remove('hidden');
     try {
+      // POST returns 202 immediately — extraction runs in the background on
+      // the server. We poll /preview until it succeeds (or the file goes back
+      // to awaiting_extraction with a persisted error).
       const res  = await apiFetch(`${BASE}/api/import/files/${state.fileId}/extract-llm`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || data.error || `HTTP ${res.status}`);
-      // Re-open the preview — it will fetch the freshly-cached preview_json
+      if (!res.ok && res.status !== 202) throw new Error(data.message || data.error || `HTTP ${res.status}`);
+      await pollExtractionUntilDone(status);
       el('previewRefreshBtn').classList.remove('hidden');
       el('previewPushBtn').classList.remove('hidden');
       await open(state.fileId);
@@ -4520,6 +4556,31 @@ const PreviewPanel = (() => {
       btn.innerHTML   = '<span>✨</span> Réessayer l\'extraction';
       status.className = 'text-xs text-red-600 mt-3';
       status.textContent = 'Échec : ' + e.message;
+    }
+  }
+
+  // Poll /preview until extraction terminates. Elapsed timer displayed so
+  // the user has visual feedback that things are still moving.
+  async function pollExtractionUntilDone(statusEl) {
+    const startedAt = Date.now();
+    const maxWaitMs = 180000; // 3 minutes hard ceiling
+    for (;;) {
+      if (Date.now() - startedAt > maxWaitMs) {
+        throw new Error('Timeout après 3 min — extraction toujours en cours côté serveur ; recharger la page dans quelques instants.');
+      }
+      const secs = Math.round((Date.now() - startedAt) / 1000);
+      statusEl.textContent = `Extraction en cours… ${secs}s`;
+      await new Promise(r => setTimeout(r, 3000));
+      const res  = await apiFetch(`${BASE}/api/import/files/${state.fileId}/preview`);
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 202 && data.status === 'extracting') continue;
+      if (res.ok) return; // done — preview available
+      // Any other non-ok → treat as failure. If awaiting_extraction with
+      // last_extraction_error, surface it verbatim.
+      if (data.error === 'awaiting_extraction' && data.last_extraction_error) {
+        throw new Error(data.last_extraction_error);
+      }
+      throw new Error(data.message || data.error || `HTTP ${res.status}`);
     }
   }
 
