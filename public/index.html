@@ -1064,6 +1064,16 @@
           <div class="w-full h-2 bg-indigo-100 rounded-full overflow-hidden">
             <div id="previewProgressBar" class="h-full bg-indigo-600 transition-all" style="width:0%"></div>
           </div>
+          <div id="previewProgressEta" class="mt-2 flex items-start gap-2 text-[11px] text-gray-600">
+            <span class="text-blue-600">ℹ</span>
+            <span>
+              <b>Le push tourne côté serveur.</b> Tu peux fermer cette page ou naviguer ailleurs —
+              le processus continue tout seul.
+              L'API Lightspeed limite à 3 requêtes/seconde, donc la synchro prend du temps
+              proportionnellement au nombre de lignes.
+              <span id="previewProgressEtaTime" class="text-gray-500"></span>
+            </span>
+          </div>
           <div id="previewProgressErrors" class="mt-3 text-[11px] text-red-700 hidden"></div>
         </div>
 
@@ -4926,6 +4936,21 @@ const PreviewPanel = (() => {
     el('previewProgressCounts').textContent =
       `${p.current}/${p.total}  (ok=${p.counts?.ordered || 0}, err=${p.counts?.error || 0})`;
     el('previewProgressStatus').textContent = p.status;
+    // Rough ETA — the queue processes at ~3 API calls/sec and each line
+    // needs ~3-4 calls (matrix + variants + tags + order line). ~1s/line
+    // is a defensible ceiling; use elapsed rate if we have data.
+    const remaining = Math.max(0, (p.total || 0) - (p.current || 0));
+    const etaEl = el('previewProgressEtaTime');
+    if (etaEl) {
+      if (remaining === 0) {
+        etaEl.textContent = '';
+      } else {
+        const secondsLeft = remaining * 1.0;
+        const mins = Math.floor(secondsLeft / 60);
+        const secs = Math.round(secondsLeft % 60);
+        etaEl.textContent = ` — estimation: ${mins > 0 ? mins + ' min ' : ''}${secs}s restants (${remaining} ligne${remaining>1?'s':''}).`;
+      }
+    }
 
     if (p.recent_errors && p.recent_errors.length) {
       el('previewProgressErrors').classList.remove('hidden');
