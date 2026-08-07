@@ -4760,6 +4760,76 @@ const PreviewPanel = (() => {
     state.pollTimer = setInterval(refreshProgress, 3000);
   }
 
+  // Vendor mapping picker — shown when /push fails with no_vendor_map.
+  // Fetches the Lightspeed vendor list, lets the operator pick one, saves
+  // the brand→vendor mapping, then auto-retries push.
+  async function renderVendorMappingPicker() {
+    const manufacturer = state.data?.target_manufacturer || '?';
+    setMessage('error', `<div class="flex items-center gap-2"><span class="animate-spin">⟳</span> Chargement des fournisseurs Lightspeed…</div>`);
+    let vendors;
+    try {
+      const res  = await apiFetch(`${BASE}/api/import/lightspeed/vendors`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      vendors = data.vendors || [];
+    } catch (e) {
+      setMessage('error', `Impossible de charger la liste des fournisseurs Lightspeed : ${escHtml(e.message)}`);
+      return;
+    }
+    const options = vendors.map(v =>
+      `<option value="${escHtml(v.vendor_id)}" data-name="${escHtml(v.name)}">${escHtml(v.name)}${v.code ? ' — ' + escHtml(v.code) : ''} (id ${escHtml(v.vendor_id)})</option>`
+    ).join('');
+    const m = el('previewMessage');
+    m.className = 'rounded-xl px-5 py-4 bg-amber-50 border border-amber-300';
+    m.innerHTML = `
+      <div class="text-sm font-semibold text-amber-900 mb-1">Fournisseur Lightspeed manquant</div>
+      <div class="text-xs text-amber-800 mb-3">
+        Aucune correspondance entre la marque <b>"${escHtml(manufacturer)}"</b> et un fournisseur Lightspeed.
+        Choisis le fournisseur à utiliser ci-dessous — le mapping est sauvegardé pour les prochains imports de cette marque.
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <select id="vendorPickerSelect" class="text-xs border border-amber-300 rounded-lg px-3 py-2 bg-white min-w-[300px]">
+          <option value="">— Sélectionner un fournisseur —</option>
+          ${options}
+        </select>
+        <button id="vendorPickerSave"
+          class="bg-emerald-600 text-white rounded-lg px-4 py-2 text-xs font-semibold hover:bg-emerald-700 disabled:bg-gray-300"
+          disabled>Sauver et relancer le push</button>
+      </div>
+      <div id="vendorPickerStatus" class="text-xs mt-2 hidden"></div>`;
+    m.classList.remove('hidden');
+    const sel  = el('vendorPickerSelect');
+    const btn  = el('vendorPickerSave');
+    const stat = el('vendorPickerStatus');
+    sel.onchange = () => { btn.disabled = !sel.value; };
+    btn.onclick = async () => {
+      const vendorId   = sel.value;
+      const vendorName = sel.options[sel.selectedIndex]?.dataset.name || null;
+      if (!vendorId) return;
+      btn.disabled = true;
+      btn.textContent = 'Sauvegarde…';
+      try {
+        const putRes = await apiFetch(`${BASE}/api/settings/brand-vendor-map`, {
+          method:  'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ manufacturer, vendor_id: vendorId, vendor_name: vendorName }),
+        });
+        const putData = await putRes.json();
+        if (!putRes.ok) throw new Error(putData.message || `HTTP ${putRes.status}`);
+        stat.className = 'text-xs mt-2 text-emerald-700';
+        stat.textContent = `Mapping "${manufacturer}" → ${vendorName} sauvegardé. Relance du push…`;
+        stat.classList.remove('hidden');
+        setTimeout(push, 500);
+      } catch (e) {
+        stat.className = 'text-xs mt-2 text-red-700';
+        stat.textContent = `Erreur : ${e.message}`;
+        stat.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Sauver et relancer le push';
+      }
+    };
+  }
+
   async function push() {
     const selectable = state.data.orders.filter(o => o.selected && o.batch_status !== 'abandoned').length;
     if (!selectable) return;
@@ -4788,6 +4858,8 @@ const PreviewPanel = (() => {
         if (data.error === 'extraction_incomplete') {
           const reasons = (data.incomplete_reasons || []).map(r => `  • ${r.description}`).join('\n');
           setMessage('error', `Extraction incomplète — push refusé.<br/><pre class="text-[10px] mt-1">${escHtml(reasons)}</pre>Utilise le bouton "Pousser quand même" pour forcer.`);
+        } else if (data.error === 'no_vendor_map') {
+          await renderVendorMappingPicker();
         } else {
           setMessage('error', data.message || `HTTP ${res.status}`);
         }
