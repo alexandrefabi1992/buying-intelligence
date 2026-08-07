@@ -1034,6 +1034,9 @@
         <button id="previewRefreshBtn"
           class="text-gray-500 hover:text-indigo-600 text-xs border border-gray-200 rounded-lg px-3 py-1.5 hover:border-indigo-300 hover:bg-indigo-50"
           data-i18n="preview_refresh_btn">Recharger</button>
+        <button id="previewReExtractLlmBtn"
+          class="text-indigo-600 hover:text-white hover:bg-indigo-600 text-xs border border-indigo-200 rounded-lg px-3 py-1.5 hidden"
+          title="Relance une nouvelle extraction par IA (remplace la précédente)">✨ Ré-extraire IA</button>
         <button id="previewAbandonBtn"
           class="text-red-600 hover:text-white hover:bg-red-600 text-xs border border-red-200 rounded-lg px-3 py-1.5 hidden"
           data-i18n="preview_abandon_btn">Abandonner</button>
@@ -4447,6 +4450,7 @@ const PreviewPanel = (() => {
     show();
     el('previewProgress').classList.add('hidden');
     el('previewAbandonBtn').classList.add('hidden');
+    el('previewReExtractLlmBtn').classList.add('hidden');
     setMessage('info', t('preview_loading'));
     el('previewSummaryTiles').innerHTML  = '';
     el('previewBatchesList').innerHTML   = '';
@@ -4523,6 +4527,7 @@ const PreviewPanel = (() => {
     el('previewRefreshBtn').classList.add('hidden');
     el('previewPushBtn').classList.add('hidden');
     el('previewAbandonBtn').classList.add('hidden');
+    el('previewReExtractLlmBtn').classList.add('hidden');
     setStatusPill('En attente d\'extraction', 'amber');
     const m = el('previewMessage');
     m.className = 'rounded-xl px-6 py-8 bg-white border border-gray-200 shadow-sm';
@@ -4549,6 +4554,16 @@ const PreviewPanel = (() => {
       </div>`;
     m.classList.remove('hidden');
     el('extractLlmBtn').onclick = extractWithLlm;
+  }
+
+  // Triggered from the "Ré-extraire IA" header button on an already-
+  // LLM-extracted file. Confirms, then re-runs the async extraction
+  // flow (replaces the previous LLM output; batches are deleted+re-
+  // inserted server-side in the /extract-llm handler).
+  async function reExtractWithLlm() {
+    if (!confirm('Relancer une nouvelle extraction IA sur ce fichier ?\n\nLa prévisualisation actuelle sera remplacée par le résultat de la nouvelle extraction (30 à 60 secondes).\n\nUtile pour appliquer une amélioration du prompt ou pour corriger une extraction imparfaite.')) return;
+    renderAwaitingExtraction();
+    await extractWithLlm();
   }
 
   async function extractWithLlm() {
@@ -4639,6 +4654,14 @@ const PreviewPanel = (() => {
     // Enable abandon after preview loaded (still hidden while pushing; will show
     // if push finishes with error or partial state)
     el('previewAbandonBtn').classList.add('hidden');
+
+    // Re-extract-LLM button — only for files extracted via LLM. Recipe
+    // files use "Recharger" to re-parse; LLM files must go through the
+    // extract-llm endpoint (which spawns the async pipeline). Hidden if
+    // the file has been pushed (immutable at that point).
+    const isLlm = d.extraction_source === 'llm';
+    const canReExtract = isLlm && !['pushing','pushed','partial'].includes(d.file?.status);
+    el('previewReExtractLlmBtn').classList.toggle('hidden', !canReExtract);
 
     // Summary tiles
     const s = d.summary;
@@ -5047,6 +5070,7 @@ const PreviewPanel = (() => {
     el('previewPushBtn')?.addEventListener('click', push);
     el('previewAbandonBtn')?.addEventListener('click', abandon);
     el('previewDeleteBtn')?.addEventListener('click', deleteFile);
+    el('previewReExtractLlmBtn')?.addEventListener('click', reExtractWithLlm);
   }
 
   return { init, open };
