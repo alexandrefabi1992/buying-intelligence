@@ -6240,6 +6240,44 @@ app.listen(PORT, '0.0.0.0', async () => {
     console.error('[startup] Auto-resume check failed:', err.message);
   }
 
+  // Orphan-recovery for import jobs (pushes + LLM extractions).
+  // Any process running these tasks was killed when this container restarted.
+  // Mark them as failed/awaiting so the operator can retry from the UI.
+  try {
+    const { rows: stalePush } = await pool.query(
+      `UPDATE import_queue SET status = 'failed', finished_at = now(),
+                                error_message = 'Container restarted mid-push (orphan recovery on boot)'
+       WHERE status IN ('queued','running')
+       RETURNING job_id, tenant_id, file_id`,
+    );
+    if (stalePush.length) {
+      console.warn(`[startup] Marked ${stalePush.length} orphan push job(s) as failed:`,
+        stalePush.map(r => `job=${r.job_id} file=${r.file_id}`).join(', '));
+      // Companion: bring their import_files back to 'previewed' so the operator
+      // can click Push again. The queue processor is idempotent (skips lines
+      // that already have lightspeed_order_line_id), so retries resume where
+      // the previous run left off — no double-inserts in Lightspeed.
+      const fileIds = stalePush.map(r => r.file_id);
+      await pool.query(
+        `UPDATE import_files SET status = 'previewed'
+         WHERE file_id = ANY($1::int[]) AND status = 'pushing'`,
+        [fileIds],
+      );
+    }
+    const { rows: staleExtract } = await pool.query(
+      `UPDATE import_files SET status = 'awaiting_extraction',
+                                last_extraction_error = 'Container restarted mid-extraction (orphan recovery on boot)'
+       WHERE status = 'extracting'
+       RETURNING file_id, tenant_id`,
+    );
+    if (staleExtract.length) {
+      console.warn(`[startup] Marked ${staleExtract.length} orphan LLM extraction(s) as awaiting:`,
+        staleExtract.map(r => `file=${r.file_id}`).join(', '));
+    }
+  } catch (err) {
+    console.error('[startup] Orphan-job recovery failed:', err.message);
+  }
+
   // Hourly sync — spawns sync.js --once every hour if no sync is already running.
   // SYNC_DAYS_BACK controls the sales/transfers window (keep it small, e.g. 7,
   // since full historical data is already in the DB from the initial sync).
