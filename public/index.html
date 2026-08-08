@@ -4926,6 +4926,20 @@ const PreviewPanel = (() => {
       const catCell   = catPath
         ? `<button class="matrix-cat-btn text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 hover:bg-emerald-100" data-matrix-key="${escHtml(matrixKey)}">${escHtml(catPath)} ✎</button>`
         : `<button class="matrix-cat-btn text-[11px] text-indigo-600 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-50" data-matrix-key="${escHtml(matrixKey)}">+ Choisir</button>`;
+      // Effective cost overrides PDF cost when brand has margin_override_pct
+      // set. Show effective value prominently + strikethrough original if diff.
+      let costCellContent = '—';
+      if (m.effective_unit_cost != null) {
+        const orig = Number(m.unit_cost);
+        const eff  = Number(m.effective_unit_cost);
+        if (m.margin_override_pct_applied != null && orig !== eff) {
+          costCellContent = `<span class="font-semibold text-emerald-700">${eff.toFixed(2)}</span> <span class="text-[10px] text-gray-400 line-through">${orig.toFixed(2)}</span>`;
+        } else {
+          costCellContent = eff.toFixed(2);
+        }
+      } else if (m.unit_cost != null) {
+        costCellContent = m.unit_cost;
+      }
       return `
         <tr class="border-t border-gray-100">
           <td class="px-3 py-2 font-semibold text-gray-800">${escHtml(m.style_ref)}</td>
@@ -4934,7 +4948,7 @@ const PreviewPanel = (() => {
           <td class="px-3 py-2"><span class="text-[10px] font-semibold px-2 py-0.5 rounded ${actCls}">${escHtml(actionLabel(m.action))}</span></td>
           <td class="px-3 py-2 text-gray-700">${escHtml(m.matrix_description_planned || '')} ${reuseStr}</td>
           <td class="px-3 py-2">${catCell}</td>
-          <td class="px-3 py-2 text-right text-gray-600">${m.unit_cost ?? '—'}</td>
+          <td class="px-3 py-2 text-right text-gray-600">${costCellContent}</td>
           <td class="px-3 py-2 text-right text-gray-600">${m.retail_price ?? '—'}</td>
           <td class="px-3 py-2 text-[11px] text-gray-700">${createStr}${create.length && already.length ? ' ' : ''}${alreadyStr} ${posN > 1 ? `<span class="text-[10px] text-indigo-500 ml-1">×${posN}PO</span>` : ''}</td>
         </tr>`;
