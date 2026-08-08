@@ -1206,6 +1206,8 @@ async function runMigrations() {
       PRIMARY KEY (tenant_id, file_id, matrix_key)
     )
   `);
+  // Add retail_price override (operator-set price, overrides the PDF's price).
+  await pool.query(`ALTER TABLE import_matrix_overrides ADD COLUMN IF NOT EXISTS retail_price_override NUMERIC(10,2)`);
   // recipe_id is NULLable — LLM-extracted files and files awaiting extraction
   // legitimately have no matching parse_recipes row, and were previously
   // attached to an arbitrary recipe just to satisfy the NOT NULL constraint

@@ -1114,6 +1114,17 @@
               <label class="text-gray-500"><input type="checkbox" id="previewFilterComplete" class="align-middle" checked> <span data-i18n="preview_flt_complete">à compléter</span></label>
             </div>
           </div>
+          <!-- Retail-price multiplier tool -->
+          <div id="previewRetailTool" class="hidden px-5 py-2 border-b border-gray-100 bg-amber-50/50 flex items-center gap-3 text-xs">
+            <span class="text-amber-800 font-semibold">Multiplicateur retail :</span>
+            <input id="previewRetailMultiplier" type="number" step="0.01" min="0.01"
+                   placeholder="2.5"
+                   class="w-24 border border-amber-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-amber-400">
+            <span class="text-gray-500">× coût</span>
+            <button id="previewApplyMultiplierMissing" class="text-xs bg-amber-600 text-white rounded px-3 py-1 hover:bg-amber-700 disabled:bg-gray-300" title="Ne remplit que les matrices sans prix retail actuel">Appliquer aux matrices sans retail</button>
+            <button id="previewApplyMultiplierAll" class="text-xs border border-amber-300 text-amber-700 rounded px-3 py-1 hover:bg-amber-100" title="Écrase le retail de TOUTES les matrices">Appliquer à toutes</button>
+            <span id="previewRetailToolStatus" class="text-[11px] text-gray-500 ml-2"></span>
+          </div>
           <div class="overflow-x-auto">
             <table class="min-w-full text-xs">
               <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
@@ -4963,7 +4974,15 @@ const PreviewPanel = (() => {
           <td class="px-3 py-2 text-gray-700">${escHtml(m.matrix_description_planned || '')} ${reuseStr}</td>
           <td class="px-3 py-2">${catCell}</td>
           <td class="px-3 py-2 text-right text-gray-600">${costCellContent}</td>
-          <td class="px-3 py-2 text-right text-gray-600">${m.retail_price ?? '—'}</td>
+          <td class="px-3 py-2 text-right">
+            <input type="number" step="0.01" min="0"
+              class="matrix-retail-input w-20 text-right border border-gray-200 rounded px-1 py-0.5 text-xs ${m.override_retail_price != null ? 'bg-emerald-50 border-emerald-300 font-semibold text-emerald-800' : (m.retail_price == null ? 'bg-red-50 border-red-200' : 'bg-white')}"
+              data-matrix-key="${escHtml(matrixKey)}"
+              data-original="${m.retail_price ?? ''}"
+              value="${m.effective_retail_price ?? ''}"
+              placeholder="—"
+              title="${m.override_retail_price != null ? 'Prix personnalisé (override). PDF: ' + (m.retail_price ?? 'aucun') : (m.retail_price == null ? 'Aucun prix retail dans le PDF — entrer manuellement' : 'Prix du PDF (éditable)')}">
+          </td>
           <td class="px-3 py-2 text-[11px] text-gray-700">${createStr}${create.length && already.length ? ' ' : ''}${alreadyStr} ${posN > 1 ? `<span class="text-[10px] text-indigo-500 ml-1">×${posN}PO</span>` : ''}</td>
         </tr>`;
     }).join('') || `<tr><td colspan="9" class="px-3 py-8 text-center text-gray-400">Aucun résultat avec les filtres actuels.</td></tr>`;
@@ -4971,6 +4990,71 @@ const PreviewPanel = (() => {
     el('previewMatricesBody').querySelectorAll('.matrix-cat-btn').forEach(btn => {
       btn.onclick = () => openCategoryPicker(btn.dataset.matrixKey);
     });
+    // Wire retail-price inputs (save on blur if value changed)
+    el('previewMatricesBody').querySelectorAll('.matrix-retail-input').forEach(inp => {
+      inp.addEventListener('blur', () => saveRetailOverride(inp));
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+    });
+
+    // Retail multiplier tool — show when at least one matrix has no retail
+    const anyMissingRetail = state.data.matrices.some(m => m.effective_retail_price == null);
+    el('previewRetailTool').classList.toggle('hidden', !anyMissingRetail && state.data.matrices.length === 0);
+    // Actually show always if there are matrices — operator may want to override even filled ones
+    el('previewRetailTool').classList.toggle('hidden', state.data.matrices.length === 0);
+  }
+
+  async function saveRetailOverride(inp) {
+    const matrixKey = inp.dataset.matrixKey;
+    const original  = inp.dataset.original === '' ? null : Number(inp.dataset.original);
+    const raw       = inp.value.trim();
+    const newVal    = raw === '' ? null : Number(raw);
+    // No-op if value unchanged from PDF (send null override = revert to PDF)
+    // vs current display value. Simpler: always PATCH.
+    inp.disabled = true;
+    try {
+      const url = `${BASE}/api/import/files/${state.fileId}/matrices/${encodeURIComponent(matrixKey)}/override`;
+      const res = await apiFetch(url, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        // Send null when equal to PDF value (clears override), else send new number
+        body: JSON.stringify({
+          retail_price_override: (newVal === original || newVal == null) ? null : newVal,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      inp.classList.add('ring-2', 'ring-emerald-400');
+      setTimeout(() => inp.classList.remove('ring-2', 'ring-emerald-400'), 800);
+    } catch (e) {
+      alert('Erreur sauvegarde retail: ' + e.message);
+    } finally {
+      inp.disabled = false;
+    }
+  }
+
+  async function applyMultiplier(scope) {
+    const mult = Number(el('previewRetailMultiplier').value);
+    if (!Number.isFinite(mult) || mult <= 0) {
+      alert('Multiplicateur invalide — entrer un nombre positif (ex: 2.5)');
+      return;
+    }
+    if (scope === 'all' && !confirm(`Appliquer un multiplicateur de ${mult}× à TOUTES les matrices ?\n\nCette action écrase les prix retail existants (du PDF ou déjà édités). Continuer ?`)) return;
+    const status = el('previewRetailToolStatus');
+    status.textContent = 'Application…';
+    try {
+      const res = await apiFetch(`${BASE}/api/import/files/${state.fileId}/matrices/apply-multiplier`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ multiplier: mult, scope }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      status.textContent = `✓ ${data.applied} matrices mises à jour`;
+      setTimeout(() => { status.textContent = ''; }, 3000);
+      await open(state.fileId); // refresh to show new prices
+    } catch (e) {
+      status.textContent = '✗ ' + e.message;
+    }
   }
 
   async function refreshProgress() {
@@ -5208,6 +5292,8 @@ const PreviewPanel = (() => {
     el('previewAbandonBtn')?.addEventListener('click', abandon);
     el('previewDeleteBtn')?.addEventListener('click', deleteFile);
     el('previewReExtractLlmBtn')?.addEventListener('click', reExtractWithLlm);
+    el('previewApplyMultiplierMissing')?.addEventListener('click', () => applyMultiplier('missing'));
+    el('previewApplyMultiplierAll')?.addEventListener('click', () => applyMultiplier('all'));
   }
 
   // Category picker — exposed so renderMatricesTable can call it. Handles the
