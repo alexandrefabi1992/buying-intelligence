@@ -59,18 +59,30 @@ async function fetchLinesForFile(pool, tenantId, fileId) {
   return rows;
 }
 
-// Build a lookup: for each unique (style_ref, color_normalized_stripped) → matrix_id
-// Also indexes by the full color_normalized (in case old override was written
-// with the full key post-fix).
+// Build lookup indexes. Full-key match is authoritative (post-5ee9dbc
+// format). Stripped-key is a fuzzy fallback for legacy overrides written
+// pre-fix — but only used when no collision exists on that stripped key.
+// A collision means two different color codes named the same (e.g.
+// LAVENDER-054 + LAVENDER-058, both → LAVENDER); we refuse to guess.
+// Returns { idx, strippedIdx, collisions }.
 function buildMatrixKeyIndex(lines) {
-  const idx = new Map();
+  const idx         = new Map();  // fullKey → matrix_id
+  const strippedIdx = new Map();  // strippedKey → first matrix_id
+  const collisions  = new Map();  // strippedKey → Set<matrix_id>
   for (const l of lines) {
     const fullKey    = `${l.supplier_style_ref}|${l.color_normalized}`;
     const strippedKey = `${l.supplier_style_ref}|${stripCodeSuffix(l.color_normalized, l.supplier_color_ref)}`;
     idx.set(fullKey, l.matrix_id);
-    if (!idx.has(strippedKey)) idx.set(strippedKey, l.matrix_id);
+    const prev = strippedIdx.get(strippedKey);
+    if (prev == null) {
+      strippedIdx.set(strippedKey, l.matrix_id);
+    } else if (prev !== l.matrix_id) {
+      const set = collisions.get(strippedKey) || new Set([prev]);
+      set.add(l.matrix_id);
+      collisions.set(strippedKey, set);
+    }
   }
-  return idx;
+  return { idx, strippedIdx, collisions };
 }
 
 async function main() {
@@ -94,14 +106,23 @@ async function main() {
     console.log(`\n── file_id=${f.file_id} "${f.source_filename}" (${f.target_manufacturer}) ──`);
     const overrides = await fetchOverridesForFile(pool, f.tenant_id, f.file_id);
     const lines     = await fetchLinesForFile(pool, f.tenant_id, f.file_id);
-    const idx       = buildMatrixKeyIndex(lines);
+    const { idx, strippedIdx, collisions } = buildMatrixKeyIndex(lines);
 
     for (const ov of overrides) {
       const hasCategory = ov.category_id != null;
       const hasRetail   = ov.retail_price_override != null;
       if (!hasCategory && !hasRetail) { totalSkipped++; continue; }
 
-      const matrixId = idx.get(ov.matrix_key);
+      let matrixId = idx.get(ov.matrix_key);
+      if (!matrixId) {
+        if (collisions.has(ov.matrix_key)) {
+          const colliders = [...collisions.get(ov.matrix_key)].join(',');
+          console.log(`  ⚠ COLLISION matrix_key="${ov.matrix_key}" — matrices [${colliders}] all strip to this key. REFUSED (set manually in Lightspeed).`);
+          totalNotFound++;
+          continue;
+        }
+        matrixId = strippedIdx.get(ov.matrix_key);
+      }
       if (!matrixId) {
         console.log(`  ✗ matrix_key="${ov.matrix_key}" — no matching pushed matrix found`);
         totalNotFound++;
