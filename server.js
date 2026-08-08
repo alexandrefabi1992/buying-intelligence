@@ -1170,6 +1170,22 @@ async function runMigrations() {
   // job runs, and last_extraction_error persists the failure message across
   // page reloads so the operator can see what went wrong without re-running.
   await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS last_extraction_error TEXT`);
+  // Per-matrix overrides — operator-editable fields (category first; more to
+  // come). Keyed by (tenant, file, matrix_key) where matrix_key is
+  // "style_ref|color_normalized" (same key preview-generator uses to dedupe).
+  // Overrides are loaded at preview render + push time, so a value set once
+  // sticks through re-extractions and push retries.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS import_matrix_overrides (
+      tenant_id      TEXT NOT NULL REFERENCES tenants(id),
+      file_id        INT  NOT NULL REFERENCES import_files(file_id) ON DELETE CASCADE,
+      matrix_key     TEXT NOT NULL,
+      category_id    TEXT,
+      category_path  TEXT,
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (tenant_id, file_id, matrix_key)
+    )
+  `);
   // recipe_id is NULLable — LLM-extracted files and files awaiting extraction
   // legitimately have no matching parse_recipes row, and were previously
   // attached to an arbitrary recipe just to satisfy the NOT NULL constraint

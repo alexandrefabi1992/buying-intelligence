@@ -1114,6 +1114,7 @@
                   <th class="px-3 py-2 text-left">Description</th>
                   <th class="px-3 py-2 text-left" data-i18n="preview_col_action">Action</th>
                   <th class="px-3 py-2 text-left" data-i18n="preview_col_desc_planned">Nom planifié</th>
+                  <th class="px-3 py-2 text-left">Catégorie</th>
                   <th class="px-3 py-2 text-right">Coût</th>
                   <th class="px-3 py-2 text-right">Détail</th>
                   <th class="px-3 py-2 text-left" data-i18n="preview_col_variants">Variantes</th>
@@ -1123,6 +1124,26 @@
             </table>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ── Category Picker — drill-down navigator (per-matrix) ────── -->
+    <div id="categoryPicker" class="hidden fixed inset-0 bg-black/40 z-[60] flex items-center justify-center">
+      <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col">
+        <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+          <h3 class="text-sm font-bold text-gray-800">Choisir une catégorie</h3>
+          <div class="flex gap-2">
+            <button id="categoryPickerClear" class="text-xs text-red-600 border border-red-200 rounded px-3 py-1 hover:bg-red-50" title="Retirer la catégorie assignée">Aucune</button>
+            <button id="categoryPickerCancel" class="text-xs text-gray-600 border border-gray-200 rounded px-3 py-1 hover:bg-gray-50">Annuler</button>
+            <button id="categoryPickerOk" class="text-xs bg-emerald-600 text-white rounded px-3 py-1 hover:bg-emerald-700 disabled:bg-gray-300" disabled>OK</button>
+          </div>
+        </div>
+        <div class="px-5 py-2 border-b border-gray-100 flex items-center gap-2 text-xs text-gray-600">
+          <span>Sélectionné :</span>
+          <span id="categoryPickerBreadcrumb" class="font-semibold text-gray-800">Aucun</span>
+          <button id="categoryPickerBack" class="hidden ml-auto text-xs text-gray-500 border border-gray-200 rounded px-2 py-0.5 hover:bg-gray-50">← Retour</button>
+        </div>
+        <div id="categoryPickerBody" class="flex-1 overflow-y-auto p-3 space-y-1"></div>
       </div>
     </div>
 
@@ -4900,6 +4921,11 @@ const PreviewPanel = (() => {
       const createStr = create.map(v => `${escHtml(v.size)}×${v.qty_across_pos}`).join(' ');
       const alreadyStr = already.length ? `<span class="text-gray-400 text-[10px]">déjà : ${already.map(v => escHtml(v.size)).join(',')}</span>` : '';
       const reuseStr = m.reused_matrix_id ? `<span class="text-[10px] text-indigo-600">→ #${escHtml(m.reused_matrix_id)}</span>` : '';
+      const matrixKey = `${m.style_ref}|${m.color_normalized}`;
+      const catPath   = m.override_category_path;
+      const catCell   = catPath
+        ? `<button class="matrix-cat-btn text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 hover:bg-emerald-100" data-matrix-key="${escHtml(matrixKey)}">${escHtml(catPath)} ✎</button>`
+        : `<button class="matrix-cat-btn text-[11px] text-indigo-600 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-50" data-matrix-key="${escHtml(matrixKey)}">+ Choisir</button>`;
       return `
         <tr class="border-t border-gray-100">
           <td class="px-3 py-2 font-semibold text-gray-800">${escHtml(m.style_ref)}</td>
@@ -4907,11 +4933,16 @@ const PreviewPanel = (() => {
           <td class="px-3 py-2 text-gray-500">${escHtml(m.description || '')}</td>
           <td class="px-3 py-2"><span class="text-[10px] font-semibold px-2 py-0.5 rounded ${actCls}">${escHtml(actionLabel(m.action))}</span></td>
           <td class="px-3 py-2 text-gray-700">${escHtml(m.matrix_description_planned || '')} ${reuseStr}</td>
+          <td class="px-3 py-2">${catCell}</td>
           <td class="px-3 py-2 text-right text-gray-600">${m.unit_cost ?? '—'}</td>
           <td class="px-3 py-2 text-right text-gray-600">${m.retail_price ?? '—'}</td>
           <td class="px-3 py-2 text-[11px] text-gray-700">${createStr}${create.length && already.length ? ' ' : ''}${alreadyStr} ${posN > 1 ? `<span class="text-[10px] text-indigo-500 ml-1">×${posN}PO</span>` : ''}</td>
         </tr>`;
-    }).join('') || `<tr><td colspan="8" class="px-3 py-8 text-center text-gray-400">Aucun résultat avec les filtres actuels.</td></tr>`;
+    }).join('') || `<tr><td colspan="9" class="px-3 py-8 text-center text-gray-400">Aucun résultat avec les filtres actuels.</td></tr>`;
+    // Wire category-picker buttons (delegated event since rows are re-rendered)
+    el('previewMatricesBody').querySelectorAll('.matrix-cat-btn').forEach(btn => {
+      btn.onclick = () => openCategoryPicker(btn.dataset.matrixKey);
+    });
   }
 
   async function refreshProgress() {
@@ -5150,6 +5181,125 @@ const PreviewPanel = (() => {
     el('previewDeleteBtn')?.addEventListener('click', deleteFile);
     el('previewReExtractLlmBtn')?.addEventListener('click', reExtractWithLlm);
   }
+
+  // Category picker — exposed so renderMatricesTable can call it. Handles the
+  // full drill-down modal: fetches the category tree once, tracks the current
+  // path, PATCHes the override on OK, then re-fetches the preview so the
+  // matrix row reflects the new category badge.
+  const catState = {
+    tree:      null,      // { nodes, roots } — cached after first fetch
+    matrixKey: null,      // which matrix we're picking for
+    stack:     [],        // [{id, name}, ...] — breadcrumb path
+    selected:  null,      // {id, path} — current "would-be OK" value
+  };
+
+  async function openCategoryPicker(matrixKey) {
+    catState.matrixKey = matrixKey;
+    catState.stack     = [];
+    catState.selected  = null;
+    // Pre-seed with the existing override if any
+    const matrix = state.data?.matrices?.find(m => `${m.style_ref}|${m.color_normalized}` === matrixKey);
+    if (matrix?.override_category_id) {
+      catState.selected = { id: matrix.override_category_id, path: matrix.override_category_path };
+    }
+    el('categoryPicker').classList.remove('hidden');
+    el('categoryPickerBody').innerHTML = '<div class="text-center text-gray-400 text-xs py-8">Chargement des catégories…</div>';
+    if (!catState.tree) {
+      try {
+        const res  = await apiFetch(`${BASE}/api/import/lightspeed/categories`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+        catState.tree = { nodes: data.nodes, roots: data.roots };
+      } catch (e) {
+        el('categoryPickerBody').innerHTML = `<div class="text-red-700 text-xs py-4">Impossible de charger l'arborescence : ${escHtml(e.message)}</div>`;
+        return;
+      }
+    }
+    renderCategoryLevel();
+  }
+
+  function renderCategoryLevel() {
+    const nodes = catState.tree.nodes;
+    const currentId = catState.stack.length ? catState.stack[catState.stack.length - 1].id : null;
+    const childrenIds = currentId ? nodes[currentId].children : catState.tree.roots;
+
+    // Breadcrumb
+    const breadcrumbEl = el('categoryPickerBreadcrumb');
+    breadcrumbEl.textContent = catState.selected?.path
+      || (catState.stack.length ? '/ ' + catState.stack.map(s => s.name).join(' / ') : 'Aucun');
+    el('categoryPickerBack').classList.toggle('hidden', catState.stack.length === 0);
+
+    // OK enabled if we have a selection OR the current level's node is selected
+    const okEnabled = catState.selected !== null;
+    el('categoryPickerOk').disabled = !okEnabled;
+
+    // List
+    const body = el('categoryPickerBody');
+    if (!childrenIds.length) {
+      body.innerHTML = `<div class="text-center text-gray-400 text-xs py-8">Ce niveau n'a pas de sous-catégorie. Clique OK pour confirmer la sélection actuelle.</div>`;
+      return;
+    }
+    body.innerHTML = childrenIds.map(id => {
+      const n = nodes[id];
+      const hasChildren = n.children.length > 0;
+      return `
+        <div class="flex items-center gap-2 border border-gray-100 rounded px-2 py-1.5 hover:bg-gray-50">
+          <button data-id="${id}" class="cat-select-btn text-[11px] bg-gray-100 border border-gray-200 rounded px-3 py-1 hover:bg-indigo-600 hover:text-white hover:border-indigo-600">
+            Sélectionner
+          </button>
+          <span class="text-sm text-gray-800 flex-1">${escHtml(n.name)}</span>
+          ${hasChildren ? `<button data-id="${id}" class="cat-drill-btn text-xs text-indigo-600 hover:text-indigo-800" title="Explorer les sous-catégories">→</button>` : ''}
+        </div>`;
+    }).join('');
+    // Wire
+    body.querySelectorAll('.cat-select-btn').forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.dataset.id;
+        const n  = nodes[id];
+        catState.selected = { id, path: n.full_path };
+        renderCategoryLevel();
+      };
+    });
+    body.querySelectorAll('.cat-drill-btn').forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.dataset.id;
+        catState.stack.push({ id, name: nodes[id].name });
+        renderCategoryLevel();
+      };
+    });
+  }
+
+  async function saveCategoryPick(categoryId, categoryPath) {
+    if (!catState.matrixKey || !state.fileId) return;
+    const url = `${BASE}/api/import/files/${state.fileId}/matrices/${encodeURIComponent(catState.matrixKey)}/override`;
+    try {
+      const res = await apiFetch(url, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ category_id: categoryId, category_path: categoryPath }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      el('categoryPicker').classList.add('hidden');
+      await open(state.fileId); // refresh preview to show new badge
+    } catch (e) {
+      alert('Erreur lors de la sauvegarde : ' + e.message);
+    }
+  }
+
+  // Init the category picker's own event handlers (called once by PreviewPanel.init)
+  function initCategoryPicker() {
+    el('categoryPickerCancel')?.addEventListener('click', () => el('categoryPicker').classList.add('hidden'));
+    el('categoryPickerClear')?.addEventListener('click', () => saveCategoryPick(null, null));
+    el('categoryPickerOk')?.addEventListener('click', () => {
+      if (catState.selected) saveCategoryPick(catState.selected.id, catState.selected.path);
+    });
+    el('categoryPickerBack')?.addEventListener('click', () => {
+      catState.stack.pop();
+      renderCategoryLevel();
+    });
+  }
+  initCategoryPicker();
 
   return { init, open };
 })();
