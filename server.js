@@ -1170,6 +1170,9 @@ async function runMigrations() {
   // job runs, and last_extraction_error persists the failure message across
   // page reloads so the operator can see what went wrong without re-running.
   await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS last_extraction_error TEXT`);
+  // Optional operator-provided PO name — overrides the default refNum
+  // ("po_number + customer_reference") when set at upload time.
+  await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS custom_order_name TEXT`);
   // Per-matrix overrides — operator-editable fields (category first; more to
   // come). Keyed by (tenant, file, matrix_key) where matrix_key is
   // "style_ref|color_normalized" (same key preview-generator uses to dedupe).

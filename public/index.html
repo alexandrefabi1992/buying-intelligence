@@ -1005,6 +1005,15 @@
                    class="w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 file:font-semibold file:cursor-pointer hover:file:bg-gray-100">
           </div>
 
+          <!-- Custom PO name (optional) — becomes the refNum in Lightspeed -->
+          <div>
+            <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1">Nom du PO dans Lightspeed <span class="text-gray-400 font-normal">(optionnel)</span></label>
+            <input id="importModalOrderName" type="text" maxlength="200"
+                   placeholder="Ex: Liu Jo P27 St-Sauveur"
+                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <p class="text-[10px] text-gray-400 mt-1">Si vide, le nom sera "PO# + référence" (comportement par défaut).</p>
+          </div>
+
           <!-- Feedback / result -->
           <div id="importModalStatus" class="hidden text-xs rounded-lg px-3 py-2"></div>
           <div id="importModalResult" class="hidden text-xs bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-3 space-y-1"></div>
@@ -4172,6 +4181,7 @@ const ImportModal = (() => {
 
   function reset() {
     el('importModalFile').value = '';
+    if (el('importModalOrderName')) el('importModalOrderName').value = '';
     el('importModalStatus').classList.add('hidden');
     el('importModalStatus').className = 'text-xs rounded-lg px-3 py-2 hidden';
     el('importModalStatus').textContent = '';
@@ -4253,6 +4263,8 @@ const ImportModal = (() => {
       fd.append('season_tag', state.season);
       fd.append('destination_shop_id', shopId);
       fd.append('target_manufacturer', state.brand);
+      const customName = (el('importModalOrderName')?.value || '').trim();
+      if (customName) fd.append('custom_order_name', customName);
       // Use fetch directly — apiFetch sets Content-Type: json which breaks multipart.
       const token = getToken();
       const res = await fetch(`${BASE}/api/import/upload`, {
