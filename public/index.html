@@ -4932,7 +4932,9 @@ const PreviewPanel = (() => {
       const posN = m.pos_referenced?.length || 1;
       const createStr = create.map(v => `${escHtml(v.size)}×${v.qty_across_pos}`).join(' ');
       const alreadyStr = already.length ? `<span class="text-gray-400 text-[10px]">déjà : ${already.map(v => escHtml(v.size)).join(',')}</span>` : '';
-      const reuseStr = m.reused_matrix_id ? `<span class="text-[10px] text-indigo-600">→ #${escHtml(m.reused_matrix_id)}</span>` : '';
+      const reuseStr = m.reused_matrix_id
+        ? `<a href="https://us.merchantos.com/?name=item.views.matrix.editmatrix&matrixID=${encodeURIComponent(m.reused_matrix_id)}" target="_blank" rel="noopener" class="text-[10px] text-indigo-600 hover:text-indigo-800 hover:underline" title="Ouvrir dans Lightspeed">→ #${escHtml(m.reused_matrix_id)} ↗</a>`
+        : '';
       const matrixKey = `${m.style_ref}|${m.color_normalized}`;
       const catPath   = m.override_category_path;
       const catCell   = catPath
