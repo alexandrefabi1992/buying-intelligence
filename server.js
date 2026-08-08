@@ -1102,7 +1102,7 @@ async function runMigrations() {
       approved_at         TIMESTAMPTZ,
       pushed_at           TIMESTAMPTZ,
       errors              JSONB,
-      UNIQUE (tenant_id, po_number)               -- one PO per tenant across all files
+      UNIQUE (tenant_id, file_id, po_number)      -- one PO per import file (same PO OK across different files, e.g. multi-shop)
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_import_batches_file ON import_batches(file_id)`);
@@ -1173,6 +1173,23 @@ async function runMigrations() {
   // Optional operator-provided PO name — overrides the default refNum
   // ("po_number + customer_reference") when set at upload time.
   await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS custom_order_name TEXT`);
+  // Relax the (tenant_id, po_number) constraint on import_batches — it
+  // blocked the legit case of the same supplier PO being imported for two
+  // different shops (each shop → its own Lightspeed Order). Dedup at file
+  // level is already enforced by import_files.source_hash + upload dup check.
+  // Replace with the softer (tenant_id, file_id, po_number) so we still
+  // reject duplicates WITHIN one file. Idempotent: DROP IF EXISTS + ADD IF
+  // NOT EXISTS.
+  await pool.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'import_batches_tenant_id_po_number_key') THEN
+        ALTER TABLE import_batches DROP CONSTRAINT import_batches_tenant_id_po_number_key;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'import_batches_tenant_file_po_key') THEN
+        ALTER TABLE import_batches ADD CONSTRAINT import_batches_tenant_file_po_key UNIQUE (tenant_id, file_id, po_number);
+      END IF;
+    END $$;
+  `);
   // Per-matrix overrides — operator-editable fields (category first; more to
   // come). Keyed by (tenant, file, matrix_key) where matrix_key is
   // "style_ref|color_normalized" (same key preview-generator uses to dedupe).
