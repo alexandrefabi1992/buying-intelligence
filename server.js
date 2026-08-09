@@ -1184,6 +1184,21 @@ async function runMigrations() {
   // the per-drop button label — 'Importer' when null, 'Voir importation'
   // once confirmed.
   await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ`);
+  // Relax the UNIQUE (tenant_id, source_hash) constraint that blocked
+  // the legitimate case of the same PDF being re-attached under a
+  // different season / drop (operator realizes the wrong season was
+  // selected, deletes + re-attaches). Dedup is now done in application
+  // logic scoped by (tenant, source_hash, season, drop, manufacturer).
+  await pool.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'import_files_tenant_id_source_hash_key') THEN
+        ALTER TABLE import_files DROP CONSTRAINT import_files_tenant_id_source_hash_key;
+      END IF;
+    END $$;
+  `);
+  // Non-unique index on source_hash for the dedup lookup performance
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_import_files_tenant_hash
+                    ON import_files(tenant_id, source_hash)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_import_files_manufacturer_drop
                     ON import_files(tenant_id, target_manufacturer, season_tag, drop_id)
                     WHERE drop_id IS NOT NULL`);
@@ -4496,10 +4511,20 @@ app.post('/api/budget-plan/document', async (req, res, next) => {
       try {
         const crypto = require('crypto');
         const source_hash = crypto.createHash('sha256').update(buf).digest('hex');
-        // Skip if an import already exists for the same PDF
+        // Dedup is context-aware: same PDF re-attached under a DIFFERENT
+        // season / mfr / drop is a legitimate new intent (not a duplicate).
+        // Only reuse when every dimension matches — otherwise create a
+        // fresh import so the season/drop/mfr on the preview reflect the
+        // operator's current context, not the first attach.
         const { rows: dup } = await pool.query(
-          `SELECT file_id FROM import_files WHERE tenant_id = $1 AND source_hash = $2 LIMIT 1`,
-          [req.tenantId, source_hash],
+          `SELECT file_id FROM import_files
+           WHERE tenant_id = $1
+             AND source_hash = $2
+             AND season_tag = $3
+             AND lower(target_manufacturer) = lower($4)
+             AND COALESCE(drop_id, '') = COALESCE($5, '')
+           LIMIT 1`,
+          [req.tenantId, source_hash, season_code.toLowerCase(), manufacturer, String(drop_id || '')],
         );
         if (dup.length) {
           preAnalysisFileId = dup[0].file_id;
