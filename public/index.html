@@ -4346,10 +4346,22 @@ const ImportModal = (() => {
 
       // Success — render batches. Two paths:
       //  (a) recipe matched   → batches[] populated, show PO summary
-      //  (b) LLM needed       → batches=[], needs_llm_extraction=true
+      //  (b) LLM auto-started → extraction_started=true, redirect immediately
       state.fileId = data.file_id;
       const box = el('importModalResult');
+      // (b) Auto-triggered LLM extraction — skip the modal result screen and
+      // go straight to the PreviewPanel, which detects the 202 'extracting'
+      // status and starts the polling UI on its own.
+      if (data.extraction_started) {
+        const capturedFileId = data.file_id;
+        hide();
+        PreviewPanel.open(capturedFileId);
+        return;
+      }
       if (data.needs_llm_extraction) {
+        // Legacy path (shouldn't be reachable after the auto-trigger fix,
+        // kept as a safety net in case a future upload response returns
+        // needs_llm_extraction without extraction_started).
         box.className = 'text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-3 space-y-1';
         box.innerHTML = `
           <div class="font-semibold text-amber-900 mb-1">📄 Fichier prêt — extraction IA requise</div>
