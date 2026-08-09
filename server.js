@@ -1173,6 +1173,14 @@ async function runMigrations() {
   // Optional operator-provided PO name — overrides the default refNum
   // ("po_number + customer_reference") when set at upload time.
   await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS custom_order_name TEXT`);
+  // drop_id links an import file to a specific Drop (livraison) in the
+  // Plan tab. When present, the Plan UI shows a 'Voir importation' button
+  // beside that drop instead of 'Importer'. Nullable — legacy files and
+  // imports triggered from the top-level 'Importer' button leave it null.
+  await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS drop_id TEXT`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_import_files_manufacturer_drop
+                    ON import_files(tenant_id, target_manufacturer, season_tag, drop_id)
+                    WHERE drop_id IS NOT NULL`);
   // Relax the (tenant_id, po_number) constraint on import_batches — it
   // blocked the legit case of the same supplier PO being imported for two
   // different shops (each shop → its own Lightspeed Order). Dedup at file

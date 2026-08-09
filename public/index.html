@@ -3437,6 +3437,11 @@ const PlanTab = (() => {
     overrides: {},
     allMfrs: [],
     sort: { col: null, dir: null },
+    // Index of import files keyed by `${manufacturer}|${drop_id}` (both
+    // lowercased for stable matching). Populated once per plan render via
+    // GET /api/import/files, filtered by season, so each drop block can
+    // decide whether to show 'Importer' or 'Voir importation'.
+    importsByMfrDrop: new Map(),
   };
 
   function shopExcludeKey() {
@@ -3514,6 +3519,33 @@ const PlanTab = (() => {
     await fetchAndRender();
   }
 
+  // Rebuild the imports-per-drop index. Keys are `${mfr}|${drop_id}`
+  // (both lowercased) so lookups are stable across capitalization diffs
+  // between the plan's manufacturer label and the file's target_manufacturer.
+  // Only files matching the currently-selected season are indexed.
+  async function refreshImportsIndex() {
+    planState.importsByMfrDrop.clear();
+    try {
+      const res = await apiFetch(`${BASE}/api/import/files`);
+      if (!res.ok) return;
+      const data = await res.json();
+      for (const f of (data.files || [])) {
+        if (!f.drop_id) continue;
+        if (f.season_tag !== planState.season) continue;
+        const key = `${String(f.target_manufacturer || '').toLowerCase()}|${String(f.drop_id).toLowerCase()}`;
+        // Prefer the latest file for a (mfr, drop) pair — files are ordered DESC
+        // by uploaded_at, so first-seen wins.
+        if (!planState.importsByMfrDrop.has(key)) {
+          planState.importsByMfrDrop.set(key, {
+            file_id: f.file_id,
+            status:  f.status,
+            filename: f.source_filename,
+          });
+        }
+      }
+    } catch { /* non-fatal */ }
+  }
+
   async function fetchAndRender() {
     const season    = planState.season;
     const shopParam = planState.selectedShops.size
@@ -3531,6 +3563,9 @@ const PlanTab = (() => {
         planState.excluded.clear();
         saveExcluded();
       }
+      // Load imports index so drop blocks know which drop already has an
+      // import (button becomes "Voir importation" instead of "Importer").
+      await refreshImportsIndex();
       renderTable();
     } catch (e) {
       document.getElementById('planBody').innerHTML =
@@ -3811,6 +3846,21 @@ const PlanTab = (() => {
           </label>
         </div>`;
 
+      // Import button per drop — becomes "Voir importation" once a file
+      // exists for this (mfr, drop_id, current season) triplet.
+      const importKey = `${String(mfr).toLowerCase()}|${String(drop_id).toLowerCase()}`;
+      const existing  = planState.importsByMfrDrop.get(importKey);
+      const importBtn = existing
+        ? `<button class="plan-drop-view-import text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100 ml-2"
+             data-file-id="${existing.file_id}"
+             title="Ouvrir la prévisualisation (${escHtml(existing.filename)} — ${escHtml(existing.status)})">
+             📄 Voir importation
+           </button>`
+        : `<button class="plan-drop-import text-[11px] text-gray-500 hover:text-indigo-600 border border-gray-200 rounded px-2 py-1 hover:border-indigo-300 hover:bg-indigo-50 ml-2"
+             data-mfr="${escHtml(mfr)}" data-drop="${drop_id}"
+             title="Importer un fichier PO pour ce drop">
+             ↑ Importer
+           </button>`;
       return `
         <div class="plan-drop-block mb-4 last:mb-0" data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">
           <div class="flex items-center gap-2 mb-2">
@@ -3818,6 +3868,7 @@ const PlanTab = (() => {
               class="plan-drop-name border-b border-gray-200 bg-transparent text-xs font-semibold text-gray-600 px-1 py-0.5 focus:outline-none focus:border-indigo-400 w-40"
               data-mfr="${escHtml(mfr)}" data-drop="${drop_id}"
               value="${escHtml(drop_name)}">
+            ${importBtn}
             ${deleteBtn}
             ${dropTotal > 0 ? `<span class="text-xs text-indigo-600 font-semibold ml-2">${fmtC(dropTotal)}</span>` : ''}
           </div>
@@ -4240,9 +4291,10 @@ const ImportModal = (() => {
     el('importModalShopHint').textContent = t('import_shop_hint_pick');
   }
 
-  function open(brand) {
+  function open(brand, opts = {}) {
     reset();
-    state.brand = brand;
+    state.brand  = brand;
+    state.dropId = opts.dropId || null;
     // Season from the planSeason selector — required
     const seasonSel = el('planSeason');
     state.season = seasonSel?.value || null;
@@ -4278,6 +4330,7 @@ const ImportModal = (() => {
       fd.append('target_manufacturer', state.brand);
       const customName = (el('importModalOrderName')?.value || '').trim();
       if (customName) fd.append('custom_order_name', customName);
+      if (state.dropId) fd.append('drop_id', state.dropId);
       // Use fetch directly — apiFetch sets Content-Type: json which breaks multipart.
       const token = getToken();
       const res = await fetch(`${BASE}/api/import/upload`, {
@@ -4429,10 +4482,28 @@ const ImportModal = (() => {
   function init() {
     // Delegated listener — fires for any .plan-import-btn even after re-renders.
     document.getElementById('planBody')?.addEventListener('click', e => {
-      const btn = e.target.closest('.plan-import-btn');
-      if (!btn) return;
-      e.stopPropagation();
-      open(btn.dataset.mfr);
+      // Top-level brand-import button (existing behavior — no drop context)
+      const topBtn = e.target.closest('.plan-import-btn');
+      if (topBtn) {
+        e.stopPropagation();
+        open(topBtn.dataset.mfr);
+        return;
+      }
+      // Per-drop import button — passes drop_id so the file gets tagged
+      // and the button flips to "Voir importation" on next render
+      const dropBtn = e.target.closest('.plan-drop-import');
+      if (dropBtn) {
+        e.stopPropagation();
+        open(dropBtn.dataset.mfr, { dropId: dropBtn.dataset.drop });
+        return;
+      }
+      // Per-drop 'Voir importation' — opens PreviewPanel on the linked file
+      const viewBtn = e.target.closest('.plan-drop-view-import');
+      if (viewBtn) {
+        e.stopPropagation();
+        PreviewPanel.open(Number(viewBtn.dataset.fileId));
+        return;
+      }
     });
     el('importModalClose')?.addEventListener('click', hide);
     el('importModalSubmit')?.addEventListener('click', submit);
