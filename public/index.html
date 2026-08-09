@@ -3552,10 +3552,10 @@ const PlanTab = (() => {
     return null;
   }
 
-  // Rebuild the imports-per-drop index. Keys are `${mfr}|${drop_id}`
-  // (both lowercased) so lookups are stable across capitalization diffs
-  // between the plan's manufacturer label and the file's target_manufacturer.
-  // Only files matching the currently-selected season are indexed.
+  // Rebuild the imports-per-drop-per-shop index. Keys are
+  // `${mfr}|${drop_id}|${shop_id}` (all lowercased) — critical: without
+  // shop_id, a PO imported for shop A appeared as "already imported"
+  // in shop B's Plan tab.
   async function refreshImportsIndex() {
     planState.importsByMfrDrop.clear();
     try {
@@ -3565,15 +3565,17 @@ const PlanTab = (() => {
       for (const f of (data.files || [])) {
         if (!f.drop_id) continue;
         if (f.season_tag !== planState.season) continue;
-        const key = `${String(f.target_manufacturer || '').toLowerCase()}|${String(f.drop_id).toLowerCase()}`;
-        // Prefer the latest file for a (mfr, drop) pair — files are ordered DESC
-        // by uploaded_at, so first-seen wins.
+        const shopId = String(f.destination_shop_id || '').toLowerCase();
+        const key = `${String(f.target_manufacturer || '').toLowerCase()}|${String(f.drop_id).toLowerCase()}|${shopId}`;
+        // Prefer the latest file for a (mfr, drop, shop) — files are DESC
+        // by uploaded_at, first-seen wins.
         if (!planState.importsByMfrDrop.has(key)) {
           planState.importsByMfrDrop.set(key, {
-            file_id:      f.file_id,
-            status:       f.status,
-            filename:     f.source_filename,
-            confirmed_at: f.confirmed_at,  // null = pre-analysis only, not yet imported
+            file_id:              f.file_id,
+            status:               f.status,
+            filename:             f.source_filename,
+            destination_shop_id:  f.destination_shop_id,
+            confirmed_at:         f.confirmed_at,
           });
         }
       }
@@ -3880,13 +3882,23 @@ const PlanTab = (() => {
         </div>`;
 
       // Import button per drop — 3 states based on file lifecycle:
-      //  1. No file at all → "↑ Importer" (opens modal in picker mode)
-      //  2. File exists but confirmed_at IS NULL (pre-analysis only, operator
-      //     hasn't clicked yet) → "↑ Importer" (opens modal in checkbox mode)
+      //  1. No file for THIS shop → "↑ Importer" (opens modal in picker mode)
+      //  2. File exists for THIS shop but confirmed_at IS NULL (pre-analysis
+      //     only, operator hasn't clicked yet) → "↑ Importer" (opens modal
+      //     in checkbox mode)
       //  3. File exists AND confirmed_at IS NOT NULL → "📄 Voir importation"
       //     (operator has explicitly imported at least once)
-      const importKey = `${String(mfr).toLowerCase()}|${String(drop_id).toLowerCase()}`;
-      const existing  = planState.importsByMfrDrop.get(importKey);
+      // Scope by shop: iterate every visible shop for this drop and look
+      // up the (mfr|drop|shop) key. First match wins. If nothing found,
+      // button stays in default "Importer" state — critical fix for the
+      // multi-shop bug where a Brax file for shop A appeared as imported
+      // in shop B's Plan tab.
+      let existing = null;
+      for (const sh of visibleShops) {
+        const k = `${String(mfr).toLowerCase()}|${String(drop_id).toLowerCase()}|${String(sh.id).toLowerCase()}`;
+        const hit = planState.importsByMfrDrop.get(k);
+        if (hit) { existing = hit; break; }
+      }
       let importBtn;
       if (existing?.confirmed_at) {
         importBtn = `<button class="plan-drop-view-import text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100 ml-2"
@@ -4296,8 +4308,18 @@ const PlanTab = (() => {
 
   // Lookup helper — ImportModal.open() uses this to decide whether to
   // show the file picker or the "confirm existing file" checkbox mode.
-  function getExistingImport(mfrDropKey) {
-    return planState.importsByMfrDrop.get(mfrDropKey) || null;
+  // Iterates visible shops if no explicit shop_id is passed — matches
+  // the same first-hit-wins semantics as the drop button render.
+  function getExistingImport(mfrDropKey, shopId) {
+    if (shopId) {
+      return planState.importsByMfrDrop.get(`${mfrDropKey}|${String(shopId).toLowerCase()}`) || null;
+    }
+    // No shop context — scan all visible shops, return first hit
+    for (const sh of SHOPS.filter(s => planState.selectedShops.has(s.id))) {
+      const hit = planState.importsByMfrDrop.get(`${mfrDropKey}|${String(sh.id).toLowerCase()}`);
+      if (hit) return hit;
+    }
+    return null;
   }
 
   return { load, init, refreshAfterUpload, getExistingImport };

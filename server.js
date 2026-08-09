@@ -4512,10 +4512,10 @@ app.post('/api/budget-plan/document', async (req, res, next) => {
         const crypto = require('crypto');
         const source_hash = crypto.createHash('sha256').update(buf).digest('hex');
         // Dedup is context-aware: same PDF re-attached under a DIFFERENT
-        // season / mfr / drop is a legitimate new intent (not a duplicate).
-        // Only reuse when every dimension matches — otherwise create a
-        // fresh import so the season/drop/mfr on the preview reflect the
-        // operator's current context, not the first attach.
+        // season / mfr / drop / SHOP is a legitimate new intent (not a
+        // duplicate). Shop matters because each destination_shop_id gets
+        // its own PO in Lightspeed — same PDF for shop A is a different
+        // business event from same PDF for shop B.
         const { rows: dup } = await pool.query(
           `SELECT file_id FROM import_files
            WHERE tenant_id = $1
@@ -4523,8 +4523,10 @@ app.post('/api/budget-plan/document', async (req, res, next) => {
              AND season_tag = $3
              AND lower(target_manufacturer) = lower($4)
              AND COALESCE(drop_id, '') = COALESCE($5, '')
+             AND COALESCE(destination_shop_id, '') = COALESCE($6, '')
            LIMIT 1`,
-          [req.tenantId, source_hash, season_code.toLowerCase(), manufacturer, String(drop_id || '')],
+          [req.tenantId, source_hash, season_code.toLowerCase(), manufacturer,
+           String(drop_id || ''), String(destination_shop_id || '')],
         );
         if (dup.length) {
           preAnalysisFileId = dup[0].file_id;
