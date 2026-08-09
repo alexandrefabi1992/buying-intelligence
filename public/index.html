@@ -4219,7 +4219,15 @@ const PlanTab = (() => {
     });
   }
 
-  return { load, init };
+  // Public hook — ImportModal calls this after a successful upload so the
+  // per-drop "Importer" button flips to "Voir importation" without needing
+  // a manual page reload. Re-fetches the imports index + re-renders.
+  async function refreshAfterUpload() {
+    await refreshImportsIndex();
+    renderTable();
+  }
+
+  return { load, init, refreshAfterUpload };
 })();
 
 // ────────────────────────────────────────────────────────────────────────
@@ -4410,6 +4418,9 @@ const ImportModal = (() => {
       if (data.extraction_started) {
         const capturedFileId = data.file_id;
         hide();
+        // Refresh the Plan tab's imports index so the per-drop button
+        // flips from "Importer" to "Voir importation" without a reload.
+        try { await PlanTab.refreshAfterUpload(); } catch { /* PlanTab may not be visible */ }
         PreviewPanel.open(capturedFileId);
         return;
       }
@@ -4468,8 +4479,9 @@ const ImportModal = (() => {
       // state.fileId, and passing null to PreviewPanel.open turns the URL
       // into /files/null/preview -> 500 (integer parse error server-side).
       const capturedFileId = state.fileId;
-      el('importGoToPreview').addEventListener('click', () => {
+      el('importGoToPreview').addEventListener('click', async () => {
         hide();
+        try { await PlanTab.refreshAfterUpload(); } catch { /* not critical */ }
         PreviewPanel.open(capturedFileId, { refresh: true });
       });
     } catch (e) {
