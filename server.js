@@ -246,7 +246,7 @@ app.use('/api/token',       requireAdmin);
 // Global JWT middleware above already runs requireAuth for /api/*; the
 // mounted routes call requireAuth again defensively (idempotent).
 const { mountImportRoutes } = require('./lib/import-routes');
-mountImportRoutes(app, pool, requireAuth, requireAdmin);
+const importHelpers = mountImportRoutes(app, pool, requireAuth, requireAdmin);
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/login — email + password → JWT (no auth required)
@@ -4462,7 +4462,8 @@ app.get('/api/budget-plan/documents', async (req, res, next) => {
 // Upload a document (base64 JSON body)
 app.post('/api/budget-plan/document', async (req, res, next) => {
   try {
-    const { season_code, manufacturer, drop_id = 'drop_1', filename, content_type, data_base64 } = req.body;
+    const { season_code, manufacturer, drop_id = 'drop_1', filename, content_type, data_base64,
+            destination_shop_id } = req.body;
     if (!season_code || !manufacturer || !filename || !data_base64)
       return res.status(400).json({ error: 'season_code, manufacturer, filename, data_base64 are required' });
     const buf = Buffer.from(data_base64, 'base64');
@@ -4472,7 +4473,55 @@ app.post('/api/budget-plan/document', async (req, res, next) => {
       [req.tenantId, season_code.toLowerCase(), manufacturer, drop_id, filename,
        content_type || 'application/octet-stream', buf.length, buf]
     );
-    res.json({ ok: true, id: rows[0].id, filename });
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Pre-analysis kick-off — if the attached doc is a PDF and we have
+    // enough context (mfr + season + drop_id + shop), immediately start
+    // an LLM extraction in the background. When the operator later
+    // clicks the drop's Importer button, the extraction is often
+    // already complete → preview appears instantly instead of a 30-90s
+    // wait. Uses source_hash to skip re-extraction of already-imported
+    // PDFs (deduplication).
+    // ═══════════════════════════════════════════════════════════════════
+    let preAnalysisFileId = null;
+    const isPdf = (content_type || '').toLowerCase().includes('pdf')
+                || filename.toLowerCase().endsWith('.pdf');
+    if (isPdf && destination_shop_id) {
+      try {
+        const crypto = require('crypto');
+        const source_hash = crypto.createHash('sha256').update(buf).digest('hex');
+        // Skip if an import already exists for the same PDF
+        const { rows: dup } = await pool.query(
+          `SELECT file_id FROM import_files WHERE tenant_id = $1 AND source_hash = $2 LIMIT 1`,
+          [req.tenantId, source_hash],
+        );
+        if (dup.length) {
+          preAnalysisFileId = dup[0].file_id;
+        } else {
+          const insRes = await pool.query(
+            `INSERT INTO import_files
+               (tenant_id, supplier_key, recipe_id, source_filename, source_hash, source_bytes,
+                uploaded_by, season_tag, destination_shop_id, target_manufacturer, status,
+                extraction_source, drop_id, preview_computed_at)
+             VALUES ($1, 'unknown', NULL, $2, $3, $4, $5, $6, $7, $8, 'extracting', 'recipe', $9, now())
+             RETURNING file_id`,
+            [req.tenantId, filename, source_hash, buf, req.userId ?? null,
+             season_code.toLowerCase(), String(destination_shop_id),
+             manufacturer, String(drop_id)],
+          );
+          preAnalysisFileId = insRes.rows[0].file_id;
+          if (importHelpers?.spawnLlmExtractionBackground) {
+            importHelpers.spawnLlmExtractionBackground(req.tenantId, preAnalysisFileId);
+            console.log(`[pre-analysis] file=${preAnalysisFileId} mfr=${manufacturer} drop=${drop_id} tenant=${req.tenantId} spawned`);
+          }
+        }
+      } catch (e) {
+        // Non-fatal — the doc attachment succeeded, only the pre-analysis failed
+        console.error('[pre-analysis] failed:', e.message);
+      }
+    }
+    res.json({ ok: true, id: rows[0].id, filename,
+      pre_analysis_file_id: preAnalysisFileId });
   } catch (err) { next(err); }
 });
 

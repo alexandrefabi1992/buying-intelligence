@@ -3519,6 +3519,22 @@ const PlanTab = (() => {
     await fetchAndRender();
   }
 
+  // Derive the destination shop for a (mfr, drop) — used at doc-attach
+  // time to enable pre-analysis. Priority order:
+  //  1. If the drop has amounts on a SINGLE shop → that shop
+  //  2. If planState.selectedShops has exactly one entry → that shop
+  //  3. If exactly one shop total is visible → that shop
+  //  4. Otherwise null → pre-analysis is skipped
+  function deriveDropShopId(mfr, dropId) {
+    const shopMap = (planState.plan[mfr] ?? {})[dropId] ?? {};
+    const withAmount = Object.entries(shopMap).filter(([, amt]) => amt > 0);
+    if (withAmount.length === 1) return withAmount[0][0];
+    if (planState.selectedShops.size === 1) return [...planState.selectedShops][0];
+    const visibleShops = SHOPS.filter(s => planState.selectedShops.has(s.id));
+    if (visibleShops.length === 1) return visibleShops[0].id;
+    return null;
+  }
+
   // Rebuild the imports-per-drop index. Keys are `${mfr}|${drop_id}`
   // (both lowercased) so lookups are stable across capitalization diffs
   // between the plan's manufacturer label and the file's target_manufacturer.
@@ -3712,10 +3728,9 @@ const PlanTab = (() => {
           <td class="px-4 py-2.5 text-right font-semibold text-indigo-700">${totalPlan > 0 ? fmtC(totalPlan) : '<span class="text-gray-300">—</span>'}</td>
           <td class="px-4 py-2.5 text-right">${diffHtml}</td>
           <td class="px-4 py-2.5 text-center">
-            <button class="plan-import-btn text-gray-400 hover:text-indigo-600 text-xs px-2 py-1 rounded border border-transparent hover:border-indigo-200 hover:bg-indigo-50 transition-colors"
-                    title="${t('plan_import_supplier_title')}" data-mfr="${escHtml(mfr)}">
-              ↑ ${t('plan_import_supplier_btn')}
-            </button>
+            <!-- Top-level brand-import button removed — the per-drop
+                 Importer / Voir importation button inside each drop
+                 block is now the canonical entry point. -->
           </td>
           <td class="px-4 py-2.5 text-right">
             ${m._manual
@@ -4166,15 +4181,32 @@ const PlanTab = (() => {
       const reader = new FileReader();
       reader.onload = async evt => {
         const base64 = evt.target.result.split(',')[1];
+        // Pass the drop's destination shop so backend can pre-analyze the
+        // PDF in the background while the operator does other things. If
+        // no single shop can be derived, extraction is skipped and the
+        // operator triggers it manually via the per-drop Importer button.
+        const derivedShopId = deriveDropShopId(mfr, drop);
         try {
           const res = await apiFetch(`${BASE}/api/budget-plan/document`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               season_code: planState.season, manufacturer: mfr, drop_id: drop,
               filename: file.name, content_type: file.type || 'application/octet-stream', data_base64: base64,
+              destination_shop_id: derivedShopId,
             }),
           });
-          if (res.ok) flashSaved();
+          if (res.ok) {
+            flashSaved();
+            const data = await res.json().catch(() => ({}));
+            if (data.pre_analysis_file_id) {
+              // Pre-analysis fired — refresh imports index so the per-drop
+              // button flips to "Voir importation" as soon as extraction
+              // finishes (the button reflects file existence, not
+              // extraction completion — user can click to poll).
+              await refreshImportsIndex();
+              renderTable();
+            }
+          }
         } catch {}
         input.value = '';
         loadDocs(mfr, drop);
