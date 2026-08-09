@@ -4858,9 +4858,46 @@ const PreviewPanel = (() => {
       const tilesEl = document.getElementById('previewSummaryTiles');
       tilesEl.parentNode.insertBefore(el2, tilesEl);
     }
-    const reasonHtml = (summary.incomplete_reasons || [])
-      .map(r => `<li><code class="text-[10px] bg-red-100 text-red-800 px-1 py-0.5 rounded">${escHtml(r.code)}</code> — ${escHtml(r.description)}</li>`)
-      .join('');
+    // Render each incomplete_reason. When the reason carries samples
+    // (currently only size_mismatch_suspected — the LLM column-shift check
+    // emits up to 5 samples per assessCompleteness), expand them into a
+    // small table so the operator sees WHICH products triggered the flag
+    // and what the difference is between the LLM output and what the raw
+    // text suggests.
+    const reasonHtml = (summary.incomplete_reasons || []).map(r => {
+      let extra = '';
+      if (r.code === 'size_mismatch_suspected' && Array.isArray(r.samples) && r.samples.length) {
+        const rows = r.samples.map(s => `
+          <tr class="border-t border-red-200">
+            <td class="px-2 py-1 font-mono">${escHtml(s.style_ref || '?')}</td>
+            <td class="px-2 py-1 text-[10px]">${(s.llm_sizes || []).map(sz => `<code class="bg-red-100 px-1 rounded">${escHtml(String(sz))}</code>`).join(' ')}</td>
+            <td class="px-2 py-1 text-[10px]">${(s.expected_sizes || []).map(sz => `<code class="bg-emerald-100 px-1 rounded">${escHtml(String(sz))}</code>`).join(' ')}</td>
+            <td class="px-2 py-1 text-[10px] text-gray-500 font-mono truncate max-w-md" title="${escHtml(s.raw_row || '')}">${escHtml((s.raw_row || '').slice(0, 60))}${s.raw_row && s.raw_row.length > 60 ? '…' : ''}</td>
+          </tr>`).join('');
+        const shown = Math.min(r.samples.length, r.suspected || r.samples.length);
+        const total = r.suspected || r.samples.length;
+        extra = `
+          <details class="mt-2" open>
+            <summary class="cursor-pointer text-[11px] text-red-700 hover:underline">
+              Voir les ${shown}${total > shown ? '/' + total : ''} produits suspects (comparaison tailles LLM vs texte brut)
+            </summary>
+            <div class="mt-2 overflow-x-auto">
+              <table class="w-full text-[11px] border border-red-200 rounded">
+                <thead class="bg-red-100 text-red-900 text-[10px] uppercase">
+                  <tr>
+                    <th class="px-2 py-1 text-left">Style</th>
+                    <th class="px-2 py-1 text-left">Sizes LLM</th>
+                    <th class="px-2 py-1 text-left">Sizes attendues (texte brut)</th>
+                    <th class="px-2 py-1 text-left">Extrait de la ligne PDF</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+          </details>`;
+      }
+      return `<li><code class="text-[10px] bg-red-100 text-red-800 px-1 py-0.5 rounded">${escHtml(r.code)}</code> — ${escHtml(r.description)}${extra}</li>`;
+    }).join('');
     const stats = summary.extraction_stats || {};
     el2.className = 'bg-red-50 border border-red-300 rounded-xl px-5 py-4 text-red-800 shadow-sm';
     el2.innerHTML = `
