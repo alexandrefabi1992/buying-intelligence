@@ -1125,15 +1125,8 @@
             <button id="previewApplyMultiplierAll" class="text-xs border border-amber-300 text-amber-700 rounded px-3 py-1 hover:bg-amber-100" title="Écrase le retail de TOUTES les matrices">Appliquer à toutes</button>
             <span id="previewRetailToolStatus" class="text-[11px] text-gray-500 ml-2"></span>
           </div>
-          <!-- Bulk category tool: pick once, apply to many -->
-          <div id="previewCategoryTool" class="hidden px-5 py-2 border-b border-gray-100 bg-indigo-50/50 flex items-center gap-3 text-xs">
-            <span class="text-indigo-800 font-semibold">Catégorie groupée :</span>
-            <span id="previewCategoryBulkLabel" class="text-gray-700 italic">— rien sélectionné —</span>
-            <button id="previewCategoryBulkPick" class="text-xs border border-indigo-300 text-indigo-700 rounded px-3 py-1 hover:bg-indigo-100">Choisir…</button>
-            <button id="previewApplyCategoryMissing" class="text-xs bg-indigo-600 text-white rounded px-3 py-1 hover:bg-indigo-700 disabled:bg-gray-300" disabled title="Ne remplit que les matrices sans catégorie actuelle">Appliquer aux matrices sans catégorie</button>
-            <button id="previewApplyCategoryAll" class="text-xs border border-indigo-300 text-indigo-700 rounded px-3 py-1 hover:bg-indigo-100 disabled:opacity-40" disabled title="Écrase la catégorie de TOUTES les matrices">Appliquer à toutes</button>
-            <span id="previewCategoryToolStatus" class="text-[11px] text-gray-500 ml-2"></span>
-          </div>
+          <!-- (bulk category tool removed — replaced by inline drag-to-fill
+               handle on each category cell, see renderMatricesTable) -->
           <div class="overflow-x-auto">
             <table class="min-w-full text-xs">
               <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
@@ -5006,9 +4999,16 @@ const PreviewPanel = (() => {
         : '';
       const matrixKey = `${m.style_ref}|${m.color_normalized}`;
       const catPath   = m.override_category_path;
-      const catCell   = catPath
+      // Cell = button + drag-handle (only when a category is set — a blank
+      // cell has nothing to propagate). The handle is a small indigo tab in
+      // the bottom-right corner that appears on cell hover, matching the
+      // Excel / Google Sheets fill-down affordance.
+      const fillHandle = catPath
+        ? `<span class="matrix-cat-fill absolute -bottom-1 -right-1 w-3 h-3 bg-indigo-500 border border-white rounded-sm cursor-crosshair opacity-0 group-hover:opacity-100 transition-opacity" title="Glisser vers le bas pour copier cette catégorie sur les lignes suivantes"></span>`
+        : '';
+      const catCell   = `<div class="matrix-cat-cell relative group inline-block" data-matrix-key="${escHtml(matrixKey)}" data-cat-id="${escHtml(m.override_category_id || '')}" data-cat-path="${escHtml(catPath || '')}">${catPath
         ? `<button class="matrix-cat-btn text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 hover:bg-emerald-100" data-matrix-key="${escHtml(matrixKey)}">${escHtml(catPath)} ✎</button>`
-        : `<button class="matrix-cat-btn text-[11px] text-indigo-600 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-50" data-matrix-key="${escHtml(matrixKey)}">+ Choisir</button>`;
+        : `<button class="matrix-cat-btn text-[11px] text-indigo-600 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-50" data-matrix-key="${escHtml(matrixKey)}">+ Choisir</button>`}${fillHandle}</div>`;
       // Effective cost overrides PDF cost when brand has margin_override_pct
       // set. Show effective value prominently + strikethrough original if diff.
       let costCellContent = '—';
@@ -5024,13 +5024,13 @@ const PreviewPanel = (() => {
         costCellContent = m.unit_cost;
       }
       return `
-        <tr class="border-t border-gray-100">
+        <tr class="matrix-row border-t border-gray-100" data-matrix-key="${escHtml(matrixKey)}" data-row-idx="${rows.indexOf(m)}">
           <td class="px-3 py-2 font-semibold text-gray-800">${escHtml(m.style_ref)}</td>
           <td class="px-3 py-2 text-gray-700">${escHtml(m.color_normalized)}</td>
           <td class="px-3 py-2 text-gray-500">${escHtml(m.description || '')}</td>
           <td class="px-3 py-2"><span class="text-[10px] font-semibold px-2 py-0.5 rounded ${actCls}">${escHtml(actionLabel(m.action))}</span></td>
           <td class="px-3 py-2 text-gray-700">${escHtml(m.matrix_description_planned || '')} ${reuseStr}</td>
-          <td class="px-3 py-2">${catCell}</td>
+          <td class="px-3 py-2 matrix-cat-td">${catCell}</td>
           <td class="px-3 py-2 text-right text-gray-600">${costCellContent}</td>
           <td class="px-3 py-2 text-right">
             <input type="number" step="0.01" min="0"
@@ -5053,13 +5053,101 @@ const PreviewPanel = (() => {
       inp.addEventListener('blur', () => saveRetailOverride(inp));
       inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
     });
+    // Wire category drag-to-fill handles — Google-Sheets-style fill-down.
+    el('previewMatricesBody').querySelectorAll('.matrix-cat-fill').forEach(handle => {
+      handle.addEventListener('mousedown', startCategoryDragFill);
+    });
 
     // Retail multiplier tool — show when at least one matrix has no retail
     const anyMissingRetail = state.data.matrices.some(m => m.effective_retail_price == null);
     el('previewRetailTool').classList.toggle('hidden', !anyMissingRetail && state.data.matrices.length === 0);
     // Actually show always if there are matrices — operator may want to override even filled ones
     el('previewRetailTool').classList.toggle('hidden', state.data.matrices.length === 0);
-    el('previewCategoryTool').classList.toggle('hidden', state.data.matrices.length === 0);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Category drag-to-fill — Google-Sheets-style: click the little indigo
+  // handle on a category cell, drag DOWN to copy that category to every
+  // row you cover, release to apply. All covered rows get PATCHed in
+  // parallel.
+  // ═══════════════════════════════════════════════════════════════════════
+  let dragCat = null;
+
+  function startCategoryDragFill(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const sourceCell = e.currentTarget.closest('.matrix-cat-cell');
+    if (!sourceCell) return;
+    const sourceRow  = e.currentTarget.closest('tr[data-row-idx]');
+    if (!sourceRow) return;
+    dragCat = {
+      sourceRowIdx:  Number(sourceRow.dataset.rowIdx),
+      currentRowIdx: Number(sourceRow.dataset.rowIdx),
+      categoryId:    sourceCell.dataset.catId,
+      categoryPath:  sourceCell.dataset.catPath,
+    };
+    document.body.style.cursor = 'crosshair';
+    document.addEventListener('mousemove', onCategoryDragMove);
+    document.addEventListener('mouseup', onCategoryDragEnd, { once: true });
+    highlightDragRange();
+  }
+
+  function onCategoryDragMove(e) {
+    if (!dragCat) return;
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    if (!target) return;
+    const row = target.closest('tr[data-row-idx]');
+    if (!row) return;
+    const idx = Number(row.dataset.rowIdx);
+    if (idx === dragCat.currentRowIdx) return;
+    dragCat.currentRowIdx = idx;
+    highlightDragRange();
+  }
+
+  function highlightDragRange() {
+    if (!dragCat) return;
+    const [lo, hi] = [dragCat.sourceRowIdx, dragCat.currentRowIdx].sort((a, b) => a - b);
+    el('previewMatricesBody').querySelectorAll('tr[data-row-idx]').forEach(tr => {
+      const i = Number(tr.dataset.rowIdx);
+      const inRange = i >= lo && i <= hi;
+      tr.classList.toggle('bg-indigo-50', inRange && i !== dragCat.sourceRowIdx);
+      tr.classList.toggle('ring-1', inRange);
+      tr.classList.toggle('ring-indigo-400', inRange);
+    });
+  }
+
+  async function onCategoryDragEnd() {
+    if (!dragCat) return;
+    document.body.style.cursor = '';
+    document.removeEventListener('mousemove', onCategoryDragMove);
+    const { sourceRowIdx, currentRowIdx, categoryId, categoryPath } = dragCat;
+    const [lo, hi] = [sourceRowIdx, currentRowIdx].sort((a, b) => a - b);
+    // Clear visual highlights
+    el('previewMatricesBody').querySelectorAll('tr[data-row-idx]').forEach(tr => {
+      tr.classList.remove('bg-indigo-50', 'ring-1', 'ring-indigo-400');
+    });
+    dragCat = null;
+    // No-op if source == target (no drag movement)
+    if (lo === hi) return;
+    // Collect the target matrix_keys — every row in range except source
+    const targets = [];
+    el('previewMatricesBody').querySelectorAll('tr[data-row-idx]').forEach(tr => {
+      const i = Number(tr.dataset.rowIdx);
+      if (i >= lo && i <= hi && i !== sourceRowIdx) targets.push(tr.dataset.matrixKey);
+    });
+    if (!targets.length) return;
+    // Optimistic PATCH in parallel
+    try {
+      await Promise.all(targets.map(mk =>
+        apiFetch(`${BASE}/api/import/files/${state.fileId}/matrices/${encodeURIComponent(mk)}/override`, {
+          method:  'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ category_id: categoryId, category_path: categoryPath }),
+        })));
+      await open(state.fileId); // refresh to show new badges
+    } catch (e) {
+      alert('Erreur lors de l\'application en cascade : ' + e.message);
+    }
   }
 
   async function saveRetailOverride(inp) {
