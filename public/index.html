@@ -4342,6 +4342,8 @@ const ImportModal = (() => {
     if (el('importModalPickerRow')) el('importModalPickerRow').classList.remove('hidden');
     state.fileId          = null;
     state.existingFileId  = null;
+    state.attachedDocId   = null;
+    state.attachedDocName = null;
   }
 
   function setStatus(kind, msg) {
@@ -4394,46 +4396,125 @@ const ImportModal = (() => {
     if (planShopVal && shopRow) showShopLocked(shopRow.id, shopRow.name);
     else                        showShopPicker();
     if (!state.season) setStatus('error', t('import_err_no_season'));
-    // If a pre-analyzed file already exists for this drop, show the
-    // confirmation checkbox instead of the file picker. Op ticks it and
-    // hits "Analyser" — modal closes, PreviewPanel opens directly on
-    // the existing file (extraction may be complete or still running).
-    state.existingFileId = null;
-    if (state.dropId && brand) {
-      const key = `${String(brand).toLowerCase()}|${String(state.dropId).toLowerCase()}`;
-      const existing = (window.PlanTab?.getExistingImport?.(key)) || null;
-      if (existing) {
-        state.existingFileId  = existing.file_id;
-        el('importModalExistingFilename').textContent = existing.filename;
-        el('importModalExistingStatus').textContent   =
-          existing.status === 'extracting' ? '⏳ Extraction en cours (préparée en arrière-plan)'
-          : existing.status === 'previewed' ? '✓ Analyse prête'
-          : existing.status === 'awaiting_extraction' ? '⚠ Extraction à relancer'
-          : `Statut : ${existing.status}`;
-        el('importModalExistingFile').classList.remove('hidden');
-        el('importModalPickerRow').classList.add('hidden');
-        el('importModalConfirmExisting').checked = true;
-        el('importModalSubmit').textContent = 'Confirmer et voir la prévisualisation';
-      }
-    }
+    // If a pre-analyzed file OR an attached doc already exists for this
+    // drop, show the confirmation checkbox instead of the file picker.
+    state.existingFileId  = null;
+    state.attachedDocId   = null;
+    state.attachedDocName = null;
     show();
+    if (state.dropId && brand) {
+      detectExistingForDrop(brand, state.dropId).catch(() => { /* non-fatal */ });
+    }
+  }
+
+  // Detect either a pre-analyzed file OR an attached-but-not-analyzed
+  // document for the current (brand, drop) pair. If either is found,
+  // populate the confirm-checkbox UI.
+  async function detectExistingForDrop(brand, dropId) {
+    // 1. Pre-analyzed file (via PlanTab's cached index)
+    const key = `${String(brand).toLowerCase()}|${String(dropId).toLowerCase()}`;
+    const existing = (window.PlanTab?.getExistingImport?.(key)) || null;
+    if (existing) {
+      state.existingFileId  = existing.file_id;
+      showConfirmBox(existing.filename, humanStatus(existing.status));
+      return;
+    }
+    // 2. Attached document (budget_documents table) — fall back if
+    //    pre-analysis didn't fire (typically because shop couldn't be
+    //    derived at attach time).
+    try {
+      const seasonSel = el('planSeason');
+      const season = seasonSel?.value || planState?.season || 'p26';
+      const url = `${BASE}/api/budget-plan/documents?season=${season}&manufacturer=${encodeURIComponent(brand)}&drop_id=${dropId}`;
+      const r = await apiFetch(url);
+      if (!r.ok) return;
+      const data = await r.json();
+      const doc = (data.docs || []).find(d => {
+        const ct = (d.content_type || '').toLowerCase();
+        return ct.includes('pdf') || (d.filename || '').toLowerCase().endsWith('.pdf');
+      });
+      if (doc) {
+        state.attachedDocId   = doc.id;
+        state.attachedDocName = doc.filename;
+        showConfirmBox(doc.filename, '📎 Fichier attaché — analyse au clic sur Confirmer');
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  function showConfirmBox(filename, statusLine) {
+    el('importModalExistingFilename').textContent = filename;
+    el('importModalExistingStatus').textContent   = statusLine;
+    el('importModalExistingFile').classList.remove('hidden');
+    el('importModalPickerRow').classList.add('hidden');
+    el('importModalConfirmExisting').checked = true;
+    el('importModalSubmit').textContent = 'Confirmer et voir la prévisualisation';
+  }
+
+  function humanStatus(s) {
+    return s === 'extracting' ? '⏳ Extraction en cours (préparée en arrière-plan)'
+      :  s === 'previewed' ? '✓ Analyse prête'
+      :  s === 'awaiting_extraction' ? '⚠ Extraction à relancer'
+      :  s === 'pushed' ? '✓ Déjà poussé vers Lightspeed'
+      :  `Statut : ${s}`;
   }
 
   async function submit() {
-    // Confirm-existing mode: skip upload entirely, jump to the preview.
-    // The file was already uploaded + LLM-extracted in the background at
-    // doc-attach time. Mark it as confirmed so the per-drop button flips
-    // from "Importer" to "Voir importation" — semantically: the operator
-    // has now formally imported this file, not just attached it.
+    // Confirm-existing mode (pre-analyzed): file already in import_files,
+    // just mark confirmed + go to preview.
     if (state.existingFileId && el('importModalConfirmExisting').checked) {
       const fid = state.existingFileId;
       try {
         await apiFetch(`${BASE}/api/import/files/${fid}/confirm`, { method: 'POST' });
-      } catch { /* non-fatal — user can still see the preview */ }
+      } catch { /* non-fatal */ }
       hide();
-      try { await PlanTab.refreshAfterUpload(); } catch { /* not critical */ }
+      try { await PlanTab.refreshAfterUpload(); } catch { }
       PreviewPanel.open(fid);
       return;
+    }
+
+    // Confirm-attached mode (doc attached but pre-analysis didn't fire):
+    // download the attached bytes from budget_documents, upload via the
+    // normal /api/import/upload with the modal's shop context, then open
+    // preview. This is the fallback for drops where deriveDropShopId
+    // returned null at attach time.
+    if (state.attachedDocId && el('importModalConfirmExisting').checked) {
+      const shopId = state.shopId || el('importModalShop').value;
+      if (!shopId)       return setStatus('error', t('import_err_no_shop'));
+      if (!state.season) return setStatus('error', t('import_err_no_season'));
+      el('importModalSubmit').disabled = true;
+      el('importModalSubmit').textContent = 'Analyse du document attaché…';
+      try {
+        const blobRes = await apiFetch(`${BASE}/api/budget-plan/document/${state.attachedDocId}`);
+        if (!blobRes.ok) throw new Error(`GET doc HTTP ${blobRes.status}`);
+        const blob = await blobRes.blob();
+        const fd = new FormData();
+        fd.append('file', blob, state.attachedDocName || 'attached.pdf');
+        fd.append('season_tag', state.season);
+        fd.append('destination_shop_id', shopId);
+        fd.append('target_manufacturer', state.brand);
+        const customName = (el('importModalOrderName')?.value || '').trim();
+        if (customName) fd.append('custom_order_name', customName);
+        if (state.dropId) fd.append('drop_id', state.dropId);
+        const token = getToken();
+        const res = await fetch(`${BASE}/api/import/upload`, {
+          method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok && data.error !== 'duplicate_file') throw new Error(data.message || `HTTP ${res.status}`);
+        // If duplicate, use existing_file_id; else use fresh file_id
+        const fid = data.file_id || data.existing_file_id;
+        if (!fid) throw new Error('No file_id in response');
+        try { await apiFetch(`${BASE}/api/import/files/${fid}/confirm`, { method: 'POST' }); } catch {}
+        hide();
+        try { await PlanTab.refreshAfterUpload(); } catch { }
+        PreviewPanel.open(fid);
+        return;
+      } catch (e) {
+        setStatus('error', 'Erreur analyse doc attaché : ' + e.message);
+        el('importModalSubmit').disabled = false;
+        el('importModalSubmit').textContent = 'Confirmer et voir la prévisualisation';
+        return;
+      }
     }
     const file = el('importModalFile').files[0];
     if (!file)          return setStatus('error', t('import_err_no_file'));
