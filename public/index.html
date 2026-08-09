@@ -998,8 +998,25 @@
             <p id="importModalShopHint" class="text-[10px] text-gray-400 mt-1"></p>
           </div>
 
-          <!-- PDF picker -->
-          <div>
+          <!-- Existing file confirmation (shown when a pre-analyzed file
+               already exists for this drop). Operator ticks the checkbox
+               to confirm using it, then clicks Analyser to jump straight
+               to the preview. Includes a fallback link to upload a
+               different file if the existing one is wrong. -->
+          <div id="importModalExistingFile" class="hidden">
+            <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1">Fichier déjà attaché</label>
+            <label class="flex items-start gap-2 p-3 border border-indigo-200 bg-indigo-50 rounded-lg cursor-pointer hover:bg-indigo-100">
+              <input type="checkbox" id="importModalConfirmExisting" class="mt-0.5 accent-indigo-600">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold text-indigo-900 truncate" id="importModalExistingFilename">—</div>
+                <div class="text-[10px] text-indigo-700 mt-0.5" id="importModalExistingStatus">—</div>
+              </div>
+            </label>
+            <button type="button" id="importModalUseAnother" class="text-[10px] text-gray-500 hover:text-indigo-600 mt-2 underline">Ou choisir un autre fichier…</button>
+          </div>
+
+          <!-- PDF picker (hidden when an existing file is being confirmed) -->
+          <div id="importModalPickerRow">
             <label class="text-[10px] uppercase font-semibold text-gray-500 block mb-1" data-i18n="import_lbl_file">Fichier PDF</label>
             <input id="importModalFile" type="file" accept="application/pdf"
                    class="w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-gray-300 file:bg-gray-50 file:text-gray-700 file:font-semibold file:cursor-pointer hover:file:bg-gray-100">
@@ -3868,7 +3885,9 @@ const PlanTab = (() => {
       const importBtn = existing
         ? `<button class="plan-drop-view-import text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100 ml-2"
              data-file-id="${existing.file_id}"
-             title="Ouvrir la prévisualisation (${escHtml(existing.filename)} — ${escHtml(existing.status)})">
+             data-mfr="${escHtml(mfr)}"
+             data-drop="${drop_id}"
+             title="Confirmer et voir la prévisualisation (${escHtml(existing.filename)} — ${escHtml(existing.status)})">
              📄 Voir importation
            </button>`
         : `<button class="plan-drop-import text-[11px] text-gray-500 hover:text-indigo-600 border border-gray-200 rounded px-2 py-1 hover:border-indigo-300 hover:bg-indigo-50 ml-2"
@@ -4259,7 +4278,13 @@ const PlanTab = (() => {
     renderTable();
   }
 
-  return { load, init, refreshAfterUpload };
+  // Lookup helper — ImportModal.open() uses this to decide whether to
+  // show the file picker or the "confirm existing file" checkbox mode.
+  function getExistingImport(mfrDropKey) {
+    return planState.importsByMfrDrop.get(mfrDropKey) || null;
+  }
+
+  return { load, init, refreshAfterUpload, getExistingImport };
 })();
 
 // ────────────────────────────────────────────────────────────────────────
@@ -4293,7 +4318,14 @@ const ImportModal = (() => {
     el('importModalResult').innerHTML = '';
     el('importModalSubmit').disabled = false;
     el('importModalSubmit').textContent = t('import_btn_upload');
-    state.fileId = null;
+    // Reset the confirm-existing UI
+    if (el('importModalExistingFile')) {
+      el('importModalExistingFile').classList.add('hidden');
+      el('importModalConfirmExisting').checked = false;
+    }
+    if (el('importModalPickerRow')) el('importModalPickerRow').classList.remove('hidden');
+    state.fileId          = null;
+    state.existingFileId  = null;
   }
 
   function setStatus(kind, msg) {
@@ -4346,10 +4378,41 @@ const ImportModal = (() => {
     if (planShopVal && shopRow) showShopLocked(shopRow.id, shopRow.name);
     else                        showShopPicker();
     if (!state.season) setStatus('error', t('import_err_no_season'));
+    // If a pre-analyzed file already exists for this drop, show the
+    // confirmation checkbox instead of the file picker. Op ticks it and
+    // hits "Analyser" — modal closes, PreviewPanel opens directly on
+    // the existing file (extraction may be complete or still running).
+    state.existingFileId = null;
+    if (state.dropId && brand) {
+      const key = `${String(brand).toLowerCase()}|${String(state.dropId).toLowerCase()}`;
+      const existing = (window.PlanTab?.getExistingImport?.(key)) || null;
+      if (existing) {
+        state.existingFileId  = existing.file_id;
+        el('importModalExistingFilename').textContent = existing.filename;
+        el('importModalExistingStatus').textContent   =
+          existing.status === 'extracting' ? '⏳ Extraction en cours (préparée en arrière-plan)'
+          : existing.status === 'previewed' ? '✓ Analyse prête'
+          : existing.status === 'awaiting_extraction' ? '⚠ Extraction à relancer'
+          : `Statut : ${existing.status}`;
+        el('importModalExistingFile').classList.remove('hidden');
+        el('importModalPickerRow').classList.add('hidden');
+        el('importModalConfirmExisting').checked = true;
+        el('importModalSubmit').textContent = 'Confirmer et voir la prévisualisation';
+      }
+    }
     show();
   }
 
   async function submit() {
+    // Confirm-existing mode: skip upload entirely, jump to the preview.
+    // The file was already uploaded + LLM-extracted in the background at
+    // doc-attach time, so there's nothing to send.
+    if (state.existingFileId && el('importModalConfirmExisting').checked) {
+      const fid = state.existingFileId;
+      hide();
+      PreviewPanel.open(fid);
+      return;
+    }
     const file = el('importModalFile').files[0];
     if (!file)          return setStatus('error', t('import_err_no_file'));
     if (!state.season)  return setStatus('error', t('import_err_no_season'));
@@ -4541,16 +4604,35 @@ const ImportModal = (() => {
         open(dropBtn.dataset.mfr, { dropId: dropBtn.dataset.drop });
         return;
       }
-      // Per-drop 'Voir importation' — opens PreviewPanel on the linked file
+      // Per-drop 'Voir importation' — opens the modal in confirm mode
+      // (checkbox on the existing file). User confirms → PreviewPanel.
+      // Route through modal so operator can still tweak marque/saison/
+      // boutique/custom name before committing.
       const viewBtn = e.target.closest('.plan-drop-view-import');
       if (viewBtn) {
         e.stopPropagation();
-        PreviewPanel.open(Number(viewBtn.dataset.fileId));
+        open(viewBtn.dataset.mfr, { dropId: viewBtn.dataset.drop });
         return;
       }
     });
     el('importModalClose')?.addEventListener('click', hide);
     el('importModalSubmit')?.addEventListener('click', submit);
+    // "Ou choisir un autre fichier" — reveal the file picker even when a
+    // pre-analyzed file exists (operator wants to replace it)
+    el('importModalUseAnother')?.addEventListener('click', () => {
+      el('importModalPickerRow').classList.remove('hidden');
+      el('importModalConfirmExisting').checked = false;
+      el('importModalSubmit').textContent = t('import_btn_upload');
+      state.existingFileId = null;  // treat as fresh upload
+    });
+    // Toggle the submit label depending on which mode is active
+    el('importModalConfirmExisting')?.addEventListener('change', (e) => {
+      if (e.target.checked && state.existingFileId) {
+        el('importModalSubmit').textContent = 'Confirmer et voir la prévisualisation';
+      } else {
+        el('importModalSubmit').textContent = t('import_btn_upload');
+      }
+    });
     // If the operator picks a different PDF after a prior upload succeeded,
     // clear the stale success banner + re-enable submit so they can upload
     // the new file without having to close+reopen the modal.
