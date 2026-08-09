@@ -1125,6 +1125,15 @@
             <button id="previewApplyMultiplierAll" class="text-xs border border-amber-300 text-amber-700 rounded px-3 py-1 hover:bg-amber-100" title="Écrase le retail de TOUTES les matrices">Appliquer à toutes</button>
             <span id="previewRetailToolStatus" class="text-[11px] text-gray-500 ml-2"></span>
           </div>
+          <!-- Bulk category tool: pick once, apply to many -->
+          <div id="previewCategoryTool" class="hidden px-5 py-2 border-b border-gray-100 bg-indigo-50/50 flex items-center gap-3 text-xs">
+            <span class="text-indigo-800 font-semibold">Catégorie groupée :</span>
+            <span id="previewCategoryBulkLabel" class="text-gray-700 italic">— rien sélectionné —</span>
+            <button id="previewCategoryBulkPick" class="text-xs border border-indigo-300 text-indigo-700 rounded px-3 py-1 hover:bg-indigo-100">Choisir…</button>
+            <button id="previewApplyCategoryMissing" class="text-xs bg-indigo-600 text-white rounded px-3 py-1 hover:bg-indigo-700 disabled:bg-gray-300" disabled title="Ne remplit que les matrices sans catégorie actuelle">Appliquer aux matrices sans catégorie</button>
+            <button id="previewApplyCategoryAll" class="text-xs border border-indigo-300 text-indigo-700 rounded px-3 py-1 hover:bg-indigo-100 disabled:opacity-40" disabled title="Écrase la catégorie de TOUTES les matrices">Appliquer à toutes</button>
+            <span id="previewCategoryToolStatus" class="text-[11px] text-gray-500 ml-2"></span>
+          </div>
           <div class="overflow-x-auto">
             <table class="min-w-full text-xs">
               <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
@@ -5050,6 +5059,7 @@ const PreviewPanel = (() => {
     el('previewRetailTool').classList.toggle('hidden', !anyMissingRetail && state.data.matrices.length === 0);
     // Actually show always if there are matrices — operator may want to override even filled ones
     el('previewRetailTool').classList.toggle('hidden', state.data.matrices.length === 0);
+    el('previewCategoryTool').classList.toggle('hidden', state.data.matrices.length === 0);
   }
 
   async function saveRetailOverride(inp) {
@@ -5351,15 +5361,19 @@ const PreviewPanel = (() => {
   // matrix row reflects the new category badge.
   const catState = {
     tree:      null,      // { nodes, roots } — cached after first fetch
-    matrixKey: null,      // which matrix we're picking for
+    matrixKey: null,      // which matrix we're picking for (null in bulk mode)
     stack:     [],        // [{id, name}, ...] — breadcrumb path
     selected:  null,      // {id, path} — current "would-be OK" value
+    onOk:      null,      // callback(categoryId, categoryPath) — set per open()
   };
+  // Bulk selection state (independent from catState — persists after close)
+  const bulkCategoryState = { id: null, path: null };
 
   async function openCategoryPicker(matrixKey) {
     catState.matrixKey = matrixKey;
     catState.stack     = [];
     catState.selected  = null;
+    catState.onOk      = saveCategoryPick;
     // Pre-seed with the existing override if any
     const matrix = state.data?.matrices?.find(m => `${m.style_ref}|${m.color_normalized}` === matrixKey);
     if (matrix?.override_category_id) {
@@ -5450,17 +5464,86 @@ const PreviewPanel = (() => {
     }
   }
 
+  // Bulk category picker — opens the same modal but stores the pick in
+  // bulkCategoryState instead of PATCHing a single matrix. Also enables
+  // the "Appliquer aux matrices sans catégorie" / "Appliquer à toutes"
+  // buttons in the header tool bar.
+  async function openBulkCategoryPicker() {
+    catState.matrixKey = null;
+    catState.stack     = [];
+    catState.selected  = bulkCategoryState.id
+      ? { id: bulkCategoryState.id, path: bulkCategoryState.path }
+      : null;
+    catState.onOk      = (id, path) => {
+      bulkCategoryState.id   = id;
+      bulkCategoryState.path = path;
+      el('previewCategoryBulkLabel').textContent = path || 'Aucune';
+      el('previewCategoryBulkLabel').className   = 'text-indigo-800 font-semibold';
+      el('previewApplyCategoryMissing').disabled = !id;
+      el('previewApplyCategoryAll').disabled     = !id;
+      el('categoryPicker').classList.add('hidden');
+    };
+    el('categoryPicker').classList.remove('hidden');
+    el('categoryPickerBody').innerHTML = '<div class="text-center text-gray-400 text-xs py-8">Chargement des catégories…</div>';
+    if (!catState.tree) {
+      try {
+        const res  = await apiFetch(`${BASE}/api/import/lightspeed/categories`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+        catState.tree = { nodes: data.nodes, roots: data.roots };
+      } catch (e) {
+        el('categoryPickerBody').innerHTML = `<div class="text-red-700 text-xs py-4">Impossible de charger l'arborescence : ${escHtml(e.message)}</div>`;
+        return;
+      }
+    }
+    renderCategoryLevel();
+  }
+
+  async function applyBulkCategory(scope) {
+    if (!bulkCategoryState.id) return;
+    if (scope === 'all' && !confirm(`Appliquer la catégorie "${bulkCategoryState.path}" à TOUTES les matrices ?\n\nCette action écrase les catégories déjà assignées. Continuer ?`)) return;
+    const status = el('previewCategoryToolStatus');
+    status.textContent = 'Application…';
+    try {
+      const res = await apiFetch(`${BASE}/api/import/files/${state.fileId}/matrices/apply-category`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          category_id:   bulkCategoryState.id,
+          category_path: bulkCategoryState.path,
+          scope,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      status.textContent = `✓ ${data.applied} matrices catégorisées`;
+      setTimeout(() => { status.textContent = ''; }, 3000);
+      await open(state.fileId);
+    } catch (e) {
+      status.textContent = '✗ ' + e.message;
+    }
+  }
+
   // Init the category picker's own event handlers (called once by PreviewPanel.init)
   function initCategoryPicker() {
     el('categoryPickerCancel')?.addEventListener('click', () => el('categoryPicker').classList.add('hidden'));
-    el('categoryPickerClear')?.addEventListener('click', () => saveCategoryPick(null, null));
+    el('categoryPickerClear')?.addEventListener('click', () => {
+      const cb = catState.onOk || saveCategoryPick;
+      cb(null, null);
+    });
     el('categoryPickerOk')?.addEventListener('click', () => {
-      if (catState.selected) saveCategoryPick(catState.selected.id, catState.selected.path);
+      if (!catState.selected) return;
+      const cb = catState.onOk || saveCategoryPick;
+      cb(catState.selected.id, catState.selected.path);
     });
     el('categoryPickerBack')?.addEventListener('click', () => {
       catState.stack.pop();
       renderCategoryLevel();
     });
+    // Bulk category tool wiring
+    el('previewCategoryBulkPick')?.addEventListener('click', openBulkCategoryPicker);
+    el('previewApplyCategoryMissing')?.addEventListener('click', () => applyBulkCategory('missing'));
+    el('previewApplyCategoryAll')?.addEventListener('click', () => applyBulkCategory('all'));
   }
   initCategoryPicker();
 
