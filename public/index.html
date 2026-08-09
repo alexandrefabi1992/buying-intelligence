@@ -3570,9 +3570,10 @@ const PlanTab = (() => {
         // by uploaded_at, so first-seen wins.
         if (!planState.importsByMfrDrop.has(key)) {
           planState.importsByMfrDrop.set(key, {
-            file_id: f.file_id,
-            status:  f.status,
-            filename: f.source_filename,
+            file_id:      f.file_id,
+            status:       f.status,
+            filename:     f.source_filename,
+            confirmed_at: f.confirmed_at,  // null = pre-analysis only, not yet imported
           });
         }
       }
@@ -3878,23 +3879,38 @@ const PlanTab = (() => {
           </label>
         </div>`;
 
-      // Import button per drop — becomes "Voir importation" once a file
-      // exists for this (mfr, drop_id, current season) triplet.
+      // Import button per drop — 3 states based on file lifecycle:
+      //  1. No file at all → "↑ Importer" (opens modal in picker mode)
+      //  2. File exists but confirmed_at IS NULL (pre-analysis only, operator
+      //     hasn't clicked yet) → "↑ Importer" (opens modal in checkbox mode)
+      //  3. File exists AND confirmed_at IS NOT NULL → "📄 Voir importation"
+      //     (operator has explicitly imported at least once)
       const importKey = `${String(mfr).toLowerCase()}|${String(drop_id).toLowerCase()}`;
       const existing  = planState.importsByMfrDrop.get(importKey);
-      const importBtn = existing
-        ? `<button class="plan-drop-view-import text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100 ml-2"
+      let importBtn;
+      if (existing?.confirmed_at) {
+        importBtn = `<button class="plan-drop-view-import text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100 ml-2"
              data-file-id="${existing.file_id}"
              data-mfr="${escHtml(mfr)}"
              data-drop="${drop_id}"
-             title="Confirmer et voir la prévisualisation (${escHtml(existing.filename)} — ${escHtml(existing.status)})">
+             title="Ouvrir la prévisualisation (${escHtml(existing.filename)} — ${escHtml(existing.status)})">
              📄 Voir importation
-           </button>`
-        : `<button class="plan-drop-import text-[11px] text-gray-500 hover:text-indigo-600 border border-gray-200 rounded px-2 py-1 hover:border-indigo-300 hover:bg-indigo-50 ml-2"
+           </button>`;
+      } else if (existing) {
+        // Pre-analysis in progress or ready but operator hasn't confirmed yet
+        const analyzing = existing.status === 'extracting';
+        importBtn = `<button class="plan-drop-import text-[11px] text-indigo-600 border border-indigo-200 bg-indigo-50/40 rounded px-2 py-1 hover:bg-indigo-100 ml-2"
+             data-mfr="${escHtml(mfr)}" data-drop="${drop_id}"
+             title="Un fichier est attaché ${analyzing ? '(analyse en cours)' : '(analyse prête)'} — clique pour confirmer et voir la prévisualisation">
+             ${analyzing ? '⏳' : '✨'} Importer
+           </button>`;
+      } else {
+        importBtn = `<button class="plan-drop-import text-[11px] text-gray-500 hover:text-indigo-600 border border-gray-200 rounded px-2 py-1 hover:border-indigo-300 hover:bg-indigo-50 ml-2"
              data-mfr="${escHtml(mfr)}" data-drop="${drop_id}"
              title="Importer un fichier PO pour ce drop">
              ↑ Importer
            </button>`;
+      }
       return `
         <div class="plan-drop-block mb-4 last:mb-0" data-mfr="${escHtml(mfr)}" data-drop="${drop_id}">
           <div class="flex items-center gap-2 mb-2">
@@ -4406,10 +4422,16 @@ const ImportModal = (() => {
   async function submit() {
     // Confirm-existing mode: skip upload entirely, jump to the preview.
     // The file was already uploaded + LLM-extracted in the background at
-    // doc-attach time, so there's nothing to send.
+    // doc-attach time. Mark it as confirmed so the per-drop button flips
+    // from "Importer" to "Voir importation" — semantically: the operator
+    // has now formally imported this file, not just attached it.
     if (state.existingFileId && el('importModalConfirmExisting').checked) {
       const fid = state.existingFileId;
+      try {
+        await apiFetch(`${BASE}/api/import/files/${fid}/confirm`, { method: 'POST' });
+      } catch { /* non-fatal — user can still see the preview */ }
       hide();
+      try { await PlanTab.refreshAfterUpload(); } catch { /* not critical */ }
       PreviewPanel.open(fid);
       return;
     }

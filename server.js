@@ -1178,6 +1178,12 @@ async function runMigrations() {
   // beside that drop instead of 'Importer'. Nullable — legacy files and
   // imports triggered from the top-level 'Importer' button leave it null.
   await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS drop_id TEXT`);
+  // confirmed_at: null while a file is only in pre-analysis mode (attached
+  // to a drop but the operator hasn't clicked Importer yet). Set to now()
+  // the first time the operator confirms the import via the modal. Drives
+  // the per-drop button label — 'Importer' when null, 'Voir importation'
+  // once confirmed.
+  await pool.query(`ALTER TABLE import_files ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_import_files_manufacturer_drop
                     ON import_files(tenant_id, target_manufacturer, season_tag, drop_id)
                     WHERE drop_id IS NOT NULL`);
