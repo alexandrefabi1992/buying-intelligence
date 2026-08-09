@@ -4511,22 +4511,27 @@ app.post('/api/budget-plan/document', async (req, res, next) => {
       try {
         const crypto = require('crypto');
         const source_hash = crypto.createHash('sha256').update(buf).digest('hex');
-        // Dedup is context-aware: same PDF re-attached under a DIFFERENT
-        // season / mfr / drop / SHOP is a legitimate new intent (not a
-        // duplicate). Shop matters because each destination_shop_id gets
-        // its own PO in Lightspeed — same PDF for shop A is a different
-        // business event from same PDF for shop B.
+        // Pre-analysis dedup: skip if a file with the SAME source_hash
+        // already exists for this (mfr, drop, season) — regardless of
+        // shop. Pre-analysis is a background convenience; we don't want
+        // to auto-spawn N extractions for N shops of the same drop just
+        // because the operator switched views. The shop-specific import
+        // is created explicitly when the operator clicks Importer per
+        // shop (which goes through /api/import/upload with the intended
+        // shop and sets confirmed_at). This is stricter than the
+        // per-shop dedup on /upload — intentional, to prevent orphan
+        // pre-analyses from cluttering other shops' Plan tabs.
         const { rows: dup } = await pool.query(
-          `SELECT file_id FROM import_files
+          `SELECT file_id, destination_shop_id FROM import_files
            WHERE tenant_id = $1
              AND source_hash = $2
              AND season_tag = $3
              AND lower(target_manufacturer) = lower($4)
              AND COALESCE(drop_id, '') = COALESCE($5, '')
-             AND COALESCE(destination_shop_id, '') = COALESCE($6, '')
+           ORDER BY confirmed_at DESC NULLS LAST, uploaded_at DESC
            LIMIT 1`,
           [req.tenantId, source_hash, season_code.toLowerCase(), manufacturer,
-           String(drop_id || ''), String(destination_shop_id || '')],
+           String(drop_id || '')],
         );
         if (dup.length) {
           preAnalysisFileId = dup[0].file_id;
