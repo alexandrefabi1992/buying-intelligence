@@ -1,0 +1,2479 @@
+{
+  "file": {
+    "supplier_key": "unknown",
+    "customer_name": null,
+    "default_vendor_id": null,
+    "target_manufacturer": "Brax",
+    "default_attribute_set_id": "5"
+  },
+  "orders": [
+    {
+      "lines": [
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "28",
+          "color_normalized": "HEAVEN-28"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "28",
+          "color_normalized": "HEAVEN-28"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "28",
+          "color_normalized": "HEAVEN-28"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "28",
+          "color_normalized": "HEAVEN-28"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "28",
+          "color_normalized": "HEAVEN-28"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "28",
+          "color_normalized": "HEAVEN-28"
+        },
+        {
+          "qty": 1,
+          "size": "31",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 2,
+          "size": "34",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "71854 CHUCKU 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "31",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "36",
+          "color_normalized": "SAGE-36"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "36",
+          "color_normalized": "SAGE-36"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "36",
+          "color_normalized": "SAGE-36"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "36",
+          "color_normalized": "SAGE-36"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "36",
+          "color_normalized": "SAGE-36"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "36",
+          "color_normalized": "SAGE-36"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "36",
+          "color_normalized": "SAGE-36"
+        },
+        {
+          "qty": 1,
+          "size": "31",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "58",
+          "color_normalized": "SAND-58"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "58",
+          "color_normalized": "SAND-58"
+        },
+        {
+          "qty": 2,
+          "size": "34",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "58",
+          "color_normalized": "SAND-58"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "58",
+          "color_normalized": "SAND-58"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "58",
+          "color_normalized": "SAND-58"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "72502 CHUCKL 32",
+          "unit_cost": 119.2,
+          "color_code": "58",
+          "color_normalized": "SAND-58"
+        },
+        {
+          "qty": 1,
+          "size": "31",
+          "style_ref": "73214 BOZEN",
+          "unit_cost": 91.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "73214 BOZEN",
+          "unit_cost": 91.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "73214 BOZEN",
+          "unit_cost": 91.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "73214 BOZEN",
+          "unit_cost": 91.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "73214 BOZEN",
+          "unit_cost": 91.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "73214 BOZEN",
+          "unit_cost": 91.2,
+          "color_code": "53",
+          "color_normalized": "MUSCAT-53"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 2,
+          "size": "34",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 1,
+          "size": "31",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 2,
+          "size": "32",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "73622 CHUCK 32",
+          "unit_cost": 107.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "74622 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "56",
+          "color_normalized": "SAND-56"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "74622 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "56",
+          "color_normalized": "SAND-56"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "74622 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "56",
+          "color_normalized": "SAND-56"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "74622 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "56",
+          "color_normalized": "SAND-56"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "74622 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "56",
+          "color_normalized": "SAND-56"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "74622 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "56",
+          "color_normalized": "SAND-56"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "74622 CHUCK 34",
+          "unit_cost": 119.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "74622 CHUCK 34",
+          "unit_cost": 119.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "74622 CHUCK 34",
+          "unit_cost": 119.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "74622 CHUCK 34",
+          "unit_cost": 119.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "74622 CHUCK 34",
+          "unit_cost": 119.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "74622 CHUCK 34",
+          "unit_cost": 119.2,
+          "color_code": "07",
+          "color_normalized": "SILVER-07"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "07",
+          "color_normalized": "SLATE GREY-07"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "07",
+          "color_normalized": "SLATE GREY-07"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "07",
+          "color_normalized": "SLATE GREY-07"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "07",
+          "color_normalized": "SLATE GREY-07"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "07",
+          "color_normalized": "SLATE GREY-07"
+        },
+        {
+          "qty": 1,
+          "size": "31",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "27",
+          "color_normalized": "SKY BLUE-27"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "27",
+          "color_normalized": "SKY BLUE-27"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "27",
+          "color_normalized": "SKY BLUE-27"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "27",
+          "color_normalized": "SKY BLUE-27"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "27",
+          "color_normalized": "SKY BLUE-27"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "27",
+          "color_normalized": "SKY BLUE-27"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "55",
+          "color_normalized": "WARM SAND-55"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "55",
+          "color_normalized": "WARM SAND-55"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "55",
+          "color_normalized": "WARM SAND-55"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "55",
+          "color_normalized": "WARM SAND-55"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "55",
+          "color_normalized": "WARM SAND-55"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "76724 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "55",
+          "color_normalized": "WARM SAND-55"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "23",
+          "color_normalized": "DEEP BLUE-23"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "23",
+          "color_normalized": "DEEP BLUE-23"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "23",
+          "color_normalized": "DEEP BLUE-23"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "23",
+          "color_normalized": "DEEP BLUE-23"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "23",
+          "color_normalized": "DEEP BLUE-23"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "23",
+          "color_normalized": "DEEP BLUE-23"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "25",
+          "color_normalized": "REGULAR BLUE-25"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "25",
+          "color_normalized": "REGULAR BLUE-25"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "25",
+          "color_normalized": "REGULAR BLUE-25"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "25",
+          "color_normalized": "REGULAR BLUE-25"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "25",
+          "color_normalized": "REGULAR BLUE-25"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "77244 CHUCK 32",
+          "unit_cost": 119.2,
+          "color_code": "25",
+          "color_normalized": "REGULAR BLUE-25"
+        },
+        {
+          "qty": 1,
+          "size": "31",
+          "style_ref": "803650CHUCK 34",
+          "unit_cost": 111.2,
+          "color_code": "58",
+          "color_normalized": "PAPER-58"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "803650CHUCK 34",
+          "unit_cost": 111.2,
+          "color_code": "58",
+          "color_normalized": "PAPER-58"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "803650CHUCK 34",
+          "unit_cost": 111.2,
+          "color_code": "58",
+          "color_normalized": "PAPER-58"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "803650CHUCK 34",
+          "unit_cost": 111.2,
+          "color_code": "58",
+          "color_normalized": "PAPER-58"
+        },
+        {
+          "qty": 1,
+          "size": "35",
+          "style_ref": "803650CHUCK 34",
+          "unit_cost": 111.2,
+          "color_code": "58",
+          "color_normalized": "PAPER-58"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "803650CHUCK 34",
+          "unit_cost": 111.2,
+          "color_code": "58",
+          "color_normalized": "PAPER-58"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "803650CHUCK 34",
+          "unit_cost": 111.2,
+          "color_code": "58",
+          "color_normalized": "PAPER-58"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "06",
+          "color_normalized": "SILVER MELANGE-06"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "06",
+          "color_normalized": "SILVER MELANGE-06"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "06",
+          "color_normalized": "SILVER MELANGE-06"
+        },
+        {
+          "qty": 2,
+          "size": "35",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "06",
+          "color_normalized": "SILVER MELANGE-06"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "06",
+          "color_normalized": "SILVER MELANGE-06"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "06",
+          "color_normalized": "SILVER MELANGE-06"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 2,
+          "size": "35",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "23",
+          "color_normalized": "NAVY-23"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "24",
+          "color_normalized": "INDIGO MELANGE-24"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "24",
+          "color_normalized": "INDIGO MELANGE-24"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "24",
+          "color_normalized": "INDIGO MELANGE-24"
+        },
+        {
+          "qty": 2,
+          "size": "35",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "24",
+          "color_normalized": "INDIGO MELANGE-24"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "24",
+          "color_normalized": "INDIGO MELANGE-24"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "24",
+          "color_normalized": "INDIGO MELANGE-24"
+        },
+        {
+          "qty": 1,
+          "size": "32",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "54",
+          "color_normalized": "CAMEL-54"
+        },
+        {
+          "qty": 1,
+          "size": "33",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "54",
+          "color_normalized": "CAMEL-54"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "54",
+          "color_normalized": "CAMEL-54"
+        },
+        {
+          "qty": 2,
+          "size": "35",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "54",
+          "color_normalized": "CAMEL-54"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "54",
+          "color_normalized": "CAMEL-54"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "804400CHUCK 32",
+          "unit_cost": 111.2,
+          "color_code": "54",
+          "color_normalized": "CAMEL-54"
+        }
+      ],
+      "batch_id": null,
+      "selected": true,
+      "po_number": "S27 BXAM",
+      "order_date": "2026-07-29",
+      "cancel_date": null,
+      "batch_status": null,
+      "delivery_date": "2027-04-01",
+      "is_consignment": false,
+      "amount_declared": 15106.4,
+      "customer_reference": "309542876",
+      "lightspeed_order_id": null,
+      "unit_count_declared": 132
+    }
+  ],
+  "summary": {
+    "counters": {
+      "error": 0,
+      "create_new": 18,
+      "complete_existing": 2,
+      "create_with_suffix": 0
+    },
+    "incomplete": true,
+    "order_count": 1,
+    "units_match": true,
+    "matrix_count": 20,
+    "extraction_stats": {
+      "skipped": 0,
+      "attempted": 20,
+      "successful": 20,
+      "units_ratio": 1,
+      "skipped_ratio": 0,
+      "qty_mismatched": 0,
+      "size_validation": {
+        "suspected": [
+          {
+            "header": [
+              "31",
+              "32",
+              "33",
+              "34",
+              "35",
+              "36",
+              "38"
+            ],
+            "raw_row": "72502 CHUCKL 32   CHUCK                                 31  32  33  34  35  36  38",
+            "llm_sizes": [
+              "32",
+              "33",
+              "34",
+              "35",
+              "36",
+              "38"
+            ],
+            "style_ref": "72502 CHUCKL 32",
+            "expected_sizes": [
+              "31",
+              "32",
+              "33",
+              "34",
+              "35",
+              "36",
+              "38"
+            ]
+          }
+        ],
+        "considered": 20,
+        "headers_found": 28
+      },
+      "qty_mismatch_ratio": 0
+    },
+    "variants_already": 13,
+    "summed_cost_total": 15106.4,
+    "incomplete_reasons": [
+      {
+        "code": "size_mismatch_suspected",
+        "actual": 0.05,
+        "samples": [
+          {
+            "header": [
+              "31",
+              "32",
+              "33",
+              "34",
+              "35",
+              "36",
+              "38"
+            ],
+            "raw_row": "72502 CHUCKL 32   CHUCK                                 31  32  33  34  35  36  38",
+            "llm_sizes": [
+              "32",
+              "33",
+              "34",
+              "35",
+              "36",
+              "38"
+            ],
+            "style_ref": "72502 CHUCKL 32",
+            "expected_sizes": [
+              "31",
+              "32",
+              "33",
+              "34",
+              "35",
+              "36",
+              "38"
+            ]
+          }
+        ],
+        "suspected": 1,
+        "threshold": 0.02,
+        "considered": 20,
+        "description": "1/20 produits présentent une attribution de tailles suspecte (5%, seuil 2%). Cause probable : décalage de colonne dans la lecture LLM du tableau tailles.",
+        "headers_found": 28
+      }
+    ],
+    "summed_units_total": 132,
+    "variants_to_create": 111,
+    "summed_amount_total": 15106.4,
+    "summed_retail_total": 0,
+    "declared_units_total": 132,
+    "declared_amount_total": 15106.4,
+    "validation_thresholds": {
+      "min_units_ratio": 0.95,
+      "max_skipped_ratio": 0.1,
+      "max_qty_mismatch_ratio": 0.1,
+      "max_size_mismatch_ratio": 0.02,
+      "max_cost_ratio_deviation": 0.02,
+      "max_skipped_ratio_no_declared": 0.05
+    },
+    "summed_amount_total_effective": 15106.4
+  },
+  "matrices": [
+    {
+      "key": "71854 CHUCKU 32|HEAVEN-28",
+      "action": "create_new",
+      "style_ref": "71854 CHUCKU 32",
+      "total_qty": 6,
+      "unit_cost": 119.2,
+      "color_code": "28",
+      "description": "CHUCK",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "HEAVEN",
+      "color_normalized": "HEAVEN-28",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "71854 CHUCKU 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "71854 CHUCKU 32|MUSCAT-53",
+      "action": "create_new",
+      "style_ref": "71854 CHUCKU 32",
+      "total_qty": 8,
+      "unit_cost": 119.2,
+      "color_code": "53",
+      "description": "CHUCK",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "31": 1,
+          "32": 1,
+          "33": 1,
+          "34": 2,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "MUSCAT",
+      "color_normalized": "MUSCAT-53",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "31",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 2
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "71854 CHUCKU 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "72502 CHUCKL 32|SAGE-36",
+      "action": "create_new",
+      "style_ref": "72502 CHUCKL 32",
+      "total_qty": 7,
+      "unit_cost": 119.2,
+      "color_code": "36",
+      "description": "CHUCK",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "31": 1,
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "SAGE",
+      "color_normalized": "SAGE-36",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "31",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "72502 CHUCKL 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "72502 CHUCKL 32|MUSCAT-53",
+      "action": "create_new",
+      "style_ref": "72502 CHUCKL 32",
+      "total_qty": 7,
+      "unit_cost": 119.2,
+      "color_code": "53",
+      "description": "CHUCK",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "31": 1,
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "MUSCAT",
+      "color_normalized": "MUSCAT-53",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "31",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "72502 CHUCKL 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "72502 CHUCKL 32|SAND-58",
+      "action": "create_new",
+      "style_ref": "72502 CHUCKL 32",
+      "total_qty": 7,
+      "unit_cost": 119.2,
+      "color_code": "58",
+      "description": "CHUCK",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 2,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "SAND",
+      "color_normalized": "SAND-58",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 2
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "72502 CHUCKL 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "73214 BOZEN|MUSCAT-53",
+      "action": "complete_existing",
+      "style_ref": "73214 BOZEN",
+      "total_qty": 6,
+      "unit_cost": 91.2,
+      "color_code": "53",
+      "description": "BOZEN-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "31": 1,
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "MUSCAT",
+      "color_normalized": "MUSCAT-53",
+      "reused_matrix_id": "29584",
+      "existing_variants": [
+        {
+          "size": "31",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140412",
+          "color_attr": "NAVY-23"
+        },
+        {
+          "size": "32",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140413",
+          "color_attr": "NAVY-23"
+        },
+        {
+          "size": "33",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140414",
+          "color_attr": "NAVY-23"
+        },
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140415",
+          "color_attr": "NAVY-23"
+        },
+        {
+          "size": "35",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140416",
+          "color_attr": "NAVY-23"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140417",
+          "color_attr": "NAVY-23"
+        },
+        {
+          "size": "31",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140513",
+          "color_attr": "MUSCAT-53"
+        },
+        {
+          "size": "32",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140514",
+          "color_attr": "MUSCAT-53"
+        },
+        {
+          "size": "33",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140515",
+          "color_attr": "MUSCAT-53"
+        },
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140516",
+          "color_attr": "MUSCAT-53"
+        },
+        {
+          "size": "35",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140517",
+          "color_attr": "MUSCAT-53"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140518",
+          "color_attr": "MUSCAT-53"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "31",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "73214 BOZEN",
+      "effective_retail_price": null,
+      "effective_unit_cost": 91.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "73622 CHUCK 32|SILVER-07",
+      "action": "create_new",
+      "style_ref": "73622 CHUCK 32",
+      "total_qty": 7,
+      "unit_cost": 107.2,
+      "color_code": "07",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 2,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "SILVER",
+      "color_normalized": "SILVER-07",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 2
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "73622 CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 107.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "73622 CHUCK 32|NAVY-23",
+      "action": "create_new",
+      "style_ref": "73622 CHUCK 32",
+      "total_qty": 8,
+      "unit_cost": 107.2,
+      "color_code": "23",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "31": 1,
+          "32": 2,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY-23",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "31",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "32",
+          "qty_across_pos": 2
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "73622 CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 107.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "74622 CHUCK 32|SAND-56",
+      "action": "create_new",
+      "style_ref": "74622 CHUCK 32",
+      "total_qty": 6,
+      "unit_cost": 119.2,
+      "color_code": "56",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "SAND",
+      "color_normalized": "SAND-56",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "74622 CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "74622 CHUCK 34|SILVER-07",
+      "action": "create_new",
+      "style_ref": "74622 CHUCK 34",
+      "total_qty": 6,
+      "unit_cost": 119.2,
+      "color_code": "07",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "SILVER",
+      "color_normalized": "SILVER-07",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "74622 CHUCK 34",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "76724 CHUCK 32|SLATE GREY-07",
+      "action": "create_new",
+      "style_ref": "76724 CHUCK 32",
+      "total_qty": 5,
+      "unit_cost": 119.2,
+      "color_code": "07",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "SLATE GREY",
+      "color_normalized": "SLATE GREY-07",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "76724 CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "76724 CHUCK 32|SKY BLUE-27",
+      "action": "create_new",
+      "style_ref": "76724 CHUCK 32",
+      "total_qty": 6,
+      "unit_cost": 119.2,
+      "color_code": "27",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "31": 1,
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "SKY BLUE",
+      "color_normalized": "SKY BLUE-27",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "31",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "76724 CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "76724 CHUCK 32|WARM SAND-55",
+      "action": "create_new",
+      "style_ref": "76724 CHUCK 32",
+      "total_qty": 6,
+      "unit_cost": 119.2,
+      "color_code": "55",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "WARM SAND",
+      "color_normalized": "WARM SAND-55",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "76724 CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "77244 CHUCK 32|DEEP BLUE-23",
+      "action": "create_new",
+      "style_ref": "77244 CHUCK 32",
+      "total_qty": 6,
+      "unit_cost": 119.2,
+      "color_code": "23",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "DEEP BLUE",
+      "color_normalized": "DEEP BLUE-23",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "77244 CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "77244 CHUCK 32|REGULAR BLUE-25",
+      "action": "create_new",
+      "style_ref": "77244 CHUCK 32",
+      "total_qty": 6,
+      "unit_cost": 119.2,
+      "color_code": "25",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "REGULAR BLUE",
+      "color_normalized": "REGULAR BLUE-25",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "77244 CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 119.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "803650CHUCK 34|PAPER-58",
+      "action": "complete_existing",
+      "style_ref": "803650CHUCK 34",
+      "total_qty": 7,
+      "unit_cost": 111.2,
+      "color_code": "58",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "31": 1,
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "PAPER",
+      "color_normalized": "PAPER-58",
+      "reused_matrix_id": "29593",
+      "existing_variants": [
+        {
+          "size": "31",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140547",
+          "color_attr": "RYE-55"
+        },
+        {
+          "size": "32",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140548",
+          "color_attr": "RYE-55"
+        },
+        {
+          "size": "33",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140549",
+          "color_attr": "RYE-55"
+        },
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140550",
+          "color_attr": "RYE-55"
+        },
+        {
+          "size": "35",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140551",
+          "color_attr": "RYE-55"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140552",
+          "color_attr": "RYE-55"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140553",
+          "color_attr": "RYE-55"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "31",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "803650CHUCK 34",
+      "effective_retail_price": null,
+      "effective_unit_cost": 111.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "804400CHUCK 32|SILVER MELANGE-06",
+      "action": "create_new",
+      "style_ref": "804400CHUCK 32",
+      "total_qty": 7,
+      "unit_cost": 111.2,
+      "color_code": "06",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 2,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "SILVER MELANGE",
+      "color_normalized": "SILVER MELANGE-06",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 2
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "804400CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 111.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "804400CHUCK 32|NAVY-23",
+      "action": "create_new",
+      "style_ref": "804400CHUCK 32",
+      "total_qty": 7,
+      "unit_cost": 111.2,
+      "color_code": "23",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 2,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY-23",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 2
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "804400CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 111.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "804400CHUCK 32|INDIGO MELANGE-24",
+      "action": "create_new",
+      "style_ref": "804400CHUCK 32",
+      "total_qty": 7,
+      "unit_cost": 111.2,
+      "color_code": "24",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 2,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "INDIGO MELANGE",
+      "color_normalized": "INDIGO MELANGE-24",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 2
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "804400CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 111.2,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "804400CHUCK 32|CAMEL-54",
+      "action": "create_new",
+      "style_ref": "804400CHUCK 32",
+      "total_qty": 7,
+      "unit_cost": 111.2,
+      "color_code": "54",
+      "description": "CHUCK-",
+      "retail_price": null,
+      "po_quantities": {
+        "S27 BXAM": {
+          "32": 1,
+          "33": 1,
+          "34": 1,
+          "35": 2,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "S27 BXAM"
+      ],
+      "color_label_raw": "CAMEL",
+      "color_normalized": "CAMEL-54",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35",
+          "qty_across_pos": 2
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "804400CHUCK 32",
+      "effective_retail_price": null,
+      "effective_unit_cost": 111.2,
+      "margin_override_pct_applied": null
+    }
+  ],
+  "warnings": [],
+  "season_tag": "p27",
+  "target_manufacturer": "Brax",
+  "margin_override_pct": null,
+  "cached": true,
+  "extraction_source": "llm",
+  "preview_computed_at": "2026-08-09T02:37:30.924Z"
+}

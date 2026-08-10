@@ -1,0 +1,1092 @@
+{
+  "file": {
+    "supplier_key": "unknown",
+    "customer_name": null,
+    "default_vendor_id": null,
+    "target_manufacturer": "Marcoliani",
+    "default_attribute_set_id": "5"
+  },
+  "orders": [
+    {
+      "lines": [
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4909T",
+          "unit_cost": 16.8,
+          "color_code": "054",
+          "color_normalized": "LAVENDER"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4909T",
+          "unit_cost": 16.8,
+          "color_code": "285",
+          "color_normalized": "INDIGO BLUE"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4909T",
+          "unit_cost": 16.8,
+          "color_code": "303",
+          "color_normalized": "SILVER GREY"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4633T",
+          "unit_cost": 16.8,
+          "color_code": "092",
+          "color_normalized": "FOREST"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4633T",
+          "unit_cost": 16.8,
+          "color_code": "Y11",
+          "color_normalized": "Navy / blue"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR3976T",
+          "unit_cost": 16.8,
+          "color_code": "111",
+          "color_normalized": "Denim/sage"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR3976T",
+          "unit_cost": 16.8,
+          "color_code": "322",
+          "color_normalized": "Denim / tomato"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR3976T",
+          "unit_cost": 16.8,
+          "color_code": "Y25",
+          "color_normalized": "Navy / brown"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4888T",
+          "unit_cost": 20,
+          "color_code": "323",
+          "color_normalized": "Denim / orange"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4542T",
+          "unit_cost": 22.4,
+          "color_code": "001",
+          "color_normalized": "NAVY"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4542T",
+          "unit_cost": 22.4,
+          "color_code": "035",
+          "color_normalized": "BEIGE"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4943T",
+          "unit_cost": 16.8,
+          "color_code": "001",
+          "color_normalized": "NAVY"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4946T",
+          "unit_cost": 16.8,
+          "color_code": "001",
+          "color_normalized": "NAVY"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4944T",
+          "unit_cost": 16.8,
+          "color_code": "001",
+          "color_normalized": "NAVY"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4942T",
+          "unit_cost": 16.8,
+          "color_code": "001",
+          "color_normalized": "NAVY"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4945T",
+          "unit_cost": 16.8,
+          "color_code": "001",
+          "color_normalized": "NAVY"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4900T",
+          "unit_cost": 16.8,
+          "color_code": "004",
+          "color_normalized": "CHARCOAL"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4903T",
+          "unit_cost": 16.8,
+          "color_code": "076",
+          "color_normalized": "ASPHALT"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4899T",
+          "unit_cost": 16.8,
+          "color_code": "005",
+          "color_normalized": "FLANNEL GREY"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4896T",
+          "unit_cost": 16.8,
+          "color_code": "001",
+          "color_normalized": "NAVY"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4896T",
+          "unit_cost": 16.8,
+          "color_code": "002",
+          "color_normalized": "DARK BROWN"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4816T",
+          "unit_cost": 16.8,
+          "color_code": "035",
+          "color_normalized": "BEIGE"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "MAR4911T",
+          "unit_cost": 16.8,
+          "color_code": "004",
+          "color_normalized": "CHARCOAL"
+        }
+      ],
+      "batch_id": null,
+      "selected": true,
+      "po_number": "2507",
+      "order_date": null,
+      "cancel_date": null,
+      "batch_status": null,
+      "delivery_date": "2027-03-10",
+      "is_consignment": false,
+      "amount_declared": 1202.4,
+      "customer_reference": "A00077",
+      "lightspeed_order_id": null,
+      "unit_count_declared": 69
+    }
+  ],
+  "summary": {
+    "counters": {
+      "error": 0,
+      "create_new": 6,
+      "complete_existing": 0,
+      "create_with_suffix": 17
+    },
+    "incomplete": false,
+    "order_count": 1,
+    "units_match": true,
+    "matrix_count": 23,
+    "extraction_stats": {
+      "skipped": 0,
+      "attempted": 23,
+      "successful": 23,
+      "units_ratio": 1,
+      "skipped_ratio": 0,
+      "qty_mismatched": 0,
+      "size_validation": {
+        "suspected": [],
+        "considered": 0,
+        "headers_found": 0
+      },
+      "qty_mismatch_ratio": 0
+    },
+    "variants_already": 0,
+    "summed_cost_total": 1202.4,
+    "incomplete_reasons": [],
+    "summed_units_total": 69,
+    "variants_to_create": 23,
+    "summed_amount_total": 1202.4,
+    "summed_retail_total": 0,
+    "declared_units_total": 69,
+    "declared_amount_total": 1202.4,
+    "validation_thresholds": {
+      "min_units_ratio": 0.95,
+      "max_skipped_ratio": 0.1,
+      "max_qty_mismatch_ratio": 0.1,
+      "max_size_mismatch_ratio": 0.02,
+      "max_cost_ratio_deviation": 0.02,
+      "max_skipped_ratio_no_declared": 0.05
+    },
+    "summed_amount_total_effective": 1202.4
+  },
+  "matrices": [
+    {
+      "key": "MAR4909T|LAVENDER",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4909T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "054",
+      "description": "Pima Cotton Funky stripes",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "LAVENDER",
+      "color_normalized": "LAVENDER",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4909T p27",
+      "override_category_id": "252",
+      "override_category_path": "Homme/Accessoires/Bas/Bas",
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4909T|INDIGO BLUE",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4909T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "285",
+      "description": "Pima Cotton Funky stripes",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "INDIGO BLUE",
+      "color_normalized": "INDIGO BLUE",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4909T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4909T|SILVER GREY",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4909T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "303",
+      "description": "Pima Cotton Funky stripes",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "SILVER GREY",
+      "color_normalized": "SILVER GREY",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4909T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4633T|FOREST",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4633T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "092",
+      "description": "Pima Cotton Multicolor stripe",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "FOREST",
+      "color_normalized": "FOREST",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4633T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4633T|Navy / blue",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4633T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "Y11",
+      "description": "Pima Cotton Multicolor stripe",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "Navy / blue",
+      "color_normalized": "Navy / blue",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4633T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR3976T|Denim/sage",
+      "action": "create_with_suffix",
+      "style_ref": "MAR3976T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "111",
+      "description": "Pima Cotton Rainbow stripe",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "Denim/sage",
+      "color_normalized": "Denim/sage",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR3976T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR3976T|Denim / tomato",
+      "action": "create_with_suffix",
+      "style_ref": "MAR3976T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "322",
+      "description": "Pima Cotton Rainbow stripe",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "Denim / tomato",
+      "color_normalized": "Denim / tomato",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR3976T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR3976T|Navy / brown",
+      "action": "create_with_suffix",
+      "style_ref": "MAR3976T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "Y25",
+      "description": "Pima Cotton Rainbow stripe",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "Navy / brown",
+      "color_normalized": "Navy / brown",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR3976T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4888T|Denim / orange",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4888T",
+      "total_qty": 3,
+      "unit_cost": 20,
+      "color_code": "323",
+      "description": "Linen & Cotton T-shirt Stripe",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "Denim / orange",
+      "color_normalized": "Denim / orange",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4888T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 50,
+      "effective_retail_price": 50,
+      "effective_unit_cost": 20,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4542T|NAVY",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4542T",
+      "total_qty": 3,
+      "unit_cost": 22.4,
+      "color_code": "001",
+      "description": "Fresh of Modal Classic plain",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4542T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 56,
+      "effective_retail_price": 56,
+      "effective_unit_cost": 22.4,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4542T|BEIGE",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4542T",
+      "total_qty": 3,
+      "unit_cost": 22.4,
+      "color_code": "035",
+      "description": "Fresh of Modal Classic plain",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "BEIGE",
+      "color_normalized": "BEIGE",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4542T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 56,
+      "effective_retail_price": 56,
+      "effective_unit_cost": 22.4,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4943T|NAVY",
+      "action": "create_new",
+      "style_ref": "MAR4943T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "001",
+      "description": "Pima Cotton Seagulls",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4943T",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4946T|NAVY",
+      "action": "create_new",
+      "style_ref": "MAR4946T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "001",
+      "description": "Pima Cotton Tailor Stripe",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4946T",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4944T|NAVY",
+      "action": "create_new",
+      "style_ref": "MAR4944T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "001",
+      "description": "Pima Cotton Tiny Flower",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4944T",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4942T|NAVY",
+      "action": "create_new",
+      "style_ref": "MAR4942T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "001",
+      "description": "Pima Cotton Milano Stripe",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4942T",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4945T|NAVY",
+      "action": "create_new",
+      "style_ref": "MAR4945T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "001",
+      "description": "Pima Cotton Polka Dot",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4945T",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4900T|CHARCOAL",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4900T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "004",
+      "description": "Pima Cotton Dots",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "CHARCOAL",
+      "color_normalized": "CHARCOAL",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4900T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4903T|ASPHALT",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4903T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "076",
+      "description": "Pima Cotton Vintage",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "ASPHALT",
+      "color_normalized": "ASPHALT",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4903T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4899T|FLANNEL GREY",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4899T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "005",
+      "description": "Pima Cotton Tailor dots",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "FLANNEL GREY",
+      "color_normalized": "FLANNEL GREY",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4899T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4896T|NAVY",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4896T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "001",
+      "description": "Pima Cotton City stripe",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4896T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4896T|DARK BROWN",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4896T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "002",
+      "description": "Pima Cotton City stripe",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "DARK BROWN",
+      "color_normalized": "DARK BROWN",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4896T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4816T|BEIGE",
+      "action": "create_with_suffix",
+      "style_ref": "MAR4816T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "035",
+      "description": "Pima Cotton Torino stripe",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "BEIGE",
+      "color_normalized": "BEIGE",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4816T p27",
+      "override_category_id": null,
+      "override_category_path": null,
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "MAR4911T|CHARCOAL",
+      "action": "create_new",
+      "style_ref": "MAR4911T",
+      "total_qty": 3,
+      "unit_cost": 16.8,
+      "color_code": "004",
+      "description": "Pima Cotton Paisley elephant",
+      "retail_price": null,
+      "po_quantities": {
+        "2507": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "2507"
+      ],
+      "color_label_raw": "CHARCOAL",
+      "color_normalized": "CHARCOAL",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "MAR4911T",
+      "override_category_id": "252",
+      "override_category_path": "Homme/Accessoires/Bas/Bas",
+      "override_retail_price": 42,
+      "effective_retail_price": 42,
+      "effective_unit_cost": 16.8,
+      "margin_override_pct_applied": null
+    }
+  ],
+  "warnings": [],
+  "season_tag": "p27",
+  "target_manufacturer": "Marcoliani",
+  "margin_override_pct": null,
+  "cached": true,
+  "extraction_source": "llm",
+  "preview_computed_at": "2026-08-08T02:07:28.397Z"
+}

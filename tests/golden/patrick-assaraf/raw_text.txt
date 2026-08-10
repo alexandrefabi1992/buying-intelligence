@@ -1,0 +1,169 @@
+--- PAGE 1 ---
+                               Herno S.p.A.                         Company Name            Cod Cust. 001487
+                               Via Opifici, 100 - 28040 Lesa (NO) - Italy -
+                               Tel.+39.0322.77091 r.a. - Fax +39.0322.77974 VALERIE SIMON HOMME
+                               Reg. Imp. NO n.3329 Trib.Verbania - C.C.I.A.A.
+                                                                    Canada
+                               R.E.A. Novara
+                               118053 -                             MONTREAL
+                               Posiz.Mecc. NO011194 - C.C.P. n.16232282
+                               C.F./P.IVA 00080630031 - Cap.Soc. € 1.540.000 i.v. 366 AVENUE LAURIER O
+                                                                    Delivery Address        Cod Ship. 306
+                                                                    VALERIE SIMON HOMME
+        Sales Order N°  306            01/07/2024                   MONTREAL
+                                                               1/2
+        Device:         DMPYP03EKD80
+                                                                    366 AVENUE LAURIER O
+        Cart Name:      Cart 1
+         SealAgent                      Delivery:                   Phone                E-Mail
+         065     DIREZIONALE USA        02-12-2024 - 28-02-2025     0015142720618       INFO@VALERIESIMON.CA
+        Pricelist:                      Payment Term:                                        Tot Qty       Unit Prz.
+        WHOLESALE CD                    REM CLI 30 GG DF                                                  Total Row
+            COLLECTION:      HUM                         Line and season reference:   HU     25P
+         # 1                                                                                              CAD
+                                                  42 44 46  48 50 52 54 56 58 60 62
+         CM000012U
+                                                            1  1  1                              3         218.00
+         12684
+                                          Delivery:
+         9200 BLU NAVY
+                                          Theme:                                             CAD
+                                                                                                           654.00
+        CAMICIA BOWLING SEERCREASE
+         # 2                                                                                              CAD
+                                                  42 44 46  48 50 52 54 56 58 60 62
+         GA000192U
+                                                            1  1  1  1                           4         361.00
+         12684
+                                          Delivery:
+         9200 BLU NAVY
+                                          Theme:                                             CAD
+                                                                                                          1444.00
+         # 3                                                                                              CAD
+                                                  42 44 46  48 50 52 54 56 58 60 62  64
+         IM000348U
+                                                         1  1  1  1  1                           5         478.00
+         12010ZR
+                                          Delivery:
+         9201 BLU NAVY
+                                          Theme:                                             CAD
+                                                                                                          2390.00
+         # 4                                                                                              CAD
+                                                  42 44 46  48 50 52 54 56 58 60 62  64
+         IM000365U
+                                                               1  1  1  1                        4         509.00
+         13218Z
+                                          Delivery:
+         2157
+         CAMMELLO                         Theme:                                             CAD
+                                                                                                          2036.00
+        TRENCH MONOPETTO DELON
+         # 5                                                      XX                                      CAD
+                                                  XS  S  M  L  XL
+                                                                  L
+         CM000009U
+                                                      1  1  1  1                                 4         214.00
+         13251
+                                          Delivery:
+         9121 DENIM
+                                          Theme:                                             CAD
+                                                                                                           856.00
+        CAMICIA DENIM CHAMBRAY
+                                                                                                            Tot.
+                                                                                             Tot. Items
+                                                                                                          Amount
+                                                                                                               CAD
+                                                                                                      20    7380.00
+
+--- PAGE 2 ---
+            CONDIZIONI GENERALI DI VENDITA - Art. 1.           Ambito di applicazione
+            Con l’acquisto dei prodotti Herno (“Prodotti”), il rivenditore dichiara di essere consapevole di entrare a far parte del sistema di distribuzione selettiva implementato da
+            Herno (“Rivenditore”).
+            Gli ordini dei Prodotti effettuati dai Rivenditori saranno regolati dalle presenti condizioni generali fino a quanto siano eventualmente sostituite o modificate da nuove
+            condizioni generali fornite da Herno. Ogni eventuale deroga dovrà essere concordata per iscritto tra Herno e il Rivenditore.
+            Art. 2. Conclusione del contratto
+            L’ordine costituisce una proposta di contratto, che si concluderà solo con la conferma di avvenuta accettazione da parte di Herno.
+            Art. 3. Termini di consegna
+            I termini di consegna sono meramente indicativi ed è riconosciuta a Herno una tolleranza di due settimane rispetto alla data di consegna prospettata, in caso di
+            imprevisti produttivi o di trasporto.
+            Herno non risponde della mancata consegna della merce imputabile a forza maggiore né del rischio di eventuali avarie, danneggiamenti, furti e ritardi verificatisi
+            durante il trasporto.
+            Art. 4. Riserva di proprietà
+            La proprietà della merce si intenderà trasferita da Herno al Rivenditore al momento dell’integrale pagamento del prezzo – inclusi gli interessi maturati e ogni altra
+            somma eventualmente dovuta – della merce oggetto di ciascun ordine.
+            Art. 5. Prezzi al dettaglio
+            Il Rivenditore è libero di fissare i prezzi di rivendita dei Prodotti. Herno può fornire di volta in volta al Rivenditore il listino dei prezzi suggeriti per la rivendita al
+            dettaglio della merce. I prezzi suggeriti saranno individuati tenendo conto dell’immagine e del prestigio del marchio Herno.
+            Poiché Herno ha implementato un sistema di distribuzione selettiva, la commercializzazione dei Prodotti a prezzi eccessivamente scontati non è consentita in quanto
+            potrebbe svilire il valore del brand e avere un impatto negativo sull’esclusività dei Prodotti.
+            Art. 6. Distribuzione dei Prodotti
+            Il Rivenditore si impegna a vendere i Prodotti esclusivamente nel/nei punti vendita e, eventualmente, attraverso il proprio sito web purché sia conforme ai criteri
+            selettivi qualitativi individuati da Herno per l’ammissione dei Rivenditori al network distributivo. In conseguenza della sua ammissione al sistema di distribuzione
+            selettiva implementato da Herno, il Rivenditore può vendere i Prodotti esclusivamente a consumatori finali e/o ad altri Rivenditori Autorizzati. Fatti salvi i casi in cui
+            Herno si riserva la facoltà di autorizzare i Rivenditori a vendere i Prodotti tramite marketplaces (che operano con proprio logo e nome visibili), i Rivenditori Autorizzati
+            non possono servirsi di tali piattaforme terze al fine di tutelare l’immagine e il prestigio del Marchio.
+            Art. 7. Verifica della merce, reclami e resi
+            Il Rivenditore ha l’obbligo di verificare la merce non appena ne ha la disponibilità. Eventuali reclami, comunque motivati, dovranno essere formulati dal Rivenditore,
+            sotto pena di decadenza, entro il termine di 5 giorni dal ricevimento della merce. I vizi occulti dovranno essere denunciati, sempre a pena di decadenza, entro 5
+            giorni dalla scoperta. Eventuali reclami non daranno mai diritto al Rivenditore di sospendere il pagamento delle fatture. La responsabilità di Herno, in caso di
+            contestazioni, è comunque limitata al prezzo della merce fatturata. Herno non accetterà restituzione di merce se non previamente autorizzata dalla stessa per iscritto.
+            Art. 8. Pagamenti
+            Salvo diverso accordo scritto tra le parti, il Rivenditore si impegna ad adempiere puntualmente agli obblighi di pagamento del prezzo dovuto a Herno entro i tempi
+            prestabiliti in fattura. La violazione di questo obbligo può comportare, a discrezione di Herno, la risoluzione del contratto per inadempimento. In caso di modifica delle
+            condizioni economiche e finanziarie del Rivenditore, tali da diminuirne le garanzie di solvibilità, Herno avrà la facoltà di annullare la conferma dell’ordine, di
+            sospenderne l’esecuzione, o di modificare, mediante comunicazione scritta, i termini e le modalità di pagamento precedentemente indicati.
+            Art. 9. Ritardo nei pagamenti e penale
+            In caso di ritardo nei pagamenti dei Prodotti, Herno si riserva la facoltà di annullare, in tutto o in parte, gli ordini già presi in carico, anche se confermati in
+            precedenza, dandone comunicazione scritta al Rivenditore.
+            Il ritardato o mancato pagamento (totale o parziale) della merce ordinata o l’annullamento, senza previa autorizzazione di Herno, di un ordine già approvato (anche
+            se non ancora spedito) comportano il diritto di quest’ultima di richiedere al Rivenditore il pagamento di una somma pari al 30% del valore complessivo della merce
+            ordinata.
+            Art. 10. Non esclusiva
+            Il Rivenditore non ha alcun diritto di esclusiva, salvo che ciò venga concordato espressamente per iscritto con Herno.
+            Art. 11. Legge applicabile e controversie
+            Le presenti condizioni generali di vendita sono regolate dalla legge italiana e ogni controversia relativa alla validità, interpretazione ed esecuzione delle stesse sarà
+            risolta in via esclusiva dal Foro di Milano.
+             GENERAL SALES CONDITIONS - Art. 1.                Scope
+            By purchasing Herno products ("Products"), the retailer declares that they are aware that they are joining the selective distribution system implemented by Herno.
+            Orders for Products placed by Retailers shall be governed by these general terms and conditions until such time as they are superseded or amended by new general
+            terms and conditions provided by Herno. Any exceptions shall be agreed upon in writing between Herno and the Retailer.
+            Art. 2. Conclusion of the contract
+            An order constitutes a proposal for a contract, which shall only be concluded upon confirmation of acceptance by Herno.
+            Art. 3. Delivery times
+            Delivery times are merely indicative and Herno is entitled to two weeks' grace from the planned delivery date should unforeseen production issues or transport
+            problems arise. Herno shall not be liable for non-delivery of goods due to force majeure or for any risk of damage, theft or delay in transit.
+            Art. 4. Retention of title
+            Ownership of the goods shall be deemed to be transferred from Herno to the Retailer upon full payment of the price—including accrued interest and any other sum
+            due—of the goods included in each order.
+            Art. 5. Retail prices
+            The Retailer is free to set the retail prices of the Products. Herno may, from time to time, provide the Retailer with a list of recommended retail prices for the goods.
+            The recommended prices will be determined with the image and prestige of the Herno brand taken into account. As Herno has implemented a selective distribution
+            system, the marketing of Products at excessively discounted prices is not permitted, as it could debase the value of the brand and have a negative impact on the
+            exclusivity of the Products.
+            Art. 6. Distribution of Products
+            The Retailer undertakes to sell the Products in their store(s) only and, if applicable, through their own website, provided that the qualitative selection criteria provided
+            by Herno for the admission of Retailers to the distribution network are complied with. Once admitted to the selective distribution system implemented by Herno, the
+            Retailer may only sell the Products to end consumers and/or other Authorised Retailers. Except in cases where Herno reserves the right to authorise Retailers to sell
+            Products through marketplaces (which operate with their own visible logo and name), Authorised Retailers are prohibited from using such third-party platforms in
+            order to protect the image and prestige of the Brand.
+            Art. 7. Checking of goods, complaints and returns
+            The Retailer is obliged to check the goods as soon as they are available. Any complaints, however justified, must be made by the Retailer, under penalty of forfeiture,
+            within 5 days of receipt of the goods. Hidden defects must be reported, again under penalty of forfeiture, within 5 days of their discovery. Complaints shall never
+            entitle the Retailer to suspend payment of invoices. Herno's liability in the event of a dispute shall in any event be limited to the price of the invoiced goods. Herno
+            shall not accept any return of goods unless previously authorised by the same in writing.
+            Art. 8. Payments
+            Unless otherwise agreed upon in writing between the parties, the Retailer undertakes to punctually fulfil their obligation to pay the price due to Herno within the time-
+            frame detailed on the invoice. Violation of this obligation may, at Herno's discretion, result in the termination of the contract for non-compliance. In the event that the
+            Retailer's economic and financial situation changes, so much so that it compromises the Retailer's guarantee of solvency, Herno shall have the right to cancel the
+            order confirmation, suspend the fulfilment of the order, or change, by way of written communication, the payment terms and methods previously specified.
+            Art. 9. Late payments and penalties
+            If there is a delay in payment for the Products, Herno reserves the right to cancel, in whole or in part, orders that have already been taken on, even if previously
+            confirmed, and will provide the Retailer with written notice of this. Delayed payments or non-payments (full or partial) for goods ordered or the cancellation, without
+            Herno's prior consent, of an order that has already been approved (even if not yet shipped) shall entitle Herno to demand payment from the Retailer of a sum equal
+            to 30% of the total value of the goods ordered.
+            Art. 10.     No exclusive rights
+            The Retailer shall have no exclusive rights, unless this is expressly agreed in writing with Herno.
+            Art. 11.     Applicable law and disputes
+            These general terms and conditions of sale are governed by Italian law and any dispute relating to their validity, interpretation and execution shall be settled
+            exclusively by the Court of Milan.
+                                                                                                                                          SIGNATURE OF PURCHASE

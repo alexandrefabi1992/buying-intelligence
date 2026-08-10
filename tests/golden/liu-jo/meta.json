@@ -1,0 +1,11 @@
+{
+  "file_id": 23,
+  "source_filename": "Order Confirmation ERP.pdf",
+  "manufacturer": "liujo",
+  "season_tag": "p27",
+  "destination_shop_id": "9",
+  "extraction_source": "llm",
+  "extracted_at": "2026-08-07T03:54:10.208Z",
+  "captured_at": "2026-08-10T03:36:28.113Z",
+  "notes": "Fix taille numérique (commits 5287525, b25965e, 7b17ef8) appliqué au prompt post-hoc — ce golden reflète le preview_json cached AVANT ces fixes. Non re-testé rétroactivement car file en status='pushed' immuable. Une future re-extraction pourrait différer et c'est ATTENDU. Fix taille numérique appliqué post-hoc, non re-testé rétroactivement."
+}

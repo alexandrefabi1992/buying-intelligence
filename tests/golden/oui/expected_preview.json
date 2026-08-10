@@ -1,0 +1,3869 @@
+{
+  "file": {
+    "supplier_key": "oui-eurostyle",
+    "target_manufacturer": "Oui"
+  },
+  "orders": [
+    {
+      "lines": [
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94192",
+          "unit_cost": 70.95,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94192",
+          "unit_cost": 70.95,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94192",
+          "unit_cost": 70.95,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94192",
+          "unit_cost": 70.95,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94192",
+          "unit_cost": 70.95,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94192",
+          "unit_cost": 70.95,
+          "color_code": "1030",
+          "color_normalized": "Pristine-1030"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94192",
+          "unit_cost": 70.95,
+          "color_code": "1030",
+          "color_normalized": "Pristine-1030"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94192",
+          "unit_cost": 70.95,
+          "color_code": "1030",
+          "color_normalized": "Pristine-1030"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94192",
+          "unit_cost": 70.95,
+          "color_code": "1030",
+          "color_normalized": "Pristine-1030"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94192",
+          "unit_cost": 70.95,
+          "color_code": "1030",
+          "color_normalized": "Pristine-1030"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94143",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94143",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94143",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94143",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94506",
+          "unit_cost": 161.25,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94506",
+          "unit_cost": 161.25,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94506",
+          "unit_cost": 161.25,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94506",
+          "unit_cost": 161.25,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94286",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94286",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94286",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94286",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94286",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94774",
+          "unit_cost": 118.25,
+          "color_code": "108",
+          "color_normalized": "White brown-108"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94774",
+          "unit_cost": 118.25,
+          "color_code": "108",
+          "color_normalized": "White brown-108"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94774",
+          "unit_cost": 118.25,
+          "color_code": "108",
+          "color_normalized": "White brown-108"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94774",
+          "unit_cost": 118.25,
+          "color_code": "108",
+          "color_normalized": "White brown-108"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94774",
+          "unit_cost": 118.25,
+          "color_code": "108",
+          "color_normalized": "White brown-108"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94774",
+          "unit_cost": 118.25,
+          "color_code": "108",
+          "color_normalized": "White brown-108"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94298",
+          "unit_cost": 109.65,
+          "color_code": "8378",
+          "color_normalized": "Taupe-8378"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94298",
+          "unit_cost": 109.65,
+          "color_code": "8378",
+          "color_normalized": "Taupe-8378"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94298",
+          "unit_cost": 109.65,
+          "color_code": "8378",
+          "color_normalized": "Taupe-8378"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94298",
+          "unit_cost": 109.65,
+          "color_code": "8378",
+          "color_normalized": "Taupe-8378"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94298",
+          "unit_cost": 109.65,
+          "color_code": "8378",
+          "color_normalized": "Taupe-8378"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94298",
+          "unit_cost": 109.65,
+          "color_code": "8378",
+          "color_normalized": "Taupe-8378"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "86917",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "86917",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "86917",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "86917",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "86917",
+          "unit_cost": 126.85,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94308",
+          "unit_cost": 96.75,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94308",
+          "unit_cost": 96.75,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94308",
+          "unit_cost": 96.75,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94308",
+          "unit_cost": 96.75,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94308",
+          "unit_cost": 96.75,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94308",
+          "unit_cost": 96.75,
+          "color_code": "8828",
+          "color_normalized": "Espresso-8828"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94626",
+          "unit_cost": 118.25,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94626",
+          "unit_cost": 118.25,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94626",
+          "unit_cost": 118.25,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94275",
+          "unit_cost": 126.85,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94275",
+          "unit_cost": 126.85,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94275",
+          "unit_cost": 126.85,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94275",
+          "unit_cost": 126.85,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94275",
+          "unit_cost": 126.85,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94584",
+          "unit_cost": 96.75,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94584",
+          "unit_cost": 96.75,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94584",
+          "unit_cost": 96.75,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94584",
+          "unit_cost": 96.75,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94584",
+          "unit_cost": 96.75,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94623",
+          "unit_cost": 126.85,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94623",
+          "unit_cost": 126.85,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94623",
+          "unit_cost": 126.85,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94623",
+          "unit_cost": 126.85,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94623",
+          "unit_cost": 126.85,
+          "color_code": "103",
+          "color_normalized": "White red-103"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "88220",
+          "unit_cost": 49.45,
+          "color_code": "871",
+          "color_normalized": "Dk brown offwhite-871"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "88220",
+          "unit_cost": 49.45,
+          "color_code": "871",
+          "color_normalized": "Dk brown offwhite-871"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "88220",
+          "unit_cost": 49.45,
+          "color_code": "871",
+          "color_normalized": "Dk brown offwhite-871"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "88220",
+          "unit_cost": 49.45,
+          "color_code": "871",
+          "color_normalized": "Dk brown offwhite-871"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "88220",
+          "unit_cost": 49.45,
+          "color_code": "871",
+          "color_normalized": "Dk brown offwhite-871"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "88220",
+          "unit_cost": 49.45,
+          "color_code": "871",
+          "color_normalized": "Dk brown offwhite-871"
+        },
+        {
+          "qty": 1,
+          "size": "46",
+          "style_ref": "88220",
+          "unit_cost": 49.45,
+          "color_code": "871",
+          "color_normalized": "Dk brown offwhite-871"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94149",
+          "unit_cost": 126.85,
+          "color_code": "7065",
+          "color_normalized": "Lt beige melange-7065"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94149",
+          "unit_cost": 126.85,
+          "color_code": "7065",
+          "color_normalized": "Lt beige melange-7065"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94149",
+          "unit_cost": 126.85,
+          "color_code": "7065",
+          "color_normalized": "Lt beige melange-7065"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94149",
+          "unit_cost": 126.85,
+          "color_code": "7065",
+          "color_normalized": "Lt beige melange-7065"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94149",
+          "unit_cost": 126.85,
+          "color_code": "7065",
+          "color_normalized": "Lt beige melange-7065"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94149",
+          "unit_cost": 126.85,
+          "color_code": "7065",
+          "color_normalized": "Lt beige melange-7065"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "79918",
+          "unit_cost": 212.85,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "79918",
+          "unit_cost": 212.85,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "79918",
+          "unit_cost": 212.85,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "79918",
+          "unit_cost": 212.85,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "79918",
+          "unit_cost": 212.85,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "79918",
+          "unit_cost": 212.85,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94609",
+          "unit_cost": 101.05,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94609",
+          "unit_cost": 101.05,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94609",
+          "unit_cost": 101.05,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94609",
+          "unit_cost": 101.05,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94609",
+          "unit_cost": 101.05,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94609",
+          "unit_cost": 101.05,
+          "color_code": "3912",
+          "color_normalized": "Bramble berry-3912"
+        },
+        {
+          "qty": 3,
+          "size": "OS",
+          "style_ref": "94667",
+          "unit_cost": 58.05,
+          "color_code": "303",
+          "color_normalized": "Rose red-303"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94480",
+          "unit_cost": 230.05,
+          "color_code": "118",
+          "color_normalized": "Offwhite brown-118"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94480",
+          "unit_cost": 230.05,
+          "color_code": "118",
+          "color_normalized": "Offwhite brown-118"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94480",
+          "unit_cost": 230.05,
+          "color_code": "118",
+          "color_normalized": "Offwhite brown-118"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94480",
+          "unit_cost": 230.05,
+          "color_code": "118",
+          "color_normalized": "Offwhite brown-118"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94277",
+          "unit_cost": 109.65,
+          "color_code": "1021",
+          "color_normalized": "Blanc cassé-1021"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94277",
+          "unit_cost": 109.65,
+          "color_code": "1021",
+          "color_normalized": "Blanc cassé-1021"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94277",
+          "unit_cost": 109.65,
+          "color_code": "1021",
+          "color_normalized": "Blanc cassé-1021"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94277",
+          "unit_cost": 109.65,
+          "color_code": "1021",
+          "color_normalized": "Blanc cassé-1021"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94277",
+          "unit_cost": 109.65,
+          "color_code": "1021",
+          "color_normalized": "Blanc cassé-1021"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94277",
+          "unit_cost": 109.65,
+          "color_code": "1021",
+          "color_normalized": "Blanc cassé-1021"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "95695",
+          "unit_cost": 161.25,
+          "color_code": "8139",
+          "color_normalized": "Taupe-8139"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "95695",
+          "unit_cost": 161.25,
+          "color_code": "8139",
+          "color_normalized": "Taupe-8139"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "95695",
+          "unit_cost": 161.25,
+          "color_code": "8139",
+          "color_normalized": "Taupe-8139"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "93363",
+          "unit_cost": 92.45,
+          "color_code": "8142",
+          "color_normalized": "Fungi-8142"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "93363",
+          "unit_cost": 92.45,
+          "color_code": "8142",
+          "color_normalized": "Fungi-8142"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "93363",
+          "unit_cost": 92.45,
+          "color_code": "8142",
+          "color_normalized": "Fungi-8142"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "93363",
+          "unit_cost": 92.45,
+          "color_code": "8142",
+          "color_normalized": "Fungi-8142"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "93363",
+          "unit_cost": 92.45,
+          "color_code": "8142",
+          "color_normalized": "Fungi-8142"
+        },
+        {
+          "qty": 1,
+          "size": "46",
+          "style_ref": "93363",
+          "unit_cost": 92.45,
+          "color_code": "8142",
+          "color_normalized": "Fungi-8142"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94281",
+          "unit_cost": 96.75,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94281",
+          "unit_cost": 96.75,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94281",
+          "unit_cost": 96.75,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94281",
+          "unit_cost": 96.75,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94281",
+          "unit_cost": 96.75,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94281",
+          "unit_cost": 96.75,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94255",
+          "unit_cost": 118.25,
+          "color_code": "817",
+          "color_normalized": "Lt brown stone-817"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94255",
+          "unit_cost": 118.25,
+          "color_code": "817",
+          "color_normalized": "Lt brown stone-817"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94255",
+          "unit_cost": 118.25,
+          "color_code": "817",
+          "color_normalized": "Lt brown stone-817"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94255",
+          "unit_cost": 118.25,
+          "color_code": "817",
+          "color_normalized": "Lt brown stone-817"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94255",
+          "unit_cost": 118.25,
+          "color_code": "817",
+          "color_normalized": "Lt brown stone-817"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94255",
+          "unit_cost": 118.25,
+          "color_code": "817",
+          "color_normalized": "Lt brown stone-817"
+        },
+        {
+          "qty": 1,
+          "size": "46",
+          "style_ref": "94255",
+          "unit_cost": 118.25,
+          "color_code": "817",
+          "color_normalized": "Lt brown stone-817"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94443",
+          "unit_cost": 126.85,
+          "color_code": "729",
+          "color_normalized": "Lt stone grey-729"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94443",
+          "unit_cost": 126.85,
+          "color_code": "729",
+          "color_normalized": "Lt stone grey-729"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94443",
+          "unit_cost": 126.85,
+          "color_code": "729",
+          "color_normalized": "Lt stone grey-729"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94443",
+          "unit_cost": 126.85,
+          "color_code": "729",
+          "color_normalized": "Lt stone grey-729"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94443",
+          "unit_cost": 126.85,
+          "color_code": "729",
+          "color_normalized": "Lt stone grey-729"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94443",
+          "unit_cost": 126.85,
+          "color_code": "729",
+          "color_normalized": "Lt stone grey-729"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94628",
+          "unit_cost": 144.05,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94628",
+          "unit_cost": 144.05,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94628",
+          "unit_cost": 144.05,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94628",
+          "unit_cost": 144.05,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94628",
+          "unit_cost": 144.05,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "94628",
+          "unit_cost": 144.05,
+          "color_code": "8151",
+          "color_normalized": "Smokey taupe-8151"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94516",
+          "unit_cost": 101.05,
+          "color_code": "728",
+          "color_normalized": "Lt stone brown-728"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94516",
+          "unit_cost": 101.05,
+          "color_code": "728",
+          "color_normalized": "Lt stone brown-728"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94516",
+          "unit_cost": 101.05,
+          "color_code": "728",
+          "color_normalized": "Lt stone brown-728"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "94516",
+          "unit_cost": 101.05,
+          "color_code": "728",
+          "color_normalized": "Lt stone brown-728"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "94516",
+          "unit_cost": 101.05,
+          "color_code": "728",
+          "color_normalized": "Lt stone brown-728"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "94144",
+          "unit_cost": 126.85,
+          "color_code": "1021",
+          "color_normalized": "Blanc cassé-1021"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "94144",
+          "unit_cost": 126.85,
+          "color_code": "1021",
+          "color_normalized": "Blanc cassé-1021"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "94144",
+          "unit_cost": 126.85,
+          "color_code": "1021",
+          "color_normalized": "Blanc cassé-1021"
+        }
+      ],
+      "batch_id": 33,
+      "selected": true,
+      "last_page": null,
+      "po_number": "0350437",
+      "first_page": null,
+      "order_date": "2025-01-27T00:00:00.000Z",
+      "cancel_date": null,
+      "batch_status": "pushing",
+      "delivery_date": null,
+      "is_consignment": false,
+      "amount_declared": 16886.1,
+      "customer_reference": null,
+      "lightspeed_order_id": "18",
+      "unit_count_declared": 144
+    }
+  ],
+  "summary": {
+    "counters": {
+      "error": 0,
+      "create_new": 0,
+      "complete_existing": 28,
+      "create_with_suffix": 0
+    },
+    "incomplete": false,
+    "order_count": 1,
+    "units_match": true,
+    "matrix_count": 28,
+    "extraction_stats": {
+      "skipped": 0,
+      "attempted": 28,
+      "successful": 28,
+      "units_ratio": 1,
+      "skipped_ratio": 0,
+      "qty_mismatched": 0,
+      "size_validation": null,
+      "qty_mismatch_ratio": 0
+    },
+    "variants_already": 142,
+    "summed_cost_total": 16886.1,
+    "incomplete_reasons": [],
+    "summed_units_total": 144,
+    "variants_to_create": 0,
+    "summed_amount_total": 16886.1,
+    "summed_retail_total": 39270,
+    "declared_units_total": 144,
+    "declared_amount_total": 16886.1,
+    "validation_thresholds": {
+      "min_units_ratio": 0.95,
+      "max_skipped_ratio": 0.1,
+      "max_qty_mismatch_ratio": 0.1,
+      "max_size_mismatch_ratio": 0.02,
+      "max_cost_ratio_deviation": 0.02,
+      "max_skipped_ratio_no_declared": 0.05
+    },
+    "summed_amount_total_effective": 16493.4
+  },
+  "matrices": [
+    {
+      "key": "94192|Espresso-8828",
+      "action": "complete_existing",
+      "style_ref": "94192",
+      "total_qty": 5,
+      "unit_cost": 70.95,
+      "color_code": "8828",
+      "description": "",
+      "retail_price": 165,
+      "po_quantities": {
+        "0350437": {
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Espresso-8828",
+      "color_normalized": "Espresso-8828",
+      "reused_matrix_id": "29317",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139149",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139150",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139151",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139152",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139153",
+          "color_attr": "Espresso-8828"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94192 p27",
+      "effective_retail_price": 165,
+      "effective_unit_cost": 69.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94192|Pristine-1030",
+      "action": "complete_existing",
+      "style_ref": "94192",
+      "total_qty": 5,
+      "unit_cost": 70.95,
+      "color_code": "1030",
+      "description": "",
+      "retail_price": 165,
+      "po_quantities": {
+        "0350437": {
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Pristine-1030",
+      "color_normalized": "Pristine-1030",
+      "reused_matrix_id": "29317",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139149",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139150",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139151",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139152",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139153",
+          "color_attr": "Espresso-8828"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94192 p27",
+      "effective_retail_price": 165,
+      "effective_unit_cost": 69.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94143|Espresso-8828",
+      "action": "complete_existing",
+      "style_ref": "94143",
+      "total_qty": 4,
+      "unit_cost": 126.85,
+      "color_code": "8828",
+      "description": "",
+      "retail_price": 295,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Espresso-8828",
+      "color_normalized": "Espresso-8828",
+      "reused_matrix_id": "29319",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139159",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139160",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139161",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139162",
+          "color_attr": "Espresso-8828"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94143 p27",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 123.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94506|Espresso-8828",
+      "action": "complete_existing",
+      "style_ref": "94506",
+      "total_qty": 4,
+      "unit_cost": 161.25,
+      "color_code": "8828",
+      "description": "",
+      "retail_price": 375,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Espresso-8828",
+      "color_normalized": "Espresso-8828",
+      "reused_matrix_id": "29320",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139163",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139164",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139165",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139166",
+          "color_attr": "Espresso-8828"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94506 p27",
+      "effective_retail_price": 375,
+      "effective_unit_cost": 157.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94286|Espresso-8828",
+      "action": "complete_existing",
+      "style_ref": "94286",
+      "total_qty": 5,
+      "unit_cost": 126.85,
+      "color_code": "8828",
+      "description": "",
+      "retail_price": 295,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Espresso-8828",
+      "color_normalized": "Espresso-8828",
+      "reused_matrix_id": "29321",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139167",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139168",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139169",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139170",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139171",
+          "color_attr": "Espresso-8828"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94286 p27",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 123.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94774|White brown-108",
+      "action": "complete_existing",
+      "style_ref": "94774",
+      "total_qty": 6,
+      "unit_cost": 118.25,
+      "color_code": "108",
+      "description": "",
+      "retail_price": 275,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "White brown-108",
+      "color_normalized": "White brown-108",
+      "reused_matrix_id": "29322",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139172",
+          "color_attr": "White brown-108"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139173",
+          "color_attr": "White brown-108"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139174",
+          "color_attr": "White brown-108"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139175",
+          "color_attr": "White brown-108"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139176",
+          "color_attr": "White brown-108"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139177",
+          "color_attr": "White brown-108"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94774 p27",
+      "effective_retail_price": 275,
+      "effective_unit_cost": 115.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94298|Taupe-8378",
+      "action": "complete_existing",
+      "style_ref": "94298",
+      "total_qty": 6,
+      "unit_cost": 109.65,
+      "color_code": "8378",
+      "description": "",
+      "retail_price": 255,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Taupe-8378",
+      "color_normalized": "Taupe-8378",
+      "reused_matrix_id": "29323",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139178",
+          "color_attr": "Taupe-8378"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139179",
+          "color_attr": "Taupe-8378"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139180",
+          "color_attr": "Taupe-8378"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139181",
+          "color_attr": "Taupe-8378"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139182",
+          "color_attr": "Taupe-8378"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139183",
+          "color_attr": "Taupe-8378"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94298 p27",
+      "effective_retail_price": 255,
+      "effective_unit_cost": 107.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "86917|Espresso-8828",
+      "action": "complete_existing",
+      "style_ref": "86917",
+      "total_qty": 5,
+      "unit_cost": 126.85,
+      "color_code": "8828",
+      "description": "",
+      "retail_price": 295,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Espresso-8828",
+      "color_normalized": "Espresso-8828",
+      "reused_matrix_id": "29324",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139184",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139185",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139186",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139187",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139188",
+          "color_attr": "Espresso-8828"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "86917 p27",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 123.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94308|Espresso-8828",
+      "action": "complete_existing",
+      "style_ref": "94308",
+      "total_qty": 6,
+      "unit_cost": 96.75,
+      "color_code": "8828",
+      "description": "",
+      "retail_price": 225,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Espresso-8828",
+      "color_normalized": "Espresso-8828",
+      "reused_matrix_id": "29325",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139189",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139190",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139191",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139192",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139193",
+          "color_attr": "Espresso-8828"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139194",
+          "color_attr": "Espresso-8828"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94308 p27",
+      "effective_retail_price": 225,
+      "effective_unit_cost": 94.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94626|White red-103",
+      "action": "complete_existing",
+      "style_ref": "94626",
+      "total_qty": 3,
+      "unit_cost": 118.25,
+      "color_code": "103",
+      "description": "",
+      "retail_price": 275,
+      "po_quantities": {
+        "0350437": {
+          "36": 1,
+          "38": 1,
+          "40": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "White red-103",
+      "color_normalized": "White red-103",
+      "reused_matrix_id": "29326",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139195",
+          "color_attr": "White red-103"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139196",
+          "color_attr": "White red-103"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139197",
+          "color_attr": "White red-103"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94626 p27",
+      "effective_retail_price": 275,
+      "effective_unit_cost": 115.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94275|Bramble berry-3912",
+      "action": "complete_existing",
+      "style_ref": "94275",
+      "total_qty": 5,
+      "unit_cost": 126.85,
+      "color_code": "3912",
+      "description": "",
+      "retail_price": 295,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Bramble berry-3912",
+      "color_normalized": "Bramble berry-3912",
+      "reused_matrix_id": "29327",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139198",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139199",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139200",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139201",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139202",
+          "color_attr": "Bramble berry-3912"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94275 p27",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 123.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94584|White red-103",
+      "action": "complete_existing",
+      "style_ref": "94584",
+      "total_qty": 5,
+      "unit_cost": 96.75,
+      "color_code": "103",
+      "description": "",
+      "retail_price": 225,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "White red-103",
+      "color_normalized": "White red-103",
+      "reused_matrix_id": "29328",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139203",
+          "color_attr": "White red-103"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139204",
+          "color_attr": "White red-103"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139205",
+          "color_attr": "White red-103"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139206",
+          "color_attr": "White red-103"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139207",
+          "color_attr": "White red-103"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94584 p27",
+      "effective_retail_price": 225,
+      "effective_unit_cost": 94.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94623|White red-103",
+      "action": "complete_existing",
+      "style_ref": "94623",
+      "total_qty": 5,
+      "unit_cost": 126.85,
+      "color_code": "103",
+      "description": "",
+      "retail_price": 295,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "White red-103",
+      "color_normalized": "White red-103",
+      "reused_matrix_id": "29329",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139208",
+          "color_attr": "White red-103"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139209",
+          "color_attr": "White red-103"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139210",
+          "color_attr": "White red-103"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139211",
+          "color_attr": "White red-103"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139212",
+          "color_attr": "White red-103"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94623 p27",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 123.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "88220|Dk brown offwhite-871",
+      "action": "complete_existing",
+      "style_ref": "88220",
+      "total_qty": 7,
+      "unit_cost": 49.45,
+      "color_code": "871",
+      "description": "",
+      "retail_price": 115,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1,
+          "46": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Dk brown offwhite-871",
+      "color_normalized": "Dk brown offwhite-871",
+      "reused_matrix_id": "29330",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139213",
+          "color_attr": "Dk brown offwhite-871"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139214",
+          "color_attr": "Dk brown offwhite-871"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139215",
+          "color_attr": "Dk brown offwhite-871"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139216",
+          "color_attr": "Dk brown offwhite-871"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139217",
+          "color_attr": "Dk brown offwhite-871"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139218",
+          "color_attr": "Dk brown offwhite-871"
+        },
+        {
+          "size": "46",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139219",
+          "color_attr": "Dk brown offwhite-871"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "46",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "88220 p27",
+      "effective_retail_price": 115,
+      "effective_unit_cost": 48.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94149|Lt beige melange-7065",
+      "action": "complete_existing",
+      "style_ref": "94149",
+      "total_qty": 6,
+      "unit_cost": 126.85,
+      "color_code": "7065",
+      "description": "",
+      "retail_price": 295,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Lt beige melange-7065",
+      "color_normalized": "Lt beige melange-7065",
+      "reused_matrix_id": "29331",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139220",
+          "color_attr": "Lt beige melange-7065"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139221",
+          "color_attr": "Lt beige melange-7065"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139222",
+          "color_attr": "Lt beige melange-7065"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139223",
+          "color_attr": "Lt beige melange-7065"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139224",
+          "color_attr": "Lt beige melange-7065"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139225",
+          "color_attr": "Lt beige melange-7065"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94149 p27",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 123.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "79918|Bramble berry-3912",
+      "action": "complete_existing",
+      "style_ref": "79918",
+      "total_qty": 6,
+      "unit_cost": 212.85,
+      "color_code": "3912",
+      "description": "",
+      "retail_price": 495,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Bramble berry-3912",
+      "color_normalized": "Bramble berry-3912",
+      "reused_matrix_id": "29332",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139226",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139227",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139228",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139229",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139230",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139231",
+          "color_attr": "Bramble berry-3912"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "79918 p27",
+      "effective_retail_price": 495,
+      "effective_unit_cost": 207.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94609|Bramble berry-3912",
+      "action": "complete_existing",
+      "style_ref": "94609",
+      "total_qty": 6,
+      "unit_cost": 101.05,
+      "color_code": "3912",
+      "description": "",
+      "retail_price": 235,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Bramble berry-3912",
+      "color_normalized": "Bramble berry-3912",
+      "reused_matrix_id": "29333",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139232",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139233",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139234",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139235",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139236",
+          "color_attr": "Bramble berry-3912"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139237",
+          "color_attr": "Bramble berry-3912"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94609 p27",
+      "effective_retail_price": 235,
+      "effective_unit_cost": 98.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94667|Rose red-303",
+      "action": "complete_existing",
+      "style_ref": "94667",
+      "total_qty": 3,
+      "unit_cost": 58.05,
+      "color_code": "303",
+      "description": "",
+      "retail_price": 135,
+      "po_quantities": {
+        "0350437": {
+          "OS": 3
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Rose red-303",
+      "color_normalized": "Rose red-303",
+      "reused_matrix_id": "29334",
+      "existing_variants": [
+        {
+          "size": "OS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139238",
+          "color_attr": "Rose red-303"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "OS",
+          "qty_across_pos": 3
+        }
+      ],
+      "matrix_description_planned": "94667 p27",
+      "effective_retail_price": 135,
+      "effective_unit_cost": 56.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94480|Offwhite brown-118",
+      "action": "complete_existing",
+      "style_ref": "94480",
+      "total_qty": 4,
+      "unit_cost": 230.05,
+      "color_code": "118",
+      "description": "",
+      "retail_price": 535,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Offwhite brown-118",
+      "color_normalized": "Offwhite brown-118",
+      "reused_matrix_id": "29335",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139239",
+          "color_attr": "Offwhite brown-118"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139240",
+          "color_attr": "Offwhite brown-118"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139241",
+          "color_attr": "Offwhite brown-118"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139242",
+          "color_attr": "Offwhite brown-118"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94480 p27",
+      "effective_retail_price": 535,
+      "effective_unit_cost": 224.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94277|Blanc cassé-1021",
+      "action": "complete_existing",
+      "style_ref": "94277",
+      "total_qty": 6,
+      "unit_cost": 109.65,
+      "color_code": "1021",
+      "description": "",
+      "retail_price": 255,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Blanc cassé-1021",
+      "color_normalized": "Blanc cassé-1021",
+      "reused_matrix_id": "29336",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139243",
+          "color_attr": "Blanc cassé-1021"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139244",
+          "color_attr": "Blanc cassé-1021"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139245",
+          "color_attr": "Blanc cassé-1021"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139246",
+          "color_attr": "Blanc cassé-1021"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139247",
+          "color_attr": "Blanc cassé-1021"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139248",
+          "color_attr": "Blanc cassé-1021"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94277 p27",
+      "effective_retail_price": 255,
+      "effective_unit_cost": 107.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "95695|Taupe-8139",
+      "action": "complete_existing",
+      "style_ref": "95695",
+      "total_qty": 3,
+      "unit_cost": 161.25,
+      "color_code": "8139",
+      "description": "",
+      "retail_price": 375,
+      "po_quantities": {
+        "0350437": {
+          "36": 1,
+          "38": 1,
+          "40": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Taupe-8139",
+      "color_normalized": "Taupe-8139",
+      "reused_matrix_id": "29337",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139249",
+          "color_attr": "Taupe-8139"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139250",
+          "color_attr": "Taupe-8139"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139251",
+          "color_attr": "Taupe-8139"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "95695 p27",
+      "effective_retail_price": 375,
+      "effective_unit_cost": 157.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "93363|Fungi-8142",
+      "action": "complete_existing",
+      "style_ref": "93363",
+      "total_qty": 6,
+      "unit_cost": 92.45,
+      "color_code": "8142",
+      "description": "",
+      "retail_price": 215,
+      "po_quantities": {
+        "0350437": {
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1,
+          "46": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Fungi-8142",
+      "color_normalized": "Fungi-8142",
+      "reused_matrix_id": "29338",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139252",
+          "color_attr": "Fungi-8142"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139253",
+          "color_attr": "Fungi-8142"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139254",
+          "color_attr": "Fungi-8142"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139255",
+          "color_attr": "Fungi-8142"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139256",
+          "color_attr": "Fungi-8142"
+        },
+        {
+          "size": "46",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139257",
+          "color_attr": "Fungi-8142"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "46",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "93363 p27",
+      "effective_retail_price": 215,
+      "effective_unit_cost": 90.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94281|Smokey taupe-8151",
+      "action": "complete_existing",
+      "style_ref": "94281",
+      "total_qty": 6,
+      "unit_cost": 96.75,
+      "color_code": "8151",
+      "description": "",
+      "retail_price": 225,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Smokey taupe-8151",
+      "color_normalized": "Smokey taupe-8151",
+      "reused_matrix_id": "29339",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139258",
+          "color_attr": "Smokey taupe-8151"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139259",
+          "color_attr": "Smokey taupe-8151"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139260",
+          "color_attr": "Smokey taupe-8151"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139261",
+          "color_attr": "Smokey taupe-8151"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139262",
+          "color_attr": "Smokey taupe-8151"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139263",
+          "color_attr": "Smokey taupe-8151"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94281 p27",
+      "effective_retail_price": 225,
+      "effective_unit_cost": 94.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94255|Lt brown stone-817",
+      "action": "complete_existing",
+      "style_ref": "94255",
+      "total_qty": 7,
+      "unit_cost": 118.25,
+      "color_code": "817",
+      "description": "",
+      "retail_price": 275,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1,
+          "46": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Lt brown stone-817",
+      "color_normalized": "Lt brown stone-817",
+      "reused_matrix_id": "29340",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139264",
+          "color_attr": "Lt brown stone-817"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139265",
+          "color_attr": "Lt brown stone-817"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139266",
+          "color_attr": "Lt brown stone-817"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139267",
+          "color_attr": "Lt brown stone-817"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139268",
+          "color_attr": "Lt brown stone-817"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139269",
+          "color_attr": "Lt brown stone-817"
+        },
+        {
+          "size": "46",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139270",
+          "color_attr": "Lt brown stone-817"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "46",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94255 p27",
+      "effective_retail_price": 275,
+      "effective_unit_cost": 115.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94443|Lt stone grey-729",
+      "action": "complete_existing",
+      "style_ref": "94443",
+      "total_qty": 6,
+      "unit_cost": 126.85,
+      "color_code": "729",
+      "description": "",
+      "retail_price": 295,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Lt stone grey-729",
+      "color_normalized": "Lt stone grey-729",
+      "reused_matrix_id": "29341",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139271",
+          "color_attr": "Lt stone grey-729"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139272",
+          "color_attr": "Lt stone grey-729"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139273",
+          "color_attr": "Lt stone grey-729"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139274",
+          "color_attr": "Lt stone grey-729"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139275",
+          "color_attr": "Lt stone grey-729"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139276",
+          "color_attr": "Lt stone grey-729"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94443 p27",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 123.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94628|Smokey taupe-8151",
+      "action": "complete_existing",
+      "style_ref": "94628",
+      "total_qty": 6,
+      "unit_cost": 144.05,
+      "color_code": "8151",
+      "description": "",
+      "retail_price": 335,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Smokey taupe-8151",
+      "color_normalized": "Smokey taupe-8151",
+      "reused_matrix_id": "29342",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139277",
+          "color_attr": "Smokey taupe-8151"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139278",
+          "color_attr": "Smokey taupe-8151"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139279",
+          "color_attr": "Smokey taupe-8151"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139280",
+          "color_attr": "Smokey taupe-8151"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139281",
+          "color_attr": "Smokey taupe-8151"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139282",
+          "color_attr": "Smokey taupe-8151"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94628 p27",
+      "effective_retail_price": 335,
+      "effective_unit_cost": 140.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94516|Lt stone brown-728",
+      "action": "complete_existing",
+      "style_ref": "94516",
+      "total_qty": 5,
+      "unit_cost": 101.05,
+      "color_code": "728",
+      "description": "",
+      "retail_price": 235,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Lt stone brown-728",
+      "color_normalized": "Lt stone brown-728",
+      "reused_matrix_id": "29343",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139283",
+          "color_attr": "Lt stone brown-728"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139284",
+          "color_attr": "Lt stone brown-728"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139285",
+          "color_attr": "Lt stone brown-728"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139286",
+          "color_attr": "Lt stone brown-728"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139287",
+          "color_attr": "Lt stone brown-728"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94516 p27",
+      "effective_retail_price": 235,
+      "effective_unit_cost": 98.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "94144|Blanc cassé-1021",
+      "action": "complete_existing",
+      "style_ref": "94144",
+      "total_qty": 3,
+      "unit_cost": 126.85,
+      "color_code": "1021",
+      "description": "",
+      "retail_price": 295,
+      "po_quantities": {
+        "0350437": {
+          "34": 1,
+          "36": 1,
+          "38": 1
+        }
+      },
+      "pos_referenced": [
+        "0350437"
+      ],
+      "color_label_raw": "Blanc cassé-1021",
+      "color_normalized": "Blanc cassé-1021",
+      "reused_matrix_id": "29344",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139288",
+          "color_attr": "Blanc cassé-1021"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139289",
+          "color_attr": "Blanc cassé-1021"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "139290",
+          "color_attr": "Blanc cassé-1021"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "94144 p27",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 123.9,
+      "margin_override_pct_applied": 58
+    }
+  ],
+  "warnings": [],
+  "season_tag": "p27",
+  "target_manufacturer": "Oui",
+  "margin_override_pct": 58,
+  "cached": true,
+  "extraction_source": "recipe",
+  "preview_computed_at": "2026-08-08T03:21:59.494Z"
+}

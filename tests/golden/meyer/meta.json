@@ -1,0 +1,11 @@
+{
+  "file_id": 30,
+  "source_filename": "AU_6319046_VO040844__1457060.pdf",
+  "manufacturer": "Meyer",
+  "season_tag": "p26",
+  "destination_shop_id": "8",
+  "extraction_source": "llm",
+  "extracted_at": "2026-08-10T02:45:31.237Z",
+  "captured_at": "2026-08-10T03:37:49.010Z",
+  "notes": "Re-extrait avec les fixes format Meyer (commits e49fdbc + 50f785b) : style_ref épuré (2-3615, pas 2-3615/19), color_label = color_code (fallback numérique), description = 'BONN'/'ROMA'/'DUBLIN' extrait du nom modèle."
+}

@@ -1,0 +1,5197 @@
+{
+  "file": {
+    "supplier_key": "unknown",
+    "customer_name": null,
+    "default_vendor_id": null,
+    "target_manufacturer": "Numph",
+    "default_attribute_set_id": "5"
+  },
+  "orders": [
+    {
+      "lines": [
+        {
+          "qty": 1,
+          "size": "OS",
+          "style_ref": "707929-01L",
+          "unit_cost": 127.5,
+          "color_code": "6000",
+          "color_normalized": "Multi"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "707647-01L",
+          "unit_cost": 82.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707647-01L",
+          "unit_cost": 82.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707647-01L",
+          "unit_cost": 82.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707647-01L",
+          "unit_cost": 82.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707647-01L",
+          "unit_cost": 82.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707650-01L",
+          "unit_cost": 82.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707650-01L",
+          "unit_cost": 82.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707654-01L",
+          "unit_cost": 82.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707654-01L",
+          "unit_cost": 82.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707654-01L",
+          "unit_cost": 82.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707654-01L",
+          "unit_cost": 82.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "707654-01L",
+          "unit_cost": 82.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707700-01L",
+          "unit_cost": 97.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707700-01L",
+          "unit_cost": 97.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707700-01L",
+          "unit_cost": 97.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707701-01L",
+          "unit_cost": 122.5,
+          "color_code": "5518",
+          "color_normalized": "Sepia Tint"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707701-01L",
+          "unit_cost": 122.5,
+          "color_code": "5518",
+          "color_normalized": "Sepia Tint"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707701-01L",
+          "unit_cost": 122.5,
+          "color_code": "5518",
+          "color_normalized": "Sepia Tint"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707701-01L",
+          "unit_cost": 122.5,
+          "color_code": "5518",
+          "color_normalized": "Sepia Tint"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "707701-01L",
+          "unit_cost": 122.5,
+          "color_code": "5518",
+          "color_normalized": "Sepia Tint"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707731-01L",
+          "unit_cost": 112.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707731-01L",
+          "unit_cost": 112.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707731-01L",
+          "unit_cost": 112.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707731-01L",
+          "unit_cost": 112.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707732-01L",
+          "unit_cost": 87.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707732-01L",
+          "unit_cost": 87.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707732-01L",
+          "unit_cost": 87.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707732-01L",
+          "unit_cost": 87.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "707732-01L",
+          "unit_cost": 87.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707760-01L",
+          "unit_cost": 137.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707760-01L",
+          "unit_cost": 137.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707760-01L",
+          "unit_cost": 137.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707773-01L",
+          "unit_cost": 97.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707773-01L",
+          "unit_cost": 97.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707773-01L",
+          "unit_cost": 97.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707773-01L",
+          "unit_cost": 97.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707800-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707800-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707800-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707800-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707899-01L",
+          "unit_cost": 77.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707899-01L",
+          "unit_cost": 77.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707899-01L",
+          "unit_cost": 77.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "2737",
+          "color_normalized": "Dianthus"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "705367-01L",
+          "unit_cost": 57.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "706657-01L",
+          "unit_cost": 57.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "706657-01L",
+          "unit_cost": 57.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "706657-01L",
+          "unit_cost": 57.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "706657-01L",
+          "unit_cost": 57.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "706657-01L",
+          "unit_cost": 57.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "706657-01L",
+          "unit_cost": 57.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707636-01L",
+          "unit_cost": 87.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707636-01L",
+          "unit_cost": 87.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707636-01L",
+          "unit_cost": 87.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707636-01L",
+          "unit_cost": 87.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707636-01L",
+          "unit_cost": 87.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707636-01L",
+          "unit_cost": 87.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707636-01L",
+          "unit_cost": 87.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707636-01L",
+          "unit_cost": 87.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707637-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707637-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707637-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707637-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707637-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "707637-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707638-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707638-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707638-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707638-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707638-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "707638-01L",
+          "unit_cost": 67.5,
+          "color_code": "3092",
+          "color_normalized": "Blue Bell"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707739-01L",
+          "unit_cost": 77.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707739-01L",
+          "unit_cost": 77.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707739-01L",
+          "unit_cost": 77.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707739-01L",
+          "unit_cost": 77.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707739-01L",
+          "unit_cost": 77.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707742-01L",
+          "unit_cost": 77.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707742-01L",
+          "unit_cost": 77.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707742-01L",
+          "unit_cost": 77.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707742-01L",
+          "unit_cost": 77.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707747-01L",
+          "unit_cost": 77.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707747-01L",
+          "unit_cost": 77.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707747-01L",
+          "unit_cost": 77.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707747-01L",
+          "unit_cost": 77.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707747-01L",
+          "unit_cost": 77.5,
+          "color_code": "0547",
+          "color_normalized": "Gray Morn"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707751-01L",
+          "unit_cost": 92.5,
+          "color_code": "5728",
+          "color_normalized": "Desert Taupe"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707751-01L",
+          "unit_cost": 92.5,
+          "color_code": "5728",
+          "color_normalized": "Desert Taupe"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707751-01L",
+          "unit_cost": 92.5,
+          "color_code": "5728",
+          "color_normalized": "Desert Taupe"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707751-01L",
+          "unit_cost": 92.5,
+          "color_code": "5728",
+          "color_normalized": "Desert Taupe"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707751-01L",
+          "unit_cost": 92.5,
+          "color_code": "5728",
+          "color_normalized": "Desert Taupe"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "707751-01L",
+          "unit_cost": 92.5,
+          "color_code": "5728",
+          "color_normalized": "Desert Taupe"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707774-01L",
+          "unit_cost": 67.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707774-01L",
+          "unit_cost": 67.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707774-01L",
+          "unit_cost": 67.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707774-01L",
+          "unit_cost": 67.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707774-01L",
+          "unit_cost": 67.5,
+          "color_code": "9501",
+          "color_normalized": "Pristine"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707787-01L",
+          "unit_cost": 97.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707787-01L",
+          "unit_cost": 97.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707787-01L",
+          "unit_cost": 97.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707787-01L",
+          "unit_cost": 97.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707787-01L",
+          "unit_cost": 97.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "707787-01L",
+          "unit_cost": 97.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707809-01L",
+          "unit_cost": 77.5,
+          "color_code": "0510",
+          "color_normalized": "Light Grey Mel"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707809-01L",
+          "unit_cost": 77.5,
+          "color_code": "0510",
+          "color_normalized": "Light Grey Mel"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707809-01L",
+          "unit_cost": 77.5,
+          "color_code": "0510",
+          "color_normalized": "Light Grey Mel"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707809-01L",
+          "unit_cost": 77.5,
+          "color_code": "0510",
+          "color_normalized": "Light Grey Mel"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707809-01L",
+          "unit_cost": 77.5,
+          "color_code": "0510",
+          "color_normalized": "Light Grey Mel"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "707809-01L",
+          "unit_cost": 77.5,
+          "color_code": "0510",
+          "color_normalized": "Light Grey Mel"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707814-01L",
+          "unit_cost": 57.5,
+          "color_code": "9001",
+          "color_normalized": "Cloud Dancer"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707814-01L",
+          "unit_cost": 57.5,
+          "color_code": "9001",
+          "color_normalized": "Cloud Dancer"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707814-01L",
+          "unit_cost": 57.5,
+          "color_code": "9001",
+          "color_normalized": "Cloud Dancer"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707814-01L",
+          "unit_cost": 57.5,
+          "color_code": "9001",
+          "color_normalized": "Cloud Dancer"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707814-01L",
+          "unit_cost": 57.5,
+          "color_code": "9001",
+          "color_normalized": "Cloud Dancer"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707819-01L",
+          "unit_cost": 47.5,
+          "color_code": "0000",
+          "color_normalized": "Caviar"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707819-01L",
+          "unit_cost": 47.5,
+          "color_code": "0000",
+          "color_normalized": "Caviar"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707819-01L",
+          "unit_cost": 47.5,
+          "color_code": "0000",
+          "color_normalized": "Caviar"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707825-01L",
+          "unit_cost": 57.5,
+          "color_code": "9001",
+          "color_normalized": "Cloud Dancer"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707825-01L",
+          "unit_cost": 57.5,
+          "color_code": "9001",
+          "color_normalized": "Cloud Dancer"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707825-01L",
+          "unit_cost": 57.5,
+          "color_code": "9001",
+          "color_normalized": "Cloud Dancer"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707825-01L",
+          "unit_cost": 57.5,
+          "color_code": "9001",
+          "color_normalized": "Cloud Dancer"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707825-01L",
+          "unit_cost": 57.5,
+          "color_code": "9001",
+          "color_normalized": "Cloud Dancer"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "707825-01L",
+          "unit_cost": 57.5,
+          "color_code": "9001",
+          "color_normalized": "Cloud Dancer"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707841-01L",
+          "unit_cost": 47.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707841-01L",
+          "unit_cost": 47.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707841-01L",
+          "unit_cost": 47.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707841-01L",
+          "unit_cost": 47.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707841-01L",
+          "unit_cost": 47.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "707841-01L",
+          "unit_cost": 47.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707851-01L",
+          "unit_cost": 42.5,
+          "color_code": "3065",
+          "color_normalized": "Salute"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707851-01L",
+          "unit_cost": 42.5,
+          "color_code": "3065",
+          "color_normalized": "Salute"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707851-01L",
+          "unit_cost": 42.5,
+          "color_code": "3065",
+          "color_normalized": "Salute"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707851-01L",
+          "unit_cost": 42.5,
+          "color_code": "3065",
+          "color_normalized": "Salute"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707851-01L",
+          "unit_cost": 42.5,
+          "color_code": "3065",
+          "color_normalized": "Salute"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "707851-01L",
+          "unit_cost": 42.5,
+          "color_code": "3065",
+          "color_normalized": "Salute"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707859-01L",
+          "unit_cost": 57.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707859-01L",
+          "unit_cost": 57.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707859-01L",
+          "unit_cost": 57.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707859-01L",
+          "unit_cost": 57.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707859-01L",
+          "unit_cost": 57.5,
+          "color_code": "9000",
+          "color_normalized": "Bright White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707865-01L",
+          "unit_cost": 47.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707865-01L",
+          "unit_cost": 47.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707865-01L",
+          "unit_cost": 47.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707865-01L",
+          "unit_cost": 47.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "707865-01L",
+          "unit_cost": 47.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "707865-01L",
+          "unit_cost": 47.5,
+          "color_code": "1048",
+          "color_normalized": "Canary Yellow"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "707740-01L",
+          "unit_cost": 82.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "707740-01L",
+          "unit_cost": 82.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "707740-01L",
+          "unit_cost": 82.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "707740-01L",
+          "unit_cost": 82.5,
+          "color_code": "5729",
+          "color_normalized": "Nomad"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "707645-01L",
+          "unit_cost": 97.5,
+          "color_code": "3013",
+          "color_normalized": "Medium Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "707645-01L",
+          "unit_cost": 97.5,
+          "color_code": "3013",
+          "color_normalized": "Medium Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707645-01L",
+          "unit_cost": 97.5,
+          "color_code": "3013",
+          "color_normalized": "Medium Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707645-01L",
+          "unit_cost": 97.5,
+          "color_code": "3013",
+          "color_normalized": "Medium Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707645-01L",
+          "unit_cost": 97.5,
+          "color_code": "3013",
+          "color_normalized": "Medium Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707704-01L",
+          "unit_cost": 107.5,
+          "color_code": "5518",
+          "color_normalized": "Sepia Tint"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707704-01L",
+          "unit_cost": 107.5,
+          "color_code": "5518",
+          "color_normalized": "Sepia Tint"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707704-01L",
+          "unit_cost": 107.5,
+          "color_code": "5518",
+          "color_normalized": "Sepia Tint"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "707704-01L",
+          "unit_cost": 107.5,
+          "color_code": "5518",
+          "color_normalized": "Sepia Tint"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707772-01L",
+          "unit_cost": 107.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707772-01L",
+          "unit_cost": 107.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707772-01L",
+          "unit_cost": 107.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "707772-01L",
+          "unit_cost": 107.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "707876-01Z",
+          "unit_cost": 137.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "707876-01Z",
+          "unit_cost": 137.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "707876-01Z",
+          "unit_cost": 137.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "707876-01Z",
+          "unit_cost": 137.5,
+          "color_code": "3012",
+          "color_normalized": "Dark Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "34",
+          "style_ref": "706674-01Z",
+          "unit_cost": 147.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "36",
+          "style_ref": "706674-01Z",
+          "unit_cost": 147.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "38",
+          "style_ref": "706674-01Z",
+          "unit_cost": 147.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "706674-01Z",
+          "unit_cost": 147.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "706674-01Z",
+          "unit_cost": 147.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "706674-01Z",
+          "unit_cost": 147.5,
+          "color_code": "3010",
+          "color_normalized": "Light Blue Denim"
+        }
+      ],
+      "batch_id": null,
+      "selected": true,
+      "po_number": "0365575",
+      "order_date": "2026-06-30",
+      "cancel_date": "2027-02-28",
+      "batch_status": null,
+      "delivery_date": "2026-12-01",
+      "is_consignment": false,
+      "amount_declared": 30265,
+      "customer_reference": "del1",
+      "lightspeed_order_id": null,
+      "unit_count_declared": 189
+    }
+  ],
+  "summary": {
+    "counters": {
+      "error": 0,
+      "create_new": 0,
+      "complete_existing": 40,
+      "create_with_suffix": 0
+    },
+    "incomplete": false,
+    "order_count": 1,
+    "units_match": true,
+    "matrix_count": 40,
+    "extraction_stats": {
+      "skipped": 0,
+      "attempted": 40,
+      "successful": 40,
+      "units_ratio": 1,
+      "skipped_ratio": 0,
+      "qty_mismatched": 0,
+      "size_validation": {
+        "suspected": [],
+        "considered": 0,
+        "headers_found": 6
+      },
+      "qty_mismatch_ratio": 0
+    },
+    "variants_already": 184,
+    "summed_cost_total": 15132.5,
+    "incomplete_reasons": [],
+    "summed_units_total": 189,
+    "variants_to_create": 5,
+    "summed_amount_total": 15132.5,
+    "summed_retail_total": 30265,
+    "declared_units_total": 189,
+    "declared_amount_total": 30265,
+    "validation_thresholds": {
+      "min_units_ratio": 0.95,
+      "max_skipped_ratio": 0.1,
+      "max_qty_mismatch_ratio": 0.1,
+      "max_size_mismatch_ratio": 0.02,
+      "max_cost_ratio_deviation": 0.02,
+      "max_skipped_ratio_no_declared": 0.05
+    },
+    "summed_amount_total_effective": 12711.3
+  },
+  "matrices": [
+    {
+      "key": "707929-01L|Multi",
+      "action": "complete_existing",
+      "style_ref": "707929-01L",
+      "total_qty": 1,
+      "unit_cost": 127.5,
+      "color_code": "6000",
+      "description": "Nuluca Socks Prepack 6",
+      "retail_price": 255,
+      "po_quantities": {
+        "0365575": {
+          "OS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Multi",
+      "color_normalized": "Multi",
+      "reused_matrix_id": "29506",
+      "existing_variants": [
+        {
+          "size": "OS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140089",
+          "color_attr": "Multi-6000"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "OS",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707929-01L",
+      "override_category_id": "205",
+      "override_category_path": "Femme/Accessoires/Chaussette",
+      "effective_retail_price": 255,
+      "effective_unit_cost": 107.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707647-01L|Gray Morn",
+      "action": "complete_existing",
+      "style_ref": "707647-01L",
+      "total_qty": 5,
+      "unit_cost": 82.5,
+      "color_code": "0547",
+      "description": "Nusitas Shirt",
+      "retail_price": 165,
+      "po_quantities": {
+        "0365575": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Gray Morn",
+      "color_normalized": "Gray Morn",
+      "reused_matrix_id": "29507",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140090",
+          "color_attr": "Gray Morn-0547"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140091",
+          "color_attr": "Gray Morn-0547"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140092",
+          "color_attr": "Gray Morn-0547"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140093",
+          "color_attr": "Gray Morn-0547"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140094",
+          "color_attr": "Gray Morn-0547"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707647-01L",
+      "override_category_id": "228",
+      "override_category_path": "Femme/Blouses et chemises/Blouses et chemises avec col",
+      "effective_retail_price": 165,
+      "effective_unit_cost": 69.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707650-01L|Gray Morn",
+      "action": "complete_existing",
+      "style_ref": "707650-01L",
+      "total_qty": 2,
+      "unit_cost": 82.5,
+      "color_code": "0547",
+      "description": "Nusitta Skirt",
+      "retail_price": 165,
+      "po_quantities": {
+        "0365575": {
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Gray Morn",
+      "color_normalized": "Gray Morn",
+      "reused_matrix_id": "29508",
+      "existing_variants": [
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140095",
+          "color_attr": "Gray Morn-0547"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140096",
+          "color_attr": "Gray Morn-0547"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707650-01L",
+      "effective_retail_price": 165,
+      "effective_unit_cost": 69.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707654-01L|Bright White",
+      "action": "complete_existing",
+      "style_ref": "707654-01L",
+      "total_qty": 5,
+      "unit_cost": 82.5,
+      "color_code": "9000",
+      "description": "Nuabby Shirt",
+      "retail_price": 165,
+      "po_quantities": {
+        "0365575": {
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Bright White",
+      "color_normalized": "Bright White",
+      "reused_matrix_id": "29509",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140097",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140098",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140099",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140100",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140101",
+          "color_attr": "Bright White-9000"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707654-01L",
+      "effective_retail_price": 165,
+      "effective_unit_cost": 69.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707700-01L|Dianthus",
+      "action": "complete_existing",
+      "style_ref": "707700-01L",
+      "total_qty": 3,
+      "unit_cost": 97.5,
+      "color_code": "2737",
+      "description": "Nuadaline Skirt",
+      "retail_price": 195,
+      "po_quantities": {
+        "0365575": {
+          "36": 1,
+          "38": 1,
+          "40": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Dianthus",
+      "color_normalized": "Dianthus",
+      "reused_matrix_id": "29510",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140102",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140103",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140104",
+          "color_attr": "Dianthus-2737"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707700-01L",
+      "effective_retail_price": 195,
+      "effective_unit_cost": 81.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707701-01L|Sepia Tint",
+      "action": "complete_existing",
+      "style_ref": "707701-01L",
+      "total_qty": 5,
+      "unit_cost": 122.5,
+      "color_code": "5518",
+      "description": "Nuadaline Jacket",
+      "retail_price": 245,
+      "po_quantities": {
+        "0365575": {
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Sepia Tint",
+      "color_normalized": "Sepia Tint",
+      "reused_matrix_id": "29511",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140105",
+          "color_attr": "Sepia Tint-5518"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140106",
+          "color_attr": "Sepia Tint-5518"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140107",
+          "color_attr": "Sepia Tint-5518"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140108",
+          "color_attr": "Sepia Tint-5518"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140109",
+          "color_attr": "Sepia Tint-5518"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707701-01L",
+      "effective_retail_price": 245,
+      "effective_unit_cost": 102.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707731-01L|Dark Blue Denim",
+      "action": "complete_existing",
+      "style_ref": "707731-01L",
+      "total_qty": 4,
+      "unit_cost": 112.5,
+      "color_code": "3012",
+      "description": "Nualetta Dress",
+      "retail_price": 225,
+      "po_quantities": {
+        "0365575": {
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Dark Blue Denim",
+      "color_normalized": "Dark Blue Denim",
+      "reused_matrix_id": "29512",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140110",
+          "color_attr": "Dark Blue Denim-3012"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140111",
+          "color_attr": "Dark Blue Denim-3012"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140112",
+          "color_attr": "Dark Blue Denim-3012"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140113",
+          "color_attr": "Dark Blue Denim-3012"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707731-01L",
+      "effective_retail_price": 225,
+      "effective_unit_cost": 94.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707732-01L|Dark Blue Denim",
+      "action": "complete_existing",
+      "style_ref": "707732-01L",
+      "total_qty": 5,
+      "unit_cost": 87.5,
+      "color_code": "3012",
+      "description": "Nualetta Shirt",
+      "retail_price": 175,
+      "po_quantities": {
+        "0365575": {
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Dark Blue Denim",
+      "color_normalized": "Dark Blue Denim",
+      "reused_matrix_id": "29513",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140114",
+          "color_attr": "Dark Blue Denim-3012"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140115",
+          "color_attr": "Dark Blue Denim-3012"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140116",
+          "color_attr": "Dark Blue Denim-3012"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140117",
+          "color_attr": "Dark Blue Denim-3012"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140118",
+          "color_attr": "Dark Blue Denim-3012"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707732-01L",
+      "effective_retail_price": 175,
+      "effective_unit_cost": 73.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707760-01L|Blue Bell",
+      "action": "complete_existing",
+      "style_ref": "707760-01L",
+      "total_qty": 3,
+      "unit_cost": 137.5,
+      "color_code": "3092",
+      "description": "Nudicia Jacket",
+      "retail_price": 275,
+      "po_quantities": {
+        "0365575": {
+          "36": 1,
+          "38": 1,
+          "40": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Blue Bell",
+      "color_normalized": "Blue Bell",
+      "reused_matrix_id": "29514",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140119",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140120",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140121",
+          "color_attr": "Blue Bell-3092"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707760-01L",
+      "effective_retail_price": 275,
+      "effective_unit_cost": 115.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707773-01L|Light Blue Denim",
+      "action": "complete_existing",
+      "style_ref": "707773-01L",
+      "total_qty": 4,
+      "unit_cost": 97.5,
+      "color_code": "3010",
+      "description": "Nustockholm Shirt",
+      "retail_price": 195,
+      "po_quantities": {
+        "0365575": {
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Light Blue Denim",
+      "color_normalized": "Light Blue Denim",
+      "reused_matrix_id": "29515",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140122",
+          "color_attr": "Light Blue Denim-3010"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140123",
+          "color_attr": "Light Blue Denim-3010"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140124",
+          "color_attr": "Light Blue Denim-3010"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140125",
+          "color_attr": "Light Blue Denim-3010"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707773-01L",
+      "effective_retail_price": 195,
+      "effective_unit_cost": 81.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707800-01L|Blue Bell",
+      "action": "complete_existing",
+      "style_ref": "707800-01L",
+      "total_qty": 4,
+      "unit_cost": 67.5,
+      "color_code": "3092",
+      "description": "Nuasla Shirt",
+      "retail_price": 135,
+      "po_quantities": {
+        "0365575": {
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Blue Bell",
+      "color_normalized": "Blue Bell",
+      "reused_matrix_id": "29516",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140126",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140127",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140128",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140129",
+          "color_attr": "Blue Bell-3092"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707800-01L",
+      "effective_retail_price": 135,
+      "effective_unit_cost": 56.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707899-01L|Dianthus",
+      "action": "complete_existing",
+      "style_ref": "707899-01L",
+      "total_qty": 3,
+      "unit_cost": 77.5,
+      "color_code": "2737",
+      "description": "Nukitta Shirt",
+      "retail_price": 155,
+      "po_quantities": {
+        "0365575": {
+          "36": 1,
+          "38": 1,
+          "40": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Dianthus",
+      "color_normalized": "Dianthus",
+      "reused_matrix_id": "29517",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140130",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140131",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140132",
+          "color_attr": "Dianthus-2737"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707899-01L",
+      "effective_retail_price": 155,
+      "effective_unit_cost": 65.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "705367-01L|Dianthus",
+      "action": "complete_existing",
+      "style_ref": "705367-01L",
+      "total_qty": 6,
+      "unit_cost": 57.5,
+      "color_code": "2737",
+      "description": "Nufira T Shirt",
+      "retail_price": 115,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Dianthus",
+      "color_normalized": "Dianthus",
+      "reused_matrix_id": "29518",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140133",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140134",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140135",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140136",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140137",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140138",
+          "color_attr": "Dianthus-2737"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "705367-01L",
+      "effective_retail_price": 115,
+      "effective_unit_cost": 48.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "705367-01L|Blue Bell",
+      "action": "complete_existing",
+      "style_ref": "705367-01L",
+      "total_qty": 6,
+      "unit_cost": 57.5,
+      "color_code": "3092",
+      "description": "Nufira T Shirt",
+      "retail_price": 115,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Blue Bell",
+      "color_normalized": "Blue Bell",
+      "reused_matrix_id": "29518",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140133",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140134",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140135",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140136",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140137",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140138",
+          "color_attr": "Dianthus-2737"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "705367-01L",
+      "effective_retail_price": 115,
+      "effective_unit_cost": 48.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "705367-01L|Bright White",
+      "action": "complete_existing",
+      "style_ref": "705367-01L",
+      "total_qty": 6,
+      "unit_cost": 57.5,
+      "color_code": "9000",
+      "description": "Nufira T Shirt",
+      "retail_price": 115,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Bright White",
+      "color_normalized": "Bright White",
+      "reused_matrix_id": "29518",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140133",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140134",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140135",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140136",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140137",
+          "color_attr": "Dianthus-2737"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140138",
+          "color_attr": "Dianthus-2737"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "705367-01L",
+      "effective_retail_price": 115,
+      "effective_unit_cost": 48.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "706657-01L|Pristine",
+      "action": "complete_existing",
+      "style_ref": "706657-01L",
+      "total_qty": 6,
+      "unit_cost": 57.5,
+      "color_code": "9501",
+      "description": "Nudarlene Pullover",
+      "retail_price": 115,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Pristine",
+      "color_normalized": "Pristine",
+      "reused_matrix_id": "29521",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140151",
+          "color_attr": "Pristine-9501"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140152",
+          "color_attr": "Pristine-9501"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140153",
+          "color_attr": "Pristine-9501"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140154",
+          "color_attr": "Pristine-9501"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140155",
+          "color_attr": "Pristine-9501"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140156",
+          "color_attr": "Pristine-9501"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "706657-01L",
+      "effective_retail_price": 115,
+      "effective_unit_cost": 48.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707636-01L|Blue Bell",
+      "action": "complete_existing",
+      "style_ref": "707636-01L",
+      "total_qty": 3,
+      "unit_cost": 87.5,
+      "color_code": "3092",
+      "description": "Nuritti Pullover",
+      "retail_price": 175,
+      "po_quantities": {
+        "0365575": {
+          "36": 1,
+          "38": 1,
+          "40": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Blue Bell",
+      "color_normalized": "Blue Bell",
+      "reused_matrix_id": "29522",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140157",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140158",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140159",
+          "color_attr": "Blue Bell-3092"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707636-01L",
+      "effective_retail_price": 175,
+      "effective_unit_cost": 73.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707636-01L|Pristine",
+      "action": "complete_existing",
+      "style_ref": "707636-01L",
+      "total_qty": 5,
+      "unit_cost": 87.5,
+      "color_code": "9501",
+      "description": "Nuritti Pullover",
+      "retail_price": 175,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Pristine",
+      "color_normalized": "Pristine",
+      "reused_matrix_id": "29522",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140157",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140158",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140159",
+          "color_attr": "Blue Bell-3092"
+        }
+      ],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "707636-01L",
+      "effective_retail_price": 175,
+      "effective_unit_cost": 73.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707637-01L|Blue Bell",
+      "action": "complete_existing",
+      "style_ref": "707637-01L",
+      "total_qty": 6,
+      "unit_cost": 67.5,
+      "color_code": "3092",
+      "description": "Nucally Cardigan",
+      "retail_price": 135,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Blue Bell",
+      "color_normalized": "Blue Bell",
+      "reused_matrix_id": "29524",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140165",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140166",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140167",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140168",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140169",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140170",
+          "color_attr": "Blue Bell-3092"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707637-01L",
+      "effective_retail_price": 135,
+      "effective_unit_cost": 56.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707638-01L|Blue Bell",
+      "action": "complete_existing",
+      "style_ref": "707638-01L",
+      "total_qty": 6,
+      "unit_cost": 67.5,
+      "color_code": "3092",
+      "description": "Nucally Pullover",
+      "retail_price": 135,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Blue Bell",
+      "color_normalized": "Blue Bell",
+      "reused_matrix_id": "29525",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140171",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140172",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140173",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140174",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140175",
+          "color_attr": "Blue Bell-3092"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140176",
+          "color_attr": "Blue Bell-3092"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707638-01L",
+      "effective_retail_price": 135,
+      "effective_unit_cost": 56.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707739-01L|Nomad",
+      "action": "complete_existing",
+      "style_ref": "707739-01L",
+      "total_qty": 5,
+      "unit_cost": 77.5,
+      "color_code": "5729",
+      "description": "Nuvela Pullover",
+      "retail_price": 155,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Nomad",
+      "color_normalized": "Nomad",
+      "reused_matrix_id": "29526",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140177",
+          "color_attr": "Nomad-5729"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140178",
+          "color_attr": "Nomad-5729"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140179",
+          "color_attr": "Nomad-5729"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140180",
+          "color_attr": "Nomad-5729"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140181",
+          "color_attr": "Nomad-5729"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707739-01L",
+      "effective_retail_price": 155,
+      "effective_unit_cost": 65.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707742-01L|Nomad",
+      "action": "complete_existing",
+      "style_ref": "707742-01L",
+      "total_qty": 4,
+      "unit_cost": 77.5,
+      "color_code": "5729",
+      "description": "Nuvela Pants",
+      "retail_price": 155,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Nomad",
+      "color_normalized": "Nomad",
+      "reused_matrix_id": "29527",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140182",
+          "color_attr": "Nomad-5729"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140183",
+          "color_attr": "Nomad-5729"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140184",
+          "color_attr": "Nomad-5729"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140185",
+          "color_attr": "Nomad-5729"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707742-01L",
+      "effective_retail_price": 155,
+      "effective_unit_cost": 65.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707747-01L|Gray Morn",
+      "action": "complete_existing",
+      "style_ref": "707747-01L",
+      "total_qty": 5,
+      "unit_cost": 77.5,
+      "color_code": "0547",
+      "description": "Nulivana Pullover",
+      "retail_price": 155,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Gray Morn",
+      "color_normalized": "Gray Morn",
+      "reused_matrix_id": "29528",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140186",
+          "color_attr": "Gray Morn-0547"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140187",
+          "color_attr": "Gray Morn-0547"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140188",
+          "color_attr": "Gray Morn-0547"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140189",
+          "color_attr": "Gray Morn-0547"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140190",
+          "color_attr": "Gray Morn-0547"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707747-01L",
+      "effective_retail_price": 155,
+      "effective_unit_cost": 65.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707751-01L|Desert Taupe",
+      "action": "complete_existing",
+      "style_ref": "707751-01L",
+      "total_qty": 6,
+      "unit_cost": 92.5,
+      "color_code": "5728",
+      "description": "Nunola Cardigan",
+      "retail_price": 185,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Desert Taupe",
+      "color_normalized": "Desert Taupe",
+      "reused_matrix_id": "29529",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140191",
+          "color_attr": "Desert Taupe-5728"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140192",
+          "color_attr": "Desert Taupe-5728"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140193",
+          "color_attr": "Desert Taupe-5728"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140194",
+          "color_attr": "Desert Taupe-5728"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140195",
+          "color_attr": "Desert Taupe-5728"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140196",
+          "color_attr": "Desert Taupe-5728"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707751-01L",
+      "effective_retail_price": 185,
+      "effective_unit_cost": 77.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707774-01L|Pristine",
+      "action": "complete_existing",
+      "style_ref": "707774-01L",
+      "total_qty": 5,
+      "unit_cost": 67.5,
+      "color_code": "9501",
+      "description": "Numalani Pullover",
+      "retail_price": 135,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Pristine",
+      "color_normalized": "Pristine",
+      "reused_matrix_id": "29530",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140197",
+          "color_attr": "Pristine-9501"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140198",
+          "color_attr": "Pristine-9501"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140199",
+          "color_attr": "Pristine-9501"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140200",
+          "color_attr": "Pristine-9501"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140201",
+          "color_attr": "Pristine-9501"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707774-01L",
+      "effective_retail_price": 135,
+      "effective_unit_cost": 56.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707787-01L|Canary Yellow",
+      "action": "complete_existing",
+      "style_ref": "707787-01L",
+      "total_qty": 6,
+      "unit_cost": 97.5,
+      "color_code": "1048",
+      "description": "Nuriette Cardigan",
+      "retail_price": 195,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Canary Yellow",
+      "color_normalized": "Canary Yellow",
+      "reused_matrix_id": "29531",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140202",
+          "color_attr": "Canary Yellow-1048"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140203",
+          "color_attr": "Canary Yellow-1048"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140204",
+          "color_attr": "Canary Yellow-1048"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140205",
+          "color_attr": "Canary Yellow-1048"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140206",
+          "color_attr": "Canary Yellow-1048"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140207",
+          "color_attr": "Canary Yellow-1048"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707787-01L",
+      "effective_retail_price": 195,
+      "effective_unit_cost": 81.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707809-01L|Light Grey Mel",
+      "action": "complete_existing",
+      "style_ref": "707809-01L",
+      "total_qty": 6,
+      "unit_cost": 77.5,
+      "color_code": "0510",
+      "description": "Nuvelina Sweatshirt",
+      "retail_price": 155,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Light Grey Mel",
+      "color_normalized": "Light Grey Mel",
+      "reused_matrix_id": "29532",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140208",
+          "color_attr": "Light Grey Mel-0510"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140209",
+          "color_attr": "Light Grey Mel-0510"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140210",
+          "color_attr": "Light Grey Mel-0510"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140211",
+          "color_attr": "Light Grey Mel-0510"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140212",
+          "color_attr": "Light Grey Mel-0510"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140213",
+          "color_attr": "Light Grey Mel-0510"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707809-01L",
+      "effective_retail_price": 155,
+      "effective_unit_cost": 65.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707814-01L|Cloud Dancer",
+      "action": "complete_existing",
+      "style_ref": "707814-01L",
+      "total_qty": 5,
+      "unit_cost": 57.5,
+      "color_code": "9001",
+      "description": "Nucalira T Shirt",
+      "retail_price": 115,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Cloud Dancer",
+      "color_normalized": "Cloud Dancer",
+      "reused_matrix_id": "29533",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140214",
+          "color_attr": "Cloud Dancer-9001"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140215",
+          "color_attr": "Cloud Dancer-9001"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140216",
+          "color_attr": "Cloud Dancer-9001"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140217",
+          "color_attr": "Cloud Dancer-9001"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140218",
+          "color_attr": "Cloud Dancer-9001"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707814-01L",
+      "effective_retail_price": 115,
+      "effective_unit_cost": 48.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707819-01L|Caviar",
+      "action": "complete_existing",
+      "style_ref": "707819-01L",
+      "total_qty": 3,
+      "unit_cost": 47.5,
+      "color_code": "0000",
+      "description": "Nukirella Blouse",
+      "retail_price": 95,
+      "po_quantities": {
+        "0365575": {
+          "36": 1,
+          "38": 1,
+          "40": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Caviar",
+      "color_normalized": "Caviar",
+      "reused_matrix_id": "29534",
+      "existing_variants": [
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140219",
+          "color_attr": "Caviar-0000"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140220",
+          "color_attr": "Caviar-0000"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140221",
+          "color_attr": "Caviar-0000"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707819-01L",
+      "effective_retail_price": 95,
+      "effective_unit_cost": 39.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707825-01L|Cloud Dancer",
+      "action": "complete_existing",
+      "style_ref": "707825-01L",
+      "total_qty": 6,
+      "unit_cost": 57.5,
+      "color_code": "9001",
+      "description": "Nusolena T Shirt",
+      "retail_price": 115,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Cloud Dancer",
+      "color_normalized": "Cloud Dancer",
+      "reused_matrix_id": "29535",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140222",
+          "color_attr": "Cloud Dancer-9001"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140223",
+          "color_attr": "Cloud Dancer-9001"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140224",
+          "color_attr": "Cloud Dancer-9001"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140225",
+          "color_attr": "Cloud Dancer-9001"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140226",
+          "color_attr": "Cloud Dancer-9001"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140227",
+          "color_attr": "Cloud Dancer-9001"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707825-01L",
+      "effective_retail_price": 115,
+      "effective_unit_cost": 48.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707841-01L|Bright White",
+      "action": "complete_existing",
+      "style_ref": "707841-01L",
+      "total_qty": 6,
+      "unit_cost": 47.5,
+      "color_code": "9000",
+      "description": "Nueverly T Shirt",
+      "retail_price": 95,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Bright White",
+      "color_normalized": "Bright White",
+      "reused_matrix_id": "29536",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140228",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140229",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140230",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140231",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140232",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140233",
+          "color_attr": "Bright White-9000"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707841-01L",
+      "effective_retail_price": 95,
+      "effective_unit_cost": 39.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707851-01L|Salute",
+      "action": "complete_existing",
+      "style_ref": "707851-01L",
+      "total_qty": 6,
+      "unit_cost": 42.5,
+      "color_code": "3065",
+      "description": "Nujinka Blouse",
+      "retail_price": 85,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Salute",
+      "color_normalized": "Salute",
+      "reused_matrix_id": "29537",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140234",
+          "color_attr": "Salute-3065"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140235",
+          "color_attr": "Salute-3065"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140236",
+          "color_attr": "Salute-3065"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140237",
+          "color_attr": "Salute-3065"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140238",
+          "color_attr": "Salute-3065"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140239",
+          "color_attr": "Salute-3065"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707851-01L",
+      "effective_retail_price": 85,
+      "effective_unit_cost": 35.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707859-01L|Bright White",
+      "action": "complete_existing",
+      "style_ref": "707859-01L",
+      "total_qty": 5,
+      "unit_cost": 57.5,
+      "color_code": "9000",
+      "description": "Nuumba T Shirt",
+      "retail_price": 115,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Bright White",
+      "color_normalized": "Bright White",
+      "reused_matrix_id": "29538",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140240",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140241",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140242",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140243",
+          "color_attr": "Bright White-9000"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140244",
+          "color_attr": "Bright White-9000"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707859-01L",
+      "effective_retail_price": 115,
+      "effective_unit_cost": 48.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707865-01L|Canary Yellow",
+      "action": "complete_existing",
+      "style_ref": "707865-01L",
+      "total_qty": 6,
+      "unit_cost": 47.5,
+      "color_code": "1048",
+      "description": "Nukirella Top",
+      "retail_price": 95,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Canary Yellow",
+      "color_normalized": "Canary Yellow",
+      "reused_matrix_id": "29539",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140245",
+          "color_attr": "Canary Yellow-1048"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140246",
+          "color_attr": "Canary Yellow-1048"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140247",
+          "color_attr": "Canary Yellow-1048"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140248",
+          "color_attr": "Canary Yellow-1048"
+        },
+        {
+          "size": "XL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140249",
+          "color_attr": "Canary Yellow-1048"
+        },
+        {
+          "size": "XXL",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140250",
+          "color_attr": "Canary Yellow-1048"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707865-01L",
+      "effective_retail_price": 95,
+      "effective_unit_cost": 39.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707740-01L|Nomad",
+      "action": "complete_existing",
+      "style_ref": "707740-01L",
+      "total_qty": 4,
+      "unit_cost": 82.5,
+      "color_code": "5729",
+      "description": "Nuvela Cardigan",
+      "retail_price": 165,
+      "po_quantities": {
+        "0365575": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Nomad",
+      "color_normalized": "Nomad",
+      "reused_matrix_id": "29540",
+      "existing_variants": [
+        {
+          "size": "XS",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140251",
+          "color_attr": "Nomad-5729"
+        },
+        {
+          "size": "S",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140252",
+          "color_attr": "Nomad-5729"
+        },
+        {
+          "size": "M",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140253",
+          "color_attr": "Nomad-5729"
+        },
+        {
+          "size": "L",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140254",
+          "color_attr": "Nomad-5729"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707740-01L",
+      "effective_retail_price": 165,
+      "effective_unit_cost": 69.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707645-01L|Medium Blue Denim",
+      "action": "complete_existing",
+      "style_ref": "707645-01L",
+      "total_qty": 5,
+      "unit_cost": 97.5,
+      "color_code": "3013",
+      "description": "Nuseattle Jeans",
+      "retail_price": 195,
+      "po_quantities": {
+        "0365575": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Medium Blue Denim",
+      "color_normalized": "Medium Blue Denim",
+      "reused_matrix_id": "29541",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140255",
+          "color_attr": "Medium Blue Denim-3013"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140256",
+          "color_attr": "Medium Blue Denim-3013"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140257",
+          "color_attr": "Medium Blue Denim-3013"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140258",
+          "color_attr": "Medium Blue Denim-3013"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140259",
+          "color_attr": "Medium Blue Denim-3013"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707645-01L",
+      "effective_retail_price": 195,
+      "effective_unit_cost": 81.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707704-01L|Sepia Tint",
+      "action": "complete_existing",
+      "style_ref": "707704-01L",
+      "total_qty": 4,
+      "unit_cost": 107.5,
+      "color_code": "5518",
+      "description": "Nuadaline Pants",
+      "retail_price": 215,
+      "po_quantities": {
+        "0365575": {
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Sepia Tint",
+      "color_normalized": "Sepia Tint",
+      "reused_matrix_id": "29542",
+      "existing_variants": [
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140260",
+          "color_attr": "Sepia Tint-5518"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140261",
+          "color_attr": "Sepia Tint-5518"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140262",
+          "color_attr": "Sepia Tint-5518"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140263",
+          "color_attr": "Sepia Tint-5518"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707704-01L",
+      "effective_retail_price": 215,
+      "effective_unit_cost": 90.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707772-01L|Light Blue Denim",
+      "action": "complete_existing",
+      "style_ref": "707772-01L",
+      "total_qty": 4,
+      "unit_cost": 107.5,
+      "color_code": "3010",
+      "description": "Nustockholm Jeans",
+      "retail_price": 215,
+      "po_quantities": {
+        "0365575": {
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Light Blue Denim",
+      "color_normalized": "Light Blue Denim",
+      "reused_matrix_id": "29543",
+      "existing_variants": [
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140264",
+          "color_attr": "Light Blue Denim-3010"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140265",
+          "color_attr": "Light Blue Denim-3010"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140266",
+          "color_attr": "Light Blue Denim-3010"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140267",
+          "color_attr": "Light Blue Denim-3010"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707772-01L",
+      "effective_retail_price": 215,
+      "effective_unit_cost": 90.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "707876-01Z|Dark Blue Denim",
+      "action": "complete_existing",
+      "style_ref": "707876-01Z",
+      "total_qty": 4,
+      "unit_cost": 137.5,
+      "color_code": "3012",
+      "description": "Nuseville Jeans",
+      "retail_price": 275,
+      "po_quantities": {
+        "0365575": {
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Dark Blue Denim",
+      "color_normalized": "Dark Blue Denim",
+      "reused_matrix_id": "29544",
+      "existing_variants": [
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140268",
+          "color_attr": "Dark Blue Denim-3012"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140269",
+          "color_attr": "Dark Blue Denim-3012"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140270",
+          "color_attr": "Dark Blue Denim-3012"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140271",
+          "color_attr": "Dark Blue Denim-3012"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "707876-01Z",
+      "effective_retail_price": 275,
+      "effective_unit_cost": 115.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "706674-01Z|Light Blue Denim",
+      "action": "complete_existing",
+      "style_ref": "706674-01Z",
+      "total_qty": 6,
+      "unit_cost": 147.5,
+      "color_code": "3010",
+      "description": "Nupisa Jeans",
+      "retail_price": 295,
+      "po_quantities": {
+        "0365575": {
+          "34": 1,
+          "36": 1,
+          "38": 1,
+          "40": 1,
+          "42": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "0365575"
+      ],
+      "color_label_raw": "Light Blue Denim",
+      "color_normalized": "Light Blue Denim",
+      "reused_matrix_id": "29545",
+      "existing_variants": [
+        {
+          "size": "34",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140272",
+          "color_attr": "Light Blue Denim-3010"
+        },
+        {
+          "size": "36",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140273",
+          "color_attr": "Light Blue Denim-3010"
+        },
+        {
+          "size": "38",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140274",
+          "color_attr": "Light Blue Denim-3010"
+        },
+        {
+          "size": "40",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140275",
+          "color_attr": "Light Blue Denim-3010"
+        },
+        {
+          "size": "42",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140276",
+          "color_attr": "Light Blue Denim-3010"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p27"
+          ],
+          "itemID": "140277",
+          "color_attr": "Light Blue Denim-3010"
+        }
+      ],
+      "variants_to_create": [],
+      "variants_already_present": [
+        {
+          "size": "34",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "matrix_description_planned": "706674-01Z",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 123.9,
+      "margin_override_pct_applied": 58
+    }
+  ],
+  "warnings": [],
+  "season_tag": "p27",
+  "target_manufacturer": "Numph",
+  "margin_override_pct": 58,
+  "cached": true,
+  "extraction_source": "llm",
+  "preview_computed_at": "2026-08-08T01:42:08.131Z"
+}

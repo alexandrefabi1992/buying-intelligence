@@ -1,0 +1,11 @@
+{
+  "file_id": 26,
+  "source_filename": "TESTnumph1_lsliuj.pdf",
+  "manufacturer": "Numph",
+  "season_tag": "p27",
+  "destination_shop_id": "2",
+  "extraction_source": "llm",
+  "extracted_at": "2026-08-08T01:42:08.131Z",
+  "captured_at": "2026-08-10T03:37:19.757Z",
+  "notes": "Prepacks (Nuluca Socks Prepack 6 Multi) — fix appliqué au prompt post-extraction (commit 40eb0bd). Ce golden reflète l'état PRE-fix (units summed=194 alors que declared=189, différence de 5 dûe aux prepacks mal comptés)."
+}

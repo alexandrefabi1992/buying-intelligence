@@ -1,0 +1,12 @@
+{
+  "file_id": 32,
+  "source_filename": "SO00175577.pdf",
+  "manufacturer": "Brax",
+  "season_tag": "p27",
+  "destination_shop_id": "1",
+  "extraction_source": "llm",
+  "extracted_at": "2026-08-09T02:37:30.924Z",
+  "captured_at": "2026-08-10T03:37:44.462Z",
+  "notes": "Doit réutiliser les matrices 73214 BOZEN et 803650CHUCK 34 déjà créées par le push de Brax PL — action='complete_existing' avec reused_matrix_id sur ces 2 rows. ATTENTION : summary.incomplete=true au moment de la capture (code(s): size_mismatch_suspected). Le golden fige cet état — les fixes size_mismatch de la soirée n'ont pas résolu tous les cas.",
+  "incomplete_at_capture": true
+}

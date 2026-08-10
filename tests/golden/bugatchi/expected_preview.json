@@ -1,0 +1,1109 @@
+{
+  "file": {
+    "supplier_key": "bugatchi-socks",
+    "target_manufacturer": "Bugatchi"
+  },
+  "orders": [
+    {
+      "lines": [
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1006",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Navy"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1007",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1009",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Navy"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1014",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Steel"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1021",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Navy"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1022",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1023",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Navy"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1026",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Steel"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1027",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Navy"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1028",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Navy"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1033",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1033",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Navy"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1035",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Navy"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1037",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Steel"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1038",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Steel"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1042",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Air blue"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1049",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Stone"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1054",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Sand"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1057",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1061",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Navy"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1066",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Navy"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1077",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Navy"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1080",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1081",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Steel"
+        },
+        {
+          "qty": 3,
+          "size": "ONE",
+          "style_ref": "LB1082",
+          "unit_cost": 11.5,
+          "color_code": null,
+          "color_normalized": "Cobalt"
+        }
+      ],
+      "batch_id": 72,
+      "selected": true,
+      "last_page": null,
+      "po_number": "309037143",
+      "first_page": null,
+      "order_date": null,
+      "cancel_date": "2027-03-31T00:00:00.000Z",
+      "batch_status": "parsed",
+      "delivery_date": "2027-03-15T00:00:00.000Z",
+      "is_consignment": false,
+      "amount_declared": null,
+      "customer_reference": "VALERIE SIMON SS27",
+      "lightspeed_order_id": null,
+      "unit_count_declared": null
+    }
+  ],
+  "summary": {
+    "counters": {
+      "error": 0,
+      "create_new": 25,
+      "complete_existing": 0,
+      "create_with_suffix": 0
+    },
+    "incomplete": false,
+    "order_count": 1,
+    "units_match": false,
+    "matrix_count": 25,
+    "extraction_stats": {
+      "skipped": 0,
+      "attempted": 25,
+      "successful": 25,
+      "units_ratio": null,
+      "skipped_ratio": 0,
+      "qty_mismatched": 0,
+      "size_validation": null,
+      "qty_mismatch_ratio": 0
+    },
+    "variants_already": 0,
+    "summed_cost_total": 862.5,
+    "incomplete_reasons": [],
+    "summed_units_total": 75,
+    "variants_to_create": 25,
+    "summed_amount_total": 862.5,
+    "summed_retail_total": 0,
+    "declared_units_total": 0,
+    "declared_amount_total": 0,
+    "validation_thresholds": {
+      "min_units_ratio": 0.95,
+      "max_skipped_ratio": 0.1,
+      "max_qty_mismatch_ratio": 0.1,
+      "max_size_mismatch_ratio": 0.02,
+      "max_cost_ratio_deviation": 0.02,
+      "max_skipped_ratio_no_declared": 0.05
+    },
+    "summed_amount_total_effective": 862.5
+  },
+  "matrices": [
+    {
+      "key": "LB1006|Navy",
+      "action": "create_new",
+      "style_ref": "LB1006",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Navy",
+      "color_normalized": "Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1006",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1007|Black",
+      "action": "create_new",
+      "style_ref": "LB1007",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Black",
+      "color_normalized": "Black",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1007",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1009|Navy",
+      "action": "create_new",
+      "style_ref": "LB1009",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Navy",
+      "color_normalized": "Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1009",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1014|Steel",
+      "action": "create_new",
+      "style_ref": "LB1014",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Steel",
+      "color_normalized": "Steel",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1014",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1021|Navy",
+      "action": "create_new",
+      "style_ref": "LB1021",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Navy",
+      "color_normalized": "Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1021",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1022|Black",
+      "action": "create_new",
+      "style_ref": "LB1022",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Black",
+      "color_normalized": "Black",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1022",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1023|Navy",
+      "action": "create_new",
+      "style_ref": "LB1023",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Navy",
+      "color_normalized": "Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1023",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1026|Steel",
+      "action": "create_new",
+      "style_ref": "LB1026",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Steel",
+      "color_normalized": "Steel",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1026",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1027|Navy",
+      "action": "create_new",
+      "style_ref": "LB1027",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Navy",
+      "color_normalized": "Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1027",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1028|Navy",
+      "action": "create_new",
+      "style_ref": "LB1028",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Navy",
+      "color_normalized": "Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1028",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1033|Black",
+      "action": "create_new",
+      "style_ref": "LB1033",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Black",
+      "color_normalized": "Black",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1033",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1033|Navy",
+      "action": "create_new",
+      "style_ref": "LB1033",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Navy",
+      "color_normalized": "Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1033",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1035|Navy",
+      "action": "create_new",
+      "style_ref": "LB1035",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Navy",
+      "color_normalized": "Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1035",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1037|Steel",
+      "action": "create_new",
+      "style_ref": "LB1037",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Steel",
+      "color_normalized": "Steel",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1037",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1038|Steel",
+      "action": "create_new",
+      "style_ref": "LB1038",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Steel",
+      "color_normalized": "Steel",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1038",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1042|Air blue",
+      "action": "create_new",
+      "style_ref": "LB1042",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Air blue",
+      "color_normalized": "Air blue",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1042",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1049|Stone",
+      "action": "create_new",
+      "style_ref": "LB1049",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Stone",
+      "color_normalized": "Stone",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1049",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1054|Sand",
+      "action": "create_new",
+      "style_ref": "LB1054",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Sand",
+      "color_normalized": "Sand",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1054",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1057|Black",
+      "action": "create_new",
+      "style_ref": "LB1057",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Black",
+      "color_normalized": "Black",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1057",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1061|Navy",
+      "action": "create_new",
+      "style_ref": "LB1061",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Navy",
+      "color_normalized": "Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1061",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1066|Navy",
+      "action": "create_new",
+      "style_ref": "LB1066",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Navy",
+      "color_normalized": "Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1066",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1077|Navy",
+      "action": "create_new",
+      "style_ref": "LB1077",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Navy",
+      "color_normalized": "Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1077",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1080|Black",
+      "action": "create_new",
+      "style_ref": "LB1080",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Black",
+      "color_normalized": "Black",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1080",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1081|Steel",
+      "action": "create_new",
+      "style_ref": "LB1081",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Steel",
+      "color_normalized": "Steel",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1081",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "LB1082|Cobalt",
+      "action": "create_new",
+      "style_ref": "LB1082",
+      "total_qty": 3,
+      "unit_cost": 11.5,
+      "color_code": null,
+      "description": "",
+      "retail_price": null,
+      "po_quantities": {
+        "309037143": {
+          "ONE": 3
+        }
+      },
+      "pos_referenced": [
+        "309037143"
+      ],
+      "color_label_raw": "Cobalt",
+      "color_normalized": "Cobalt",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "ONE",
+          "qty_across_pos": 3
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "LB1082",
+      "effective_retail_price": null,
+      "effective_unit_cost": 11.5,
+      "margin_override_pct_applied": null
+    }
+  ],
+  "warnings": [
+    {
+      "code": "units_mismatch_parser_vs_declared",
+      "context": {
+        "summed": 75,
+        "declared": 0
+      },
+      "message": "parser summed 75 units but PDF declares 0"
+    }
+  ],
+  "season_tag": "p27",
+  "target_manufacturer": "Bugatchi",
+  "margin_override_pct": null,
+  "cached": true,
+  "extraction_source": "recipe",
+  "preview_computed_at": "2026-08-10T03:45:58.498Z"
+}

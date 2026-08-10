@@ -1,0 +1,3633 @@
+{
+  "file": {
+    "supplier_key": "unknown",
+    "customer_name": null,
+    "default_vendor_id": null,
+    "target_manufacturer": "liujo",
+    "default_attribute_set_id": "5"
+  },
+  "orders": [
+    {
+      "lines": [
+        {
+          "qty": 1,
+          "size": "1",
+          "style_ref": "TA7204_T942A",
+          "unit_cost": 107.1,
+          "color_code": "L9729",
+          "color_normalized": "Sienna"
+        },
+        {
+          "qty": 1,
+          "size": "1",
+          "style_ref": "TA7205_T942A",
+          "unit_cost": 123.9,
+          "color_code": "T9991",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "1",
+          "style_ref": "TA7208_T546A",
+          "unit_cost": 115.5,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "1",
+          "style_ref": "TA7208_T942A",
+          "unit_cost": 107.1,
+          "color_code": "ST9991",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7038_MS49I",
+          "unit_cost": 111.3,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7038_MS49I",
+          "unit_cost": 111.3,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7038_MS49I",
+          "unit_cost": 111.3,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7038_MS49I",
+          "unit_cost": 111.3,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7038_MS49I",
+          "unit_cost": 111.3,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7085_J1627L",
+          "unit_cost": 119.7,
+          "color_code": "L9831",
+          "color_normalized": "Quartz"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7085_J1627L",
+          "unit_cost": 119.7,
+          "color_code": "L9831",
+          "color_normalized": "Quartz"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7085_J1627L",
+          "unit_cost": 119.7,
+          "color_code": "L9831",
+          "color_normalized": "Quartz"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7085_J1627L",
+          "unit_cost": 119.7,
+          "color_code": "L9831",
+          "color_normalized": "Quartz"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7085_J1627L",
+          "unit_cost": 119.7,
+          "color_code": "L9831",
+          "color_normalized": "Quartz"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7086_J1627L",
+          "unit_cost": 94.5,
+          "color_code": "SL9832",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7086_J1627L",
+          "unit_cost": 94.5,
+          "color_code": "SL9832",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7086_J1627L",
+          "unit_cost": 94.5,
+          "color_code": "SL9832",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7086_J1627L",
+          "unit_cost": 94.5,
+          "color_code": "SL9832",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7086_J1627L",
+          "unit_cost": 94.5,
+          "color_code": "SL9832",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7089_J1627L",
+          "unit_cost": 107.1,
+          "color_code": "71510",
+          "color_normalized": "Quartz"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7089_J1627L",
+          "unit_cost": 107.1,
+          "color_code": "71510",
+          "color_normalized": "Quartz"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7089_J1627L",
+          "unit_cost": 107.1,
+          "color_code": "71510",
+          "color_normalized": "Quartz"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7089_J1627L",
+          "unit_cost": 107.1,
+          "color_code": "71510",
+          "color_normalized": "Quartz"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7106_MA84S",
+          "unit_cost": 136.5,
+          "color_code": "D3143",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7106_MA84S",
+          "unit_cost": 136.5,
+          "color_code": "D3143",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7106_MA84S",
+          "unit_cost": 136.5,
+          "color_code": "D3143",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7108_MA84S",
+          "unit_cost": 102.9,
+          "color_code": "D3143",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7108_MA84S",
+          "unit_cost": 102.9,
+          "color_code": "D3143",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7108_MA84S",
+          "unit_cost": 102.9,
+          "color_code": "D3143",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "1",
+          "style_ref": "TA7139_T972A",
+          "unit_cost": 241.5,
+          "color_code": "71510",
+          "color_normalized": "Quartz"
+        },
+        {
+          "qty": 1,
+          "size": "2",
+          "style_ref": "TA7139_T972A",
+          "unit_cost": 241.5,
+          "color_code": "71510",
+          "color_normalized": "Quartz"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7157_MS63L",
+          "unit_cost": 136.5,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7157_MS63L",
+          "unit_cost": 136.5,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7157_MS63L",
+          "unit_cost": 136.5,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7157_MS63L",
+          "unit_cost": 136.5,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7157_MS63L",
+          "unit_cost": 136.5,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7183_T941A",
+          "unit_cost": 119.7,
+          "color_code": "81763",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7183_T941A",
+          "unit_cost": 119.7,
+          "color_code": "81763",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7183_T941A",
+          "unit_cost": 119.7,
+          "color_code": "81763",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7183_T941A",
+          "unit_cost": 119.7,
+          "color_code": "81763",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7185_J1632L",
+          "unit_cost": 136.5,
+          "color_code": "22222",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7185_J1632L",
+          "unit_cost": 136.5,
+          "color_code": "22222",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7185_J1632L",
+          "unit_cost": 136.5,
+          "color_code": "22222",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "XXS",
+          "style_ref": "TA7186_T941A",
+          "unit_cost": 220.5,
+          "color_code": "22222",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7186_T941A",
+          "unit_cost": 220.5,
+          "color_code": "22222",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7186_T941A",
+          "unit_cost": 220.5,
+          "color_code": "22222",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7186_T941A",
+          "unit_cost": 220.5,
+          "color_code": "22222",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7186_T941A",
+          "unit_cost": 220.5,
+          "color_code": "22222",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7186_T941A",
+          "unit_cost": 220.5,
+          "color_code": "22222",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7190_JS923L",
+          "unit_cost": 60.9,
+          "color_code": "K9030",
+          "color_normalized": "Rosa Ant"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7190_JS923L",
+          "unit_cost": 60.9,
+          "color_code": "K9030",
+          "color_normalized": "Rosa Ant"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7190_JS923L",
+          "unit_cost": 60.9,
+          "color_code": "K9030",
+          "color_normalized": "Rosa Ant"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7190_JS923L",
+          "unit_cost": 60.9,
+          "color_code": "K9030",
+          "color_normalized": "Rosa Ant"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7190_JS923L",
+          "unit_cost": 60.9,
+          "color_code": "K9030",
+          "color_normalized": "Rosa Ant"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7194_JS923L",
+          "unit_cost": 90.3,
+          "color_code": "L9823",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7194_JS923L",
+          "unit_cost": 90.3,
+          "color_code": "L9823",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7194_JS923L",
+          "unit_cost": 90.3,
+          "color_code": "L9823",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7194_JS923L",
+          "unit_cost": 90.3,
+          "color_code": "L9823",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7194_JS923L",
+          "unit_cost": 90.3,
+          "color_code": "L9823",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7221_MS63L",
+          "unit_cost": 81.9,
+          "color_code": "A4417",
+          "color_normalized": "Rosa Ant"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7221_MS63L",
+          "unit_cost": 81.9,
+          "color_code": "A4417",
+          "color_normalized": "Rosa Ant"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7221_MS63L",
+          "unit_cost": 81.9,
+          "color_code": "A4417",
+          "color_normalized": "Rosa Ant"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7221_MS63L",
+          "unit_cost": 81.9,
+          "color_code": "A4417",
+          "color_normalized": "Rosa Ant"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7221_MS63L",
+          "unit_cost": 81.9,
+          "color_code": "A4417",
+          "color_normalized": "Rosa Ant"
+        },
+        {
+          "qty": 1,
+          "size": "1",
+          "style_ref": "TA7226_MS056L",
+          "unit_cost": 94.5,
+          "color_code": "03N61",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "2",
+          "style_ref": "TA7226_MS056L",
+          "unit_cost": 94.5,
+          "color_code": "03N61",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7229_MS056L",
+          "unit_cost": 136.5,
+          "color_code": "03N61",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7229_MS056L",
+          "unit_cost": 136.5,
+          "color_code": "03N61",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7229_MS056L",
+          "unit_cost": 136.5,
+          "color_code": "03N61",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7229_MS056L",
+          "unit_cost": 136.5,
+          "color_code": "03N61",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7229_MS056L",
+          "unit_cost": 136.5,
+          "color_code": "03N61",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7233_JS182L",
+          "unit_cost": 94.5,
+          "color_code": "L9891",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7233_JS182L",
+          "unit_cost": 94.5,
+          "color_code": "L9891",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7233_JS182L",
+          "unit_cost": 94.5,
+          "color_code": "L9891",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7233_JS182L",
+          "unit_cost": 94.5,
+          "color_code": "L9891",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7233_JS182L",
+          "unit_cost": 94.5,
+          "color_code": "L9891",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7238_T941A",
+          "unit_cost": 165.9,
+          "color_code": "D3143",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7238_T941A",
+          "unit_cost": 165.9,
+          "color_code": "D3143",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7238_T941A",
+          "unit_cost": 165.9,
+          "color_code": "D3143",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7238_T941A",
+          "unit_cost": 165.9,
+          "color_code": "D3143",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7238_T941A",
+          "unit_cost": 165.9,
+          "color_code": "D3143",
+          "color_normalized": "Fuoco"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7244_T063B",
+          "unit_cost": 144.9,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7244_T063B",
+          "unit_cost": 144.9,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7244_T063B",
+          "unit_cost": 144.9,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7244_T063B",
+          "unit_cost": 144.9,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7244_T063B",
+          "unit_cost": 144.9,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7247_T004B",
+          "unit_cost": 94.5,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7247_T004B",
+          "unit_cost": 94.5,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7247_T004B",
+          "unit_cost": 94.5,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7247_T004B",
+          "unit_cost": 94.5,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7247_T004B",
+          "unit_cost": 94.5,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7249_T004B",
+          "unit_cost": 144.9,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7249_T004B",
+          "unit_cost": 144.9,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7249_T004B",
+          "unit_cost": 144.9,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7249_T004B",
+          "unit_cost": 144.9,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7249_T004B",
+          "unit_cost": 144.9,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7250_T004B",
+          "unit_cost": 178.5,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7250_T004B",
+          "unit_cost": 178.5,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7250_T004B",
+          "unit_cost": 178.5,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7250_T004B",
+          "unit_cost": 178.5,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7250_T004B",
+          "unit_cost": 178.5,
+          "color_code": "Z9601",
+          "color_normalized": "Natural"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7258_JS923L",
+          "unit_cost": 73.5,
+          "color_code": "L9864",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7258_JS923L",
+          "unit_cost": 73.5,
+          "color_code": "L9864",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7258_JS923L",
+          "unit_cost": 73.5,
+          "color_code": "L9864",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7258_JS923L",
+          "unit_cost": 73.5,
+          "color_code": "L9864",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7258_JS923L",
+          "unit_cost": 73.5,
+          "color_code": "L9864",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7259_JS923L",
+          "unit_cost": 77.7,
+          "color_code": "L9837",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7259_JS923L",
+          "unit_cost": 77.7,
+          "color_code": "L9837",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7259_JS923L",
+          "unit_cost": 77.7,
+          "color_code": "L9837",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7259_JS923L",
+          "unit_cost": 77.7,
+          "color_code": "L9837",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7259_JS923L",
+          "unit_cost": 77.7,
+          "color_code": "L9837",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7282_T039A",
+          "unit_cost": 136.5,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7282_T039A",
+          "unit_cost": 136.5,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7282_T039A",
+          "unit_cost": 136.5,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7282_T039A",
+          "unit_cost": 136.5,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7282_T039A",
+          "unit_cost": 136.5,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7283_T039A",
+          "unit_cost": 140.7,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7283_T039A",
+          "unit_cost": 140.7,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7283_T039A",
+          "unit_cost": 140.7,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7284_T039A",
+          "unit_cost": 178.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7284_T039A",
+          "unit_cost": 178.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7284_T039A",
+          "unit_cost": 178.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7284_T039A",
+          "unit_cost": 178.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7284_T039A",
+          "unit_cost": 178.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7287_T039A",
+          "unit_cost": 136.5,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7287_T039A",
+          "unit_cost": 136.5,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7287_T039A",
+          "unit_cost": 136.5,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7287_T039A",
+          "unit_cost": 136.5,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7290_TS922L",
+          "unit_cost": 123.9,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7290_TS922L",
+          "unit_cost": 123.9,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7290_TS922L",
+          "unit_cost": 123.9,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7290_TS922L",
+          "unit_cost": 123.9,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7290_TS922L",
+          "unit_cost": 123.9,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7291_TS922L",
+          "unit_cost": 157.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7291_TS922L",
+          "unit_cost": 157.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7291_TS922L",
+          "unit_cost": 157.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7291_TS922L",
+          "unit_cost": 157.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7291_TS922L",
+          "unit_cost": 157.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7292_J3855L",
+          "unit_cost": 144.9,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7292_J3855L",
+          "unit_cost": 144.9,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7292_J3855L",
+          "unit_cost": 144.9,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7292_J3855L",
+          "unit_cost": 144.9,
+          "color_code": "70115",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7294_J3855L",
+          "unit_cost": 81.9,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7294_J3855L",
+          "unit_cost": 81.9,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7294_J3855L",
+          "unit_cost": 81.9,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "XXS",
+          "style_ref": "TA7295_MS55N",
+          "unit_cost": 149.1,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7295_MS55N",
+          "unit_cost": 149.1,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7295_MS55N",
+          "unit_cost": 149.1,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7295_MS55N",
+          "unit_cost": 149.1,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7295_MS55N",
+          "unit_cost": 149.1,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7295_MS55N",
+          "unit_cost": 149.1,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7296_MS55N",
+          "unit_cost": 136.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7296_MS55N",
+          "unit_cost": 136.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7296_MS55N",
+          "unit_cost": 136.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7296_MS55N",
+          "unit_cost": 136.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7296_MS55N",
+          "unit_cost": 136.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7297_MS55N",
+          "unit_cost": 136.5,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7297_MS55N",
+          "unit_cost": 136.5,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7297_MS55N",
+          "unit_cost": 136.5,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7297_MS55N",
+          "unit_cost": 136.5,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7297_MS55N",
+          "unit_cost": 136.5,
+          "color_code": "L9900",
+          "color_normalized": "Tarragon"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7300_JS923L",
+          "unit_cost": 52.5,
+          "color_code": "L9854",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7300_JS923L",
+          "unit_cost": 52.5,
+          "color_code": "L9854",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7300_JS923L",
+          "unit_cost": 52.5,
+          "color_code": "L9854",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7300_JS923L",
+          "unit_cost": 52.5,
+          "color_code": "L9854",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7300_JS923L",
+          "unit_cost": 52.5,
+          "color_code": "L9854",
+          "color_normalized": "Nero"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7300_JS923L",
+          "unit_cost": 52.5,
+          "color_code": "L9975",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7300_JS923L",
+          "unit_cost": 52.5,
+          "color_code": "L9975",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7300_JS923L",
+          "unit_cost": 52.5,
+          "color_code": "L9975",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7300_JS923L",
+          "unit_cost": 52.5,
+          "color_code": "L9975",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7300_JS923L",
+          "unit_cost": 52.5,
+          "color_code": "L9975",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7312_JS923L",
+          "unit_cost": 73.5,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7312_JS923L",
+          "unit_cost": 73.5,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7312_JS923L",
+          "unit_cost": 73.5,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7312_JS923L",
+          "unit_cost": 73.5,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7312_JS923L",
+          "unit_cost": 73.5,
+          "color_code": "10602",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XS",
+          "style_ref": "TA7316_J3855L",
+          "unit_cost": 136.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TA7316_J3855L",
+          "unit_cost": 136.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TA7316_J3855L",
+          "unit_cost": 136.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TA7316_J3855L",
+          "unit_cost": 136.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TA7316_J3855L",
+          "unit_cost": 136.5,
+          "color_code": "L9850",
+          "color_normalized": "Snow White"
+        }
+      ],
+      "batch_id": null,
+      "selected": true,
+      "po_number": "0365563",
+      "order_date": "2026-06-30",
+      "cancel_date": "2027-04-30",
+      "batch_status": null,
+      "delivery_date": "2026-12-01",
+      "is_consignment": false,
+      "amount_declared": 52675,
+      "customer_reference": "LSLIUJ",
+      "lightspeed_order_id": null,
+      "unit_count_declared": 181
+    }
+  ],
+  "summary": {
+    "counters": {
+      "error": 0,
+      "create_new": 43,
+      "complete_existing": 0,
+      "create_with_suffix": 0
+    },
+    "incomplete": false,
+    "order_count": 1,
+    "units_match": true,
+    "matrix_count": 43,
+    "extraction_stats": {
+      "skipped": 0,
+      "attempted": 43,
+      "successful": 43,
+      "units_ratio": 1,
+      "skipped_ratio": 0,
+      "qty_mismatched": 0,
+      "size_validation": {
+        "suspected": [],
+        "considered": 0,
+        "headers_found": 9
+      },
+      "qty_mismatch_ratio": 0
+    },
+    "variants_already": 0,
+    "incomplete_reasons": [],
+    "summed_units_total": 181,
+    "variants_to_create": 181,
+    "declared_units_total": 181,
+    "declared_amount_total": 52675,
+    "validation_thresholds": {
+      "min_units_ratio": 0.95,
+      "max_skipped_ratio": 0.1,
+      "max_qty_mismatch_ratio": 0.1,
+      "max_size_mismatch_ratio": 0.02,
+      "max_skipped_ratio_no_declared": 0.05
+    },
+    "summed_amount_total_effective": 22123.5
+  },
+  "matrices": [
+    {
+      "key": "TA7204_T942A|Sienna",
+      "action": "create_new",
+      "style_ref": "TA7204_T942A",
+      "total_qty": 1,
+      "unit_cost": 107.1,
+      "color_code": "L9729",
+      "description": "Bag Camouflage",
+      "retail_price": 255,
+      "po_quantities": {
+        "0365563": {
+          "1": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Sienna",
+      "color_normalized": "Sienna",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "1",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7204_T942A",
+      "effective_retail_price": 255,
+      "effective_unit_cost": 107.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7205_T942A|Nero",
+      "action": "create_new",
+      "style_ref": "TA7205_T942A",
+      "total_qty": 1,
+      "unit_cost": 123.9,
+      "color_code": "T9991",
+      "description": "Bag Nero Camouflage",
+      "retail_price": 295,
+      "po_quantities": {
+        "0365563": {
+          "1": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Nero",
+      "color_normalized": "Nero",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "1",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7205_T942A",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 123.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7208_T546A|Natural",
+      "action": "create_new",
+      "style_ref": "TA7208_T546A",
+      "total_qty": 1,
+      "unit_cost": 115.5,
+      "color_code": "Z9601",
+      "description": "Bag Animalier",
+      "retail_price": 275,
+      "po_quantities": {
+        "0365563": {
+          "1": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Natural",
+      "color_normalized": "Natural",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "1",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7208_T546A",
+      "effective_retail_price": 275,
+      "effective_unit_cost": 115.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7208_T942A|Nero",
+      "action": "create_new",
+      "style_ref": "TA7208_T942A",
+      "total_qty": 1,
+      "unit_cost": 107.1,
+      "color_code": "ST9991",
+      "description": "Bag Nero Camouflage",
+      "retail_price": 255,
+      "po_quantities": {
+        "0365563": {
+          "1": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Nero",
+      "color_normalized": "Nero",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "1",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7208_T942A",
+      "effective_retail_price": 255,
+      "effective_unit_cost": 107.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7038_MS49I|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7038_MS49I",
+      "total_qty": 5,
+      "unit_cost": 111.3,
+      "color_code": "10602",
+      "description": "Sweater",
+      "retail_price": 265,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7038_MS49I",
+      "effective_retail_price": 265,
+      "effective_unit_cost": 111.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7085_J1627L|Quartz",
+      "action": "create_new",
+      "style_ref": "TA7085_J1627L",
+      "total_qty": 5,
+      "unit_cost": 119.7,
+      "color_code": "L9831",
+      "description": "Sweatshirt Quartz Bow",
+      "retail_price": 285,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Quartz",
+      "color_normalized": "Quartz",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7085_J1627L",
+      "effective_retail_price": 285,
+      "effective_unit_cost": 119.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7086_J1627L|Fuoco",
+      "action": "create_new",
+      "style_ref": "TA7086_J1627L",
+      "total_qty": 5,
+      "unit_cost": 94.5,
+      "color_code": "SL9832",
+      "description": "Sweatshirt Fuoco Bow",
+      "retail_price": 225,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Fuoco",
+      "color_normalized": "Fuoco",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7086_J1627L",
+      "effective_retail_price": 225,
+      "effective_unit_cost": 94.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7089_J1627L|Quartz",
+      "action": "create_new",
+      "style_ref": "TA7089_J1627L",
+      "total_qty": 4,
+      "unit_cost": 107.1,
+      "color_code": "71510",
+      "description": "Pant Quartz",
+      "retail_price": 255,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Quartz",
+      "color_normalized": "Quartz",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7089_J1627L",
+      "effective_retail_price": 255,
+      "effective_unit_cost": 107.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7106_MA84S|Fuoco",
+      "action": "create_new",
+      "style_ref": "TA7106_MA84S",
+      "total_qty": 3,
+      "unit_cost": 136.5,
+      "color_code": "D3143",
+      "description": "Skirt Fuoco Sn White",
+      "retail_price": 325,
+      "po_quantities": {
+        "0365563": {
+          "M": 1,
+          "S": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Fuoco",
+      "color_normalized": "Fuoco",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7106_MA84S",
+      "effective_retail_price": 325,
+      "effective_unit_cost": 136.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7108_MA84S|Fuoco",
+      "action": "create_new",
+      "style_ref": "TA7108_MA84S",
+      "total_qty": 3,
+      "unit_cost": 102.9,
+      "color_code": "D3143",
+      "description": "Sweater Fuoco Sn White",
+      "retail_price": 245,
+      "po_quantities": {
+        "0365563": {
+          "M": 1,
+          "S": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Fuoco",
+      "color_normalized": "Fuoco",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7108_MA84S",
+      "effective_retail_price": 245,
+      "effective_unit_cost": 102.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7139_T972A|Quartz",
+      "action": "create_new",
+      "style_ref": "TA7139_T972A",
+      "total_qty": 2,
+      "unit_cost": 241.5,
+      "color_code": "71510",
+      "description": "Coat Quartz",
+      "retail_price": 575,
+      "po_quantities": {
+        "0365563": {
+          "1": 1,
+          "2": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Quartz",
+      "color_normalized": "Quartz",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "1",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "2",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7139_T972A",
+      "effective_retail_price": 575,
+      "effective_unit_cost": 241.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7157_MS63L|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7157_MS63L",
+      "total_qty": 5,
+      "unit_cost": 136.5,
+      "color_code": "10602",
+      "description": "Sweater",
+      "retail_price": 325,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7157_MS63L",
+      "effective_retail_price": 325,
+      "effective_unit_cost": 136.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7183_T941A|Fuoco",
+      "action": "create_new",
+      "style_ref": "TA7183_T941A",
+      "total_qty": 4,
+      "unit_cost": 119.7,
+      "color_code": "81763",
+      "description": "Pant Fuoco",
+      "retail_price": 285,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Fuoco",
+      "color_normalized": "Fuoco",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7183_T941A",
+      "effective_retail_price": 285,
+      "effective_unit_cost": 119.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7185_J1632L|Nero",
+      "action": "create_new",
+      "style_ref": "TA7185_J1632L",
+      "total_qty": 3,
+      "unit_cost": 136.5,
+      "color_code": "22222",
+      "description": "Skirt Nero",
+      "retail_price": 325,
+      "po_quantities": {
+        "0365563": {
+          "M": 1,
+          "S": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Nero",
+      "color_normalized": "Nero",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7185_J1632L",
+      "effective_retail_price": 325,
+      "effective_unit_cost": 136.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7186_T941A|Nero",
+      "action": "create_new",
+      "style_ref": "TA7186_T941A",
+      "total_qty": 6,
+      "unit_cost": 220.5,
+      "color_code": "22222",
+      "description": "Short Coat Nero",
+      "retail_price": 525,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Nero",
+      "color_normalized": "Nero",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XXS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7186_T941A",
+      "effective_retail_price": 525,
+      "effective_unit_cost": 220.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7190_JS923L|Rosa Ant",
+      "action": "create_new",
+      "style_ref": "TA7190_JS923L",
+      "total_qty": 5,
+      "unit_cost": 60.9,
+      "color_code": "K9030",
+      "description": "T Shirt Rosa Ant Borch Camou",
+      "retail_price": 145,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Rosa Ant",
+      "color_normalized": "Rosa Ant",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7190_JS923L",
+      "effective_retail_price": 145,
+      "effective_unit_cost": 60.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7194_JS923L|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7194_JS923L",
+      "total_qty": 5,
+      "unit_cost": 90.3,
+      "color_code": "L9823",
+      "description": "T Shirt Sn White Lace",
+      "retail_price": 215,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7194_JS923L",
+      "effective_retail_price": 215,
+      "effective_unit_cost": 90.3,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7221_MS63L|Rosa Ant",
+      "action": "create_new",
+      "style_ref": "TA7221_MS63L",
+      "total_qty": 5,
+      "unit_cost": 81.9,
+      "color_code": "A4417",
+      "description": "Sweater Rosa Ant Scuro Met",
+      "retail_price": 195,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Rosa Ant",
+      "color_normalized": "Rosa Ant",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7221_MS63L",
+      "effective_retail_price": 195,
+      "effective_unit_cost": 81.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7226_MS056L|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7226_MS056L",
+      "total_qty": 2,
+      "unit_cost": 94.5,
+      "color_code": "03N61",
+      "description": "Sweater Snow White Fuoco",
+      "retail_price": 225,
+      "po_quantities": {
+        "0365563": {
+          "1": 1,
+          "2": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "1",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "2",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7226_MS056L",
+      "effective_retail_price": 225,
+      "effective_unit_cost": 94.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7229_MS056L|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7229_MS056L",
+      "total_qty": 5,
+      "unit_cost": 136.5,
+      "color_code": "03N61",
+      "description": "Sweater Snow White Fuoco",
+      "retail_price": 325,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7229_MS056L",
+      "effective_retail_price": 325,
+      "effective_unit_cost": 136.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7233_JS182L|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7233_JS182L",
+      "total_qty": 5,
+      "unit_cost": 94.5,
+      "color_code": "L9891",
+      "description": "Sweatshirt Sn Wh Circ Liujo Eye",
+      "retail_price": 225,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7233_JS182L",
+      "effective_retail_price": 225,
+      "effective_unit_cost": 94.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7238_T941A|Fuoco",
+      "action": "create_new",
+      "style_ref": "TA7238_T941A",
+      "total_qty": 5,
+      "unit_cost": 165.9,
+      "color_code": "D3143",
+      "description": "Coat Fuoco Sn White",
+      "retail_price": 395,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Fuoco",
+      "color_normalized": "Fuoco",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7238_T941A",
+      "effective_retail_price": 395,
+      "effective_unit_cost": 165.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7244_T063B|Natural",
+      "action": "create_new",
+      "style_ref": "TA7244_T063B",
+      "total_qty": 5,
+      "unit_cost": 144.9,
+      "color_code": "Z9601",
+      "description": "Jacket Animalier",
+      "retail_price": 345,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Natural",
+      "color_normalized": "Natural",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7244_T063B",
+      "effective_retail_price": 345,
+      "effective_unit_cost": 144.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7247_T004B|Natural",
+      "action": "create_new",
+      "style_ref": "TA7247_T004B",
+      "total_qty": 5,
+      "unit_cost": 94.5,
+      "color_code": "Z9601",
+      "description": "Tank Top Animalier",
+      "retail_price": 225,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Natural",
+      "color_normalized": "Natural",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7247_T004B",
+      "effective_retail_price": 225,
+      "effective_unit_cost": 94.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7249_T004B|Natural",
+      "action": "create_new",
+      "style_ref": "TA7249_T004B",
+      "total_qty": 5,
+      "unit_cost": 144.9,
+      "color_code": "Z9601",
+      "description": "Pant Animalier",
+      "retail_price": 345,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Natural",
+      "color_normalized": "Natural",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7249_T004B",
+      "effective_retail_price": 345,
+      "effective_unit_cost": 144.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7250_T004B|Natural",
+      "action": "create_new",
+      "style_ref": "TA7250_T004B",
+      "total_qty": 5,
+      "unit_cost": 178.5,
+      "color_code": "Z9601",
+      "description": "Dress Animalier",
+      "retail_price": 425,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Natural",
+      "color_normalized": "Natural",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7250_T004B",
+      "effective_retail_price": 425,
+      "effective_unit_cost": 178.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7258_JS923L|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7258_JS923L",
+      "total_qty": 5,
+      "unit_cost": 73.5,
+      "color_code": "L9864",
+      "description": "T Shirt Sn White Lines",
+      "retail_price": 175,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7258_JS923L",
+      "effective_retail_price": 175,
+      "effective_unit_cost": 73.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7259_JS923L|Nero",
+      "action": "create_new",
+      "style_ref": "TA7259_JS923L",
+      "total_qty": 5,
+      "unit_cost": 77.7,
+      "color_code": "L9837",
+      "description": "T Shirt Nero Fiocco",
+      "retail_price": 185,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Nero",
+      "color_normalized": "Nero",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7259_JS923L",
+      "effective_retail_price": 185,
+      "effective_unit_cost": 77.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7282_T039A|Tarragon",
+      "action": "create_new",
+      "style_ref": "TA7282_T039A",
+      "total_qty": 5,
+      "unit_cost": 136.5,
+      "color_code": "70115",
+      "description": "Blouse Tarragon",
+      "retail_price": 325,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Tarragon",
+      "color_normalized": "Tarragon",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7282_T039A",
+      "effective_retail_price": 325,
+      "effective_unit_cost": 136.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7283_T039A|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7283_T039A",
+      "total_qty": 3,
+      "unit_cost": 140.7,
+      "color_code": "L9850",
+      "description": "Pant Sn White Tarragon",
+      "retail_price": 335,
+      "po_quantities": {
+        "0365563": {
+          "M": 1,
+          "S": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7283_T039A",
+      "effective_retail_price": 335,
+      "effective_unit_cost": 140.7,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7284_T039A|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7284_T039A",
+      "total_qty": 5,
+      "unit_cost": 178.5,
+      "color_code": "L9850",
+      "description": "Dress Sn White Tarragon",
+      "retail_price": 425,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7284_T039A",
+      "effective_retail_price": 425,
+      "effective_unit_cost": 178.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7287_T039A|Tarragon",
+      "action": "create_new",
+      "style_ref": "TA7287_T039A",
+      "total_qty": 4,
+      "unit_cost": 136.5,
+      "color_code": "70115",
+      "description": "Dress Tarragon",
+      "retail_price": 325,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Tarragon",
+      "color_normalized": "Tarragon",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7287_T039A",
+      "effective_retail_price": 325,
+      "effective_unit_cost": 136.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7290_TS922L|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7290_TS922L",
+      "total_qty": 5,
+      "unit_cost": 123.9,
+      "color_code": "10602",
+      "description": "Jacket Snow White",
+      "retail_price": 295,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7290_TS922L",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 123.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7291_TS922L|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7291_TS922L",
+      "total_qty": 5,
+      "unit_cost": 157.5,
+      "color_code": "L9850",
+      "description": "Dress Sn White Tarragon",
+      "retail_price": 375,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7291_TS922L",
+      "effective_retail_price": 375,
+      "effective_unit_cost": 157.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7292_J3855L|Tarragon",
+      "action": "create_new",
+      "style_ref": "TA7292_J3855L",
+      "total_qty": 4,
+      "unit_cost": 144.9,
+      "color_code": "70115",
+      "description": "Sweatshirt Tarragon",
+      "retail_price": 345,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Tarragon",
+      "color_normalized": "Tarragon",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7292_J3855L",
+      "effective_retail_price": 345,
+      "effective_unit_cost": 144.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7294_J3855L|Tarragon",
+      "action": "create_new",
+      "style_ref": "TA7294_J3855L",
+      "total_qty": 3,
+      "unit_cost": 81.9,
+      "color_code": "L9900",
+      "description": "Pant Tarragon Sn White",
+      "retail_price": 195,
+      "po_quantities": {
+        "0365563": {
+          "M": 1,
+          "S": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Tarragon",
+      "color_normalized": "Tarragon",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7294_J3855L",
+      "effective_retail_price": 195,
+      "effective_unit_cost": 81.9,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7295_MS55N|Tarragon",
+      "action": "create_new",
+      "style_ref": "TA7295_MS55N",
+      "total_qty": 6,
+      "unit_cost": 149.1,
+      "color_code": "L9900",
+      "description": "Knit Tarragon Sn White",
+      "retail_price": 355,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1,
+          "XXS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Tarragon",
+      "color_normalized": "Tarragon",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XXS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7295_MS55N",
+      "effective_retail_price": 355,
+      "effective_unit_cost": 149.1,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7296_MS55N|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7296_MS55N",
+      "total_qty": 5,
+      "unit_cost": 136.5,
+      "color_code": "L9850",
+      "description": "Sweater Sn White Tarragon",
+      "retail_price": 325,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7296_MS55N",
+      "effective_retail_price": 325,
+      "effective_unit_cost": 136.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7297_MS55N|Tarragon",
+      "action": "create_new",
+      "style_ref": "TA7297_MS55N",
+      "total_qty": 5,
+      "unit_cost": 136.5,
+      "color_code": "L9900",
+      "description": "Skirt Tarragon Sn White",
+      "retail_price": 325,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Tarragon",
+      "color_normalized": "Tarragon",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7297_MS55N",
+      "effective_retail_price": 325,
+      "effective_unit_cost": 136.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7300_JS923L|Nero",
+      "action": "create_new",
+      "style_ref": "TA7300_JS923L",
+      "total_qty": 5,
+      "unit_cost": 52.5,
+      "color_code": "L9854",
+      "description": "T Shirt Nero Bollo Lj",
+      "retail_price": 125,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Nero",
+      "color_normalized": "Nero",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7300_JS923L",
+      "effective_retail_price": 125,
+      "effective_unit_cost": 52.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7300_JS923L|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7300_JS923L",
+      "total_qty": 5,
+      "unit_cost": 52.5,
+      "color_code": "L9975",
+      "description": "T Shirt Snow White Bollo Lj",
+      "retail_price": 125,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7300_JS923L",
+      "effective_retail_price": 125,
+      "effective_unit_cost": 52.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7312_JS923L|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7312_JS923L",
+      "total_qty": 5,
+      "unit_cost": 73.5,
+      "color_code": "10602",
+      "description": "T Shirt Snow White",
+      "retail_price": 175,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7312_JS923L",
+      "effective_retail_price": 175,
+      "effective_unit_cost": 73.5,
+      "margin_override_pct_applied": 58
+    },
+    {
+      "key": "TA7316_J3855L|Snow White",
+      "action": "create_new",
+      "style_ref": "TA7316_J3855L",
+      "total_qty": 5,
+      "unit_cost": 136.5,
+      "color_code": "L9850",
+      "description": "Sweatshirt Sn White Tarragon",
+      "retail_price": 325,
+      "po_quantities": {
+        "0365563": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1,
+          "XS": 1
+        }
+      },
+      "pos_referenced": [
+        "0365563"
+      ],
+      "color_label_raw": "Snow White",
+      "color_normalized": "Snow White",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "XS",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TA7316_J3855L",
+      "effective_retail_price": 325,
+      "effective_unit_cost": 136.5,
+      "margin_override_pct_applied": 58
+    }
+  ],
+  "warnings": [],
+  "season_tag": "p27",
+  "target_manufacturer": "liujo",
+  "margin_override_pct": 58,
+  "cached": true,
+  "extraction_source": "llm",
+  "preview_computed_at": "2026-08-07T03:54:10.208Z"
+}

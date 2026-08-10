@@ -1,0 +1,11 @@
+{
+  "file_id": 37,
+  "source_filename": "Boutique in - A2 - 2 SUR 2.pdf",
+  "manufacturer": "Des Petits Hauts",
+  "season_tag": "a26",
+  "destination_shop_id": "2",
+  "extraction_source": "llm",
+  "extracted_at": "2026-08-10T03:46:31.584Z",
+  "captured_at": "2026-08-10T03:48:44.842Z",
+  "notes": "Extrait AVEC les fixes DPH commit 7bbe198 (header T0/T1/T2/T3 ABOVE row prioritaire). Sur ce PO les tailles sortent normalisées en N1..N6 (convention DPH). Aucune matrice PAULA sur ce PO (PAULA est en fait chez Marc Cain). L'assertion PAULA est skip-si-absent : elle vérifie uniquement color_normalized non-null par matrice."
+}

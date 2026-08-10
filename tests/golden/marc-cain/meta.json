@@ -1,0 +1,11 @@
+{
+  "file_id": 34,
+  "source_filename": "Draft Order MD01925.pdf",
+  "manufacturer": "Marc Cain",
+  "season_tag": "a26",
+  "destination_shop_id": "1",
+  "extraction_source": "llm",
+  "extracted_at": "2026-08-10T03:45:55.336Z",
+  "captured_at": "2026-08-10T03:48:40.414Z",
+  "notes": "Format Marc Cain avec colonne `N` (préfixe article) — vérifier qu'aucune variant.size ne commence par 'N', et que style_ref est bien épuré. Note : PAULA (size=OS) est dans ce PDF Marc Cain, pas DPH."
+}

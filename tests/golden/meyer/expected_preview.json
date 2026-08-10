@@ -1,0 +1,1548 @@
+{
+  "file": {
+    "supplier_key": "unknown",
+    "customer_name": null,
+    "default_vendor_id": null,
+    "target_manufacturer": "Meyer",
+    "default_attribute_set_id": "5"
+  },
+  "orders": [
+    {
+      "lines": [
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "58",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "60",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "32",
+          "color_normalized": "32"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "32",
+          "color_normalized": "32"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "32",
+          "color_normalized": "32"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "32",
+          "color_normalized": "32"
+        },
+        {
+          "qty": 1,
+          "size": "58",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "32",
+          "color_normalized": "32"
+        },
+        {
+          "qty": 1,
+          "size": "60",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "32",
+          "color_normalized": "32"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "33",
+          "color_normalized": "33"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "33",
+          "color_normalized": "33"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "33",
+          "color_normalized": "33"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "33",
+          "color_normalized": "33"
+        },
+        {
+          "qty": 1,
+          "size": "58",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "33",
+          "color_normalized": "33"
+        },
+        {
+          "qty": 1,
+          "size": "60",
+          "style_ref": "2-3615",
+          "unit_cost": 117.18,
+          "color_code": "33",
+          "color_normalized": "33"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "07",
+          "color_normalized": "07"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "07",
+          "color_normalized": "07"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "07",
+          "color_normalized": "07"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "07",
+          "color_normalized": "07"
+        },
+        {
+          "qty": 1,
+          "size": "58",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "07",
+          "color_normalized": "07"
+        },
+        {
+          "qty": 1,
+          "size": "60",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "07",
+          "color_normalized": "07"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "58",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "60",
+          "style_ref": "2-5628",
+          "unit_cost": 117.18,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "2-390",
+          "unit_cost": 173.91,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "2-390",
+          "unit_cost": 173.91,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "2-390",
+          "unit_cost": 173.91,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "2-390",
+          "unit_cost": 173.91,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "58",
+          "style_ref": "2-390",
+          "unit_cost": 173.91,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "2-390",
+          "unit_cost": 173.91,
+          "color_code": "33",
+          "color_normalized": "33"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "2-390",
+          "unit_cost": 173.91,
+          "color_code": "33",
+          "color_normalized": "33"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "2-390",
+          "unit_cost": 173.91,
+          "color_code": "33",
+          "color_normalized": "33"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "2-390",
+          "unit_cost": 173.91,
+          "color_code": "33",
+          "color_normalized": "33"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "58",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "60",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "19",
+          "color_normalized": "19"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "20",
+          "color_normalized": "20"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "20",
+          "color_normalized": "20"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "20",
+          "color_normalized": "20"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "20",
+          "color_normalized": "20"
+        },
+        {
+          "qty": 1,
+          "size": "58",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "20",
+          "color_normalized": "20"
+        },
+        {
+          "qty": 1,
+          "size": "60",
+          "style_ref": "9-629",
+          "unit_cost": 106.02,
+          "color_code": "20",
+          "color_normalized": "20"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "2-4556",
+          "unit_cost": 120.9,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "2-4556",
+          "unit_cost": 120.9,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "2-4556",
+          "unit_cost": 120.9,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "2-4556",
+          "unit_cost": 120.9,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "58",
+          "style_ref": "2-4556",
+          "unit_cost": 120.9,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "60",
+          "style_ref": "2-4556",
+          "unit_cost": 120.9,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "2-4595",
+          "unit_cost": 131.13,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "2-4595",
+          "unit_cost": 131.13,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "2-4595",
+          "unit_cost": 131.13,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "2-4595",
+          "unit_cost": 131.13,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "58",
+          "style_ref": "2-4595",
+          "unit_cost": 131.13,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "60",
+          "style_ref": "2-4595",
+          "unit_cost": 131.13,
+          "color_code": "17",
+          "color_normalized": "17"
+        },
+        {
+          "qty": 1,
+          "size": "32/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "18",
+          "color_normalized": "18"
+        },
+        {
+          "qty": 1,
+          "size": "33/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "18",
+          "color_normalized": "18"
+        },
+        {
+          "qty": 1,
+          "size": "34/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "18",
+          "color_normalized": "18"
+        },
+        {
+          "qty": 1,
+          "size": "35/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "18",
+          "color_normalized": "18"
+        },
+        {
+          "qty": 1,
+          "size": "36/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "18",
+          "color_normalized": "18"
+        },
+        {
+          "qty": 1,
+          "size": "38/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "18",
+          "color_normalized": "18"
+        },
+        {
+          "qty": 1,
+          "size": "32/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "33/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "34/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "35/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "36/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "38/32",
+          "style_ref": "2-6598",
+          "unit_cost": 112.53,
+          "color_code": "34",
+          "color_normalized": "34"
+        },
+        {
+          "qty": 1,
+          "size": "32/32",
+          "style_ref": "2-6510",
+          "unit_cost": 106.95,
+          "color_code": "18",
+          "color_normalized": "18"
+        },
+        {
+          "qty": 1,
+          "size": "33/32",
+          "style_ref": "2-6510",
+          "unit_cost": 106.95,
+          "color_code": "18",
+          "color_normalized": "18"
+        },
+        {
+          "qty": 1,
+          "size": "34/32",
+          "style_ref": "2-6510",
+          "unit_cost": 106.95,
+          "color_code": "18",
+          "color_normalized": "18"
+        },
+        {
+          "qty": 1,
+          "size": "35/32",
+          "style_ref": "2-6510",
+          "unit_cost": 106.95,
+          "color_code": "18",
+          "color_normalized": "18"
+        },
+        {
+          "qty": 1,
+          "size": "36/32",
+          "style_ref": "2-6510",
+          "unit_cost": 106.95,
+          "color_code": "18",
+          "color_normalized": "18"
+        },
+        {
+          "qty": 1,
+          "size": "38/32",
+          "style_ref": "2-6510",
+          "unit_cost": 106.95,
+          "color_code": "18",
+          "color_normalized": "18"
+        }
+      ],
+      "batch_id": null,
+      "selected": true,
+      "po_number": "VO040844",
+      "order_date": "2026-02-08",
+      "cancel_date": null,
+      "batch_status": null,
+      "delivery_date": "2026-07-01",
+      "is_consignment": false,
+      "amount_declared": 9857.07,
+      "customer_reference": "63101777",
+      "lightspeed_order_id": null,
+      "unit_count_declared": 81
+    }
+  ],
+  "summary": {
+    "counters": {
+      "error": 0,
+      "create_new": 13,
+      "complete_existing": 1,
+      "create_with_suffix": 0
+    },
+    "incomplete": false,
+    "order_count": 1,
+    "units_match": true,
+    "matrix_count": 14,
+    "extraction_stats": {
+      "skipped": 0,
+      "attempted": 14,
+      "successful": 14,
+      "units_ratio": 1,
+      "skipped_ratio": 0,
+      "qty_mismatched": 0,
+      "size_validation": {
+        "suspected": [],
+        "considered": 0,
+        "headers_found": 0
+      },
+      "qty_mismatch_ratio": 0
+    },
+    "variants_already": 0,
+    "summed_cost_total": 9857.07,
+    "incomplete_reasons": [],
+    "summed_units_total": 81,
+    "variants_to_create": 81,
+    "summed_amount_total": 9857.07,
+    "summed_retail_total": 0,
+    "declared_units_total": 81,
+    "declared_amount_total": 9857.07,
+    "validation_thresholds": {
+      "min_units_ratio": 0.95,
+      "max_skipped_ratio": 0.1,
+      "max_qty_mismatch_ratio": 0.1,
+      "max_size_mismatch_ratio": 0.02,
+      "max_cost_ratio_deviation": 0.02,
+      "max_skipped_ratio_no_declared": 0.05
+    },
+    "summed_amount_total_effective": 9857.07
+  },
+  "matrices": [
+    {
+      "key": "2-3615|19",
+      "action": "create_new",
+      "style_ref": "2-3615",
+      "total_qty": 6,
+      "unit_cost": 117.18,
+      "color_code": "19",
+      "description": "BONN",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1,
+          "58": 1,
+          "60": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "19",
+      "color_normalized": "19",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "58",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "60",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-3615",
+      "effective_retail_price": null,
+      "effective_unit_cost": 117.18,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "2-3615|32",
+      "action": "create_new",
+      "style_ref": "2-3615",
+      "total_qty": 6,
+      "unit_cost": 117.18,
+      "color_code": "32",
+      "description": "BONN",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1,
+          "58": 1,
+          "60": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "32",
+      "color_normalized": "32",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "58",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "60",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-3615",
+      "effective_retail_price": null,
+      "effective_unit_cost": 117.18,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "2-3615|33",
+      "action": "create_new",
+      "style_ref": "2-3615",
+      "total_qty": 6,
+      "unit_cost": 117.18,
+      "color_code": "33",
+      "description": "BONN",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1,
+          "58": 1,
+          "60": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "33",
+      "color_normalized": "33",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "58",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "60",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-3615",
+      "effective_retail_price": null,
+      "effective_unit_cost": 117.18,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "2-5628|07",
+      "action": "create_new",
+      "style_ref": "2-5628",
+      "total_qty": 6,
+      "unit_cost": 117.18,
+      "color_code": "07",
+      "description": "ROMA",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1,
+          "58": 1,
+          "60": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "07",
+      "color_normalized": "07",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "58",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "60",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-5628",
+      "effective_retail_price": null,
+      "effective_unit_cost": 117.18,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "2-5628|34",
+      "action": "create_new",
+      "style_ref": "2-5628",
+      "total_qty": 6,
+      "unit_cost": 117.18,
+      "color_code": "34",
+      "description": "ROMA",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1,
+          "58": 1,
+          "60": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "34",
+      "color_normalized": "34",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "58",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "60",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-5628",
+      "effective_retail_price": null,
+      "effective_unit_cost": 117.18,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "2-390|17",
+      "action": "create_new",
+      "style_ref": "2-390",
+      "total_qty": 5,
+      "unit_cost": 173.91,
+      "color_code": "17",
+      "description": "ROMA",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1,
+          "58": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "17",
+      "color_normalized": "17",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "58",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-390",
+      "effective_retail_price": null,
+      "effective_unit_cost": 173.91,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "2-390|33",
+      "action": "create_new",
+      "style_ref": "2-390",
+      "total_qty": 4,
+      "unit_cost": 173.91,
+      "color_code": "33",
+      "description": "ROMA",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "33",
+      "color_normalized": "33",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-390",
+      "effective_retail_price": null,
+      "effective_unit_cost": 173.91,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "9-629|19",
+      "action": "create_new",
+      "style_ref": "9-629",
+      "total_qty": 6,
+      "unit_cost": 106.02,
+      "color_code": "19",
+      "description": "ROMA",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1,
+          "58": 1,
+          "60": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "19",
+      "color_normalized": "19",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "58",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "60",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "9-629",
+      "effective_retail_price": null,
+      "effective_unit_cost": 106.02,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "9-629|20",
+      "action": "create_new",
+      "style_ref": "9-629",
+      "total_qty": 6,
+      "unit_cost": 106.02,
+      "color_code": "20",
+      "description": "ROMA",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1,
+          "58": 1,
+          "60": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "20",
+      "color_normalized": "20",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "58",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "60",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "9-629",
+      "effective_retail_price": null,
+      "effective_unit_cost": 106.02,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "2-4556|17",
+      "action": "complete_existing",
+      "style_ref": "2-4556",
+      "total_qty": 6,
+      "unit_cost": 120.9,
+      "color_code": "17",
+      "description": "DUBLIN",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1,
+          "58": 1,
+          "60": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "17",
+      "color_normalized": "17",
+      "reused_matrix_id": "27228",
+      "existing_variants": [
+        {
+          "size": "42",
+          "tags": [
+            "p26",
+            "btq",
+            "nos",
+            "add"
+          ],
+          "itemID": "128136",
+          "color_attr": "bleu"
+        },
+        {
+          "size": "44",
+          "tags": [
+            "p26",
+            "btq",
+            "nos",
+            "add"
+          ],
+          "itemID": "128137",
+          "color_attr": "bleu"
+        }
+      ],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "58",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "60",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-4556 dublin",
+      "effective_retail_price": null,
+      "effective_unit_cost": 120.9,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "2-4595|17",
+      "action": "create_new",
+      "style_ref": "2-4595",
+      "total_qty": 6,
+      "unit_cost": 131.13,
+      "color_code": "17",
+      "description": "DUBLIN",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1,
+          "58": 1,
+          "60": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "17",
+      "color_normalized": "17",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "58",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "60",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-4595",
+      "effective_retail_price": null,
+      "effective_unit_cost": 131.13,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "2-6598|18",
+      "action": "create_new",
+      "style_ref": "2-6598",
+      "total_qty": 6,
+      "unit_cost": 112.53,
+      "color_code": "18",
+      "description": "MOVE",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "32/32": 1,
+          "33/32": 1,
+          "34/32": 1,
+          "35/32": 1,
+          "36/32": 1,
+          "38/32": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "18",
+      "color_normalized": "18",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38/32",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-6598",
+      "effective_retail_price": null,
+      "effective_unit_cost": 112.53,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "2-6598|34",
+      "action": "create_new",
+      "style_ref": "2-6598",
+      "total_qty": 6,
+      "unit_cost": 112.53,
+      "color_code": "34",
+      "description": "MOVE",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "32/32": 1,
+          "33/32": 1,
+          "34/32": 1,
+          "35/32": 1,
+          "36/32": 1,
+          "38/32": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "34",
+      "color_normalized": "34",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38/32",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-6598",
+      "effective_retail_price": null,
+      "effective_unit_cost": 112.53,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "2-6510|18",
+      "action": "create_new",
+      "style_ref": "2-6510",
+      "total_qty": 6,
+      "unit_cost": 106.95,
+      "color_code": "18",
+      "description": "MOVE",
+      "retail_price": null,
+      "po_quantities": {
+        "VO040844": {
+          "32/32": 1,
+          "33/32": 1,
+          "34/32": 1,
+          "35/32": 1,
+          "36/32": 1,
+          "38/32": 1
+        }
+      },
+      "pos_referenced": [
+        "VO040844"
+      ],
+      "color_label_raw": "18",
+      "color_normalized": "18",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "32/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "33/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "34/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "35/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "36/32",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "38/32",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "2-6510",
+      "effective_retail_price": null,
+      "effective_unit_cost": 106.95,
+      "margin_override_pct_applied": null
+    }
+  ],
+  "warnings": [],
+  "season_tag": "p26",
+  "target_manufacturer": "Meyer",
+  "margin_override_pct": null,
+  "cached": true,
+  "extraction_source": "llm",
+  "preview_computed_at": "2026-08-10T02:45:31.237Z"
+}

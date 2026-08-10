@@ -1,0 +1,11 @@
+{
+  "file_id": 27,
+  "source_filename": "Order MARCOLIANI.pdf",
+  "manufacturer": "Marcoliani",
+  "season_tag": "p27",
+  "destination_shop_id": "8",
+  "extraction_source": "llm",
+  "extracted_at": "2026-08-08T02:07:28.397Z",
+  "captured_at": "2026-08-10T03:37:28.306Z",
+  "notes": "PDF sans retail_price — comptable via multiplicateur retail. Accessoires (chaussettes) devraient router à attribute_set 7 (single-attr couleur) au push."
+}

@@ -1,0 +1,1773 @@
+{
+  "file": {
+    "supplier_key": "unknown",
+    "customer_name": null,
+    "default_vendor_id": null,
+    "target_manufacturer": "Fradi",
+    "default_attribute_set_id": "5"
+  },
+  "orders": [
+    {
+      "lines": [
+        {
+          "qty": 1,
+          "size": "39",
+          "style_ref": "CN6841CF680_C2",
+          "unit_cost": 170,
+          "color_code": "77-Bordeaux",
+          "color_normalized": "Bordeaux"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "CN6841CF680_C2",
+          "unit_cost": 170,
+          "color_code": "77-Bordeaux",
+          "color_normalized": "Bordeaux"
+        },
+        {
+          "qty": 1,
+          "size": "41",
+          "style_ref": "CN6841CF680_C2",
+          "unit_cost": 170,
+          "color_code": "77-Bordeaux",
+          "color_normalized": "Bordeaux"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "CN6841CF680_C2",
+          "unit_cost": 170,
+          "color_code": "77-Bordeaux",
+          "color_normalized": "Bordeaux"
+        },
+        {
+          "qty": 1,
+          "size": "43",
+          "style_ref": "CN6841CF680_C2",
+          "unit_cost": 170,
+          "color_code": "77-Bordeaux",
+          "color_normalized": "Bordeaux"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "CN6841CF680_C2",
+          "unit_cost": 170,
+          "color_code": "77-Bordeaux",
+          "color_normalized": "Bordeaux"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "WN6106MP610",
+          "unit_cost": 130,
+          "color_code": "572-Burgundy",
+          "color_normalized": "Burgundy"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "WN6106MP610",
+          "unit_cost": 130,
+          "color_code": "572-Burgundy",
+          "color_normalized": "Burgundy"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "WN6106MP610",
+          "unit_cost": 130,
+          "color_code": "572-Burgundy",
+          "color_normalized": "Burgundy"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "WN7105MP730_W",
+          "unit_cost": 134,
+          "color_code": "177-Denim",
+          "color_normalized": "Denim"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "WN7105MP730_W",
+          "unit_cost": 134,
+          "color_code": "177-Denim",
+          "color_normalized": "Denim"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "WN7105MP730_W",
+          "unit_cost": 134,
+          "color_code": "177-Denim",
+          "color_normalized": "Denim"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "WN7105MP730_W",
+          "unit_cost": 134,
+          "color_code": "177-Denim",
+          "color_normalized": "Denim"
+        },
+        {
+          "qty": 2,
+          "size": "OS",
+          "style_ref": "WS6208CAP9030",
+          "unit_cost": 118,
+          "color_code": "189-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 2,
+          "size": "OS",
+          "style_ref": "WS6208CAP9030",
+          "unit_cost": 118,
+          "color_code": "198-Blue Navy",
+          "color_normalized": "Blue Navy"
+        },
+        {
+          "qty": 1,
+          "size": "39",
+          "style_ref": "CN6918CLT503_SM",
+          "unit_cost": 106,
+          "color_code": "89-Stone Medium",
+          "color_normalized": "Stone Medium"
+        },
+        {
+          "qty": 1,
+          "size": "40",
+          "style_ref": "CN6918CLT503_SM",
+          "unit_cost": 106,
+          "color_code": "89-Stone Medium",
+          "color_normalized": "Stone Medium"
+        },
+        {
+          "qty": 1,
+          "size": "41",
+          "style_ref": "CN6918CLT503_SM",
+          "unit_cost": 106,
+          "color_code": "89-Stone Medium",
+          "color_normalized": "Stone Medium"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "CN6918CLT503_SM",
+          "unit_cost": 106,
+          "color_code": "89-Stone Medium",
+          "color_normalized": "Stone Medium"
+        },
+        {
+          "qty": 1,
+          "size": "43",
+          "style_ref": "CN6918CLT503_SM",
+          "unit_cost": 106,
+          "color_code": "89-Stone Medium",
+          "color_normalized": "Stone Medium"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "CN6918CLT503_SM",
+          "unit_cost": 106,
+          "color_code": "89-Stone Medium",
+          "color_normalized": "Stone Medium"
+        },
+        {
+          "qty": 1,
+          "size": "48",
+          "style_ref": "TN5477GAVIN",
+          "unit_cost": 614,
+          "color_code": "701-Beige",
+          "color_normalized": "Beige"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "TN5477GAVIN",
+          "unit_cost": 614,
+          "color_code": "701-Beige",
+          "color_normalized": "Beige"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "TN5477GAVIN",
+          "unit_cost": 614,
+          "color_code": "701-Beige",
+          "color_normalized": "Beige"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "TN5477GAVIN",
+          "unit_cost": 614,
+          "color_code": "701-Beige",
+          "color_normalized": "Beige"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "TN5477GAVIN",
+          "unit_cost": 614,
+          "color_code": "701-Beige",
+          "color_normalized": "Beige"
+        },
+        {
+          "qty": 1,
+          "size": "48",
+          "style_ref": "TN5477GAVIN",
+          "unit_cost": 614,
+          "color_code": "703-Blue Navy",
+          "color_normalized": "Blue Navy"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "TN5477GAVIN",
+          "unit_cost": 614,
+          "color_code": "703-Blue Navy",
+          "color_normalized": "Blue Navy"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "TN5477GAVIN",
+          "unit_cost": 614,
+          "color_code": "703-Blue Navy",
+          "color_normalized": "Blue Navy"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "TN5477GAVIN",
+          "unit_cost": 614,
+          "color_code": "703-Blue Navy",
+          "color_normalized": "Blue Navy"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "TN5477GAVIN",
+          "unit_cost": 614,
+          "color_code": "703-Blue Navy",
+          "color_normalized": "Blue Navy"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "WN6235KSB1107",
+          "unit_cost": 340,
+          "color_code": "227-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "WN6235KSB1107",
+          "unit_cost": 340,
+          "color_code": "227-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "WN6235KSB1107",
+          "unit_cost": 340,
+          "color_code": "227-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "WN6234MC615_M",
+          "unit_cost": 164,
+          "color_code": "181-Denim/Milk",
+          "color_normalized": "Denim/Milk"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "WN6234MC615_M",
+          "unit_cost": 164,
+          "color_code": "181-Denim/Milk",
+          "color_normalized": "Denim/Milk"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "WN6234MC615_M",
+          "unit_cost": 164,
+          "color_code": "181-Denim/Milk",
+          "color_normalized": "Denim/Milk"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "WN6234MD612_M",
+          "unit_cost": 144,
+          "color_code": "183-Burgundy/Grey",
+          "color_normalized": "Burgundy/Grey"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "WN6234MD612_M",
+          "unit_cost": 144,
+          "color_code": "183-Burgundy/Grey",
+          "color_normalized": "Burgundy/Grey"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "WN6234MD612_M",
+          "unit_cost": 144,
+          "color_code": "183-Burgundy/Grey",
+          "color_normalized": "Burgundy/Grey"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "WN6234MD612_M",
+          "unit_cost": 144,
+          "color_code": "183-Burgundy/Grey",
+          "color_normalized": "Burgundy/Grey"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "189-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "189-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "189-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "189-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "191-Prune",
+          "color_normalized": "Prune"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "191-Prune",
+          "color_normalized": "Prune"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "191-Prune",
+          "color_normalized": "Prune"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "191-Prune",
+          "color_normalized": "Prune"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "197-Denim",
+          "color_normalized": "Denim"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "197-Denim",
+          "color_normalized": "Denim"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "197-Denim",
+          "color_normalized": "Denim"
+        },
+        {
+          "qty": 1,
+          "size": "XXL",
+          "style_ref": "WS6208MP9019",
+          "unit_cost": 238,
+          "color_code": "197-Denim",
+          "color_normalized": "Denim"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "WS8208MP9039",
+          "unit_cost": 250,
+          "color_code": "208-Light Grey/BurgundyStriped",
+          "color_normalized": "Light Grey/Burgundy Striped"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "WS8208MP9039",
+          "unit_cost": 250,
+          "color_code": "208-Light Grey/BurgundyStriped",
+          "color_normalized": "Light Grey/Burgundy Striped"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "WS8208MP9039",
+          "unit_cost": 250,
+          "color_code": "208-Light Grey/BurgundyStriped",
+          "color_normalized": "Light Grey/Burgundy Striped"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "WN6237MPC3042",
+          "unit_cost": 270,
+          "color_code": "431-Cherry/Grey",
+          "color_normalized": "Cherry/Grey"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "WN6237MPC3042",
+          "unit_cost": 270,
+          "color_code": "431-Cherry/Grey",
+          "color_normalized": "Cherry/Grey"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "WN6237MPC3042",
+          "unit_cost": 270,
+          "color_code": "431-Cherry/Grey",
+          "color_normalized": "Cherry/Grey"
+        },
+        {
+          "qty": 2,
+          "size": "OS",
+          "style_ref": "WS6208SC9040",
+          "unit_cost": 198,
+          "color_code": "189-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 2,
+          "size": "OS",
+          "style_ref": "WS6208SC9040",
+          "unit_cost": 198,
+          "color_code": "198-Blue Navy",
+          "color_normalized": "Blue Navy"
+        },
+        {
+          "qty": 1,
+          "size": "48",
+          "style_ref": "WN6224SLD.JACKET",
+          "unit_cost": 438,
+          "color_code": "99-Burgundy",
+          "color_normalized": "Burgundy"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "WN6224SLD.JACKET",
+          "unit_cost": 438,
+          "color_code": "99-Burgundy",
+          "color_normalized": "Burgundy"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "WN6224SLD.JACKET",
+          "unit_cost": 438,
+          "color_code": "99-Burgundy",
+          "color_normalized": "Burgundy"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "WN6224SLD.JACKET",
+          "unit_cost": 438,
+          "color_code": "99-Burgundy",
+          "color_normalized": "Burgundy"
+        },
+        {
+          "qty": 1,
+          "size": "41",
+          "style_ref": "PC6014SN452",
+          "unit_cost": 270,
+          "color_code": "259-Brown/Black",
+          "color_normalized": "Brown/Black"
+        },
+        {
+          "qty": 1,
+          "size": "42",
+          "style_ref": "PC6014SN452",
+          "unit_cost": 270,
+          "color_code": "259-Brown/Black",
+          "color_normalized": "Brown/Black"
+        },
+        {
+          "qty": 1,
+          "size": "43",
+          "style_ref": "PC6014SN452",
+          "unit_cost": 270,
+          "color_code": "259-Brown/Black",
+          "color_normalized": "Brown/Black"
+        },
+        {
+          "qty": 1,
+          "size": "44",
+          "style_ref": "PC6014SN452",
+          "unit_cost": 270,
+          "color_code": "259-Brown/Black",
+          "color_normalized": "Brown/Black"
+        },
+        {
+          "qty": 1,
+          "size": "S",
+          "style_ref": "TN5412ST.BARRY",
+          "unit_cost": 319,
+          "color_code": "2-Black",
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 1,
+          "size": "M",
+          "style_ref": "TN5412ST.BARRY",
+          "unit_cost": 319,
+          "color_code": "2-Black",
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 1,
+          "size": "L",
+          "style_ref": "TN5412ST.BARRY",
+          "unit_cost": 319,
+          "color_code": "2-Black",
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 1,
+          "size": "XL",
+          "style_ref": "TN5412ST.BARRY",
+          "unit_cost": 319,
+          "color_code": "2-Black",
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 1,
+          "size": "46",
+          "style_ref": "TN5412ST.JOGGER_C",
+          "unit_cost": 176,
+          "color_code": "2-Black",
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 1,
+          "size": "48",
+          "style_ref": "TN5412ST.JOGGER_C",
+          "unit_cost": 176,
+          "color_code": "2-Black",
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "TN5412ST.JOGGER_C",
+          "unit_cost": 176,
+          "color_code": "2-Black",
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "TN5412ST.JOGGER_C",
+          "unit_cost": 176,
+          "color_code": "2-Black",
+          "color_normalized": "Black"
+        },
+        {
+          "qty": 1,
+          "size": "50",
+          "style_ref": "WN6196SYK.JACKET_GK",
+          "unit_cost": 620,
+          "color_code": "121-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 1,
+          "size": "52",
+          "style_ref": "WN6196SYK.JACKET_GK",
+          "unit_cost": 620,
+          "color_code": "121-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 1,
+          "size": "54",
+          "style_ref": "WN6196SYK.JACKET_GK",
+          "unit_cost": 620,
+          "color_code": "121-Mud",
+          "color_normalized": "Mud"
+        },
+        {
+          "qty": 1,
+          "size": "56",
+          "style_ref": "WN6196SYK.JACKET_GK",
+          "unit_cost": 620,
+          "color_code": "121-Mud",
+          "color_normalized": "Mud"
+        }
+      ],
+      "batch_id": null,
+      "selected": true,
+      "po_number": "CO-008787",
+      "order_date": "2026-02-10",
+      "cancel_date": "2026-10-31",
+      "batch_status": null,
+      "delivery_date": "2026-08-01",
+      "is_consignment": false,
+      "amount_declared": 24971.1,
+      "customer_reference": null,
+      "lightspeed_order_id": null,
+      "unit_count_declared": 85
+    }
+  ],
+  "summary": {
+    "counters": {
+      "error": 0,
+      "create_new": 23,
+      "complete_existing": 0,
+      "create_with_suffix": 0
+    },
+    "incomplete": false,
+    "order_count": 1,
+    "units_match": true,
+    "matrix_count": 23,
+    "extraction_stats": {
+      "skipped": 0,
+      "attempted": 23,
+      "successful": 23,
+      "units_ratio": 1,
+      "skipped_ratio": 0,
+      "qty_mismatched": 0,
+      "size_validation": {
+        "suspected": [],
+        "considered": 0,
+        "headers_found": 19
+      },
+      "qty_mismatch_ratio": 0
+    },
+    "variants_already": 0,
+    "incomplete_reasons": [],
+    "summed_units_total": 85,
+    "variants_to_create": 81,
+    "declared_units_total": 85,
+    "declared_amount_total": 24971.1,
+    "validation_thresholds": {
+      "min_units_ratio": 0.95,
+      "max_skipped_ratio": 0.1,
+      "max_qty_mismatch_ratio": 0.1,
+      "max_size_mismatch_ratio": 0.02,
+      "max_skipped_ratio_no_declared": 0.05
+    },
+    "summed_amount_total_effective": 23782
+  },
+  "matrices": [
+    {
+      "key": "CN6841CF680_C2|Bordeaux",
+      "action": "create_new",
+      "style_ref": "CN6841CF680_C2",
+      "total_qty": 6,
+      "unit_cost": 170,
+      "color_code": "77-Bordeaux",
+      "description": "Fradi Camicia/Shirt Uomo Check",
+      "retail_price": 425,
+      "po_quantities": {
+        "CO-008787": {
+          "39": 1,
+          "40": 1,
+          "41": 1,
+          "42": 1,
+          "43": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Bordeaux",
+      "color_normalized": "Bordeaux",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "39",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "41",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "43",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "CN6841CF680_C2",
+      "effective_retail_price": 425,
+      "effective_unit_cost": 170,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WN6106MP610|Burgundy",
+      "action": "create_new",
+      "style_ref": "WN6106MP610",
+      "total_qty": 3,
+      "unit_cost": 130,
+      "color_code": "572-Burgundy",
+      "description": "Fradi Maglia/Sweater Uomo",
+      "retail_price": 325,
+      "po_quantities": {
+        "CO-008787": {
+          "L": 1,
+          "M": 1,
+          "XL": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Burgundy",
+      "color_normalized": "Burgundy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WN6106MP610",
+      "effective_retail_price": 325,
+      "effective_unit_cost": 130,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WN7105MP730_W|Denim",
+      "action": "create_new",
+      "style_ref": "WN7105MP730_W",
+      "total_qty": 4,
+      "unit_cost": 134,
+      "color_code": "177-Denim",
+      "description": "Fradi Maglia/Sweater Uomo",
+      "retail_price": 335,
+      "po_quantities": {
+        "CO-008787": {
+          "L": 1,
+          "M": 1,
+          "XL": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Denim",
+      "color_normalized": "Denim",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WN7105MP730_W",
+      "effective_retail_price": 335,
+      "effective_unit_cost": 134,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WS6208CAP9030|Mud",
+      "action": "create_new",
+      "style_ref": "WS6208CAP9030",
+      "total_qty": 2,
+      "unit_cost": 118,
+      "color_code": "189-Mud",
+      "description": "Fradi Cappello/Hat Uomo",
+      "retail_price": 295,
+      "po_quantities": {
+        "CO-008787": {
+          "OS": 2
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Mud",
+      "color_normalized": "Mud",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 2
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WS6208CAP9030",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 118,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WS6208CAP9030|Blue Navy",
+      "action": "create_new",
+      "style_ref": "WS6208CAP9030",
+      "total_qty": 2,
+      "unit_cost": 118,
+      "color_code": "198-Blue Navy",
+      "description": "Fradi Cappello/Hat Uomo",
+      "retail_price": 295,
+      "po_quantities": {
+        "CO-008787": {
+          "OS": 2
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Blue Navy",
+      "color_normalized": "Blue Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 2
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WS6208CAP9030",
+      "effective_retail_price": 295,
+      "effective_unit_cost": 118,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "CN6918CLT503_SM|Stone Medium",
+      "action": "create_new",
+      "style_ref": "CN6918CLT503_SM",
+      "total_qty": 6,
+      "unit_cost": 106,
+      "color_code": "89-Stone Medium",
+      "description": "Fradi Camicia/Shirt Uomo",
+      "retail_price": 265,
+      "po_quantities": {
+        "CO-008787": {
+          "39": 1,
+          "40": 1,
+          "41": 1,
+          "42": 1,
+          "43": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Stone Medium",
+      "color_normalized": "Stone Medium",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "39",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "40",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "41",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "43",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "CN6918CLT503_SM",
+      "effective_retail_price": 265,
+      "effective_unit_cost": 106,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "TN5477GAVIN|Beige",
+      "action": "create_new",
+      "style_ref": "TN5477GAVIN",
+      "total_qty": 5,
+      "unit_cost": 614,
+      "color_code": "701-Beige",
+      "description": "Fradi Impermeabile/Raincoat Uomo WATER REPELLENT",
+      "retail_price": 1535,
+      "po_quantities": {
+        "CO-008787": {
+          "48": 1,
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Beige",
+      "color_normalized": "Beige",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "48",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TN5477GAVIN",
+      "effective_retail_price": 1535,
+      "effective_unit_cost": 614,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "TN5477GAVIN|Blue Navy",
+      "action": "create_new",
+      "style_ref": "TN5477GAVIN",
+      "total_qty": 5,
+      "unit_cost": 614,
+      "color_code": "703-Blue Navy",
+      "description": "Fradi Impermeabile/Raincoat Uomo WATER REPELLENT",
+      "retail_price": 1535,
+      "po_quantities": {
+        "CO-008787": {
+          "48": 1,
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Blue Navy",
+      "color_normalized": "Blue Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "48",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TN5477GAVIN",
+      "effective_retail_price": 1535,
+      "effective_unit_cost": 614,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WN6235KSB1107|Mud",
+      "action": "create_new",
+      "style_ref": "WN6235KSB1107",
+      "total_qty": 3,
+      "unit_cost": 340,
+      "color_code": "227-Mud",
+      "description": "Fradi Maglia/Sweater Uomo",
+      "retail_price": 850,
+      "po_quantities": {
+        "CO-008787": {
+          "L": 1,
+          "M": 1,
+          "XL": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Mud",
+      "color_normalized": "Mud",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WN6235KSB1107",
+      "effective_retail_price": 850,
+      "effective_unit_cost": 340,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WN6234MC615_M|Denim/Milk",
+      "action": "create_new",
+      "style_ref": "WN6234MC615_M",
+      "total_qty": 3,
+      "unit_cost": 164,
+      "color_code": "181-Denim/Milk",
+      "description": "Fradi Maglia/Sweater Uomo",
+      "retail_price": 410,
+      "po_quantities": {
+        "CO-008787": {
+          "L": 1,
+          "M": 1,
+          "XL": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Denim/Milk",
+      "color_normalized": "Denim/Milk",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WN6234MC615_M",
+      "effective_retail_price": 410,
+      "effective_unit_cost": 164,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WN6234MD612_M|Burgundy/Grey",
+      "action": "create_new",
+      "style_ref": "WN6234MD612_M",
+      "total_qty": 4,
+      "unit_cost": 144,
+      "color_code": "183-Burgundy/Grey",
+      "description": "Fradi Maglia/Sweater Uomo",
+      "retail_price": 360,
+      "po_quantities": {
+        "CO-008787": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Burgundy/Grey",
+      "color_normalized": "Burgundy/Grey",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WN6234MD612_M",
+      "effective_retail_price": 360,
+      "effective_unit_cost": 144,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WS6208MP9019|Mud",
+      "action": "create_new",
+      "style_ref": "WS6208MP9019",
+      "total_qty": 4,
+      "unit_cost": 238,
+      "color_code": "189-Mud",
+      "description": "Fradi Maglia/Sweater Uomo",
+      "retail_price": 595,
+      "po_quantities": {
+        "CO-008787": {
+          "L": 1,
+          "M": 1,
+          "XL": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Mud",
+      "color_normalized": "Mud",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WS6208MP9019",
+      "effective_retail_price": 595,
+      "effective_unit_cost": 238,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WS6208MP9019|Prune",
+      "action": "create_new",
+      "style_ref": "WS6208MP9019",
+      "total_qty": 4,
+      "unit_cost": 238,
+      "color_code": "191-Prune",
+      "description": "Fradi Maglia/Sweater Uomo",
+      "retail_price": 595,
+      "po_quantities": {
+        "CO-008787": {
+          "L": 1,
+          "M": 1,
+          "XL": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Prune",
+      "color_normalized": "Prune",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WS6208MP9019",
+      "effective_retail_price": 595,
+      "effective_unit_cost": 238,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WS6208MP9019|Denim",
+      "action": "create_new",
+      "style_ref": "WS6208MP9019",
+      "total_qty": 4,
+      "unit_cost": 238,
+      "color_code": "197-Denim",
+      "description": "Fradi Maglia/Sweater Uomo",
+      "retail_price": 595,
+      "po_quantities": {
+        "CO-008787": {
+          "L": 1,
+          "M": 1,
+          "XL": 1,
+          "XXL": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Denim",
+      "color_normalized": "Denim",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XXL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WS6208MP9019",
+      "effective_retail_price": 595,
+      "effective_unit_cost": 238,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WS8208MP9039|Light Grey/Burgundy Striped",
+      "action": "create_new",
+      "style_ref": "WS8208MP9039",
+      "total_qty": 3,
+      "unit_cost": 250,
+      "color_code": "208-Light Grey/BurgundyStriped",
+      "description": "Fradi Maglia/Sweater Uomo Light Grey/Burgundy Striped",
+      "retail_price": 625,
+      "po_quantities": {
+        "CO-008787": {
+          "L": 1,
+          "M": 1,
+          "XL": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Light Grey/Burgundy Striped",
+      "color_normalized": "Light Grey/Burgundy Striped",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WS8208MP9039",
+      "effective_retail_price": 625,
+      "effective_unit_cost": 250,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WN6237MPC3042|Cherry/Grey",
+      "action": "create_new",
+      "style_ref": "WN6237MPC3042",
+      "total_qty": 3,
+      "unit_cost": 270,
+      "color_code": "431-Cherry/Grey",
+      "description": "Fradi Maglia/Sweater Uomo",
+      "retail_price": 675,
+      "po_quantities": {
+        "CO-008787": {
+          "L": 1,
+          "M": 1,
+          "XL": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Cherry/Grey",
+      "color_normalized": "Cherry/Grey",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WN6237MPC3042",
+      "effective_retail_price": 675,
+      "effective_unit_cost": 270,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WS6208SC9040|Mud",
+      "action": "create_new",
+      "style_ref": "WS6208SC9040",
+      "total_qty": 2,
+      "unit_cost": 198,
+      "color_code": "189-Mud",
+      "description": "Fradi Sciarpa/Scarf Uomo",
+      "retail_price": 495,
+      "po_quantities": {
+        "CO-008787": {
+          "OS": 2
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Mud",
+      "color_normalized": "Mud",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 2
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WS6208SC9040",
+      "effective_retail_price": 495,
+      "effective_unit_cost": 198,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WS6208SC9040|Blue Navy",
+      "action": "create_new",
+      "style_ref": "WS6208SC9040",
+      "total_qty": 2,
+      "unit_cost": 198,
+      "color_code": "198-Blue Navy",
+      "description": "Fradi Sciarpa/Scarf Uomo",
+      "retail_price": 495,
+      "po_quantities": {
+        "CO-008787": {
+          "OS": 2
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Blue Navy",
+      "color_normalized": "Blue Navy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "OS",
+          "qty_across_pos": 2
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WS6208SC9040",
+      "effective_retail_price": 495,
+      "effective_unit_cost": 198,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WN6224SLD.JACKET|Burgundy",
+      "action": "create_new",
+      "style_ref": "WN6224SLD.JACKET",
+      "total_qty": 4,
+      "unit_cost": 438,
+      "color_code": "99-Burgundy",
+      "description": "Fradi Giacca/Jacket Uomo",
+      "retail_price": 1095,
+      "po_quantities": {
+        "CO-008787": {
+          "48": 1,
+          "50": 1,
+          "52": 1,
+          "54": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Burgundy",
+      "color_normalized": "Burgundy",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "48",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WN6224SLD.JACKET",
+      "effective_retail_price": 1095,
+      "effective_unit_cost": 438,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "PC6014SN452|Brown/Black",
+      "action": "create_new",
+      "style_ref": "PC6014SN452",
+      "total_qty": 4,
+      "unit_cost": 270,
+      "color_code": "259-Brown/Black",
+      "description": "Fradi Scarpa/Shoes Uomo",
+      "retail_price": 675,
+      "po_quantities": {
+        "CO-008787": {
+          "41": 1,
+          "42": 1,
+          "43": 1,
+          "44": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Brown/Black",
+      "color_normalized": "Brown/Black",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "41",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "42",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "43",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "44",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "PC6014SN452",
+      "effective_retail_price": 675,
+      "effective_unit_cost": 270,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "TN5412ST.BARRY|Black",
+      "action": "create_new",
+      "style_ref": "TN5412ST.BARRY",
+      "total_qty": 4,
+      "unit_cost": 319,
+      "color_code": "2-Black",
+      "description": "Fradi Giubbino/Bomber Uomo",
+      "retail_price": 798,
+      "po_quantities": {
+        "CO-008787": {
+          "L": 1,
+          "M": 1,
+          "S": 1,
+          "XL": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Black",
+      "color_normalized": "Black",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "S",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "M",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "L",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "XL",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TN5412ST.BARRY",
+      "effective_retail_price": 798,
+      "effective_unit_cost": 319,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "TN5412ST.JOGGER_C|Black",
+      "action": "create_new",
+      "style_ref": "TN5412ST.JOGGER_C",
+      "total_qty": 4,
+      "unit_cost": 176,
+      "color_code": "2-Black",
+      "description": "Fradi Pantalone/Pants Uomo WATER REPELLENT",
+      "retail_price": 440,
+      "po_quantities": {
+        "CO-008787": {
+          "46": 1,
+          "48": 1,
+          "50": 1,
+          "52": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Black",
+      "color_normalized": "Black",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "46",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "48",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "TN5412ST.JOGGER_C",
+      "effective_retail_price": 440,
+      "effective_unit_cost": 176,
+      "margin_override_pct_applied": null
+    },
+    {
+      "key": "WN6196SYK.JACKET_GK|Mud",
+      "action": "create_new",
+      "style_ref": "WN6196SYK.JACKET_GK",
+      "total_qty": 4,
+      "unit_cost": 620,
+      "color_code": "121-Mud",
+      "description": "Fradi Giacca/Jacket Uomo",
+      "retail_price": 1550,
+      "po_quantities": {
+        "CO-008787": {
+          "50": 1,
+          "52": 1,
+          "54": 1,
+          "56": 1
+        }
+      },
+      "pos_referenced": [
+        "CO-008787"
+      ],
+      "color_label_raw": "Mud",
+      "color_normalized": "Mud",
+      "reused_matrix_id": null,
+      "existing_variants": [],
+      "variants_to_create": [
+        {
+          "size": "50",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "52",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "54",
+          "qty_across_pos": 1
+        },
+        {
+          "size": "56",
+          "qty_across_pos": 1
+        }
+      ],
+      "variants_already_present": [],
+      "matrix_description_planned": "WN6196SYK.JACKET_GK",
+      "effective_retail_price": 1550,
+      "effective_unit_cost": 620,
+      "margin_override_pct_applied": null
+    }
+  ],
+  "warnings": [],
+  "season_tag": "a26",
+  "target_manufacturer": "Fradi",
+  "margin_override_pct": null,
+  "cached": true,
+  "extraction_source": "llm",
+  "preview_computed_at": "2026-08-07T16:19:26.618Z"
+}

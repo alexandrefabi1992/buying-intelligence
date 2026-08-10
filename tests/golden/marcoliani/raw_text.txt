@@ -1,0 +1,40 @@
+--- PAGE 1 ---
+       Order #.:  2507 , Po#   N/A
+       Name of account:  [A00077] BOUTIQUE VALERIE SIMON
+       Buyer:  ALEX & NORMAN FABI           Due Date (for USA mm/dd/yyyy):  03/10/2027
+       Payment Terms:          REMISE 60 JOURS RECEIVEMENT DE MARCHANDISE
+       Delivery Terms:         DDP DeliveryDutyPaid Montreal
+            CODE                   CUSTOMER                           COLOR                  SIZE       QTY      UNIT PRICE        SUBTOTALE
+        MAR4909T       Pima Cotton Funky stripes           [054] LAVENDER               ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4909T       Pima Cotton Funky stripes           [285] INDIGO BLUE            ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4909T       Pima Cotton Funky stripes           [303] SILVER GREY            ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4633T       Pima Cotton Multicolor stripe       [092] FOREST                 ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4633T       Pima Cotton Multicolor stripe       [Y11] Navy / blue            ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR3976T       Pima Cotton Rainbow stripe          [111] Denim/sage             ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR3976T       Pima Cotton Rainbow stripe          [322] Denim / tomato         ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR3976T       Pima Cotton Rainbow stripe          [Y25] Navy / brown           ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4888T       Linen & Cotton T-shirt Stripe       [323] Denim / orange         ONE SIZE            3         CAD 20.00         CAD 60.00
+        MAR4542T       Fresh of Modal Classic plain        [001] NAVY                   ONE SIZE            3         CAD 22.40         CAD 67.20
+        MAR4542T       Fresh of Modal Classic plain        [035] BEIGE                  ONE SIZE            3         CAD 22.40         CAD 67.20
+        MAR4943T       Pima Cotton Seagulls                [001] NAVY                   ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4946T       Pima Cotton Tailor Stripe           [001] NAVY                   ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4944T       Pima Cotton Tiny Flower             [001] NAVY                   ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4942T       Pima Cotton Milano Stripe           [001] NAVY                   ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4945T       Pima Cotton Polka Dot               [001] NAVY                   ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4900T       Pima Cotton Dots                    [004] CHARCOAL               ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4903T       Pima Cotton Vintage                 [076] ASPHALT                ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4899T       Pima Cotton Tailor dots             [005] FLANNEL GREY           ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4896T       Pima Cotton City stripe             [001] NAVY                   ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4896T       Pima Cotton City stripe             [002] DARK BROWN             ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4816T       Pima Cotton Torino stripe           [035] BEIGE                  ONE SIZE            3         CAD 16.80         CAD 50.40
+        MAR4911T       Pima Cotton Paisley elephant        [004] CHARCOAL               ONE SIZE            3         CAD 16.80         CAD 50.40
+                                              TOTAL ITEMS                                                  69                         CAD 1,202.40
+                                                  FREIGHT                                                                               CAD 30.00
+                                                       gst                                                                              CAD 61.62
+                                                       qst                                                                             CAD 122.93
+                                                   TO PAY                                                                             CAD 1,416.95
+                                SHIPPING ADDRESS                                                      BILLING ADDRESS
+                               BOUTIQUE POUR LUI                                                     366 LAURIER OUEST
+               2289 RUE KING O - - SHERBROOKE, J1J2G2 QC - (QC)                                  MONTREAL H2V 2K7 QC (QC)
+                                                                                                           Canada
+ Powered by TCPDF (www.tcpdf.org)

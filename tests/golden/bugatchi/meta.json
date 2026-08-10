@@ -1,0 +1,11 @@
+{
+  "file_id": 36,
+  "source_filename": "BUGATCHI_VALERIE SIMON SOCKS_SS27 OTC.pdf",
+  "manufacturer": "Bugatchi",
+  "season_tag": "p27",
+  "destination_shop_id": "1",
+  "extraction_source": "recipe",
+  "extracted_at": "2026-08-10T03:45:58.498Z",
+  "captured_at": "2026-08-10T03:48:44.334Z",
+  "notes": "Bugatchi chaussettes OS — les tailles 'ONE' doivent être normalisées en 'OS' au push. Uniquement des accessoires (chaussettes) → routing vers attribute_set 7 attendu au push. BUG CONNU : ce PO passe par la recette bugatchi-socks (pas le LLM), et la recette ne normalise PAS ONE→OS (seule la règle du prompt LLM le fait). L'assertion échoue expressément pour signaler qu'une normalisation post-recipe est manquante côté pipeline."
+}

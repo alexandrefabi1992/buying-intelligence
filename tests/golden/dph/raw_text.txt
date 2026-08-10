@@ -1,0 +1,143 @@
+--- PAGE 1 ---
+                                                                                                 Offer
+            client no.    31614.0                     order no.   4880786                       page   1/6
+            season        A - spring/summer 2026      label       C - Marc Cain Collections     order  2 - Second Collection
+            type of order Preorder                    order date  16.07.2025
+             headquarters                              order address                             agency address
+             Boutique In                               Boutique In                               Marc Cain Canada Inc.
+             1448 Rue Roberval                         1448 Rue Roberval                         260 rue de Castelnau ouest
+             ST-BRUNO, QC J3V5J2                       ST-BRUNO, QC J3V5J2                       Montreal, Qc, QC H2R 2W4
+             CANADA                                    CANADA                                    Canada
+                                                                                                 Tel: +1 514 4474044
+                                                                                                 mail: mc.canada@marc-cain.com
+             POS addresses
+             Boutique In , 1448 Rue Roberval, J3V5J2,  St-Bruno, Canada
+             Filles D'Ève, 2269 King Ouest, J1J2G2, Sherbrooke, Canada
+             delivery date
+             between 02.03.2026 and 04.05.2026 plus 12 additional days for completing delivery. Delivery dates ex factory.
+             term of payment
+             Preorder: 60 days strictly net
+             Reorder: 30 days strictly net
+             Other Order: 30 days strictly net
+             credit notes: credit note net
+             Bank account
+             bank name and city:                                                               bank code no.:
+             IBAN:                                               account no.:                  VAT no.:
+             legal form: legal form: unknown
+             term of delivery
+             postage: none                                 Incoterm: DDP delivered duty paid
+             order amount
+             qty.: 104        goods value: 21.219,00 CAD
+             importeur
+             Marc Cain Canada Inc., 260 rue de Castelnau ouest, H2R 2W4,   Montreal, Qc, Canada
+             contract
+             The Buyer shall order the articles listed in the order form sheet at the Terms and Conditions of Delivery and Payment listed on this
+             page. The General Terms and Conditions of Marc Cain Canada Inc. shall apply in addition. These can be viewed in the Showroom.
+             No cancellations are possible without the written consent of Marc Cain. The Buyer is a trader operating a commercially organized
+             business operation.
+             amendment period
+             Following the signing of the order, the customer shall have a period of ten (10) business days to request modifications. During this
+             period, the Customer may adjust the order. Should the Customer fail to submit any written request for modification within the
+             aforementioned period, the order shall be deemed confirmed in its original form and shall be binding upon the parties.
+             Signed by an authorised representative of the buyer
+             (22.07.2025)
+            Marc Cain Canada Inc.      Fon +1.514.4474044               Managing Director:                   Business number 832962187
+            260 rue de Castelnau West  mc.canada@marc-cain.com          Helmut Schlotterer
+            Montréal QC H2R 2W4        www.marc-cain.com
+            Canada
+
+--- PAGE 2 ---
+                                                                                order lines
+          client no.  31614.0                order no. 4880786                  page 2/6
+          season      A - spring/summer 2026 label     C - Marc Cain Collections order 2 - Second Collection
+          type of order Preorder             order date 16.07.2025
+           AC.2 - E - Leo's Oasis
+           delivery date between 16.03.2026 and 13.04.2026 plus 12 additional days for completing delivery. Delivery dates ex
+           factory.                                                                                          total
+           article       description     col  SL     1   2   3   4   5   6   7   qua.       pp      RRP      price
+           AC 21.40 W50  dress           223  N      1   1   1   1    -   -  -     4    235,40   565,00    941,60
+           AC 31.18 D23  jacket          112  N      1   1   1   1   1    -  -     5    331,30   795,00   1.656,50
+           AC 37.04 W70  waistcoat       112  N      1   1   1   1   1    -  -     5    310,40   745,00   1.552,00
+           AC 48.10 J55  t-shirt         110  N      1   1   1   1   1    -  -     5    131,30   315,00    656,50
+           AC 48.71 J46  t-shirt         110  N      1   1   1   1   1    -  -     5    139,60   335,00    698,00
+           AC 55.06 J79  blouse          112  N      1   1   1   1   1    -  -     5    156,30   375,00    781,50
+           AC 55.24 J56  blouse          112  N      1   1   1   1    -   -  -     4    193,80   465,00    775,20
+           AC 71.31 W70  skirt           223  N       -  1   1   1   1    -  -     4    193,80   465,00    775,20
+           AC 81.59 W70  pants RHODOS    526  N      1   1   1   1   1   1   -     6    181,30   435,00   1.087,80
+           AC 81.67 J44  pants WEDI      526  N       -  1   1   1   1    -  -     4    202,10   485,00    808,40
+           AC 83.04 W70  shorts WARANGAL 112  N      1   1   1   1   1    -  -     5    193,80   465,00    969,00
+                                                                                  52                    10.701,70
+           AC.2 - F - Blazing Sun
+           delivery date between 06.04.2026 and 04.05.2026 plus 12 additional days for completing delivery. Delivery dates ex
+           factory.                                                                                          total
+           article       description     col  SL     1   2   3   4   5   6   7   qua.       pp      RRP      price
+           AC 34.34 W69  blazer          488  N      1   1   1   1   1    -  -     5    310,40   745,00   1.552,00
+           AC 39.21 M81  cardigan        110  N      1   1   1   1   1    -  -     5    235,40   565,00   1.177,00
+           AC 39.22 M45  cardigan        488  N      1   1   1   1   1    -  -     5    268,80   645,00   1.344,00
+           AC 51.39 W51  blouse          110  N      1   1   1   1    -   -  -     4    235,40   565,00    941,60
+           AC 61.10 M78  top             488  N       -  1   1   1   1   1   -     5    131,30   315,00    656,50
+           AC 61.21 M41  top             110  N       -  1   1   1    -   -  -     3    202,10   485,00    606,30
+           AC 61.22 J52  top             110  N      1   1   1   1   1    -  -     5     77,10   185,00    385,50
+           AC 61.31 M45  top             488  N      1   1   1   1   1    -  -     5    160,40   385,00    802,00
+           AC 71.25 W76  skirt           488  N       -  1   1   1    -   -  -     3    256,30   615,00    768,90
+           AC 71.34 M41  skirt           110  N       -  1   1   1    -   -  -     3    202,10   485,00    606,30
+           AC 81.75 W62  pants WUKARI    110  N      1   1   1   1   1    -  -     5    235,40   565,00   1.177,00
+           AC B1.04 Z23  scarf           110  N      2    -   -   -   -   -  -     2    131,30   315,00    262,60
+           AC B4.07 Z29  scarf           110  N      2    -   -   -   -   -  -     2    118,80   285,00    237,60
+                                                                                  52                    10.517,30
+                           quantity / goods value                                104                    21.219,00
+           color names
+           110: off-white      112: bright ecru    223: bright tomato  488: etruscan red   526: garden green
+          Marc Cain Canada Inc. Fon +1.514.4474044         Managing Director:             Business number 832962187
+          260 rue de Castelnau West mc.canada@marc-cain.com Helmut Schlotterer
+          Montréal QC H2R 2W4   www.marc-cain.com
+          Canada
+
+--- PAGE 3 ---
+                                                                                             article images
+            client no.   31614.0                    order no.   4880786                      page  3/6
+            season       A - spring/summer 2026     label       C - Marc Cain Collections    order 2 - Second Collection
+            type of order Preorder                  order date  16.07.2025
+            AC 21.40 W50 223                        AC 31.18 D23 112                       AC 37.04 W70 112
+            AC 48.10 J55 110                        AC 48.71 J46 110                       AC 55.06 J79 112
+            Marc Cain Canada Inc.     Fon +1.514.4474044             Managing Director:                  Business number 832962187
+            260 rue de Castelnau West mc.canada@marc-cain.com        Helmut Schlotterer
+            Montréal QC H2R 2W4       www.marc-cain.com
+            Canada
+
+--- PAGE 4 ---
+                                                                                             article images
+            client no.   31614.0                    order no.   4880786                      page  4/6
+            season       A - spring/summer 2026     label       C - Marc Cain Collections    order 2 - Second Collection
+            type of order Preorder                  order date  16.07.2025
+            AC 55.24 J56 112                        AC 71.31 W70 223                       AC 81.59 W70 526
+            AC 81.67 J44 526                        AC 83.04 W70 112                       AC 34.34 W69 488
+            Marc Cain Canada Inc.     Fon +1.514.4474044             Managing Director:                  Business number 832962187
+            260 rue de Castelnau West mc.canada@marc-cain.com        Helmut Schlotterer
+            Montréal QC H2R 2W4       www.marc-cain.com
+            Canada
+
+--- PAGE 5 ---
+                                                                                             article images
+            client no.   31614.0                    order no.   4880786                      page  5/6
+            season       A - spring/summer 2026     label       C - Marc Cain Collections    order 2 - Second Collection
+            type of order Preorder                  order date  16.07.2025
+            AC 39.21 M81 110                        AC 39.22 M45 488                       AC 51.39 W51 110
+            AC 61.10 M78 488                        AC 61.21 M41 110                       AC 61.22 J52 110
+            Marc Cain Canada Inc.     Fon +1.514.4474044             Managing Director:                  Business number 832962187
+            260 rue de Castelnau West mc.canada@marc-cain.com        Helmut Schlotterer
+            Montréal QC H2R 2W4       www.marc-cain.com
+            Canada
+
+--- PAGE 6 ---
+                                                                                               article images
+            client no.    31614.0                    order no.   4880786                      page   6/6
+            season        A - spring/summer 2026     label       C - Marc Cain Collections    order  2 - Second Collection
+            type of order Preorder                   order date  16.07.2025
+             AC 61.31 M45 488                        AC 71.25 W76 488                       AC 71.34 M41 110
+             AC 81.75 W62 110                        AC B1.04 Z23 110                       AC B4.07 Z29 110
+            Marc Cain Canada Inc.      Fon +1.514.4474044              Managing Director:                  Business number 832962187
+            260 rue de Castelnau West  mc.canada@marc-cain.com         Helmut Schlotterer
+            Montréal QC H2R 2W4        www.marc-cain.com
+            Canada
+ Powered by TCPDF (www.tcpdf.org)

@@ -1,0 +1,11 @@
+{
+  "file_id": 29,
+  "source_filename": "SO00175576.pdf",
+  "manufacturer": "Brax",
+  "season_tag": "p27",
+  "destination_shop_id": "8",
+  "extraction_source": "llm",
+  "extracted_at": "2026-08-09T01:20:07.743Z",
+  "captured_at": "2026-08-10T03:37:43.552Z",
+  "notes": "PDF Brax avec size header inline (même ligne que style_ref) — nécessite fix validator 5287525. LLM extrait fidèlement le compound style_ref '76724 CHUCK 34' (inseam inclus, voulu — distingue SKUs Brax)."
+}
