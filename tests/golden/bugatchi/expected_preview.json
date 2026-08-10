@@ -1,226 +1,227 @@
 {
   "file": {
     "supplier_key": "bugatchi-socks",
-    "target_manufacturer": "Bugatchi"
+    "customer_name": null,
+    "default_vendor_id": null,
+    "target_manufacturer": "Bugatchi",
+    "default_attribute_set_id": "5"
   },
   "orders": [
     {
       "lines": [
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1006",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Navy"
+          "color_normalized": "NAVY"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1007",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Black"
+          "color_normalized": "BLACK"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1009",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Navy"
+          "color_normalized": "NAVY"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1014",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Steel"
+          "color_normalized": "STEEL"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1021",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Navy"
+          "color_normalized": "NAVY"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1022",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Black"
+          "color_normalized": "BLACK"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1023",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Navy"
+          "color_normalized": "NAVY"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1026",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Steel"
+          "color_normalized": "STEEL"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1027",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Navy"
+          "color_normalized": "NAVY"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1028",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Navy"
+          "color_normalized": "NAVY"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1033",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Black"
+          "color_normalized": "BLACK"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1033",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Navy"
+          "color_normalized": "NAVY"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1035",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Navy"
+          "color_normalized": "NAVY"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1037",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Steel"
+          "color_normalized": "STEEL"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1038",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Steel"
+          "color_normalized": "STEEL"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1042",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Air blue"
+          "color_normalized": "AIR BLUE"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1049",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Stone"
+          "color_normalized": "STONE"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1054",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Sand"
+          "color_normalized": "SAND"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1057",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Black"
+          "color_normalized": "BLACK"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1061",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Navy"
+          "color_normalized": "NAVY"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1066",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Navy"
+          "color_normalized": "NAVY"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1077",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Navy"
+          "color_normalized": "NAVY"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1080",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Black"
+          "color_normalized": "BLACK"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1081",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Steel"
+          "color_normalized": "STEEL"
         },
         {
           "qty": 3,
-          "size": "ONE",
+          "size": "OS",
           "style_ref": "LB1082",
           "unit_cost": 11.5,
           "color_code": null,
-          "color_normalized": "Cobalt"
+          "color_normalized": "COBALT"
         }
       ],
-      "batch_id": 72,
+      "batch_id": null,
       "selected": true,
-      "last_page": null,
       "po_number": "309037143",
-      "first_page": null,
-      "order_date": null,
-      "cancel_date": "2027-03-31T00:00:00.000Z",
-      "batch_status": "parsed",
-      "delivery_date": "2027-03-15T00:00:00.000Z",
+      "order_date": "2026-07-27",
+      "cancel_date": null,
+      "batch_status": null,
+      "delivery_date": "2027-03-15",
       "is_consignment": false,
-      "amount_declared": null,
+      "amount_declared": 862.5,
       "customer_reference": "VALERIE SIMON SS27",
       "lightspeed_order_id": null,
-      "unit_count_declared": null
+      "unit_count_declared": 75
     }
   ],
   "summary": {
@@ -232,16 +233,20 @@
     },
     "incomplete": false,
     "order_count": 1,
-    "units_match": false,
+    "units_match": true,
     "matrix_count": 25,
     "extraction_stats": {
       "skipped": 0,
       "attempted": 25,
       "successful": 25,
-      "units_ratio": null,
+      "units_ratio": 1,
       "skipped_ratio": 0,
       "qty_mismatched": 0,
-      "size_validation": null,
+      "size_validation": {
+        "suspected": [],
+        "considered": 0,
+        "headers_found": 0
+      },
       "qty_mismatch_ratio": 0
     },
     "variants_already": 0,
@@ -251,8 +256,8 @@
     "variants_to_create": 25,
     "summed_amount_total": 862.5,
     "summed_retail_total": 0,
-    "declared_units_total": 0,
-    "declared_amount_total": 0,
+    "declared_units_total": 75,
+    "declared_amount_total": 862.5,
     "validation_thresholds": {
       "min_units_ratio": 0.95,
       "max_skipped_ratio": 0.1,
@@ -265,29 +270,29 @@
   },
   "matrices": [
     {
-      "key": "LB1006|Navy",
+      "key": "LB1006|NAVY",
       "action": "create_new",
       "style_ref": "LB1006",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Navy",
-      "color_normalized": "Navy",
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -298,29 +303,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1007|Black",
+      "key": "LB1007|BLACK",
       "action": "create_new",
       "style_ref": "LB1007",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Black",
-      "color_normalized": "Black",
+      "color_label_raw": "BLACK",
+      "color_normalized": "BLACK",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -331,29 +336,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1009|Navy",
+      "key": "LB1009|NAVY",
       "action": "create_new",
       "style_ref": "LB1009",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Navy",
-      "color_normalized": "Navy",
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -364,29 +369,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1014|Steel",
+      "key": "LB1014|STEEL",
       "action": "create_new",
       "style_ref": "LB1014",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Steel",
-      "color_normalized": "Steel",
+      "color_label_raw": "STEEL",
+      "color_normalized": "STEEL",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -397,29 +402,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1021|Navy",
+      "key": "LB1021|NAVY",
       "action": "create_new",
       "style_ref": "LB1021",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Navy",
-      "color_normalized": "Navy",
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -430,29 +435,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1022|Black",
+      "key": "LB1022|BLACK",
       "action": "create_new",
       "style_ref": "LB1022",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Black",
-      "color_normalized": "Black",
+      "color_label_raw": "BLACK",
+      "color_normalized": "BLACK",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -463,29 +468,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1023|Navy",
+      "key": "LB1023|NAVY",
       "action": "create_new",
       "style_ref": "LB1023",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Navy",
-      "color_normalized": "Navy",
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -496,29 +501,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1026|Steel",
+      "key": "LB1026|STEEL",
       "action": "create_new",
       "style_ref": "LB1026",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Steel",
-      "color_normalized": "Steel",
+      "color_label_raw": "STEEL",
+      "color_normalized": "STEEL",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -529,29 +534,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1027|Navy",
+      "key": "LB1027|NAVY",
       "action": "create_new",
       "style_ref": "LB1027",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Navy",
-      "color_normalized": "Navy",
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -562,29 +567,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1028|Navy",
+      "key": "LB1028|NAVY",
       "action": "create_new",
       "style_ref": "LB1028",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Navy",
-      "color_normalized": "Navy",
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -595,29 +600,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1033|Black",
+      "key": "LB1033|BLACK",
       "action": "create_new",
       "style_ref": "LB1033",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Black",
-      "color_normalized": "Black",
+      "color_label_raw": "BLACK",
+      "color_normalized": "BLACK",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -628,29 +633,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1033|Navy",
+      "key": "LB1033|NAVY",
       "action": "create_new",
       "style_ref": "LB1033",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Navy",
-      "color_normalized": "Navy",
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -661,29 +666,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1035|Navy",
+      "key": "LB1035|NAVY",
       "action": "create_new",
       "style_ref": "LB1035",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Navy",
-      "color_normalized": "Navy",
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -694,29 +699,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1037|Steel",
+      "key": "LB1037|STEEL",
       "action": "create_new",
       "style_ref": "LB1037",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Steel",
-      "color_normalized": "Steel",
+      "color_label_raw": "STEEL",
+      "color_normalized": "STEEL",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -727,29 +732,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1038|Steel",
+      "key": "LB1038|STEEL",
       "action": "create_new",
       "style_ref": "LB1038",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Steel",
-      "color_normalized": "Steel",
+      "color_label_raw": "STEEL",
+      "color_normalized": "STEEL",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -760,29 +765,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1042|Air blue",
+      "key": "LB1042|AIR BLUE",
       "action": "create_new",
       "style_ref": "LB1042",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Air blue",
-      "color_normalized": "Air blue",
+      "color_label_raw": "AIR BLUE",
+      "color_normalized": "AIR BLUE",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -793,29 +798,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1049|Stone",
+      "key": "LB1049|STONE",
       "action": "create_new",
       "style_ref": "LB1049",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Stone",
-      "color_normalized": "Stone",
+      "color_label_raw": "STONE",
+      "color_normalized": "STONE",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -826,29 +831,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1054|Sand",
+      "key": "LB1054|SAND",
       "action": "create_new",
       "style_ref": "LB1054",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Sand",
-      "color_normalized": "Sand",
+      "color_label_raw": "SAND",
+      "color_normalized": "SAND",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -859,29 +864,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1057|Black",
+      "key": "LB1057|BLACK",
       "action": "create_new",
       "style_ref": "LB1057",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Black",
-      "color_normalized": "Black",
+      "color_label_raw": "BLACK",
+      "color_normalized": "BLACK",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -892,29 +897,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1061|Navy",
+      "key": "LB1061|NAVY",
       "action": "create_new",
       "style_ref": "LB1061",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Navy",
-      "color_normalized": "Navy",
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -925,29 +930,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1066|Navy",
+      "key": "LB1066|NAVY",
       "action": "create_new",
       "style_ref": "LB1066",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Navy",
-      "color_normalized": "Navy",
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -958,29 +963,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1077|Navy",
+      "key": "LB1077|NAVY",
       "action": "create_new",
       "style_ref": "LB1077",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Navy",
-      "color_normalized": "Navy",
+      "color_label_raw": "NAVY",
+      "color_normalized": "NAVY",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -991,29 +996,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1080|Black",
+      "key": "LB1080|BLACK",
       "action": "create_new",
       "style_ref": "LB1080",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Black",
-      "color_normalized": "Black",
+      "color_label_raw": "BLACK",
+      "color_normalized": "BLACK",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -1024,29 +1029,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1081|Steel",
+      "key": "LB1081|STEEL",
       "action": "create_new",
       "style_ref": "LB1081",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Steel",
-      "color_normalized": "Steel",
+      "color_label_raw": "STEEL",
+      "color_normalized": "STEEL",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -1057,29 +1062,29 @@
       "margin_override_pct_applied": null
     },
     {
-      "key": "LB1082|Cobalt",
+      "key": "LB1082|COBALT",
       "action": "create_new",
       "style_ref": "LB1082",
       "total_qty": 3,
       "unit_cost": 11.5,
       "color_code": null,
-      "description": "",
+      "description": "FASHION MERCERIZED SOCKS",
       "retail_price": null,
       "po_quantities": {
         "309037143": {
-          "ONE": 3
+          "OS": 3
         }
       },
       "pos_referenced": [
         "309037143"
       ],
-      "color_label_raw": "Cobalt",
-      "color_normalized": "Cobalt",
+      "color_label_raw": "COBALT",
+      "color_normalized": "COBALT",
       "reused_matrix_id": null,
       "existing_variants": [],
       "variants_to_create": [
         {
-          "size": "ONE",
+          "size": "OS",
           "qty_across_pos": 3
         }
       ],
@@ -1090,20 +1095,11 @@
       "margin_override_pct_applied": null
     }
   ],
-  "warnings": [
-    {
-      "code": "units_mismatch_parser_vs_declared",
-      "context": {
-        "summed": 75,
-        "declared": 0
-      },
-      "message": "parser summed 75 units but PDF declares 0"
-    }
-  ],
+  "warnings": [],
   "season_tag": "p27",
   "target_manufacturer": "Bugatchi",
   "margin_override_pct": null,
   "cached": true,
-  "extraction_source": "recipe",
-  "preview_computed_at": "2026-08-10T03:45:58.498Z"
+  "extraction_source": "llm",
+  "preview_computed_at": "2026-08-10T18:32:34.167Z"
 }
