@@ -39,7 +39,7 @@ const HELP_CONTENT = require('./help-content');
 const TOOL_DEFS = [
   {
     name: 'get_budget_recommendations',
-    description: "Obtenir les budgets d'achat recommandés par marque pour une saison. Retourne le budget net suggéré, le sell-through moyen, la tendance et le multiplicateur appliqué.",
+    description: "Budgets d'achat CALCULÉS PAR L'ALGO pour une saison à venir (basé sur ST historique × multiplicateur). Retourne budget net, ST moyen, tendance, multiplicateur. UTILISER pour : \"combien budgétiser pour Brax P27\", \"budget recommandé par marque\", \"quoi acheter cette saison\". NE PAS UTILISER pour : (a) comparer plan vs recommandé → get_plan_vs_recommended, (b) classer les marques par performance passée → get_brand_ranking.",
     parameters: {
       type: 'object',
       properties: {
@@ -52,7 +52,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_sales_analysis',
-    description: '⚠️ VENTES D\'UNE MARQUE SPÉCIFIQUE + SAISON : NE PAS appeler immédiatement — vérifier d\'abord si le périmètre est précisé. Si "toute la marque"/"NOS inclus" dans le message → utiliser get_brand_ranking(include_nos=true, manufacturer=...) à la place. Si périmètre absent → poser Q1 (règle CLARIFICATION PÉRIMÈTRE MARQUE) et attendre. Ce tool avec season= filtre TOUJOURS par tag. Appel direct autorisé pour : (1) périmètre explicitement "collection seulement", (2) question globale sans marque précise, (3) question de période sans saison. — Analyser les ventes par marque et/ou boutique. Retourne les ventes brutes HT et le coût des ventes. Sans manufacturer ni category : total toutes marques par boutique. Avec category sans manufacturer : top des marques dans cette catégorie.',
+    description: "Ventes par marque et/ou boutique et/ou catégorie sur une période ou saison. Retourne ventes brutes HT et coût des ventes. UTILISER pour : \"ventes de X en juillet\", \"ventes totales par boutique\", \"combien j'ai vendu de X depuis Y\". Sans manufacturer ni category = total toutes marques. Avec category sans manufacturer = top marques dans cette catégorie. GARDE-FOU : si la question porte sur une MARQUE + SAISON sans que le périmètre soit précisé (\"collection seulement\" vs \"toute la marque / NOS inclus\") → poser la question de périmètre AVANT (voir CLARIFICATION PÉRIMÈTRE MARQUE). NE PAS UTILISER pour : (a) ranking analytique de marques → get_brand_ranking, (b) ventes par taille précise → get_sales_by_variant, (c) répartition par catégorie (toutes) → get_sales_by_category.",
     parameters: {
       type: 'object',
       properties: {
@@ -72,7 +72,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_stock_levels',
-    description: 'Obtenir les niveaux de stock actuels par marque et/ou boutique.',
+    description: "Stock actuel AGRÉGÉ (unités + valeur) par marque × boutique. UTILISER pour : \"quel stock ai-je de Brax\", \"stock total par boutique\", vue d'ensemble. NE PAS UTILISER pour : (a) stock par taille/couleur → get_stock_by_variant, (b) valeur totale inventaire à date → get_inventory_at_date, (c) sell-through → get_sellthrough_by_size.",
     parameters: {
       type: 'object',
       properties: {
@@ -85,7 +85,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_plan_vs_recommended',
-    description: 'Comparer le budget planifié (saisi par acheteur) vs le budget recommandé par algorithme, par marque.',
+    description: "Écart entre budget PLAN (saisie manuelle acheteur) et RECOMMANDÉ (algo). UTILISER pour : \"où en suis-je vs le plan\", \"marques sur/sous-budgétées vs recommandation\", \"écart plan vs suggestion\". NE PAS UTILISER pour recalculer le budget seul → get_budget_recommendations.",
     parameters: {
       type: 'object',
       properties: {
@@ -96,7 +96,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_top_performers',
-    description: 'Classement des meilleures ou pires marques selon un critère.',
+    description: "Classement des marques avec 2 modes : (1) si cache budget existe pour la saison → métriques riches (ST, budget_net, tendance) ; (2) sinon fallback DB automatique par cout_ventes uniquement (sans ST ni budget). UTILISER pour un classement rapide axé budget/coût des ventes. NE PAS UTILISER pour un classement analytique complet en direct avec filtres min_st/max_st → get_brand_ranking. Le fallback DB ne renvoie jamais d'erreur — retourne toujours un résultat, même dégradé.",
     parameters: {
       type: 'object',
       properties: {
@@ -192,7 +192,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_transfer_recommendations',
-    description: "Obtenir les recommandations de transfert de stock : modèles dormants dans une boutique qui se vendent encore dans une autre. Utiliser quand l'utilisateur demande quoi transférer, quel stock dort, ou quelles pièces bouger entre boutiques.",
+    description: "Modèles dormants dans une boutique qui se vendent ailleurs → recommandation de transfert. UTILISER pour : \"quoi transférer\", \"quel stock dort qu'on peut bouger\", \"pièces à déplacer entre boutiques\". NE PAS UTILISER pour : (a) juste lister le stock dormant sans logique de transfert → get_items_by_criteria(max_st=X, min_stock=1), (b) réassort fournisseur → get_restock_recommendations.",
     parameters: {
       type: 'object',
       properties: {
@@ -207,7 +207,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_matrix_info',
-    description: "Obtenir les informations sur les matrices de produits (modèles regroupant toutes leurs tailles/couleurs). Utiliser quand l'utilisateur demande les tailles disponibles d'un modèle, le stock par taille, ou veut voir toutes les variantes d'un produit.",
+    description: "Info STRUCTURE d'un modèle : liste des tailles disponibles, stock actuel par taille. UTILISER pour : \"quelles tailles existent pour X\", \"stock par taille du modèle Y\", \"voir les variantes\". NE PAS UTILISER pour : (a) ST/reçus/vendus par taille → get_matrix_sellthrough (avec matrix_id) ou get_sellthrough_by_size (avec manufacturer), (b) résoudre un code produit ambigu → resolve_search_term d'abord.",
     parameters: {
       type: 'object',
       properties: {
@@ -232,7 +232,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'compare_seasons',
-    description: 'Comparer les performances d\'une marque (ou de toutes les marques) sur plusieurs saisons côte à côte. Retourne pour chaque saison : unités vendues, ventes brutes, coût des ventes, stock restant, reçus fournisseur et sell-through. Utiliser pour les questions inter-saisons : "comment P26 se compare à P25 et P24 ?", "évolution sur 3 saisons", "croissance par rapport à l\'an dernier".',
+    description: "Comparer N saisons côte à côte (métriques absolues par saison, pas de deltas). UTILISER pour : \"P26 vs P25 vs P24\", \"évolution sur 3 saisons\", \"suivi long-terme d'une marque\". NE PAS UTILISER pour comparer EXACTEMENT 2 saisons avec variations en +/-% calculées → get_season_comparison.",
     parameters: {
       type: 'object',
       properties: {
@@ -245,7 +245,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_sales_by_category',
-    description: 'Analyser les ventes agrégées par catégorie de produit pour une période ou une saison. Retourne ventes brutes, unités et coût par catégorie. Utiliser quand l\'utilisateur demande : "quelle catégorie se vend le mieux ?", "répartition des ventes par type de produit", "top catégories pour cette saison". Pour une marque spécifique, ajouter manufacturer.',
+    description: "Répartition des ventes TOUTES catégories confondues pour une période/saison. UTILISER pour : \"quelle catégorie se vend le mieux\", \"répartition par type de produit\", \"top catégories cette saison\". Pour une marque spécifique, ajouter manufacturer. NE PAS UTILISER pour les ventes d'UNE catégorie déjà connue (chemises, pantalons…) → get_sales_analysis avec category=X qui retournera juste la catégorie demandée.",
     parameters: {
       type: 'object',
       properties: {
@@ -395,7 +395,7 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_pricing_analysis',
-    description: "Analyse des remises et de la marge réelle par marque. Compare la marge théorique (prix catalogue) à la marge effectivement réalisée après remises. Retourne le taux de remise moyen, la fréquence des soldes, la distribution par palier de remise (0%, 1-19%, 20-29%, 30-39%, 40-49%, 50%+), et le revenu laissé en remises. Utiliser pour : 'quelle marque je solde le plus', 'ma vraie marge par marque', 'combien je perds en remises', 'quelles marques sont vraiment rentables', 'écart entre marge théorique et réelle'.",
+    description: "Analyse remises + marge RÉELLE (après soldes) par marque. Retourne taux remise moyen, fréquence des soldes, distribution par palier (0 / 1-19 / 20-29 / 30-39 / 40-49 / 50+ %), revenu laissé en remises. UTILISER pour : 'quelle marque je solde le plus', 'ma vraie marge par marque', 'combien je perds en remises', 'écart marge théorique vs réelle'. NE PAS UTILISER pour la marge de base (prix catalogue − coût) affichée en page marque — ce tool renvoie la marge EFFECTIVE post-remises.",
     parameters: {
       type: 'object',
       properties: {
@@ -556,6 +556,26 @@ Inventer un chiffre ou un nom est la pire erreur possible — pire que de ne pas
 - QUESTION SANS BESOIN DE TOOL : si la question ne nécessite pas de données spécifiques (clarification, définition, question générale sur l'app, salutation), réponds directement sans appeler de tool. Ne jamais inventer un chiffre pour paraître utile.
 - SYNONYMES BOUTIQUE : "magasin", "boutique", "store" (+ variantes anglaises) sont interchangeables et désignent tous shop_id. Les tournures "à X", "chez X", "au X", "dans le magasin X", "X store" ciblent la même boutique — traiter identiquement.
 - LIMITE PAR DÉFAUT DES CLASSEMENTS : pour get_brand_ranking, get_top_performers, get_items_by_criteria, get_restock_recommendations et tout tool de classement, si l'utilisateur ne précise pas de nombre, utiliser limit=5 par défaut plutôt que la liste complète.
+
+CORRESPONDANCE RAPIDE PATTERN → TOOL (aide-mémoire) :
+- Classement marques (frais, avec ST/marge/stock dormant) → get_brand_ranking
+- Classement via cache budget (ou fallback cout_ventes) → get_top_performers
+- Budget d'achat recommandé pour saison → get_budget_recommendations
+- Plan vs recommandé → get_plan_vs_recommended
+- Ventes globales par marque/boutique/période → get_sales_analysis
+- Ventes par taille précise → get_sales_by_variant
+- Reçus + ST par taille → get_sellthrough_by_size
+- Stock actuel agrégé (marque × boutique) → get_stock_levels
+- Stock détaillé par taille/couleur → get_stock_by_variant
+- Valeur inventaire à date → get_inventory_at_date
+- Répartition ventes toutes catégories → get_sales_by_category
+- Transferts inter-boutiques → get_transfer_recommendations
+- Réassort fournisseur (ruptures à venir) → get_restock_recommendations
+- Articles filtrés par critères de perf → get_items_by_criteria
+- Escomptes / termes de paiement → get_payment_terms_analysis
+- Comparaison N saisons (absolu) → compare_seasons ; 2 saisons (deltas +/-%) → get_season_comparison
+- Marge réelle après remises → get_pricing_analysis
+- Code produit / SKU / réf ambiguë → resolve_search_term d'abord
 
 EXEMPLES CONCRETS QUESTION → TOOL (patterns fréquents tirés de vraies conversations) :
 
