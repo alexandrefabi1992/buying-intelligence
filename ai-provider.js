@@ -728,19 +728,22 @@ class OpenAIProvider {
   }
 
   async complete(messages) {
+    const body = {
+      model:       this.model,
+      messages,
+      tools:       TOOL_DEFS.map(t => ({ type: 'function', function: t })),
+      tool_choice: 'auto',
+      temperature: 0.2,
+    };
+    // gpt-5.6-* models reject function tools unless reasoning_effort is set to 'none'
+    if (/^gpt-5\./i.test(this.model)) body.reasoning_effort = 'none';
     const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method:  'POST',
       headers: {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${this.apiKey}`,
       },
-      body: JSON.stringify({
-        model:       this.model,
-        messages,
-        tools:       TOOL_DEFS.map(t => ({ type: 'function', function: t })),
-        tool_choice: 'auto',
-        temperature: 0.2,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`);
     const data = await res.json();
@@ -755,6 +758,7 @@ class OpenAIProvider {
     if (!noTools) {
       body.tools = TOOL_DEFS.map(t => ({ type: 'function', function: t }));
       body.tool_choice = 'auto';
+      if (/^gpt-5\./i.test(this.model)) body.reasoning_effort = 'none';
     }
     const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method:  'POST',
