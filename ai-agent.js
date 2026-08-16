@@ -30,13 +30,30 @@ function buildPageContextBlock(pageContext) {
   else if (p.page === 'index')    who = `la page d'accueil (contexte général, aucune marque spécifique)`;
   else                            who = `la page "${String(p.page).slice(0,40)}"`;
 
+  // Orient by active tab if present (index.html only). PROBABLEMENT — hint, not
+  // constraint. Same logic as brand context: global questions bypass the tab.
+  const tabLabels = {
+    budget:       'Budget par marque',
+    nos:          'NOS (Never Out of Stock)',
+    sizes:        'Courbes de tailles',
+    transfers:    'Transferts / Actions',
+    plan:         'Création de budget',
+    'inv-history':'Historique stock',
+    accounting:   'Comptabilité',
+    params:       'Paramètres',
+  };
+  let tabHint = '';
+  if (p.page === 'index' && p.tab && tabLabels[p.tab]) {
+    tabHint = `\n- Orientation par onglet : l'utilisateur consulte actuellement l'onglet "${tabLabels[p.tab]}". Ses questions concerneront PROBABLEMENT ce sujet, mais si sa question est claire et concerne autre chose (question globale, changement de sujet explicite), réponds directement à la vraie question — NE PAS forcer l'orientation de l'onglet.`;
+  }
+
   return `
 
 CONTEXTE DE PAGE : l'utilisateur consulte actuellement ${who}.
 - Si sa question concerne UNE marque/produit sans le nommer explicitement, utilise ce contexte par défaut (ex: "quel est le stock ?" → applique la marque du contexte).
 - Si sa question est GLOBALE (compare toutes marques, top marques, ventes agrégées cross-marques, transferts multi-boutiques…), NE PAS forcer le contexte de page — ignore-le et réponds à la question globale telle qu'elle est. Ex: "quelles marques ont le meilleur ST ?" → PAS de filtre manufacturer.
 - Si l'utilisateur nomme EXPLICITEMENT une autre entité, respecte son choix (ex: "et pour Marc Cain ?" → utilise Marc Cain, pas le contexte).
-- Le contexte de page fournit la MARQUE (ou le modèle), pas le PÉRIMÈTRE. La règle CLARIFICATION PÉRIMÈTRE MARQUE s'applique aussi bien quand la marque vient du texte QUE quand elle vient du contexte de page. Si saison mentionnée sans scope explicite ("collection seulement" / "toute la marque"), poser la question de périmètre AVANT tout appel de tool.`;
+- Le contexte de page fournit la MARQUE (ou le modèle), pas le PÉRIMÈTRE. La règle CLARIFICATION PÉRIMÈTRE MARQUE s'applique aussi bien quand la marque vient du texte QUE quand elle vient du contexte de page. Si saison mentionnée sans scope explicite ("collection seulement" / "toute la marque"), poser la question de périmètre AVANT tout appel de tool.${tabHint}`;
 }
 
 // ---------------------------------------------------------------------------

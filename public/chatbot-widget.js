@@ -13,10 +13,16 @@
   if (window.__cortexChatbotInstalled) return;
   window.__cortexChatbotInstalled = true;
 
+  // ── Active tab detection (index.html only) ───────────────────────────────
+  function getActiveTab() {
+    const el = document.querySelector('.tab.tab-active');
+    return el?.dataset?.tab || null;
+  }
+
   // ── Page context detection ───────────────────────────────────────────────
-  // Parse location.pathname to determine which entity the user is looking at.
-  // Sent along with each /api/ai/chat request as pageContext so the LLM can
-  // resolve implicit references ("quel est le stock ?" → apply current brand).
+  // Parse location.pathname (+ active tab for index.html) to determine which
+  // entity the user is looking at. Sent with each /api/ai/chat request as
+  // pageContext so the LLM can resolve implicit references.
   function detectPageContext() {
     const p = location.pathname;
     let m;
@@ -29,12 +35,12 @@
     if (/^\/velocity(\.html)?$/i.test(p)) {
       return { page: 'velocity' };
     }
-    return { page: 'index' };
+    return { page: 'index', tab: getActiveTab() };
   }
 
-  // ── Suggested questions per page ─────────────────────────────────────────
-  // Interpolates {manufacturer} where relevant. Chips are populated at wire
-  // time and re-rendered when the user clicks "Nouveau" (clear).
+  // ── Suggested questions per page/tab ─────────────────────────────────────
+  // Each chip is precise enough to map unambiguously to a single tool.
+  // Interpolates {manufacturer} for brand pages.
   function buildSuggestions(ctx) {
     if (ctx.page === 'brand' && ctx.manufacturer) {
       const m = ctx.manufacturer;
@@ -47,18 +53,53 @@
     }
     if (ctx.page === 'matrix') {
       return [
-        'Quelles tailles restent en stock ?',
-        'Quel est le sell-through par taille ?',
+        'Quelles tailles restent en stock pour ce modèle ?',
+        'Quel est le sell-through par taille de ce modèle ?',
       ];
     }
     if (ctx.page === 'velocity') {
       return [
-        'Quelles marques ont la meilleure vélocité ?',
-        'Quels articles risquent la rupture de stock ?',
+        'Quelles marques ont la meilleure vélocité cette saison ?',
+        'Quels articles risquent la rupture avant fin de saison ?',
       ];
     }
-    // index / default
-    return [
+    // index — chips per active tab
+    const byTab = {
+      budget: [
+        'Top marques par ST cette saison',
+        'Marques sous 50% ST cette saison',
+        'Meilleures marques par revenue cette saison',
+      ],
+      nos: [
+        'Quels articles NOS sont en rupture ?',
+        'Top articles NOS par ventes',
+      ],
+      sizes: [
+        'Top tailles vendues cette saison',
+        'Quelles tailles sont épuisées à fort ST ?',
+      ],
+      transfers: [
+        'Quoi transférer entre boutiques ?',
+        'Stock dormant à bouger',
+      ],
+      plan: [
+        'Écart plan vs recommandé',
+        'Quelles marques sont sur-budgétées ?',
+      ],
+      'inv-history': [
+        'Stock au 1er janvier 2026',
+        'Comparer stock actuel vs il y a 30 jours',
+      ],
+      accounting: [
+        'Revenue ce mois-ci',
+        'Coût des ventes cette saison',
+      ],
+      params: [
+        'Comment fonctionne le multiplicateur de budget ?',
+        'Explique-moi le carryover',
+      ],
+    };
+    return byTab[ctx.tab] || [
       'Quelles sont les meilleures marques par ST cette saison ?',
       'Quoi transférer entre boutiques en ce moment ?',
     ];
@@ -268,6 +309,21 @@
     function hideSuggestions() { suggestBox.classList.add('cortex-hidden'); }
 
     renderSuggestions();
+
+    // Watch tab changes on index.html so chips + pageContext.tab stay in sync
+    // when the user navigates between Budget / NOS / Transferts / etc.
+    // MutationObserver fires AFTER the .tab-active class is set — no race
+    // with the app's own tab-switching handler. No-op on pages without .tab.
+    if (pageContext.page === 'index') {
+      document.querySelectorAll('.tab').forEach(tab => {
+        new MutationObserver(() => {
+          if (tab.classList.contains('tab-active') && tab.dataset.tab !== pageContext.tab) {
+            pageContext.tab = tab.dataset.tab;
+            renderSuggestions();
+          }
+        }).observe(tab, { attributes: true, attributeFilter: ['class'] });
+      });
+    }
 
     histBtn.addEventListener('click', async () => {
       const isOpen = histPanel.classList.toggle('open');
