@@ -13,6 +13,59 @@
   if (window.__cortexChatbotInstalled) return;
   window.__cortexChatbotInstalled = true;
 
+  // ── Page context detection ───────────────────────────────────────────────
+  // Parse location.pathname to determine which entity the user is looking at.
+  // Sent along with each /api/ai/chat request as pageContext so the LLM can
+  // resolve implicit references ("quel est le stock ?" → apply current brand).
+  function detectPageContext() {
+    const p = location.pathname;
+    let m;
+    if ((m = p.match(/^\/brand\/([^\/]+)/i))) {
+      return { page: 'brand', manufacturer: decodeURIComponent(m[1]) };
+    }
+    if ((m = p.match(/^\/matrix\/([^\/]+)/i))) {
+      return { page: 'matrix', matrix_id: decodeURIComponent(m[1]) };
+    }
+    if (/^\/velocity(\.html)?$/i.test(p)) {
+      return { page: 'velocity' };
+    }
+    return { page: 'index' };
+  }
+
+  // ── Suggested questions per page ─────────────────────────────────────────
+  // Interpolates {manufacturer} where relevant. Chips are populated at wire
+  // time and re-rendered when the user clicks "Nouveau" (clear).
+  function buildSuggestions(ctx) {
+    if (ctx.page === 'brand' && ctx.manufacturer) {
+      const m = ctx.manufacturer;
+      return [
+        `Quel est le ST% de ${m} cette saison ?`,
+        `Compare ${m} sur les 3 dernières saisons`,
+        `Quel budget recommandé pour ${m} ?`,
+        `Y a-t-il du stock dormant de ${m} à transférer ?`,
+      ];
+    }
+    if (ctx.page === 'matrix') {
+      return [
+        'Quelles tailles restent en stock ?',
+        'Quel est le sell-through par taille ?',
+      ];
+    }
+    if (ctx.page === 'velocity') {
+      return [
+        'Quelles marques ont la meilleure vélocité ?',
+        'Quels articles risquent la rupture de stock ?',
+      ];
+    }
+    // index / default
+    return [
+      'Quelles sont les meilleures marques par ST cette saison ?',
+      'Quoi transférer entre boutiques en ce moment ?',
+    ];
+  }
+
+  const pageContext = detectPageContext();
+
   // ── Utility: dynamic <script> loader with de-dup ─────────────────────────
   function ensureScript(src) {
     return new Promise((resolve, reject) => {
@@ -152,14 +205,7 @@
       <div class="ai-msg assistant">Bonjour ! Je suis Cortex, votre assistant achat. Posez-moi des questions sur vos budgets, ventes, stocks ou sell-through.</div>
     </div>
 
-    <div id="ai-suggestions">
-      <button class="ai-suggestion">Sell-through de Brax ce printemps ?</button>
-      <button class="ai-suggestion">Quelles marques sous-performent ?</button>
-      <button class="ai-suggestion">Budget P27 par marque</button>
-      <button class="ai-suggestion">Stock restant Brax P26 ?</button>
-      <button class="ai-suggestion">Meilleure marque cette saison ?</button>
-      <button class="ai-suggestion">Résume la saison P26</button>
-    </div>
+    <div id="ai-suggestions"></div>
 
     <div id="ai-input-row">
       <textarea id="ai-input" placeholder="Posez une question…" rows="1"></textarea>
@@ -202,16 +248,26 @@
     let open            = false;
     let lastUserMessage = null;
 
-    suggestBox.querySelectorAll('.ai-suggestion').forEach(b => {
-      b.addEventListener('click', () => {
-        input.value = b.textContent.trim();
-        hideSuggestions();
-        sendMessage();
+    function renderSuggestions() {
+      const items = buildSuggestions(pageContext);
+      suggestBox.innerHTML = '';
+      items.forEach(text => {
+        const b = document.createElement('button');
+        b.className = 'ai-suggestion';
+        b.textContent = text;
+        b.addEventListener('click', () => {
+          input.value = text;
+          hideSuggestions();
+          sendMessage();
+        });
+        suggestBox.appendChild(b);
       });
-    });
+    }
 
     function showSuggestions() { suggestBox.classList.remove('cortex-hidden'); }
     function hideSuggestions() { suggestBox.classList.add('cortex-hidden'); }
+
+    renderSuggestions();
 
     histBtn.addEventListener('click', async () => {
       const isOpen = histPanel.classList.toggle('open');
@@ -270,6 +326,7 @@
       lastUserMessage = null;
       msgs.innerHTML = '';
       appendMsg('assistant', 'Conversation réinitialisée. Comment puis-je vous aider ?');
+      renderSuggestions();
       showSuggestions();
     });
 
@@ -313,7 +370,7 @@
         const res = await apiFetch('/api/ai/chat', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-          body:    JSON.stringify({ messages: history }),
+          body:    JSON.stringify({ messages: history, pageContext }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: res.statusText }));

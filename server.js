@@ -5880,7 +5880,7 @@ app.post('/api/ai/chat', async (req, res, next) => {
         error: 'Agent IA non configuré. Ajouter MISTRAL_API_KEY (ou OPENAI_API_KEY / ANTHROPIC_API_KEY) dans les variables d\'environnement.',
       });
     }
-    const { messages } = req.body;
+    const { messages, pageContext } = req.body;
     if (!Array.isArray(messages) || !messages.length) {
       return res.status(400).json({ error: 'messages array required' });
     }
@@ -5897,6 +5897,7 @@ app.post('/api/ai/chat', async (req, res, next) => {
       tenantId: req.tenantId,
       shops: shopsResult.rows,
       seasons,
+      pageContext: pageContext && typeof pageContext === 'object' ? pageContext : null,
     };
     const wantsStream = (req.headers.accept ?? '').includes('text/event-stream');
 

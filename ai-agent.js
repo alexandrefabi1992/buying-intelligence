@@ -17,6 +17,28 @@ const MAX_TOOL_ROUNDS = 6; // safety limit against infinite loops
 const EMPTY_RESPONSE_NUDGE = "Le tour précédent n'a produit ni texte ni appel d'outil. Interprète le dernier message utilisateur dans le contexte de l'échange précédent (dernier tool appelé + son résultat si applicable) et choisis MAINTENANT une action : soit appeler un outil pertinent, soit poser UNE question de clarification claire en français. NE PAS rester silencieux.";
 const FINAL_SILENCE_MSG = "Je n'ai pas pu générer une réponse même après relance. Reformulez votre question ou soyez plus spécifique.";
 
+// Build a "CONTEXTE DE PAGE" block appended to the system prompt when the
+// client passes { pageContext: { page, manufacturer?, matrix_id? } } in the
+// request body. Empty string when no context (no impact on token budget).
+function buildPageContextBlock(pageContext) {
+  if (!pageContext || typeof pageContext !== 'object' || !pageContext.page) return '';
+  const p = pageContext;
+  let who = '';
+  if (p.page === 'brand' && p.manufacturer)  who = `la marque "${String(p.manufacturer).slice(0,80)}"`;
+  else if (p.page === 'matrix' && p.matrix_id) who = `le modèle matrix_id="${String(p.matrix_id).slice(0,40)}"`;
+  else if (p.page === 'velocity') who = `la vue Vélocité (toutes marques)`;
+  else if (p.page === 'index')    who = `la page d'accueil (contexte général, aucune marque spécifique)`;
+  else                            who = `la page "${String(p.page).slice(0,40)}"`;
+
+  return `
+
+CONTEXTE DE PAGE : l'utilisateur consulte actuellement ${who}.
+- Si sa question concerne UNE marque/produit sans le nommer explicitement, utilise ce contexte par défaut (ex: "quel est le stock ?" → applique la marque du contexte).
+- Si sa question est GLOBALE (compare toutes marques, top marques, ventes agrégées cross-marques, transferts multi-boutiques…), NE PAS forcer le contexte de page — ignore-le et réponds à la question globale telle qu'elle est. Ex: "quelles marques ont le meilleur ST ?" → PAS de filtre manufacturer.
+- Si l'utilisateur nomme EXPLICITEMENT une autre entité, respecte son choix (ex: "et pour Marc Cain ?" → utilise Marc Cain, pas le contexte).
+- Le contexte de page fournit la MARQUE (ou le modèle), pas le PÉRIMÈTRE. La règle CLARIFICATION PÉRIMÈTRE MARQUE s'applique aussi bien quand la marque vient du texte QUE quand elle vient du contexte de page. Si saison mentionnée sans scope explicite ("collection seulement" / "toute la marque"), poser la question de périmètre AVANT tout appel de tool.`;
+}
+
 // ---------------------------------------------------------------------------
 // Helper: extract size label from a variant description.
 // Handles alpha sizes (XS–3X) and numeric (28–115, 14.5–18.5).
@@ -3494,7 +3516,7 @@ Résolution du langage naturel :
 - "les X dernières saisons" → lister les X codes précédant la saison en cours du même type (P ou A)`;
 
   const basePrompt    = ctx.tenantConfig ? buildSystemPrompt(ctx.tenantConfig) : SYSTEM_PROMPT;
-  const systemContent = basePrompt + liveContext;
+  const systemContent = basePrompt + liveContext + buildPageContextBlock(ctx.pageContext);
 
   const fullMessages = [
     { role: 'system', content: systemContent },
@@ -3626,7 +3648,7 @@ Résolution du langage naturel :
 - "l'an dernier" / "last year" → utiliser period="last_year"`;
 
   const basePrompt    = ctx.tenantConfig ? buildSystemPrompt(ctx.tenantConfig) : SYSTEM_PROMPT;
-  const systemContent = basePrompt + liveContext;
+  const systemContent = basePrompt + liveContext + buildPageContextBlock(ctx.pageContext);
 
   const fullMessages = [{ role: 'system', content: systemContent }, ...messages];
   let retriedEmpty = false;
