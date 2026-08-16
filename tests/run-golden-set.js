@@ -118,10 +118,14 @@ function evaluateCase(c, response) {
   })() : {};
   const actualText = (response.content || '').trim();
 
-  // Case: expect no tool (definition/clarification)
+  // Case: expect no tool (definition/clarification) — but alternatives still count as pass
   if (c.expected_tool === null || c.expected_tool === '__ASK_CLARIFICATION__') {
     if (!actualToolName) return { pass: true, reason: 'no tool called (as expected)', actual: { tool: null, text: actualText } };
-    return { pass: false, reason: `expected no tool, got ${actualToolName}(${JSON.stringify(actualArgs).slice(0,80)})`, actual: { tool: actualToolName, args: actualArgs } };
+    const acceptedAlts = (c.expected_alternatives || []).filter(x => x && x !== 'MULTI_CALL');
+    if (acceptedAlts.includes(actualToolName)) {
+      return { pass: true, reason: `tool ${actualToolName} accepted (in alternatives to ${c.expected_tool})`, actual: { tool: actualToolName, args: actualArgs } };
+    }
+    return { pass: false, reason: `expected no tool (or ${acceptedAlts.join(', ')}), got ${actualToolName}(${JSON.stringify(actualArgs).slice(0,80)})`, actual: { tool: actualToolName, args: actualArgs } };
   }
 
   // Case: expect a specific tool (with alternatives)
