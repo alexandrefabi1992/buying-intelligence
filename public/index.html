@@ -5223,8 +5223,9 @@ const PreviewPanel = (() => {
       return `<li><code class="text-[10px] bg-red-100 text-red-800 px-1 py-0.5 rounded">${escHtml(r.code)}</code> — ${escHtml(r.description)}${extra}</li>`;
     }).join('');
     const stats = summary.extraction_stats || {};
-    el2.className = 'bg-red-50 border border-red-300 rounded-xl px-5 py-4 text-red-800 shadow-sm';
+    el2.className = 'relative bg-red-50 border border-red-300 rounded-xl px-5 py-4 text-red-800 shadow-sm';
     el2.innerHTML = `
+      <button type="button" onclick="this.parentNode.remove()" aria-label="Fermer" class="absolute top-2 right-3 text-red-400 hover:text-red-700 text-base leading-none font-bold">✕</button>
       <div class="flex items-start gap-3">
         <div class="text-2xl leading-none">⚠</div>
         <div class="flex-1">
