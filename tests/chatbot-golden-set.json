@@ -112,16 +112,18 @@
       "category": "ST marque × saison × boutique",
       "question": "peux tu me donner le st de Brax a saint-bruno pour p26?",
       "expected_tool": "get_sellthrough_by_size",
+      "expected_alternatives": ["get_brand_ranking"],
       "expected_params": { "manufacturer": "Brax", "season": "p26", "shop_id": "Saint-Bruno" },
-      "notes": "ST par marque + saison → get_sellthrough_by_size."
+      "notes": "ST par marque + saison → get_sellthrough_by_size (canonique) OU get_brand_ranking (filtré par manufacturer donne aussi le ST). Les deux légitimes."
     },
     {
       "id": "sellthrough_recu_followup",
       "category": "follow-up — 'reçu' avec season",
       "question": "et j'en avait recu combien de tager p26",
-      "expected_tool": "get_sellthrough_by_size",
-      "expected_params": { "season": "p26" },
-      "notes": "Follow-up 'reçu' + season → get_sellthrough_by_size. Filtres du tour précédent (manufacturer, shop_id, size) doivent être réutilisés."
+      "expected_tool": "__ASK_CLARIFICATION__",
+      "expected_alternatives": ["get_sellthrough_by_size"],
+      "expected_params": {},
+      "notes": "⚠ Cas one-shot limité : ce test envoie SEULEMENT la question au LLM sans historique. En prod cette question vient après un premier tour. Sans contexte, le LLM peut légitimement : (a) demander clarification (« reçu de quelle marque ? »), OU (b) tenter get_sellthrough_by_size avec juste season=p26. Vrai test follow-up nécessiterait un runner multi-turn (à faire si Chantier suivant)."
     },
     {
       "id": "sellthrough_size_specific_brand",
@@ -136,8 +138,9 @@
       "category": "ST sur plage de date (pas de saison)",
       "question": "donne moi le st de berwich depuis le 1er janvier",
       "expected_tool": "get_sellthrough_by_size",
-      "expected_params": { "manufacturer": "Berwich", "date_from": "2026-01-01" },
-      "notes": "Note: get_sellthrough_by_size ignore date_from/date_to sauf via season. Le prompt le mentionne — le LLM peut poser Q ou ignorer les dates. Comportement attendu : tenter get_sellthrough_by_size, ou get_sales_analysis en fallback."
+      "expected_alternatives": ["get_sales_analysis", "get_brand_ranking"],
+      "expected_params": { "manufacturer": "Berwich" },
+      "notes": "get_sellthrough_by_size ignore date_from/date_to. Le prompt le mentionne — le LLM peut choisir : (a) get_sellthrough_by_size (période ignorée), (b) get_sales_analysis avec date_from=2026-01-01, (c) get_brand_ranking avec period. Tous acceptables."
     },
     {
       "id": "season_comparison_2_seasons",

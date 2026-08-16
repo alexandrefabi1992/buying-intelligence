@@ -116,17 +116,18 @@ function evaluateCase(c, response) {
     try { return JSON.parse(toolCall.function.arguments || '{}'); }
     catch { return {}; }
   })() : {};
+  const actualText = (response.content || '').trim();
 
   // Case: expect no tool (definition/clarification)
   if (c.expected_tool === null || c.expected_tool === '__ASK_CLARIFICATION__') {
-    if (!actualToolName) return { pass: true, reason: 'no tool called (as expected)' };
+    if (!actualToolName) return { pass: true, reason: 'no tool called (as expected)', actual: { tool: null, text: actualText } };
     return { pass: false, reason: `expected no tool, got ${actualToolName}(${JSON.stringify(actualArgs).slice(0,80)})`, actual: { tool: actualToolName, args: actualArgs } };
   }
 
   // Case: expect a specific tool (with alternatives)
   const acceptedTools = [c.expected_tool, ...(c.expected_alternatives || [])].filter(x => x && x !== 'MULTI_CALL');
   if (!actualToolName) {
-    return { pass: false, reason: `expected ${c.expected_tool}, got no tool call`, actual: null };
+    return { pass: false, reason: `expected ${c.expected_tool}, got no tool call. TEXT: "${actualText.slice(0,120)}${actualText.length>120?'…':''}"`, actual: { tool: null, text: actualText } };
   }
   if (!acceptedTools.includes(actualToolName)) {
     return { pass: false, reason: `expected ${c.expected_tool} (or ${c.expected_alternatives || []}), got ${actualToolName}`, actual: { tool: actualToolName, args: actualArgs } };
