@@ -1,0 +1,250 @@
+{
+  "meta": {
+    "purpose": "Golden set of real user questions with expected tool + params. Used to compare providers/models and detect regressions after prompt changes.",
+    "generated_from": "conversations DB (200 sample) — questions verbatim, expected params curated to reflect CORRECT behavior per system prompt rules (not always what the LLM historically produced).",
+    "match_policy": {
+      "expected_tool": "MUST match exactly (test fails otherwise).",
+      "expected_params": "Only listed params MUST match. Extra params emitted by the LLM are tolerated as long as they don't contradict the expected ones. Params marked '__any__' just need to be present (any value).",
+      "expected_alternatives": "If a question can legitimately be answered by multiple tools, list them here — any match counts as pass."
+    }
+  },
+  "cases": [
+    {
+      "id": "sales_brand_period_named_month",
+      "category": "ventes brand/période — mois nommé",
+      "question": "quelles sont les ventes de boutique pour lui en juillet 2026",
+      "expected_tool": "get_sales_analysis",
+      "expected_params": { "date_from": "2026-07-01", "date_to": "2026-07-31", "shop_id": "Pour lui" },
+      "notes": "Mois nommé → date_from+date_to, JAMAIS period. shop_id résolu par nom."
+    },
+    {
+      "id": "sales_brand_period_relative_month",
+      "category": "ventes brand/période — mot relatif",
+      "question": "quelles sont le montant total des vente du mois précédent à saint-sauveur",
+      "expected_tool": "get_sales_analysis",
+      "expected_params": { "period": "last_month", "shop_id": "Saint-Sauveur" },
+      "notes": "'mois précédent' = mot RELATIF → period, JAMAIS calculer date_from/date_to."
+    },
+    {
+      "id": "sales_since_date_with_category",
+      "category": "ventes avec catégorie + date de début",
+      "question": "peux tu me dire combien de chemise de Paul and shark a été vendu depuis le 15 janvier dernier dans toute la compagnie",
+      "expected_tool": "get_sales_analysis",
+      "expected_params": { "date_from": "2026-01-15", "manufacturer": "Paul and Shark", "category": "Chemise" },
+      "notes": "'depuis' + date → date_from. 'toute la compagnie' → pas de shop_id. Type de produit ('chemise') → category."
+    },
+    {
+      "id": "sales_period_last_week",
+      "category": "ventes période last_week",
+      "question": "Combien j'ai vendu de Brax la semaine dernière ?",
+      "expected_tool": "get_sales_analysis",
+      "expected_params": { "period": "last_week", "manufacturer": "Brax" },
+      "notes": "'la semaine dernière' → period='last_week' (lundi-dimanche calendaire)."
+    },
+    {
+      "id": "sales_scope_marque_saison_collection",
+      "category": "périmètre marque+saison — collection explicite",
+      "question": "Ventes de Brax collection P26 seulement la semaine dernière",
+      "expected_tool": "get_sales_analysis",
+      "expected_params": { "season": "p26", "manufacturer": "Brax", "period": "last_week" },
+      "notes": "'collection seulement' = scope clair → appel direct autorisé."
+    },
+    {
+      "id": "sales_scope_marque_saison_toute_marque",
+      "category": "périmètre marque+saison — toute la marque",
+      "question": "Ventes de Marc Cain ce printemps, toute la marque",
+      "expected_tool": "get_brand_ranking",
+      "expected_params": { "season": "p26", "manufacturer": "Marc Cain", "include_nos": true },
+      "notes": "'toute la marque / NOS inclus' → get_brand_ranking(include_nos=true), pas get_sales_analysis. 'ce printemps' → p26 (via liveContext)."
+    },
+    {
+      "id": "sales_scope_marque_saison_ambigu",
+      "category": "périmètre marque+saison — ambigu (doit poser Q)",
+      "question": "Combien j'ai vendu de Brax en P26",
+      "expected_tool": "__ASK_CLARIFICATION__",
+      "expected_params": {},
+      "notes": "Marque + saison sans scope explicite → NE PAS appeler de tool, poser la question CLARIFICATION PÉRIMÈTRE MARQUE (collection seulement vs toute la marque)."
+    },
+    {
+      "id": "sales_by_size_specific",
+      "category": "ventes par taille précise",
+      "question": "combien de taille 44 j'ai vendu à la boutique de Saint-Bruno dans les 12 dernière semaine de la marque oUi",
+      "expected_tool": "get_sales_by_variant",
+      "expected_params": { "manufacturer": "oUi", "size": "44", "shop_id": "Saint-Bruno", "period": "last_12_weeks" },
+      "notes": "'combien de taille X vendu' + taille explicite → get_sales_by_variant (pas get_sales_analysis)."
+    },
+    {
+      "id": "sales_by_category_singular",
+      "category": "ventes catégorie sur période",
+      "question": "peux tu me dire combien de bermuda dans toutes les marques j'ai vendu a la boutique valerie simon depuis le 1er janvier",
+      "expected_tool": "get_sales_by_variant",
+      "expected_alternatives": ["get_sales_analysis"],
+      "expected_params": { "category": "Bermuda", "shop_id": "Valérie Simon", "date_from": "2026-01-01" },
+      "notes": "Type produit sans marque précise → get_sales_analysis(category=X) acceptable ; get_sales_by_variant si détail par variante attendu."
+    },
+    {
+      "id": "ranking_moins_st",
+      "category": "classement — pire ST",
+      "question": "quelle compagnie à Saint-Bruno j'ai eu le moins moins ST p26",
+      "expected_tool": "get_brand_ranking",
+      "expected_params": { "season": "p26", "shop_id": "Saint-Bruno", "sort_by": "st", "order": "asc" },
+      "notes": "'quelle compagnie a le moins/plus de X' → get_brand_ranking, JAMAIS get_top_performers ni get_sales_analysis."
+    },
+    {
+      "id": "ranking_filter_st_range",
+      "category": "classement avec filtre plage ST",
+      "question": "Liste-moi toutes les marques P26 avec un ST inférieur à 50%, collection seulement, toutes boutiques, triées par ST croissant",
+      "expected_tool": "get_brand_ranking",
+      "expected_params": { "season": "p26", "sort_by": "st", "max_st": 50, "include_nos": false },
+      "notes": "Filtre ST + collection seulement → get_brand_ranking avec max_st et include_nos=false."
+    },
+    {
+      "id": "ranking_top_performer_meilleure",
+      "category": "top performer — cache budget",
+      "question": "Meilleure marque cette saison ?",
+      "expected_tool": "get_top_performers",
+      "expected_alternatives": ["get_brand_ranking"],
+      "expected_params": { "season": "p26", "metric": "__any__", "order": "desc" },
+      "notes": "'meilleure/pire marque' → get_top_performers (rapide via cache) OU get_brand_ranking (frais, plus précis). Les deux OK."
+    },
+    {
+      "id": "sellthrough_brand_season_shop",
+      "category": "ST marque × saison × boutique",
+      "question": "peux tu me donner le st de Brax a saint-bruno pour p26?",
+      "expected_tool": "get_sellthrough_by_size",
+      "expected_params": { "manufacturer": "Brax", "season": "p26", "shop_id": "Saint-Bruno" },
+      "notes": "ST par marque + saison → get_sellthrough_by_size."
+    },
+    {
+      "id": "sellthrough_recu_followup",
+      "category": "follow-up — 'reçu' avec season",
+      "question": "et j'en avait recu combien de tager p26",
+      "expected_tool": "get_sellthrough_by_size",
+      "expected_params": { "season": "p26" },
+      "notes": "Follow-up 'reçu' + season → get_sellthrough_by_size. Filtres du tour précédent (manufacturer, shop_id, size) doivent être réutilisés."
+    },
+    {
+      "id": "sellthrough_size_specific_brand",
+      "category": "ST taille spécifique",
+      "question": "peux tu me dire la taille 48 à Valerie Simon de la marque Circolo p26",
+      "expected_tool": "get_sellthrough_by_size",
+      "expected_params": { "manufacturer": "Circolo", "size": "48", "season": "p26", "shop_id": "Valérie Simon" },
+      "notes": "Taille précise + saison + shop → get_sellthrough_by_size (pas get_sales_by_variant qui ne donne pas les reçus)."
+    },
+    {
+      "id": "sellthrough_since_date_no_season",
+      "category": "ST sur plage de date (pas de saison)",
+      "question": "donne moi le st de berwich depuis le 1er janvier",
+      "expected_tool": "get_sellthrough_by_size",
+      "expected_params": { "manufacturer": "Berwich", "date_from": "2026-01-01" },
+      "notes": "Note: get_sellthrough_by_size ignore date_from/date_to sauf via season. Le prompt le mentionne — le LLM peut poser Q ou ignorer les dates. Comportement attendu : tenter get_sellthrough_by_size, ou get_sales_analysis en fallback."
+    },
+    {
+      "id": "season_comparison_2_seasons",
+      "category": "comparaison 2 saisons — deltas",
+      "question": "Compare Brax P26 vs P25, collection seulement, saison complète",
+      "expected_tool": "get_season_comparison",
+      "expected_params": { "season1": "p26", "season2": "p25", "manufacturer": "Brax", "include_nos": false, "comparable_window": false },
+      "notes": "2 saisons + deltas → get_season_comparison (pas compare_seasons)."
+    },
+    {
+      "id": "season_comparison_n_seasons",
+      "category": "comparaison N saisons — absolu",
+      "question": "j'aimerais avoir le St hebdo de cette saison vs p25 et p24",
+      "expected_tool": "compare_seasons",
+      "expected_params": { "seasons": ["p26", "p25", "p24"] },
+      "notes": "3+ saisons côte à côte (pas de deltas explicites) → compare_seasons."
+    },
+    {
+      "id": "compare_two_periods",
+      "category": "comparaison multi-périodes (pas saisons)",
+      "question": "compare les ventes de juillet vs août pour Brax",
+      "expected_tool": "get_sales_analysis",
+      "expected_alternatives": ["MULTI_CALL"],
+      "expected_params": { "manufacturer": "Brax" },
+      "notes": "2 périodes calendaires → 2 appels séquentiels get_sales_analysis (juillet PUIS août). Comportement acceptable : 1er tool call = get_sales_analysis avec juillet."
+    },
+    {
+      "id": "inventory_at_date_today",
+      "category": "inventaire à date — aujourd'hui",
+      "question": "quel est le stock de la compagnie en $",
+      "expected_tool": "get_inventory_at_date",
+      "expected_params": {},
+      "notes": "Sans date = aujourd'hui. 'la compagnie' = pas de shop_id. Question sur VALEUR ($) → get_inventory_at_date (pas get_stock_levels)."
+    },
+    {
+      "id": "inventory_at_date_past",
+      "category": "inventaire à date — passée",
+      "question": "quel était le stock Brax à Saint-Sauveur hier",
+      "expected_tool": "get_inventory_at_date",
+      "expected_params": { "date": "__any__", "shop_id": "Saint-Sauveur", "manufacturer": "Brax" },
+      "notes": "'hier' → date=hier (le tool résout). Alternative acceptable : period='yesterday' si supporté."
+    },
+    {
+      "id": "inventory_specific_date_history",
+      "category": "inventaire à date lointaine (peut échouer)",
+      "question": "quel était le stock le 1er janvier 2020",
+      "expected_tool": "get_inventory_at_date",
+      "expected_params": { "date": "2020-01-01" },
+      "notes": "Date pré-historique — le tool peut retourner erreur 'aucun snapshot'. Le LLM doit choisir get_inventory_at_date quand même (tool correct, réponse dépend de la data)."
+    },
+    {
+      "id": "stock_levels_general",
+      "category": "stock actuel par boutique",
+      "question": "quels sont les niveaux de stock par boutique aujourd'hui ?",
+      "expected_tool": "get_inventory_at_date",
+      "expected_alternatives": ["get_stock_levels"],
+      "expected_params": {},
+      "notes": "'niveau de stock par boutique aujourd'hui' → get_inventory_at_date (canonique) OU get_stock_levels acceptables."
+    },
+    {
+      "id": "restock_recommendations",
+      "category": "réassort fournisseur",
+      "question": "Qu'est-ce que je dois réassortir chez Valérie Simon pour P26 ?",
+      "expected_tool": "get_restock_recommendations",
+      "expected_params": { "season": "p26", "shop_id": "Valérie Simon" },
+      "notes": "'réassortir' / 'quoi commander' → get_restock_recommendations."
+    },
+    {
+      "id": "matrix_info_by_style",
+      "category": "info modèle par style_ref",
+      "question": "le modele p11w96z est catégorisé comment",
+      "expected_tool": "get_matrix_info",
+      "expected_alternatives": ["resolve_search_term"],
+      "expected_params": { "description_search": "__any__" },
+      "notes": "Code style ambigu → resolve_search_term d'abord (idéal) ou get_matrix_info direct."
+    },
+    {
+      "id": "disambiguation_typo_brand",
+      "category": "typo marque — validation d'erreur",
+      "question": "peux tu me donner le total de $ réceptionner entre le 1mars et 15 juin à la boutique fan club pour Rafaelle rossi",
+      "expected_tool": "get_sales_analysis",
+      "expected_params": { "date_from": "2026-03-01", "date_to": "2026-06-15", "manufacturer": "__any__", "shop_id": "Fan Club" },
+      "notes": "Typo brand → LLM appelle avec le nom tel qu'écrit. Tool retourne marque_introuvable + suggestions. Réponse attendue = 'La marque X est introuvable. Vouliez-vous dire Raffaello Rossi ?'"
+    },
+    {
+      "id": "brand_scope_no_season",
+      "category": "marque sans saison — pas de scope Q",
+      "question": "Combien j'ai vendu de Marc Cain ce mois-ci",
+      "expected_tool": "get_sales_analysis",
+      "expected_params": { "period": "this_month", "manufacturer": "Marc Cain" },
+      "notes": "Marque SANS saison → PAS de question CLARIFICATION PÉRIMÈTRE (règle explicite). Appel direct autorisé."
+    },
+    {
+      "id": "pricing_analysis_discounts",
+      "category": "analyse remises / marge réelle",
+      "question": "quelle marque je solde le plus",
+      "expected_tool": "get_pricing_analysis",
+      "expected_params": { "sort_by": "taux_remise" },
+      "notes": "'je solde le plus' → get_pricing_analysis avec sort_by=taux_remise (défaut)."
+    },
+    {
+      "id": "no_tool_definition",
+      "category": "définition / clarification — pas de tool",
+      "question": "c'est quoi le sell-through au juste ?",
+      "expected_tool": null,
+      "expected_params": {},
+      "notes": "Question de définition — le prompt système contient la définition ST (voir CONTEXTE). Le bot doit répondre directement, ne JAMAIS forcer un tool call."
+    }
+  ]
+}
