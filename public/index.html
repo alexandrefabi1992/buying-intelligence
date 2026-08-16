@@ -7887,11 +7887,10 @@ const HelpPanel = (() => {
   async function load(forceReload) {
     const lang = currentLang || 'fr';
     if (helpData && helpData.__lang === lang && !forceReload) return;
-    try {
-      const r = await fetch('/api/help?lang=' + lang, { headers: { Authorization: 'Bearer ' + (getToken() || '') } });
-      helpData = await r.json();
-      helpData.__lang = lang;
-    } catch { helpData = { __lang: lang }; }
+    const r = await fetch('/api/help?lang=' + lang, { headers: { Authorization: 'Bearer ' + (getToken() || '') } });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' — vérifie ta session');
+    helpData = await r.json();
+    helpData.__lang = lang;
   }
 
   function currentTab() {
@@ -7906,13 +7905,33 @@ const HelpPanel = (() => {
     document.getElementById('help-expand-btn').title = isFullscreen ? t('help_shrink') : t('help_expand');
   }
 
+  function showFallback(msg) {
+    document.getElementById('help-content').innerHTML =
+      '<div style="padding:40px;text-align:center;color:#dc2626;font-size:14px;line-height:1.6">' +
+      '⚠ Impossible de charger l\'aide<br><br>' +
+      '<span style="color:#6b7280;font-size:12px">' + msg + '</span><br><br>' +
+      '<a href="#" onclick="location.reload();return false" style="color:#2563eb;text-decoration:underline">↺ Recharger la page</a>' +
+      '</div>';
+    document.getElementById('help-nav').innerHTML = '';
+    document.getElementById('help-overlay').classList.add('open');
+    document.getElementById('help-drawer').classList.add('open');
+  }
+
   return {
     async open(section) {
-      await load();
-      const key = section || currentTab();
-      renderSection(key);
-      document.getElementById('help-overlay').classList.add('open');
-      document.getElementById('help-drawer').classList.add('open');
+      try {
+        await load();
+        if (!helpData || Object.keys(helpData).filter(k => k !== '__lang').length === 0) {
+          throw new Error('contenu vide (endpoint /api/help)');
+        }
+        const key = section || currentTab();
+        renderSection(key);
+        document.getElementById('help-overlay').classList.add('open');
+        document.getElementById('help-drawer').classList.add('open');
+      } catch (e) {
+        console.error('[HelpPanel.open]', e);
+        showFallback(e.message || 'erreur inconnue');
+      }
     },
     close() {
       document.getElementById('help-overlay').classList.remove('open');
