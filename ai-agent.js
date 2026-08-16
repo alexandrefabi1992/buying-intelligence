@@ -3524,8 +3524,10 @@ Résolution du langage naturel :
     fullMessages.push(...results);
   }
 
+  const maxRoundsMsg = "Désolé, j'ai atteint la limite de traitement pour cette requête. Veuillez reformuler votre question.";
+  fullMessages.push({ role: 'assistant', content: maxRoundsMsg });
   return {
-    content:  "Désolé, j'ai atteint la limite de traitement pour cette requête. Veuillez reformuler votre question.",
+    content:  maxRoundsMsg,
     messages: fullMessages.slice(1),
   };
 }
@@ -3644,7 +3646,9 @@ Résolution du langage naturel :
     fullMessages.push(...results);
   }
 
-  onEvent({ type: 'done', content: "Désolé, j'ai atteint la limite de traitement. Veuillez reformuler.", messages: fullMessages.slice(1) });
+  const maxRoundsMsg = "Désolé, j'ai atteint la limite de traitement. Veuillez reformuler.";
+  fullMessages.push({ role: 'assistant', content: maxRoundsMsg });
+  onEvent({ type: 'done', content: maxRoundsMsg, messages: fullMessages.slice(1) });
 }
 
 module.exports = {
