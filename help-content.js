@@ -9,19 +9,19 @@ const HELP = {
     sections: [
       {
         heading: "Comment est structurée l'application",
-        body: "Buying Intelligence est organisée en 6 sections accessibles depuis la barre de navigation :\n\n- **📊 Budget** : calcul automatique du budget recommandé par marque\n- **🔄 NOS** : suivi et réapprovisionnement des articles permanents\n- **📐 Courbes tailles** : distribution des ventes par taille\n- **🔀 Transferts** : recommandations de mouvements inter-boutiques\n- **📝 Création de budget** : saisie et validation des budgets finaux\n- **⚙️ Paramètres** : configuration des saisons et des règles de calcul\n- **⚡ Vélocité** : performance des articles en cours de saison (page séparée)",
+        body: "Buying Intelligence est organisée en 8 onglets principaux + 2 pages séparées, accessibles depuis la barre de navigation :\n\n- **📊 Budget** : budget recommandé par marque pour une saison à venir\n- **🔄 NOS** : suivi et réapprovisionnement des articles permanents\n- **📐 Courbes tailles** : distribution des ventes par taille\n- **🔀 Transferts / Actions** : recommandations de mouvements inter-boutiques\n- **📝 Création de budget** : saisie des budgets validés + import de PDFs fournisseurs par drop\n- **📦 Historique stock** : évolution du stock dans le temps par boutique et marque\n- **💰 Comptabilité** : analyse escomptes vs terme complet par fournisseur\n- **⚙️ Paramètres** : saisons, paliers de multiplicateurs, config boutique\n\nPages séparées :\n- **⚡ Vélocité** : performance des articles en cours de saison\n- **Page marque** : détail complet d'une marque (cliquer sur une marque depuis Budget)",
       },
       {
         heading: "Flux de travail recommandé — préparation d'une saison",
-        body: "**1. Configurer la saison cible** (Paramètres → Saisons)\nDéfinir le code, les dates de réception et de vente pour la nouvelle saison.\n\n**2. Analyser le budget recommandé** (Budget → sélectionner la saison)\nConsulter les budgets par marque. Identifier les hausses, baisses et alertes.\n\n**3. Consulter le détail par marque**\nCliquer sur une marque pour voir le détail par saison de référence, le sell-through historique et la courbe de ventes.\n\n**4. Vérifier les courbes tailles** (section Courbes tailles)\nValider la répartition des commandes par taille pour chaque marque.\n\n**5. Saisir les budgets validés** (Création de budget)\nEntrer les montants finaux par marque, drop et boutique.\n\n**6. Surveiller en cours de saison** (Vélocité)\nSuivre le rythme de vente semaine par semaine et agir rapidement.",
+        body: "**1. Configurer la saison cible** (Paramètres → Saisons)\nDéfinir le code, les dates de réception et de vente pour la nouvelle saison.\n\n**2. Analyser le budget recommandé** (Budget → sélectionner la saison)\nConsulter les budgets par marque. Identifier les hausses, baisses et alertes.\n\n**3. Consulter le détail par marque**\nCliquer sur une marque pour voir le détail par saison de référence, le sell-through historique et la courbe de ventes.\n\n**4. Vérifier les courbes tailles** (section Courbes tailles)\nValider la répartition des commandes par taille pour chaque marque.\n\n**5. Saisir les budgets validés** (Création de budget)\nEntrer les montants finaux par marque, drop et boutique.\n\n**6. Importer les PDFs fournisseurs** (Création de budget → bouton Importer par drop)\nUploader chaque bon de commande, prévisualiser les articles extraits, ajuster catégorie/retail, puis pousser vers Lightspeed en un clic. Voir la section **Import de commandes fournisseur** pour le détail.\n\n**7. Surveiller en cours de saison** (Vélocité)\nSuivre le rythme de vente semaine par semaine et agir rapidement.",
       },
       {
         heading: "Glossaire des termes clés",
-        body: "- **Saison** : période de collection identifiée par un code (ex. P26 = Printemps 2026, A26 = Automne 2026).\n- **Sell-through (ST)** : % des articles reçus qui ont été vendus. ST = ventes / réceptions × 100.\n- **Réceptions impliquées** : estimation des articles commandés = articles vendus + stock restant taggé avec la saison.\n- **Base blendée** : moyenne des réceptions et des ventes — ancre le budget à la demande réelle, pas seulement aux achats passés.\n- **Carryover** : stock invendu d'une saison qui se reportera sur la suivante. Déduit du budget net.\n- **Drop** : livraison planifiée au sein d'une saison (ex. Drop 1 = janvier, Drop 2 = mars).\n- **NOS** : Never Out of Stock — articles permanents non liés à une saison.\n- **Facteur de récence** : poids accordé aux saisons récentes dans la moyenne. Un facteur de 2 signifie que la saison la plus récente compte 2× plus que la précédente.",
+        body: "- **Saison** : période de collection identifiée par un code (ex. P26 = Printemps 2026, A26 = Automne 2026).\n- **Sell-through (ST)** : % des articles reçus qui ont été vendus. ST = ventes / réceptions × 100.\n- **Réceptions impliquées** : estimation des articles commandés = articles vendus + stock restant taggé avec la saison.\n- **Base blendée** : moyenne des réceptions et des ventes — ancre le budget à la demande réelle, pas seulement aux achats passés.\n- **Carryover** : stock invendu d'une saison qui se reportera sur la suivante. Déduit du budget net.\n- **Drop** : livraison planifiée au sein d'une saison (ex. Drop 1 = janvier, Drop 2 = mars).\n- **NOS** : Never Out of Stock — articles permanents non liés à une saison.\n- **Facteur de récence** : poids accordé aux saisons récentes dans la moyenne. Un facteur de 2 signifie que la saison la plus récente compte 2× plus que la précédente.\n- **Matrice (Lightspeed)** : modèle regroupant toutes ses tailles/couleurs sous une même référence.\n- **Style-resolver** : logique qui détecte si une matrice existe déjà à l'import — pour ajouter des variantes plutôt que dupliquer.",
       },
       {
-        heading: "L'assistant IA",
-        body: "Le bouton de l'assistant IA (en bas à droite de l'écran) donne accès à un chatbot capable de :\n- Interroger directement la base de données (ventes, stock, sell-through)\n- Calculer des budgets ou des courbes tailles à la demande\n- Recommander des transferts\n- Répondre à des questions sur le fonctionnement de l'application\n\nExemples de questions : *« Quel est le ST de la marque Brax en P26 ? »*, *« Quels articles de Saint-Bruno devraient être transférés à Fan Club ? »*, *« Comment fonctionne le carryover ? »*",
+        heading: "L'assistant IA (Cortex)",
+        body: "Cortex est disponible en bas à droite **sur toutes les pages** (accueil, page marque, page modèle, vélocité). Il est propulsé par Claude Haiku 4.5.\n\nCapacités :\n- Interroger directement la base de données (ventes, stock, sell-through, historique)\n- Calculer des budgets, courbes tailles, comparaisons inter-saisons à la demande\n- Recommander des transferts et des réassorts\n- Analyser les escomptes fournisseurs\n- Répondre à des questions sur le fonctionnement de l'application\n\n**Contexte automatique** : sur la page marque, Cortex sait que tu regardes cette marque — tu peux demander *« quel est le ST cette saison ? »* sans nommer la marque. Sur l'onglet Transferts, ses suggestions se centrent sur le mouvement inter-boutiques.\n\nExemples de questions : *« ST de la marque Brax en P26 ? »*, *« Quoi transférer à Fan Club ? »*, *« Compare Brax vs Marc Cain cette saison »*, *« Comment fonctionne le carryover ? »*",
       },
     ],
   },
@@ -151,6 +151,10 @@ const HELP = {
         heading: 'Suivi et export',
         body: "- **Comparaison recommandé / saisi** : le budget recommandé par l'algorithme est affiché en regard du budget saisi pour faciliter la validation.\n- **Export** : le budget complet peut être exporté en CSV pour intégration dans un système comptable ou partage avec un fournisseur.",
       },
+      {
+        heading: 'Import de PDFs fournisseurs par drop',
+        body: "Chaque cellule marque × drop affiche un bouton **Importer** qui change de couleur selon l'état :\n\n- **Importer** (gris) : aucun PDF encore importé pour ce drop\n- **✨ Importer** (indigo) : une pré-analyse est en cours ou disponible — le PDF a été attaché et le LLM a déjà lu son contenu en arrière-plan\n- **📄 Voir importation** (vert) : une importation a déjà été poussée à Lightspeed pour ce drop\n\nCliquer ouvre le panneau de prévisualisation plein écran. Voir la section **Import de commandes fournisseur** pour tout le workflow (extraction, ajustement catégorie/retail, push vers Lightspeed).",
+      },
     ],
   },
 
@@ -234,6 +238,42 @@ const HELP = {
     ],
   },
 
+  imports: {
+    title: 'Import de commandes fournisseur',
+    icon: '📥',
+    summary: "Importer un PDF de bon de commande fournisseur, prévisualiser les articles extraits, ajuster catégorie et prix retail, puis pousser la commande vers Lightspeed en un clic.",
+    sections: [
+      {
+        heading: "Où se trouve la fonctionnalité",
+        body: "L'import est accessible depuis l'onglet **Création de budget**. Pour chaque cellule marque × drop, un bouton **Importer** apparaît (voir section Création de budget → Import de PDFs fournisseurs par drop pour les couleurs de statut).\n\nCliquer le bouton ouvre le panneau de prévisualisation plein écran.",
+      },
+      {
+        heading: "Deux voies d'extraction",
+        body: "Selon le fournisseur, l'extraction du PDF passe par une de deux voies :\n\n**Recette déterministe** (rapide, gratuit)\nCertains fournisseurs (Oui, Bugatchi) ont un format PDF stable. Une recette JSON extrait les données en < 1 seconde, sans appel LLM. Résultats prévisibles.\n\n**Extraction LLM** (Claude Haiku 4.5, quelques cents par extraction)\nPour tous les autres fournisseurs (Meyer, Marc Cain, Brax, Fradi, Numph, Des Petits Hauts, Liu Jo, Patrick Assaraf, Marcoliani, Nile…), le PDF est envoyé à un LLM qui extrait les articles selon un prompt entraîné sur ~11 formats fournisseur. Prend 20-90 secondes selon la taille du PDF.",
+      },
+      {
+        heading: "Le panneau de prévisualisation",
+        body: "Une fois l'extraction terminée, tu vois :\n\n- **Résumé** : nombre de matrices, unités totales, coût total, validation des totaux vs le document PDF\n- **Bandeau rouge** si extraction incomplète (cost_deviation, size_mismatch, etc.) — tu peux le fermer avec ✕ pour continuer\n- **Tableau des matrices** : une ligne par modèle × couleur, avec :\n  - Prix retail éditable en ligne (override si différent du PDF)\n  - Catégorie Lightspeed (clic → picker en arborescence)\n  - Poignée ↓ à droite pour appliquer la même catégorie à plusieurs lignes en glissant (style Google Sheets)\n  - Bouton **Multiplicateur** pour appliquer un ratio retail/coût à toutes les lignes d'un coup\n- **Actions en haut** : Ré-extraire IA · Recharger · Abandonner · Supprimer · **Pousser vers Lightspeed**",
+      },
+      {
+        heading: "Personnalisation avant push",
+        body: "Avant de pousser à Lightspeed, tu peux ajuster :\n\n- **Nom personnalisé du PO** (customer_reference) : par défaut le nom du fichier PDF, mais modifiable\n- **Catégorie Lightspeed** par ligne ou en batch (drag-fill style Google Sheets)\n- **Retail price** par ligne — override le prix trouvé dans le PDF\n- **Multiplicateur retail** appliqué à tout : ex. PDF sans retail → applique ×2.4 sur le coût pour générer le retail\n\nCes overrides sont sauvegardés en base immédiatement. Si tu quittes le panneau puis y reviens, tes ajustements sont conservés.",
+      },
+      {
+        heading: "Le workflow de push vers Lightspeed",
+        body: "Cliquer **Pousser vers Lightspeed** déclenche :\n\n1. Le PO est mis en queue (statut `pushing`)\n2. Pour chaque matrice : vérification si elle existe déjà dans Lightspeed (via style-resolver)\n3. **Créer** une nouvelle matrice OU **Compléter** une matrice existante en y ajoutant les nouvelles variantes\n4. Le PO Lightspeed est créé avec toutes les OrderLines\n5. Statut final : `pushed` (tout OK) ou `partial` (certaines lignes ont échoué — visibles en rouge dans la preview)\n\nUn drop pushé peut être **abandonné** (revient à `previewed`) — mais un statut `pushed` définitif ne peut plus être re-poussé sans reset de l'extraction.",
+      },
+      {
+        heading: "Statuts d'un fichier importé",
+        body: "| Statut | Signification |\n|---|---|\n| `awaiting_extraction` | Fichier uploadé, pas encore analysé par LLM |\n| `extracting` | Extraction LLM en cours (peut prendre 90s) |\n| `extraction_failed` | Échec — voir last_extraction_error, cliquer ✨ Ré-extraire IA |\n| `previewed` | Extraction OK, prêt à personnaliser + pousser |\n| `pushing` | Push vers Lightspeed en cours |\n| `pushed` | Toutes lignes créées à Lightspeed avec succès |\n| `partial` | Certaines lignes ont échoué (voir les rows rouges dans la preview) |\n| `abandoned` | Push annulé volontairement, données conservées mais LS non modifié |",
+      },
+      {
+        heading: "Diagnostic quand ça déraille",
+        body: "**Le PDF n'est pas reconnu par une recette** : vérifier qu'il n'est pas scanné (image sans texte extractible). Les recettes détectent par mots-clés du texte extrait. Fallback : l'extraction LLM est tentée automatiquement.\n\n**Extraction bloquée en `extracting`** : plus de 3 minutes → automatique reset à `awaiting_extraction` au prochain boot du serveur. Sinon cliquer ✨ Ré-extraire IA manuellement.\n\n**Total ne matche pas le document** : le bandeau rouge liste les problèmes. Les plus fréquents :\n- `cost_deviation` : ligne annulée non détectée, retail confondu avec coût, ou taxe incluse\n- `size_mismatch_suspected` : colonnes de tailles mal alignées (Marc Cain column-shift)\n- `missing_variants` : rows sautées par le LLM\n\n**Doublon détecté** (409 Conflict) : upload d'un PDF déjà présent avec même hash. Renommer le fichier, ou reset l'ancien import via ✨ Ré-extraire IA.",
+      },
+    ],
+  },
+
   'inv-history': {
     title: 'Historique stock',
     icon: '📦',
@@ -277,19 +317,19 @@ const HELP_EN = {
     sections: [
       {
         heading: "How the application is structured",
-        body: "Buying Intelligence is organized into 6 sections accessible from the navigation bar:\n\n- **📊 Budget**: automatic recommended budget calculation by brand\n- **🔄 NOS**: tracking and replenishment of permanent items\n- **📐 Size Curves**: sales distribution by size\n- **🔀 Transfers**: inter-store movement recommendations\n- **📝 Budget Planning**: entering and validating final budgets\n- **⚙️ Settings**: season configuration and calculation rules\n- **⚡ Velocity**: in-season item performance (separate page)",
+        body: "Buying Intelligence is organized into 8 main tabs + 2 separate pages, accessible from the navigation bar:\n\n- **📊 Budget**: recommended budget by brand for an upcoming season\n- **🔄 NOS**: tracking and replenishment of permanent items\n- **📐 Size Curves**: sales distribution by size\n- **🔀 Transfers / Actions**: inter-store movement recommendations\n- **📝 Budget Planning**: entering validated budgets + PDF supplier imports per drop\n- **📦 Inventory History**: stock evolution over time by store and brand\n- **💰 Accounting**: discount vs full term analysis by supplier\n- **⚙️ Settings**: seasons, multiplier tiers, store config\n\nSeparate pages:\n- **⚡ Velocity**: in-season item performance\n- **Brand page**: full brand detail (click a brand from Budget)",
       },
       {
         heading: "Recommended workflow — season preparation",
-        body: "**1. Configure the target season** (Settings → Seasons)\nDefine the code, receipt dates and sales dates for the new season.\n\n**2. Analyze the recommended budget** (Budget → select the season)\nReview budgets by brand. Identify increases, decreases and alerts.\n\n**3. Review brand details**\nClick on a brand to see the breakdown by reference season, historical sell-through and sales curve.\n\n**4. Check size curves** (Size Curves section)\nValidate the order distribution by size for each brand.\n\n**5. Enter validated budgets** (Budget Planning)\nEnter final amounts by brand, drop and store.\n\n**6. Monitor during the season** (Velocity)\nTrack weekly sales pace and act quickly.",
+        body: "**1. Configure the target season** (Settings → Seasons)\nDefine the code, receipt dates and sales dates for the new season.\n\n**2. Analyze the recommended budget** (Budget → select the season)\nReview budgets by brand. Identify increases, decreases and alerts.\n\n**3. Review brand details**\nClick on a brand to see the breakdown by reference season, historical sell-through and sales curve.\n\n**4. Check size curves** (Size Curves section)\nValidate the order distribution by size for each brand.\n\n**5. Enter validated budgets** (Budget Planning)\nEnter final amounts by brand, drop and store.\n\n**6. Import supplier PDFs** (Budget Planning → Import button per drop)\nUpload each purchase order, preview the extracted items, adjust category/retail, then push to Lightspeed in one click. See the **Supplier Order Import** section for details.\n\n**7. Monitor during the season** (Velocity)\nTrack weekly sales pace and act quickly.",
       },
       {
         heading: "Key terms glossary",
-        body: "- **Season**: a collection period identified by a code (e.g. P26 = Spring 2026, A26 = Fall 2026).\n- **Sell-through (ST)**: % of received items that were sold. ST = sales / receipts × 100.\n- **Implied receipts**: estimated ordered items = items sold + remaining stock tagged with the season.\n- **Blended base**: average of receipts and sales — anchors the budget to real demand, not just past purchases.\n- **Carryover**: unsold stock from a season that carries over to the next. Deducted from the net budget.\n- **Drop**: a planned delivery within a season (e.g. Drop 1 = January, Drop 2 = March).\n- **NOS**: Never Out of Stock — permanent items not tied to a season.\n- **Recency factor**: weight given to recent seasons in the average. A factor of 2 means the most recent season counts 2× more than the previous one.",
+        body: "- **Season**: a collection period identified by a code (e.g. P26 = Spring 2026, A26 = Fall 2026).\n- **Sell-through (ST)**: % of received items that were sold. ST = sales / receipts × 100.\n- **Implied receipts**: estimated ordered items = items sold + remaining stock tagged with the season.\n- **Blended base**: average of receipts and sales — anchors the budget to real demand, not just past purchases.\n- **Carryover**: unsold stock from a season that carries over to the next. Deducted from the net budget.\n- **Drop**: a planned delivery within a season (e.g. Drop 1 = January, Drop 2 = March).\n- **NOS**: Never Out of Stock — permanent items not tied to a season.\n- **Recency factor**: weight given to recent seasons in the average. A factor of 2 means the most recent season counts 2× more than the previous one.\n- **Matrix (Lightspeed)**: a model grouping all its sizes/colors under a single reference.\n- **Style-resolver**: logic that detects if a matrix already exists at import — to add variants rather than duplicate.",
       },
       {
-        heading: "The AI assistant",
-        body: "The AI assistant button (bottom right of the screen) gives access to a chatbot that can:\n- Query the database directly (sales, inventory, sell-through)\n- Calculate budgets or size curves on demand\n- Recommend transfers\n- Answer questions about how the application works\n\nExample questions: *\"What is the ST for the Brax brand in P26?\"*, *\"Which items at Saint-Bruno should be transferred to Fan Club?\"*, *\"How does carryover work?\"*",
+        heading: "The AI assistant (Cortex)",
+        body: "Cortex is available at the bottom right **on every page** (home, brand page, model page, velocity). Powered by Claude Haiku 4.5.\n\nCapabilities:\n- Query the database directly (sales, inventory, sell-through, history)\n- Calculate budgets, size curves, cross-season comparisons on demand\n- Recommend transfers and reorders\n- Analyze supplier discounts\n- Answer questions about how the application works\n\n**Automatic context**: on the brand page, Cortex knows you're looking at that brand — you can ask *\"what's the ST this season?\"* without naming the brand. On the Transfers tab, its suggestions center on inter-store movements.\n\nExample questions: *\"ST for Brax in P26?\"*, *\"What to transfer to Fan Club?\"*, *\"Compare Brax vs Marc Cain this season\"*, *\"How does carryover work?\"*",
       },
     ],
   },
@@ -419,6 +459,10 @@ const HELP_EN = {
         heading: 'Tracking and export',
         body: "- **Recommended vs entered comparison**: the algorithm's recommended budget is displayed alongside the entered budget for easy validation.\n- **Export**: the complete budget can be exported as CSV for integration into an accounting system or sharing with a supplier.",
       },
+      {
+        heading: 'Supplier PDF imports per drop',
+        body: "Each brand × drop cell displays an **Import** button whose color reflects its state:\n\n- **Import** (grey): no PDF imported yet for this drop\n- **✨ Import** (indigo): pre-analysis in progress or available — PDF attached and LLM already read its content in the background\n- **📄 View import** (green): an import has already been pushed to Lightspeed for this drop\n\nClicking opens the full-screen preview panel. See the **Supplier Order Import** section for the complete workflow (extraction, category/retail adjustment, push to Lightspeed).",
+      },
     ],
   },
 
@@ -498,6 +542,42 @@ const HELP_EN = {
       {
         heading: 'Cost of capital',
         body: "The cost of capital is the central parameter of the comparison. It represents what money is worth to the company — either the borrowing rate if in overdraft, or the alternative return on cash.\n\n**Default: 8%/year.** Adjust in the page header according to the actual financial situation. The value is saved and applies to all brands.",
+      },
+    ],
+  },
+
+  imports: {
+    title: 'Supplier Order Import',
+    icon: '📥',
+    summary: "Import a supplier PDF purchase order, preview extracted items, adjust category and retail price, then push the order to Lightspeed in one click.",
+    sections: [
+      {
+        heading: "Where the feature lives",
+        body: "The import lives under the **Budget Planning** tab. Each brand × drop cell shows an **Import** button (see Budget Planning → Supplier PDF imports per drop for the status colors).\n\nClicking the button opens the full-screen preview panel.",
+      },
+      {
+        heading: "Two extraction paths",
+        body: "Depending on the supplier, PDF extraction follows one of two paths:\n\n**Deterministic recipe** (fast, free)\nSome suppliers (Oui, Bugatchi) have a stable PDF format. A JSON recipe extracts the data in < 1 second, no LLM call. Predictable results.\n\n**LLM extraction** (Claude Haiku 4.5, a few cents per extraction)\nFor all other suppliers (Meyer, Marc Cain, Brax, Fradi, Numph, Des Petits Hauts, Liu Jo, Patrick Assaraf, Marcoliani, Nile…), the PDF is sent to an LLM that extracts items according to a prompt trained on ~11 supplier formats. Takes 20-90 seconds depending on PDF size.",
+      },
+      {
+        heading: "The preview panel",
+        body: "Once extraction completes, you see:\n\n- **Summary**: number of matrices, total units, total cost, validation of totals vs the PDF document\n- **Red banner** if extraction is incomplete (cost_deviation, size_mismatch, etc.) — closeable with ✕ to keep going\n- **Matrices table**: one row per model × color, with:\n  - Inline editable retail price (override if different from PDF)\n  - Lightspeed category (click → tree picker)\n  - ↓ drag handle on the right to apply the same category to multiple rows by dragging (Google Sheets style)\n  - **Multiplier** button to apply a retail/cost ratio to all rows at once\n- **Top actions**: Re-extract AI · Reload · Abandon · Delete · **Push to Lightspeed**",
+      },
+      {
+        heading: "Customization before push",
+        body: "Before pushing to Lightspeed, you can adjust:\n\n- **Custom PO name** (customer_reference): defaults to the PDF filename, but editable\n- **Lightspeed category** per row or in batch (drag-fill Google Sheets style)\n- **Retail price** per row — overrides the price found in the PDF\n- **Retail multiplier** applied to all: e.g. PDF without retail → apply ×2.4 on cost to generate retail\n\nThese overrides are saved to the database immediately. If you leave the panel and come back, your adjustments are preserved.",
+      },
+      {
+        heading: "The push-to-Lightspeed workflow",
+        body: "Clicking **Push to Lightspeed** triggers:\n\n1. The PO is queued (status `pushing`)\n2. For each matrix: check if it already exists in Lightspeed (via style-resolver)\n3. **Create** a new matrix OR **Complete** an existing matrix by adding new variants to it\n4. The Lightspeed PO is created with all OrderLines\n5. Final status: `pushed` (all OK) or `partial` (some lines failed — visible in red in the preview)\n\nA pushed drop can be **abandoned** (reverts to `previewed`) — but a definitive `pushed` status cannot be re-pushed without resetting the extraction.",
+      },
+      {
+        heading: "File statuses",
+        body: "| Status | Meaning |\n|---|---|\n| `awaiting_extraction` | File uploaded, not yet analyzed by LLM |\n| `extracting` | LLM extraction in progress (may take 90s) |\n| `extraction_failed` | Failed — see last_extraction_error, click ✨ Re-extract AI |\n| `previewed` | Extraction OK, ready to customize + push |\n| `pushing` | Push to Lightspeed in progress |\n| `pushed` | All lines successfully created in Lightspeed |\n| `partial` | Some lines failed (see red rows in preview) |\n| `abandoned` | Push canceled intentionally, data kept but LS not modified |",
+      },
+      {
+        heading: "Troubleshooting when things go wrong",
+        body: "**PDF not recognized by a recipe**: check it's not scanned (image without extractable text). Recipes detect by keywords from extracted text. Fallback: LLM extraction is attempted automatically.\n\n**Extraction stuck at `extracting`**: over 3 minutes → automatic reset to `awaiting_extraction` at next server boot. Otherwise click ✨ Re-extract AI manually.\n\n**Total doesn't match the document**: the red banner lists issues. Most common:\n- `cost_deviation`: cancelled row not detected, retail confused with cost, or tax included\n- `size_mismatch_suspected`: size columns misaligned (Marc Cain column-shift)\n- `missing_variants`: rows skipped by the LLM\n\n**Duplicate detected** (409 Conflict): upload of a PDF already present with same hash. Rename the file, or reset the old import via ✨ Re-extract AI.",
       },
     ],
   },
