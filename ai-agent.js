@@ -11,6 +11,12 @@ const { createProvider, SYSTEM_PROMPT, buildSystemPrompt } = require('./ai-provi
 
 const MAX_TOOL_ROUNDS = 6; // safety limit against infinite loops
 
+// Injected as a system message when the LLM returns empty content + no tool call
+// (a "silence"). Applied once per turn as a nudge; if the retry also silences,
+// we surface an explicit error to the user rather than an empty bubble.
+const EMPTY_RESPONSE_NUDGE = "Le tour précédent n'a produit ni texte ni appel d'outil. Interprète le dernier message utilisateur dans le contexte de l'échange précédent (dernier tool appelé + son résultat si applicable) et choisis MAINTENANT une action : soit appeler un outil pertinent, soit poser UNE question de clarification claire en français. NE PAS rester silencieux.";
+const FINAL_SILENCE_MSG = "Je n'ai pas pu générer une réponse même après relance. Reformulez votre question ou soyez plus spécifique.";
+
 // ---------------------------------------------------------------------------
 // Helper: extract size label from a variant description.
 // Handles alpha sizes (XS–3X) and numeric (28–115, 14.5–18.5).
@@ -3495,11 +3501,30 @@ Résolution du langage naturel :
     ...messages,
   ];
 
+  let retriedEmpty = false;
+
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const response = await provider.complete(fullMessages);
+    const complContent = String(response.content ?? '').trim();
+    const hasToolCalls = response.tool_calls?.length > 0;
+
+    // Silence detected: no tool call AND no textual content. Retry once with a
+    // nudge system message; if the retry also silences, give up with an explicit
+    // error rather than returning an empty response.
+    if (!hasToolCalls && !complContent) {
+      if (!retriedEmpty) {
+        console.warn('[chatbot] empty response on round ' + round + ' — retrying with nudge');
+        fullMessages.push({ role: 'system', content: EMPTY_RESPONSE_NUDGE });
+        retriedEmpty = true;
+        continue;
+      }
+      fullMessages.push({ role: 'assistant', content: FINAL_SILENCE_MSG });
+      return { content: FINAL_SILENCE_MSG, messages: fullMessages.slice(1) };
+    }
+
     fullMessages.push(response.message);
 
-    if (!response.tool_calls?.length) {
+    if (!hasToolCalls) {
       // Final text response — return content and updated history (without system prompt)
       return {
         content:  response.content,
@@ -3604,14 +3629,32 @@ Résolution du langage naturel :
   const systemContent = basePrompt + liveContext;
 
   const fullMessages = [{ role: 'system', content: systemContent }, ...messages];
+  let retriedEmpty = false;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     // Check if this is the final round (no tool calls expected) — use streaming
     // We always try non-streaming first to detect tool calls; only stream the final answer
     const response = await provider.complete(fullMessages);
+    const complContent = String(response.content ?? '').trim();
+    const hasToolCalls = response.tool_calls?.length > 0;
+
+    // Silence detected on the non-streaming probe: retry once with a nudge.
+    if (!hasToolCalls && !complContent) {
+      if (!retriedEmpty) {
+        console.warn('[chatbot-stream] empty response on round ' + round + ' — retrying with nudge');
+        fullMessages.push({ role: 'system', content: EMPTY_RESPONSE_NUDGE });
+        retriedEmpty = true;
+        continue;
+      }
+      fullMessages.push({ role: 'assistant', content: FINAL_SILENCE_MSG });
+      onEvent({ type: 'token', text: FINAL_SILENCE_MSG });
+      onEvent({ type: 'done', content: FINAL_SILENCE_MSG, messages: fullMessages.slice(1) });
+      return;
+    }
+
     fullMessages.push(response.message);
 
-    if (!response.tool_calls?.length) {
+    if (!hasToolCalls) {
       // Final response — re-issue as streaming call for token-by-token output.
       // noTools=true prevents Mistral from switching to a tool call mid-stream.
       fullMessages.pop();
