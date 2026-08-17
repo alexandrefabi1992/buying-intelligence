@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Configuration — Buying Intelligence</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: {
+        indigo: { 50:'#eef2f1',100:'#dbe4e2',200:'#b7c9c6',300:'#8fa9a4',400:'#5b7f78',500:'#3a635e',600:'#213b39',700:'#152826',800:'#0e1c1a',900:'#040807' },
+        blue:   { 50:'#f0f4f4',100:'#dbe4e2',200:'#b7c9c6',300:'#8fa9a4',400:'#5b7f78',500:'#3a635e',600:'#213b39',700:'#152826',800:'#0e1c1a',900:'#040807' },
+        purple: { 50:'#f5ede8',100:'#e5cec5',200:'#d4afa1',300:'#c48b76',400:'#b47e69',500:'#ad7460',600:'#8a5a48',700:'#6d4535' },
+        vs: { taupe:'#e6ded7', cream:'#f7f4ef', sage:'#a1aea3', emerald:'#213b39', brique:'#ad7460' },
+      },
+      fontFamily: { sans:['Inter','system-ui','sans-serif'], heading:['Poppins','Inter','sans-serif'] },
+    }}};
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
   <style>
     .step { display: none; }
     .step.active { display: block; }

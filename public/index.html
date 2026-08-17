@@ -5,10 +5,130 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Buying Intelligence</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Valérie Simon brand palette override — remap Tailwind's indigo/blue/purple to VS colors
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            // indigo → vert émeraude (primary structural)
+            indigo: {
+              50:'#eef2f1', 100:'#dbe4e2', 200:'#b7c9c6', 300:'#8fa9a4', 400:'#5b7f78',
+              500:'#3a635e', 600:'#213b39', 700:'#152826', 800:'#0e1c1a', 900:'#040807',
+            },
+            // blue-600/700 (primary buttons) → émeraude ; lighter blues stay neutral
+            blue: {
+              50:'#f0f4f4', 100:'#dbe4e2', 200:'#b7c9c6', 300:'#8fa9a4', 400:'#5b7f78',
+              500:'#3a635e', 600:'#213b39', 700:'#152826', 800:'#0e1c1a', 900:'#040807',
+            },
+            // purple (admin) → brique
+            purple: {
+              50:'#f5ede8', 100:'#e5cec5', 200:'#d4afa1', 300:'#c48b76',
+              400:'#b47e69', 500:'#ad7460', 600:'#8a5a48', 700:'#6d4535',
+            },
+            // Custom VS tokens
+            vs: {
+              taupe:'#e6ded7', cream:'#f7f4ef', sage:'#a1aea3',
+              emerald:'#213b39', brique:'#ad7460',
+            },
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            heading: ['Poppins', 'Inter', 'sans-serif'],
+          },
+        }
+      }
+    };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    .tab-active   { border-bottom: 2px solid #1d4ed8; color: #1d4ed8; font-weight: 600; }
+    * { -webkit-font-smoothing: antialiased; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .font-heading, h1, h2, h3 { font-family: 'Poppins', 'Inter', sans-serif; }
+
+    /* Sidebar (VS design) — replaces the top nav */
+    .vs-sidebar {
+      width: 232px; background: #f7f4ef; border-right: 1px solid #e6ded7;
+      display: flex; flex-direction: column; flex-shrink: 0;
+      position: relative; transition: width 0.2s ease;
+    }
+    .vs-sidebar.collapsed { width: 68px; }
+    .vs-sidebar.collapsed .vs-title,
+    .vs-sidebar.collapsed .vs-subtitle,
+    .vs-sidebar.collapsed .vs-group-label,
+    .vs-sidebar.collapsed .vs-nav-label,
+    .vs-sidebar.collapsed .vs-user-info,
+    .vs-sidebar.collapsed .vs-footer-btn-label { display: none; }
+    .vs-sidebar.collapsed .vs-brand { justify-content: center; padding: 16px 12px; }
+    .vs-sidebar.collapsed .tab, .vs-sidebar.collapsed .vs-nav-link { justify-content: center; padding: 10px 8px; margin: 1px 8px; }
+    .vs-sidebar.collapsed .vs-user-pill { justify-content: center; padding: 8px; }
+    .vs-collapse-btn {
+      position: absolute; top: 22px; right: -12px; z-index: 20;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: white; border: 1px solid #e6ded7;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+      color: #857c72; font-size: 12px;
+      transition: transform 0.15s, background 0.12s;
+    }
+    .vs-collapse-btn:hover { background: #f7f4ef; color: #2a2620; }
+    .vs-sidebar.collapsed .vs-collapse-btn { transform: rotate(180deg); }
+
+    .vs-brand { padding: 16px; border-bottom: 1px solid #e6ded7; display: flex; align-items: center; gap: 10px; }
+    .vs-mark {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg, #c48b76 0%, #ad7460 100%);
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 14px; font-weight: 700;
+      box-shadow: 0 2px 6px rgba(173, 116, 96, 0.28);
+    }
+    .vs-title { font-family: 'Poppins', 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: #2a2620; line-height: 1.2; }
+    .vs-subtitle { font-size: 10px; color: #857c72; }
+    .vs-group-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #a89f92; padding: 14px 20px 6px; }
+
+    /* Sidebar nav items — reuses .tab class so existing JS keeps working */
+    .vs-sidebar .tab, .vs-sidebar .vs-nav-link {
+      display: flex; align-items: center; gap: 11px; padding: 8px 12px;
+      margin: 1px 10px; border-radius: 8px; cursor: pointer;
+      color: #4d4640; font-size: 13px; font-weight: 500; text-align: left;
+      border: none; background: transparent; width: auto; text-decoration: none;
+      transition: background 0.12s, color 0.12s;
+    }
+    .vs-sidebar .tab:hover, .vs-sidebar .vs-nav-link:hover { background: #efeae1; color: #2a2620; }
+    /* Override the old border-bottom tab-active — sidebar uses bg + white text */
+    .vs-sidebar .tab.tab-active {
+      background: #213b39; color: white; border: none;
+      box-shadow: 0 1px 3px rgba(33, 59, 57, 0.25); font-weight: 600;
+    }
+    .vs-sidebar .tab.tab-active:hover { background: #152826; }
+    .vs-sidebar .tab.tab-inactive { border: none; color: #4d4640; }
+    .vs-nav-icon { width: 18px; text-align: center; font-size: 15px; flex-shrink: 0; }
+    .vs-nav-badge { margin-left: auto; font-size: 10px; padding: 1px 6px; background: rgba(255,255,255,0.25); border-radius: 8px; }
+    .vs-sidebar .tab:not(.tab-active) .vs-nav-badge { background: #e6ded7; color: #857c72; }
+
+    .vs-footer { border-top: 1px solid #e6ded7; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+    .vs-footer-row { display: flex; gap: 6px; align-items: center; }
+    .vs-lang-toggle { display: flex; border: 1px solid #e6ded7; border-radius: 6px; overflow: hidden; }
+    .vs-lang-btn { font-size: 10px; font-weight: 600; padding: 3px 8px; background: white; color: #a89f92; }
+    .vs-lang-btn.active { background: #213b39; color: white; }
+    .vs-footer-btn { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #857c72; padding: 5px 8px; border-radius: 6px; }
+    .vs-footer-btn:hover { background: #f7f4ef; color: #2a2620; }
+    .vs-user-pill {
+      margin-top: 6px; padding: 8px 10px; background: white;
+      border: 1px solid #e6ded7; border-radius: 10px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .vs-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: linear-gradient(135deg, #c48b76, #ad7460);
+      color: white; font-size: 12px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+
+    /* Legacy .tab-active (used outside sidebar) — kept for backward compat */
+    .tab-active   { border-bottom: 2px solid #213b39; color: #213b39; font-weight: 600; }
     .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; }
     .tab-inactive:hover { color: #374151; border-bottom-color: #d1d5db; }
     tr:hover td { background-color: #f8fafc; }
@@ -88,47 +208,73 @@
   </div>
 </div>
 
-<header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-  <div class="flex items-center gap-3">
-    <svg class="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-    </svg>
-    <h1 class="text-lg font-bold text-gray-900">Buying Intelligence</h1>
-  </div>
-  <div class="flex items-center gap-4">
-    <div id="syncStatus" class="text-xs text-gray-400">Chargement…</div>
-    <div id="tenantBadge" class="text-xs text-gray-400 hidden"></div>
-    <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-      <button id="lang-fr" onclick="setLanguage('fr')" class="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 border-r border-gray-200">FR</button>
-      <button id="lang-en" onclick="setLanguage('en')" class="text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600">EN</button>
+<div class="flex h-screen overflow-hidden">
+
+<!-- ══════════ SIDEBAR (VS design) ══════════ -->
+<aside id="vs-sidebar" class="vs-sidebar">
+  <button id="vs-collapse-btn" class="vs-collapse-btn" title="Réduire / agrandir la sidebar">‹</button>
+
+  <div class="vs-brand">
+    <div class="vs-mark">B</div>
+    <div>
+      <div class="vs-title">Buying Intelligence</div>
+      <div class="vs-subtitle" id="tenantBadge">—</div>
     </div>
-    <button onclick="handleLogout()" class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded hover:bg-gray-100 transition-colors" data-i18n="btn_logout">Déconnexion</button>
   </div>
-</header>
 
-<nav class="bg-white border-b border-gray-200 px-6 flex gap-6 items-center">
-  <button class="tab py-3 tab-active"   data-tab="budget"    data-i18n="tab_budget">Budget</button>
-  <button class="tab py-3 tab-inactive" data-tab="nos"       data-i18n="tab_nos">NOS</button>
-  <button class="tab py-3 tab-inactive" data-tab="sizes"     data-i18n="tab_sizes">Courbes tailles</button>
-  <button class="tab py-3 tab-inactive" data-tab="transfers" data-i18n="tab_transfers">Transferts / Actions</button>
-  <button class="tab py-3 tab-inactive" data-tab="plan"        data-i18n="tab_plan">Création de budget</button>
-  <button class="tab py-3 tab-inactive" data-tab="inv-history" data-i18n="tab_inv_history">Historique stock</button>
-  <button class="tab py-3 tab-inactive" data-tab="accounting" data-i18n="tab_accounting">Comptabilité</button>
-  <button class="tab py-3 tab-inactive" data-tab="params"      data-i18n="tab_params">Paramètres</button>
-  <a href="/velocity" class="py-2 px-3 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors" data-i18n="tab_velocity">Vélocité →</a>
-  <a href="/onboarding.html" class="ml-2 py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" data-i18n="tab_config">⚙ Configuration</a>
-  <button id="admin-btn" onclick="AdminPanel.open()" class="hidden ml-auto py-2 px-3 text-xs font-semibold text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-1.5" title="Administration">
-    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-    Admin
-  </button>
-  <button id="help-btn" onclick="HelpPanel.open()" class="ml-auto py-2 px-3 text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5" data-i18n-tip="help_btn_title" title="Guide d'utilisation">
-    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="currentColor" stroke-width="0"/></svg>
-    <span data-i18n="btn_help">Aide</span>
-  </button>
-</nav>
+  <nav class="flex-1 overflow-y-auto pb-4">
+    <div class="vs-group-label">Achats</div>
+    <button class="tab tab-active"   data-tab="budget"      data-i18n="tab_budget"><span class="vs-nav-icon">📊</span><span class="vs-nav-label">Budget</span></button>
+    <button class="tab tab-inactive" data-tab="nos"         data-i18n="tab_nos"><span class="vs-nav-icon">🔄</span><span class="vs-nav-label">NOS</span></button>
+    <button class="tab tab-inactive" data-tab="sizes"       data-i18n="tab_sizes"><span class="vs-nav-icon">📐</span><span class="vs-nav-label">Courbes tailles</span></button>
+    <button class="tab tab-inactive" data-tab="transfers"   data-i18n="tab_transfers"><span class="vs-nav-icon">🔀</span><span class="vs-nav-label">Transferts / Actions</span></button>
+    <button class="tab tab-inactive" data-tab="plan"        data-i18n="tab_plan"><span class="vs-nav-icon">📝</span><span class="vs-nav-label">Création de budget</span></button>
 
-<main class="p-6 max-w-7xl mx-auto">
+    <div class="vs-group-label">Analyse</div>
+    <button class="tab tab-inactive" data-tab="inv-history" data-i18n="tab_inv_history"><span class="vs-nav-icon">📦</span><span class="vs-nav-label">Historique stock</span></button>
+    <button class="tab tab-inactive" data-tab="accounting"  data-i18n="tab_accounting"><span class="vs-nav-icon">💰</span><span class="vs-nav-label">Comptabilité</span></button>
+    <a href="/velocity" class="vs-nav-link" data-i18n="tab_velocity"><span class="vs-nav-icon">⚡</span><span class="vs-nav-label">Vélocité</span></a>
+
+    <div class="vs-group-label">Configuration</div>
+    <button class="tab tab-inactive" data-tab="params"      data-i18n="tab_params"><span class="vs-nav-icon">⚙️</span><span class="vs-nav-label">Paramètres</span></button>
+    <a href="/onboarding.html" class="vs-nav-link" data-i18n="tab_config"><span class="vs-nav-icon">🛠</span><span class="vs-nav-label">Config boutique</span></a>
+    <a class="vs-nav-link" onclick="HelpPanel.open()" data-i18n-tip="help_btn_title"><span class="vs-nav-icon">💡</span><span class="vs-nav-label" data-i18n="btn_help">Aide</span></a>
+    <a id="admin-btn" class="vs-nav-link hidden" onclick="AdminPanel.open()" style="color:#8a5a48"><span class="vs-nav-icon">🛡</span><span class="vs-nav-label">Admin</span></a>
+  </nav>
+
+  <div class="vs-footer">
+    <div class="vs-footer-row" style="justify-content: space-between">
+      <div id="syncStatus" class="text-[10px] text-stone-500 truncate">Chargement…</div>
+      <div class="vs-lang-toggle">
+        <button id="lang-fr" onclick="setLanguage('fr')" class="vs-lang-btn active">FR</button>
+        <button id="lang-en" onclick="setLanguage('en')" class="vs-lang-btn">EN</button>
+      </div>
+    </div>
+    <div class="vs-user-pill">
+      <div class="vs-avatar" id="userAvatar">·</div>
+      <div class="vs-user-info flex-1 min-w-0">
+        <div class="text-xs font-semibold text-stone-800 truncate" id="userName">—</div>
+        <div class="text-[10px] text-stone-500" id="userRole">—</div>
+      </div>
+      <button class="vs-footer-btn" onclick="handleLogout()" title="Déconnexion" data-i18n="btn_logout">↪</button>
+    </div>
+  </div>
+</aside>
+
+<!-- Sidebar collapse toggle -->
+<script>
+  (function(){
+    const bar = document.getElementById('vs-sidebar');
+    const btn = document.getElementById('vs-collapse-btn');
+    try { if (localStorage.getItem('vs_sidebar_collapsed') === '1') bar.classList.add('collapsed'); } catch{}
+    btn.addEventListener('click', () => {
+      bar.classList.toggle('collapsed');
+      try { localStorage.setItem('vs_sidebar_collapsed', bar.classList.contains('collapsed') ? '1' : '0'); } catch{}
+    });
+  })();
+</script>
+
+<main class="flex-1 overflow-y-auto p-6 bg-vs-cream" style="background:#fafaf7">
 
   <!-- ── BUDGET ──────────────────────────────────────────────────── -->
   <section id="tab-budget">
@@ -964,6 +1110,8 @@
   </section>
 
 </main>
+
+</div><!-- .flex.h-screen wrapper (sidebar + main) -->
 
     <!-- ── Import modal — supplier order ingestion (B10) ─────────────── -->
     <div id="importModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
@@ -1952,17 +2100,12 @@ function setLanguage(lang) {
     const v = TRANSLATIONS[lang]?.[el.dataset.i18nTip] ?? TRANSLATIONS['fr']?.[el.dataset.i18nTip];
     if (v != null) el.dataset.tip = v;
   });
-  // Language toggle button styling
+  // Language toggle button styling (sidebar VS design)
   const frBtn = document.getElementById('lang-fr');
   const enBtn = document.getElementById('lang-en');
   if (frBtn && enBtn) {
-    if (lang === 'fr') {
-      frBtn.className = 'text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 border-r border-gray-200';
-      enBtn.className = 'text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600';
-    } else {
-      frBtn.className = 'text-xs font-semibold px-2.5 py-1 text-gray-400 hover:text-gray-600 border-r border-gray-200';
-      enBtn.className = 'text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700';
-    }
+    frBtn.classList.toggle('active', lang === 'fr');
+    enBtn.classList.toggle('active', lang === 'en');
   }
   // Re-render dynamic tables
   if (state.budgetSeas.data.length) BudgetTab.renderMarqueBudgetTable();
@@ -1988,10 +2131,18 @@ function setRole(r)    { localStorage.setItem('auth_role', r); }
 function applyRoleUI() {
   const isSuperAdmin = getRole() === 'superadmin';
   const btn = document.getElementById('admin-btn');
-  if (btn) { btn.classList.toggle('hidden', !isSuperAdmin); btn.classList.toggle('ml-auto', isSuperAdmin); }
-  // help-btn loses ml-auto when admin-btn takes it
-  const helpBtn = document.getElementById('help-btn');
-  if (helpBtn) helpBtn.classList.toggle('ml-auto', !isSuperAdmin);
+  if (btn) btn.classList.toggle('hidden', !isSuperAdmin);
+}
+
+function updateUserPill() {
+  const email = (() => { try { return localStorage.getItem('auth_email') || ''; } catch { return ''; } })();
+  const role  = getRole() || '';
+  const av = document.getElementById('userAvatar');
+  const nm = document.getElementById('userName');
+  const rl = document.getElementById('userRole');
+  if (av) av.textContent = email ? (email[0].toUpperCase() + (email.split('@')[0][1]||'').toUpperCase()) : '·';
+  if (nm) nm.textContent = email ? email.split('@')[0] : '—';
+  if (rl) rl.textContent = role ? (role === 'superadmin' ? 'Superadmin' : role) : '—';
 }
 
 function showLogin() { document.getElementById('loginOverlay').classList.remove('hidden'); }
@@ -2034,11 +2185,11 @@ async function handleLogin(e) {
     setToken(data.token);
     if (data.role) setRole(data.role);
     if (data.tenant?.name) {
-      const badge = document.getElementById('tenantBadge');
-      badge.textContent = data.tenant.name;
-      badge.classList.remove('hidden');
+      document.getElementById('tenantBadge').textContent = data.tenant.name;
     }
+    try { localStorage.setItem('auth_email', document.getElementById('loginEmail').value); } catch {}
     applyRoleUI();
+    updateUserPill();
     hideLogin();
     initApp();
   } catch (err) {
@@ -2276,8 +2427,12 @@ function addTier() {
 const tabLoaded = {};
 document.querySelectorAll('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.className = 'tab py-3 tab-inactive');
-    btn.className = 'tab py-3 tab-active';
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.remove('tab-active');
+      t.classList.add('tab-inactive');
+    });
+    btn.classList.remove('tab-inactive');
+    btn.classList.add('tab-active');
     document.querySelectorAll('section[id^="tab-"]').forEach(s => s.classList.add('hidden'));
     const id = btn.dataset.tab;
     document.getElementById(`tab-${id}`).classList.remove('hidden');
@@ -7717,6 +7872,7 @@ function initApp() {
 
 if (getToken()) {
   applyRoleUI();
+  updateUserPill();
   initApp();
 } else {
   showLogin();
