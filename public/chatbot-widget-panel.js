@@ -79,13 +79,33 @@
 
   // ── CSS ─────────────────────────────────────────────────────────────────
   const css = `
-  /* ══ OVERLAY ══ */
+  /* ══ PUSH LAYOUT (main content shrinks, no overlay on top) ══ */
+  /* Applies padding-right to the outer app flex wrapper so <main> shrinks
+     smoothly when the panel is open. Selector matches the wrappers used
+     in index-v2.html (.flex.h-screen) and index.html (also .flex.h-screen). */
+  body.ai-panel-open .flex.h-screen {
+    padding-right: 480px;
+    transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  body.ai-panel-open.ai-panel-wide .flex.h-screen {
+    padding-right: 720px;
+  }
+  .flex.h-screen { transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  @media (max-width: 900px) {
+    /* On small screens, panel takes full width — no padding shift needed,
+       treat like an overlay to avoid squeezing content into nothing. */
+    body.ai-panel-open .flex.h-screen { padding-right: 0; }
+  }
+
+  /* Overlay only visible under 900px (as fallback since panel becomes full-screen) */
   #ai-overlay {
     position: fixed; inset: 0; background: rgba(26,22,20,0.32);
     z-index: 999; opacity: 0; pointer-events: none;
     transition: opacity 0.25s ease;
   }
-  #ai-overlay.open { opacity: 1; pointer-events: all; }
+  @media (max-width: 900px) {
+    #ai-overlay.open { opacity: 1; pointer-events: all; }
+  }
 
   /* ══ SIDE PANEL ══ */
   #ai-panel {
@@ -234,21 +254,20 @@
   .ai-send-btn:hover { background: #152826; }
   .ai-send-btn:disabled { background: #e6ded7; color: #a89f92; cursor: default; }
 
-  /* ══ FLOATING TRIGGER ══ */
+  /* ══ FLOATING TRIGGER (86x86 matching original size) ══ */
   #ai-chat-btn {
     position: fixed; bottom: 20px; right: 20px;
-    width: 64px; height: 64px; border-radius: 50%;
-    background: linear-gradient(135deg, #c48b76, #ad7460);
-    border: none; cursor: pointer;
-    box-shadow: 0 6px 20px rgba(173,116,96,0.35);
+    width: 86px; height: 86px;
+    background: none; border-radius: 0; border: none;
+    cursor: pointer; box-shadow: none; padding: 0;
     display: flex; align-items: center; justify-content: center;
     z-index: 998;
-    transition: transform 0.15s, box-shadow 0.15s;
-    padding: 0;
+    transition: transform 0.15s ease, opacity 0.15s ease;
   }
-  #ai-chat-btn:hover { transform: scale(1.06); box-shadow: 0 8px 24px rgba(173,116,96,0.42); }
-  #ai-chat-btn img { width: 42px; height: 42px; object-fit: contain; display: block; }
-  #ai-panel.open ~ #ai-chat-btn { transform: scale(0); opacity: 0; pointer-events: none; }
+  #ai-chat-btn:hover { transform: scale(1.08); }
+  #ai-chat-btn img { width: 86px; height: 86px; object-fit: contain; display: block; }
+  /* Hide trigger when panel is open (freed via body class) */
+  body.ai-panel-open #ai-chat-btn { transform: scale(0); opacity: 0; pointer-events: none; }
   `;
 
   // ── HTML template ───────────────────────────────────────────────────────
@@ -373,6 +392,7 @@
       overlay.classList.add('open');
       panel.classList.add('open');
       panel.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('ai-panel-open');
       setTimeout(() => input.focus(), 250);
     }
     function closePanel() {
@@ -381,10 +401,15 @@
       panel.classList.remove('open');
       panel.setAttribute('aria-hidden', 'true');
       histPanel.classList.remove('open');
+      document.body.classList.remove('ai-panel-open');
+      document.body.classList.remove('ai-panel-wide');
+      panel.classList.remove('wide');
+      btnFull.textContent = '⤢';
     }
     function toggleFull() {
-      panel.classList.toggle('wide');
-      btnFull.textContent = panel.classList.contains('wide') ? '⤡' : '⤢';
+      const wide = panel.classList.toggle('wide');
+      document.body.classList.toggle('ai-panel-wide', wide);
+      btnFull.textContent = wide ? '⤡' : '⤢';
     }
     function resetConv() {
       history = [];
