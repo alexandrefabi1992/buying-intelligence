@@ -1444,17 +1444,24 @@ app.get('/oauth/callback', async (req, res, next) => {
       }
     }
 
+    // NEVER log refresh_token or access_token in plaintext (would persist in
+    // Railway logs, accessible to anyone with log access even after the token
+    // is rotated). Log only non-sensitive metadata.
     console.log('\n========== LIGHTSPEED TOKENS ==========');
-    if (tenantName) console.log('tenant        :', tenantName);
-    if (accountId)  console.log('account_id    :', accountId);
-    console.log('refresh_token :', refresh_token);
-    console.log('access_token  :', access_token);
-    console.log('expires_in    :', expires_in, 'seconds');
+    if (tenantName) console.log('tenant     :', tenantName);
+    if (accountId)  console.log('account_id :', accountId);
+    console.log('expires_in :', expires_in, 'seconds');
+    console.log('token stored: refresh_token=***REDACTED*** (length=' + (refresh_token?.length ?? 0) + ')');
     console.log('=======================================\n');
 
+    // If the OAuth callback was invoked without state (no tenant JWT), we used
+    // to display the token in an HTML <code> block so the developer could copy
+    // it. This was safe when the app was single-tenant and only devs saw this
+    // page — but now it's a leak vector. Instead, tell them to check server
+    // logs (or preferably use the state-encoded flow which stores automatically).
     const successMsg = tenantName
       ? `<h1 style="color:#2d7d46">✓ Lightspeed connecté — ${tenantName}</h1><p>Le compte Lightspeed (ID ${accountId ?? '?'}) a été lié automatiquement. Le prochain sync importera les données.</p><p><a href="/">← Retour à l'application</a></p>`
-      : `<h1>Authorization successful</h1><p>Copy the <strong>refresh_token</strong> into your environment:<br><code>${refresh_token}</code></p>`;
+      : `<h1>Authorization successful</h1><p>Le token a été reçu mais aucun tenant n'était encodé dans le paramètre <code>state</code>. Pour le lier à un tenant, relance le flow OAuth depuis l'interface de connexion Lightspeed du tenant concerné. Ne PAS partager cette URL.</p>`;
 
     res.send(`<!doctype html><html><head><meta charset="utf-8"><title>OAuth2</title>
 <style>body{font-family:sans-serif;max-width:600px;margin:60px auto;padding:0 20px}</style>
