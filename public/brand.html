@@ -19,7 +19,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    .spinner { width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite }
+    .spinner { width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#213b39;border-radius:50%;animation:spin .8s linear infinite }
     @keyframes spin { to { transform:rotate(360deg) } }
     .kpi-card { transition: box-shadow .15s; position: relative; }
     .kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.07) }
@@ -446,7 +446,7 @@
   // ── Recommendation config ─────────────────────────────────────────────────
   const RECO = {
     'ACHETER+':  { bg: '#16a34a', kpiColor: 'text-green-600',  tipKey: 'reco_tip_buy'    },
-    'MAINTENIR': { bg: '#2563eb', kpiColor: 'text-blue-600',   tipKey: 'reco_tip_hold'   },
+    'MAINTENIR': { bg: '#213b39', kpiColor: 'text-blue-600',   tipKey: 'reco_tip_hold'   },
     'RÉDUIRE':   { bg: '#d97706', kpiColor: 'text-amber-600',  tipKey: 'reco_tip_reduce' },
     'ARRÊTER':   { bg: '#dc2626', kpiColor: 'text-red-600',    tipKey: 'reco_tip_stop'   },
   };
@@ -457,7 +457,7 @@
 
   const SIGNAL_STYLE = {
     augmenter:    { bg: '#16a34a', label: 'Augmenter' },
-    legere_hausse:{ bg: '#7c3aed', label: 'Légère hausse' },
+    legere_hausse:{ bg: '#a1aea3', label: 'Légère hausse' },
     reconduire:   { bg: '#6b7280', label: 'Reconduire' },
     reduire:      { bg: '#d97706', label: 'Réduire' },
     couper:       { bg: '#dc2626', label: 'Couper' },
@@ -605,7 +605,7 @@
       {
         label: seasonCode.toUpperCase(),
         data: currData,
-        borderColor: '#3b82f6',
+        borderColor: '#213b39',
         backgroundColor: 'rgba(59,130,246,0.05)',
         borderWidth: 2,
         pointRadius: 2,
@@ -762,7 +762,7 @@
           {
             label: t('chart_this_year'),
             data: currU,
-            borderColor: '#3b82f6',
+            borderColor: '#213b39',
             backgroundColor: 'rgba(59,130,246,0.06)',
             borderWidth: 2,
             pointRadius: 3,
@@ -887,7 +887,7 @@
       ? d.top_sizes.map(i => bar(i, maxS, 'bg-blue-400')).join('')
       : `<p class="text-xs text-gray-400 py-2">${t('no_data')}</p>`;
     const colorsHtml = d.top_colors.length
-      ? d.top_colors.map(i => bar(i, maxC, 'bg-violet-400')).join('')
+      ? d.top_colors.map(i => bar(i, maxC, 'bg-vs-brique')).join('')
       : `<p class="text-xs text-gray-400 py-2">${t('no_data')}</p>`;
 
     document.getElementById('attrContent').innerHTML = `
