@@ -1432,9 +1432,17 @@ app.get('/oauth/callback', async (req, res, next) => {
       try {
         const payload = jwt.verify(state, process.env.JWT_SECRET ?? 'dev-secret');
         const tenantId = payload.tenantId;
+        // Encrypt the refresh_token before persisting — AES-256-GCM via
+        // lib/token-crypto.js. Requires TENANT_TOKEN_KEY env var; if missing
+        // the encrypt call throws and we fall back to plaintext so the OAuth
+        // flow doesn't completely break during migration windows.
+        const { encrypt } = require('./lib/token-crypto');
+        let tokenToStore = refresh_token;
+        try { tokenToStore = encrypt(refresh_token); }
+        catch (e) { console.warn('[oauth] Token encryption skipped:', e.message, '— storing plaintext (set TENANT_TOKEN_KEY)'); }
         await pool.query(
           `UPDATE tenants SET ls_refresh_token = $1, ls_account_id = COALESCE($2, ls_account_id) WHERE id = $3`,
-          [refresh_token, accountId, tenantId]
+          [tokenToStore, accountId, tenantId]
         );
         const { rows } = await pool.query('SELECT name FROM tenants WHERE id = $1', [tenantId]);
         tenantName = rows[0]?.name ?? tenantId;
