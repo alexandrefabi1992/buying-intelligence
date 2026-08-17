@@ -933,6 +933,23 @@ async function runMigrations() {
     )
   `);
 
+  // Copy-forward sync_state → sync_checkpoints. Runs on every boot: any
+  // rows written to sync_state by legacy sync.js between two boots get
+  // reflected in sync_checkpoints, so the new sync-worker never resumes
+  // from a stale checkpoint. The WHERE guard prevents regressing rows
+  // that the worker has already touched (source must be newer).
+  await pool.query(`
+    INSERT INTO sync_checkpoints (tenant_id, step, next_url, processed_count, updated_at)
+    SELECT tenant_id, step, next_url, processed_count, updated_at
+    FROM sync_state
+    WHERE tenant_id IS NOT NULL
+    ON CONFLICT (tenant_id, step) DO UPDATE SET
+      next_url        = EXCLUDED.next_url,
+      processed_count = EXCLUDED.processed_count,
+      updated_at      = EXCLUDED.updated_at
+    WHERE sync_checkpoints.updated_at < EXCLUDED.updated_at
+  `);
+
   // Change single-column PKs to composite (tenant_id, original_id).
   // Idempotent: only runs if products PK does not yet include tenant_id.
   {
@@ -2226,23 +2243,40 @@ app.get('/api/token/status', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/sync/checkpoints — full sync_state table (excluding token row)
+// GET /api/sync/checkpoints — merged view of sync_checkpoints (new, PK by
+// (tenant_id, step)) and sync_state (legacy, dropped in B.5). During the
+// transition window we prefer the sync_checkpoints value when both tables
+// have the same step for the tenant.
 // ---------------------------------------------------------------------------
 app.get('/api/sync/checkpoints', async (req, res, next) => {
   try {
-    // Tenant isolation: sync_state rows have tenant_id (nullable for legacy
-    // global markers). Only return rows for the caller's tenant PLUS any
-    // truly global markers (tenant_id IS NULL). Sync metadata should never
-    // leak cross-tenant since it exposes cursor positions and cadence.
-    const { rows } = await pool.query(
-      `SELECT step, next_url, processed_count, started_at, updated_at
+    // 1. New source of truth: sync_checkpoints (per-tenant PK)
+    const { rows: newRows } = await pool.query(
+      `SELECT step, next_url, processed_count, updated_at
+       FROM sync_checkpoints
+       WHERE tenant_id = $1
+       ORDER BY updated_at DESC NULLS LAST`,
+      [req.tenantId],
+    );
+    const seenSteps = new Set(newRows.map(r => r.step));
+
+    // 2. Legacy source, filtered to steps not yet in sync_checkpoints.
+    //    tenant_id IS NULL rows are shared markers written by the legacy sync
+    //    before multi-tenancy — we still surface them for continuity.
+    const { rows: oldRows } = await pool.query(
+      `SELECT step, next_url, processed_count, updated_at
        FROM sync_state
        WHERE step != 'refresh_token'
          AND (tenant_id = $1 OR tenant_id IS NULL)
        ORDER BY updated_at DESC NULLS LAST`,
-      [req.tenantId]
+      [req.tenantId],
     );
-    const formatted = rows.map(r => ({
+    const merged = [
+      ...newRows,
+      ...oldRows.filter(r => !seenSteps.has(r.step)),
+    ];
+
+    const formatted = merged.map(r => ({
       step:            r.step,
       status:          r.next_url === 'COMPLETED' ? 'completed' : r.next_url ? 'in_progress' : 'pending',
       next_url:        r.next_url === 'COMPLETED' ? null : r.next_url,
@@ -6628,6 +6662,89 @@ app.listen(PORT, '0.0.0.0', async () => {
     });
   });
   console.log('[sync/cron] Hourly sync scheduled (runs at :00 every hour)');
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Multi-tenant producer (Bloc B W3 #3, active in W3 #4)
+  //
+  // Enqueues one sync_jobs row per tenant with a Lightspeed token, in the
+  // same tick as (1) refreshing materialized views, and (2) purging old
+  // 'done' jobs. Disabled by default — set SYNC_PRODUCER_ENABLED=1 to
+  // activate. This lets us ship the producer code without triggering it
+  // until the worker is also activated.
+  //
+  // A batch is considered "complete" when no jobs from the previous batch
+  // remain in pending or running state (user-validated definition — 'failed'
+  // counts as complete). Refresh MV happens once per cycle, after batch
+  // completion, before the next batch starts.
+  // ─────────────────────────────────────────────────────────────────────────
+  const SYNC_PRODUCER_ENABLED = process.env.SYNC_PRODUCER_ENABLED === '1';
+  const SYNC_PRODUCER_CRON    = process.env.SYNC_PRODUCER_CRON || '0 5 * * *';
+  const SYNC_PURGE_DAYS       = parseInt(process.env.SYNC_PURGE_DAYS ?? '30', 10);
+
+  const { enqueue: syncEnqueue, purgeDone: syncPurgeDone } = require('./lib/sync-queue');
+  const { refreshMaterializedView: syncRefreshMV }         = require('./lib/sync-tenant');
+
+  let lastBatchStartedAt = null;
+
+  async function runProducerTick() {
+    const started = Date.now();
+
+    // 1. If the previous batch has jobs still pending or running, skip.
+    if (lastBatchStartedAt) {
+      const { rows } = await pool.query(
+        `SELECT COUNT(*)::int AS n FROM sync_jobs
+         WHERE created_at >= $1 AND status IN ('pending','running')`,
+        [lastBatchStartedAt],
+      );
+      if (rows[0].n > 0) {
+        console.log(`[producer] previous batch still active (${rows[0].n} pending/running) — skipping tick`);
+        return;
+      }
+    }
+
+    // 2. Refresh materialized views — serialised, once per cycle.
+    for (const view of ['mv_sales_velocity', 'mv_inventory_stock']) {
+      try {
+        await syncRefreshMV(pool, view);
+        console.log(`[producer] refreshed ${view}`);
+      } catch (err) {
+        console.error(`[producer] refresh ${view} failed:`, err.message);
+      }
+    }
+
+    // 3. Purge terminated 'done' jobs older than SYNC_PURGE_DAYS
+    try {
+      const purged = await syncPurgeDone(pool, SYNC_PURGE_DAYS);
+      if (purged > 0) console.log(`[producer] purged ${purged} done jobs > ${SYNC_PURGE_DAYS}d old`);
+    } catch (err) {
+      console.error('[producer] purge failed:', err.message);
+    }
+
+    // 4. Enqueue one job per tenant with a Lightspeed token
+    const { rows: tenants } = await pool.query(
+      `SELECT id FROM tenants WHERE ls_refresh_token IS NOT NULL ORDER BY id`,
+    );
+    let enqueued = 0;
+    for (const t of tenants) {
+      try {
+        const jobId = await syncEnqueue(pool, t.id);
+        if (jobId) enqueued++;
+      } catch (err) {
+        console.error(`[producer] enqueue failed for '${t.id}':`, err.message);
+      }
+    }
+    lastBatchStartedAt = new Date().toISOString();
+    console.log(`[producer] tick done in ${Date.now() - started}ms — enqueued ${enqueued}/${tenants.length} tenants @ ${lastBatchStartedAt}`);
+  }
+
+  if (SYNC_PRODUCER_ENABLED) {
+    nodeCron.schedule(SYNC_PRODUCER_CRON, () => {
+      runProducerTick().catch(err => console.error('[producer] tick failed:', err));
+    });
+    console.log(`[producer] scheduled: ${SYNC_PRODUCER_CRON} (SYNC_PURGE_DAYS=${SYNC_PURGE_DAYS})`);
+  } else {
+    console.log('[producer] disabled — set SYNC_PRODUCER_ENABLED=1 to activate the multi-tenant queue');
+  }
 });
 
 } catch (err) {
