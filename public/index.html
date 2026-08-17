@@ -59,7 +59,9 @@
     .vs-sidebar.collapsed .vs-subtitle,
     .vs-sidebar.collapsed .vs-group-label,
     .vs-sidebar.collapsed .vs-nav-label,
+    .vs-sidebar.collapsed .vs-nav-badge,
     .vs-sidebar.collapsed .vs-user-info,
+    .vs-sidebar.collapsed .vs-footer-row,
     .vs-sidebar.collapsed .vs-footer-btn-label { display: none; }
     .vs-sidebar.collapsed .vs-brand { justify-content: center; padding: 16px 12px; }
     .vs-sidebar.collapsed .tab, .vs-sidebar.collapsed .vs-nav-link { justify-content: center; padding: 10px 8px; margin: 1px 8px; }
@@ -296,7 +298,7 @@
         <div class="text-xs font-semibold text-stone-800 truncate" id="userName">—</div>
         <div class="text-[10px] text-stone-500" id="userRole">—</div>
       </div>
-      <button class="vs-footer-btn" onclick="handleLogout()" title="Déconnexion" data-i18n="btn_logout">↪</button>
+      <button class="vs-footer-btn" onclick="handleLogout()" title="Déconnexion" data-i18n-tip="btn_logout">↪</button>
     </div>
   </div>
 </aside>
