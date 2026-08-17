@@ -150,6 +150,18 @@
   }
   .ai-icon-btn:hover { background: #f7f4ef; color: #213b39; }
   .ai-icon-btn.close { font-size: 20px; padding: 4px 8px; }
+  /* Labeled 'new conversation' pill — more discoverable than a bare icon */
+  .ai-new-btn {
+    display: flex; align-items: center; gap: 4px;
+    background: #f5ede4; border: 1px solid #d4afa1;
+    color: #8a5a48; font-size: 11px; font-weight: 600;
+    padding: 4px 10px 4px 8px; border-radius: 14px;
+    cursor: pointer; margin-right: 4px;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+    line-height: 1.2;
+  }
+  .ai-new-btn:hover { background: #eae0d4; border-color: #c48b76; color: #6d4535; }
+  .ai-new-btn-plus { font-size: 14px; font-weight: 700; }
 
   /* ══ CONTENT ══ */
   #ai-content {
@@ -302,7 +314,9 @@
         </div>
       </div>
       <div class="ai-panel-actions">
-        <button class="ai-icon-btn" id="ai-btn-new" title="Nouvelle conversation">↺</button>
+        <button class="ai-new-btn" id="ai-btn-new" title="Nouvelle conversation">
+          <span class="ai-new-btn-plus">+</span><span>Nouveau</span>
+        </button>
         <button class="ai-icon-btn" id="ai-btn-history" title="Historique">⏱</button>
         <button class="ai-icon-btn" id="ai-btn-fullscreen" title="Agrandir">⤢</button>
         <button class="ai-icon-btn close" id="ai-btn-close" title="Fermer">×</button>
