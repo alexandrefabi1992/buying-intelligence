@@ -122,28 +122,32 @@ class ShopNotFoundError extends Error {
   }
 }
 
-async function resolveShopId(shop_id, pool) {
+async function resolveShopId(shop_id, pool, tenantId) {
   if (!shop_id) return null;
   if (/^\d+$/.test(String(shop_id))) {
-    const { rows } = await pool.query("SELECT shop_id FROM shops WHERE shop_id = $1", [shop_id]);
+    const { rows } = await pool.query(
+      "SELECT shop_id FROM shops WHERE shop_id = $1 AND tenant_id = $2",
+      [shop_id, tenantId]
+    );
     if (rows.length) return shop_id;
   } else {
     const { rows } = await pool.query(
-      "SELECT shop_id FROM shops WHERE name ILIKE $1 LIMIT 1",
-      [`%${shop_id}%`]
+      "SELECT shop_id FROM shops WHERE name ILIKE $1 AND tenant_id = $2 LIMIT 1",
+      [`%${shop_id}%`, tenantId]
     );
     if (rows[0]) return rows[0].shop_id;
   }
   // Unknown shop — throw with suggestions so the caller can build an explicit error
   const [{ rows: all }, { rows: sim }] = await Promise.all([
-    pool.query("SELECT name FROM shops ORDER BY name"),
+    pool.query("SELECT name FROM shops WHERE tenant_id = $1 ORDER BY name", [tenantId]),
     pool.query(`
       SELECT name, max(similarity(lower(name), lower($1))) AS sim
       FROM shops
+      WHERE tenant_id = $2
       GROUP BY name
       HAVING max(similarity(lower(name), lower($1))) > 0.15
       ORDER BY sim DESC LIMIT 3
-    `, [String(shop_id)]),
+    `, [String(shop_id), tenantId]),
   ]);
   throw new ShopNotFoundError(shop_id, all.map(r => r.name), sim.map(r => r.name));
 }
@@ -175,64 +179,66 @@ function buildTagConditions(tags, excludeTags, params) {
 
 // Returns true if at least one product row matches manufacturer (ILIKE substring).
 // Used to distinguish "brand exists, no data for this filter" from "brand not found".
-async function checkManufacturerExists(pool, manufacturer) {
+async function checkManufacturerExists(pool, tenantId, manufacturer) {
   const { rows } = await pool.query(
-    `SELECT 1 FROM products WHERE manufacturer ILIKE $1 LIMIT 1`,
-    [`%${manufacturer}%`]
+    `SELECT 1 FROM products WHERE tenant_id = $1 AND manufacturer ILIKE $2 LIMIT 1`,
+    [tenantId, `%${manufacturer}%`]
   );
   return rows.length > 0;
 }
 
 // Returns up to 3 manufacturer names whose pg_trgm similarity to the query exceeds 0.15.
 // pg_trgm (already installed) handles typos better than simple ILIKE prefix matching.
-async function findSimilarManufacturers(pool, manufacturer) {
+async function findSimilarManufacturers(pool, tenantId, manufacturer) {
   // GROUP BY instead of DISTINCT so the similarity alias is available for ORDER BY.
   const { rows } = await pool.query(`
     SELECT manufacturer,
            max(similarity(lower(manufacturer), lower($1))) AS sim
     FROM products
-    WHERE manufacturer IS NOT NULL
+    WHERE tenant_id = $2
+      AND manufacturer IS NOT NULL
       AND manufacturer != ''
     GROUP BY manufacturer
     HAVING max(similarity(lower(manufacturer), lower($1))) > 0.15
     ORDER BY sim DESC
     LIMIT 3
-  `, [manufacturer]);
+  `, [manufacturer, tenantId]);
   return rows.map(r => r.manufacturer);
 }
 
 // Shared early-return for "brand not found" across tools that filter by manufacturer.
 // Kept for backward compat; new code paths use validateFilters at the top of the tool.
-async function buildBrandNotFoundResult(pool, manufacturer) {
-  const exists = await checkManufacturerExists(pool, manufacturer);
+async function buildBrandNotFoundResult(pool, tenantId, manufacturer) {
+  const exists = await checkManufacturerExists(pool, tenantId, manufacturer);
   if (exists) return null;
   return {
     marque_introuvable: true,
     marque_cherchee:    manufacturer,
-    suggestions:        await findSimilarManufacturers(pool, manufacturer),
+    suggestions:        await findSimilarManufacturers(pool, tenantId, manufacturer),
   };
 }
 
 // ---------------------------------------------------------------------------
 // Category existence checks (mirror of manufacturer helpers). Uses pg_trgm.
 // ---------------------------------------------------------------------------
-async function checkCategoryExists(pool, category) {
+async function checkCategoryExists(pool, tenantId, category) {
   const { rows } = await pool.query(
-    `SELECT 1 FROM products WHERE category ILIKE $1 LIMIT 1`,
-    [`%${category}%`]
+    `SELECT 1 FROM products WHERE tenant_id = $1 AND category ILIKE $2 LIMIT 1`,
+    [tenantId, `%${category}%`]
   );
   return rows.length > 0;
 }
 
-async function findSimilarCategories(pool, category) {
+async function findSimilarCategories(pool, tenantId, category) {
   const { rows } = await pool.query(`
     SELECT category, max(similarity(lower(category), lower($1))) AS sim
     FROM products
-    WHERE category IS NOT NULL AND category != ''
+    WHERE tenant_id = $2
+      AND category IS NOT NULL AND category != ''
     GROUP BY category
     HAVING max(similarity(lower(category), lower($1))) > 0.15
     ORDER BY sim DESC LIMIT 5
-  `, [String(category)]);
+  `, [String(category), tenantId]);
   return rows.map(r => r.category);
 }
 
@@ -242,10 +248,10 @@ async function findSimilarCategories(pool, category) {
 // tool must return unchanged. The model then sees {erreur, filtre_invalide, ...}
 // and can suggest corrections to the user instead of presenting bogus zeros.
 // ---------------------------------------------------------------------------
-async function validateFilters({ manufacturer, category, shop_id, season }, { pool, getSeasonsConfig }) {
+async function validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig }) {
   // shop_id — reuse throwing resolveShopId, convert to structured response
   if (shop_id) {
-    try { await resolveShopId(shop_id, pool); }
+    try { await resolveShopId(shop_id, pool, tenantId); }
     catch (e) {
       if (e instanceof ShopNotFoundError) {
         return {
@@ -275,26 +281,26 @@ async function validateFilters({ manufacturer, category, shop_id, season }, { po
 
   // manufacturer — existence + pg_trgm suggestions on typo
   if (manufacturer) {
-    const exists = await checkManufacturerExists(pool, manufacturer);
+    const exists = await checkManufacturerExists(pool, tenantId, manufacturer);
     if (!exists) {
       return {
         erreur:          `Marque "${manufacturer}" introuvable.`,
         filtre_invalide: 'manufacturer',
         valeur_fournie:  manufacturer,
-        suggestions:     await findSimilarManufacturers(pool, manufacturer),
+        suggestions:     await findSimilarManufacturers(pool, tenantId, manufacturer),
       };
     }
   }
 
   // category — same treatment via pg_trgm
   if (category) {
-    const exists = await checkCategoryExists(pool, category);
+    const exists = await checkCategoryExists(pool, tenantId, category);
     if (!exists) {
       return {
         erreur:          `Catégorie "${category}" introuvable.`,
         filtre_invalide: 'category',
         valeur_fournie:  category,
-        suggestions:     await findSimilarCategories(pool, category),
+        suggestions:     await findSimilarCategories(pool, tenantId, category),
       };
     }
   }
@@ -321,10 +327,10 @@ function emptyResultResponse(filtres_appliques, message) {
 // Tool implementations
 // ---------------------------------------------------------------------------
 
-async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { pool, budgetCache, getSeasonsConfig }) {
+async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { pool, tenantId, budgetCache, getSeasonsConfig }) {
   season = (season ?? 'p26').toLowerCase();
   const rawShops = shops ? shops.split(',').map(s => s.trim()).filter(Boolean) : null;
-  const shopIds  = rawShops ? (await Promise.all(rawShops.map(s => resolveShopId(s, pool)))).filter(Boolean) : null;
+  const shopIds  = rawShops ? (await Promise.all(rawShops.map(s => resolveShopId(s, pool, tenantId)))).filter(Boolean) : null;
   const cacheKey = `marque:${season}:${shopIds?.join(',') ?? 'all'}`;
 
   // Try the in-memory cache first (already computed, fast)
@@ -345,10 +351,12 @@ async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { poo
   const target  = seasons.find(s => s.code === season);
   if (!target) return { erreur: `Saison "${season}" non trouvée dans la configuration.` };
 
-  const shopFilter = shopIds?.length ? 'AND sl.shop_id = ANY($3)' : '';
+  // tenantId placed first so shopFilter/limit indices stay aligned with $3+
+  const baseParams = [target.sell_from, target.sell_to, tenantId];
+  const shopFilter = shopIds?.length ? 'AND sl.shop_id = ANY($4)' : '';
   const params = shopIds?.length
-    ? [target.sell_from, target.sell_to, shopIds]
-    : [target.sell_from, target.sell_to];
+    ? [...baseParams, shopIds]
+    : baseParams;
 
   const { rows } = await pool.query(`
     SELECT
@@ -357,13 +365,14 @@ async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { poo
       SUM(sl.qty * p.default_cost)::numeric(12,2) AS cout_ventes,
       COUNT(DISTINCT p.item_id)          AS references_distinctes
     FROM sale_lines sl
-    JOIN products p ON p.item_id = sl.item_id
+    JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
     WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date
+      AND sl.tenant_id = $3
       AND p.manufacturer IS NOT NULL AND p.manufacturer != ''
       ${shopFilter}
     GROUP BY p.manufacturer
     ORDER BY cout_ventes DESC NULLS LAST
-    LIMIT ${ shopIds?.length ? '$4' : '$3' }
+    LIMIT ${ shopIds?.length ? '$5' : '$4' }
   `, [...params, limit]);
 
   return {
@@ -487,10 +496,10 @@ function resolvePeriod(period) {
   return { erreur: `Période "${period}" non reconnue. Valeurs acceptées : today, yesterday, last_7_days, last_14_days, last_30_days, last_90_days, last_week, this_week, this_month, last_month, this_year, last_4_weeks, last_12_weeks, ou un objet { from: "YYYY-MM-DD", to: "YYYY-MM-DD" }.` };
 }
 
-async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, date_from, date_to, period, tags, exclude_tags, total_only = false }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, getSeasonsConfig });
+async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, date_from, date_to, period, tags, exclude_tags, total_only = false }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
   let from = date_from, to = date_to;
   let seasonTag = null, periodLabel = null;
   let avertissementPeriode = null;
@@ -526,6 +535,10 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
   const conditions = ["(sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date"];
   const params     = [from, to ?? new Date().toISOString()];
 
+  // tenant isolation on sale_lines (root table); p/sh joined ON tenant_id = sl.tenant_id
+  conditions.push(`sl.tenant_id = $${params.length + 1}`);
+  params.push(tenantId);
+
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
   if (category)     { conditions.push(`p.category ILIKE $${params.length + 1}`);     params.push(`%${category}%`); }
   if (shop_id)      { conditions.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
@@ -557,8 +570,8 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
         SUM(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0))) OVER () AS total_ventes_all,
         COUNT(*)                             OVER () AS nb_marques_total
       FROM sale_lines sl
-      JOIN products p  ON p.item_id  = sl.item_id
-      JOIN shops    sh ON sh.shop_id = sl.shop_id
+      JOIN products p  ON p.item_id  = sl.item_id AND p.tenant_id = sl.tenant_id
+      JOIN shops    sh ON sh.shop_id = sl.shop_id AND sh.tenant_id = sl.tenant_id
       WHERE ${conditions.join(' AND ')}
         AND p.manufacturer IS NOT NULL
       GROUP BY p.manufacturer
@@ -597,8 +610,8 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
         ROUND(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0)), 2)::numeric(14,2) AS ventes_brutes,
         ROUND(SUM(sl.qty * COALESCE(p.default_cost, 0)), 2)::numeric(14,2) AS cout_ventes
       FROM sale_lines sl
-      LEFT JOIN products p ON p.item_id  = sl.item_id
-      JOIN shops    sh ON sh.shop_id = sl.shop_id
+      LEFT JOIN products p ON p.item_id  = sl.item_id AND p.tenant_id = sl.tenant_id
+      JOIN shops    sh ON sh.shop_id = sl.shop_id AND sh.tenant_id = sl.tenant_id
       WHERE ${conditions.join(' AND ')}
       GROUP BY sh.name
       ORDER BY ventes_brutes DESC NULLS LAST
@@ -637,8 +650,8 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
       SUM(SUM(sl.qty * COALESCE(p.default_cost, 0)))  OVER () AS total_cout_all,
       COUNT(*)                             OVER () AS nb_lignes_total
     FROM sale_lines sl
-    JOIN products p  ON p.item_id  = sl.item_id
-    JOIN shops    sh ON sh.shop_id = sl.shop_id
+    JOIN products p  ON p.item_id  = sl.item_id AND p.tenant_id = sl.tenant_id
+    JOIN shops    sh ON sh.shop_id = sl.shop_id AND sh.tenant_id = sl.tenant_id
     WHERE ${conditions.join(' AND ')}
     GROUP BY p.manufacturer, sh.name
     ORDER BY ventes_brutes DESC NULLS LAST
@@ -646,7 +659,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
   `, params);
 
   if (rows.length === 0 && manufacturer) {
-    const notFound = await buildBrandNotFoundResult(pool, manufacturer);
+    const notFound = await buildBrandNotFoundResult(pool, tenantId, manufacturer);
     if (notFound) return notFound;
   }
 
@@ -675,17 +688,17 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
   };
 }
 
-async function toolGetStockByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, getSeasonsConfig });
+async function toolGetStockByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
   if (period) {
     const resolved = resolvePeriod(period);
     if (resolved?.erreur) return { erreur: resolved.erreur };
     // period is accepted but stock is always the current snapshot — no date filter applied
   }
-  shop_id = await resolveShopId(shop_id, pool);
-  const conditions = ['p.archived = false'];
-  const params     = [];
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  const conditions = ['p.archived = false', `p.tenant_id = $${1}`];
+  const params     = [tenantId];
 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
   if (category)     { conditions.push(`p.category ILIKE $${params.length + 1}`);      params.push(`%${category}%`); }
@@ -708,15 +721,15 @@ async function toolGetStockByVariant({ manufacturer, size, category, genre, tags
       SUM(i.qty_on_hand) OVER () AS total_stock_all,
       COUNT(*)           OVER () AS nb_lignes_total
     FROM products p
-    JOIN inventory i ON i.item_id = p.item_id
-    JOIN shops    sh ON sh.shop_id = i.shop_id
+    JOIN inventory i ON i.item_id = p.item_id AND i.tenant_id = p.tenant_id
+    JOIN shops    sh ON sh.shop_id = i.shop_id AND sh.tenant_id = p.tenant_id
     WHERE ${conditions.join(' AND ')}
     ORDER BY p.description, sh.name
     LIMIT 100
   `, params);
 
   if (rows.length === 0 && manufacturer) {
-    const notFound = await buildBrandNotFoundResult(pool, manufacturer);
+    const notFound = await buildBrandNotFoundResult(pool, tenantId, manufacturer);
     if (notFound) return notFound;
   }
 
@@ -766,10 +779,10 @@ function buildSizeCondition(size, params) {
   return `p.description ILIKE $${i}`;
 }
 
-async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period, season }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, getSeasonsConfig });
+async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period, season }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
   let from, to, periodLabel = null;
 
   if (period) {
@@ -791,8 +804,8 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
 
   const label = periodLabel ?? (season ? `Saison ${season.toUpperCase()} (${from ?? '?'} → ${to ?? '?'})` : (from ? `${from} → ${to}` : 'toutes dates'));
 
-  const conditions = ['sl.qty != 0'];
-  const params     = [];
+  const conditions = ['sl.qty != 0', `sl.tenant_id = $1`];
+  const params     = [tenantId];
 
   if (from) { conditions.push(`(sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${params.length + 1}::date`); params.push(from); }
   if (to)   { conditions.push(`(sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${params.length + 1}::date`); params.push(to); }
@@ -819,7 +832,7 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
       SUM(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0))) OVER () AS total_ventes_all,
       COUNT(*)                             OVER () AS nb_articles_total
     FROM sale_lines sl
-    JOIN products p ON p.item_id = sl.item_id
+    JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
     WHERE ${conditions.join(' AND ')}
     GROUP BY p.description, p.manufacturer
     ORDER BY qty_vendue DESC
@@ -827,7 +840,7 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
   `, params);
 
   if (rows.length === 0 && manufacturer) {
-    const notFound = await buildBrandNotFoundResult(pool, manufacturer);
+    const notFound = await buildBrandNotFoundResult(pool, tenantId, manufacturer);
     if (notFound) return notFound;
   }
 
@@ -850,12 +863,12 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
   };
 }
 
-async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = false }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, getSeasonsConfig });
+async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = false }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool);
-  const conditions = ['p.archived = false', 'i.qty_on_hand > 0'];
-  const params     = [];
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  const conditions = ['p.archived = false', 'i.qty_on_hand > 0', `i.tenant_id = $1`];
+  const params     = [tenantId];
 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
   if (shop_id)      { conditions.push(`i.shop_id = $${params.length + 1}`);           params.push(shop_id); }
@@ -869,8 +882,8 @@ async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = fals
       COUNT(DISTINCT p.item_id)      AS references,
       SUM(i.qty_on_hand * p.default_cost)::numeric(12,2) AS valeur_stock
     FROM inventory i
-    JOIN products p  ON p.item_id  = i.item_id
-    JOIN shops    sh ON sh.shop_id = i.shop_id
+    JOIN products p  ON p.item_id  = i.item_id AND p.tenant_id = i.tenant_id
+    JOIN shops    sh ON sh.shop_id = i.shop_id AND sh.tenant_id = i.tenant_id
     WHERE ${conditions.join(' AND ')}
     GROUP BY p.manufacturer, sh.name
     ORDER BY valeur_stock DESC NULLS LAST
@@ -889,15 +902,15 @@ async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = fals
   };
 }
 
-async function toolGetPlanVsRecommended({ season }, { pool, budgetCache }) {
+async function toolGetPlanVsRecommended({ season }, { pool, tenantId, budgetCache }) {
   season = (season ?? 'p26').toLowerCase();
 
   // Get planned amounts
   const { rows: planRows } = await pool.query(`
     SELECT manufacturer, SUM(planned_amount)::float8 AS total_planifie
-    FROM budget_plans WHERE season_code = $1
+    FROM budget_plans WHERE tenant_id = $1 AND season_code = $2
     GROUP BY manufacturer
-  `, [season]);
+  `, [tenantId, season]);
 
   const planned = {};
   for (const r of planRows) planned[r.manufacturer] = parseFloat(r.total_planifie ?? 0);
@@ -932,10 +945,10 @@ async function toolGetPlanVsRecommended({ season }, { pool, budgetCache }) {
   return { saison: season, comparaison: comparison };
 }
 
-async function toolGetTopPerformers({ season, metric, order = 'desc', limit = 10, shops }, { pool, budgetCache, getSeasonsConfig }) {
+async function toolGetTopPerformers({ season, metric, order = 'desc', limit = 10, shops }, { pool, tenantId, budgetCache, getSeasonsConfig }) {
   season = (season ?? 'p26').toLowerCase();
   const rawShops = shops ? shops.split(',').map(s => s.trim()).filter(Boolean) : null;
-  const shopIds  = rawShops ? (await Promise.all(rawShops.map(s => resolveShopId(s, pool)))).filter(Boolean) : null;
+  const shopIds  = rawShops ? (await Promise.all(rawShops.map(s => resolveShopId(s, pool, tenantId)))).filter(Boolean) : null;
   const cacheKey = `marque:${season}:${shopIds?.join(',') ?? 'all'}`;
   const cached = budgetCache?.get(cacheKey);
 
@@ -963,8 +976,9 @@ async function toolGetTopPerformers({ season, metric, order = 'desc', limit = 10
   const seasons = await getSeasonsConfig();
   const s = seasons.find(x => x.code === season);
   if (!s) return { erreur: `Saison "${season}" non trouvée.` };
-  const shopFilter = shopIds?.length ? 'AND sl.shop_id = ANY($3)' : '';
-  const params = shopIds?.length ? [s.sell_from, s.sell_to, shopIds] : [s.sell_from, s.sell_to];
+  const baseParams = [s.sell_from, s.sell_to, tenantId];
+  const shopFilter = shopIds?.length ? 'AND sl.shop_id = ANY($4)' : '';
+  const params = shopIds?.length ? [...baseParams, shopIds] : baseParams;
 
   const dir = order === 'asc' ? 'ASC' : 'DESC';
   const { rows } = await pool.query(`
@@ -972,12 +986,13 @@ async function toolGetTopPerformers({ season, metric, order = 'desc', limit = 10
       p.manufacturer,
       SUM(sl.qty * p.default_cost)::numeric(12,2) AS cout_ventes
     FROM sale_lines sl
-    JOIN products p ON p.item_id = sl.item_id
+    JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
     WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date
+      AND sl.tenant_id = $3
       AND p.manufacturer IS NOT NULL ${shopFilter}
     GROUP BY p.manufacturer
     ORDER BY cout_ventes ${dir} NULLS LAST
-    LIMIT ${shopIds?.length ? '$4' : '$3'}
+    LIMIT ${shopIds?.length ? '$5' : '$4'}
   `, [...params, limit]);
 
   return {
@@ -987,27 +1002,30 @@ async function toolGetTopPerformers({ season, metric, order = 'desc', limit = 10
   };
 }
 
-async function toolGetShopsList(_, { pool }) {
-  const { rows } = await pool.query('SELECT shop_id, name FROM shops ORDER BY name');
+async function toolGetShopsList(_, { pool, tenantId }) {
+  const { rows } = await pool.query(
+    'SELECT shop_id, name FROM shops WHERE tenant_id = $1 ORDER BY name',
+    [tenantId]
+  );
   return { boutiques: rows.map(r => ({ id: r.shop_id, nom: r.name })) };
 }
 
-async function toolSearchBrands({ query }, { pool }) {
+async function toolSearchBrands({ query }, { pool, tenantId }) {
   const { rows } = await pool.query(`
     SELECT DISTINCT manufacturer, COUNT(DISTINCT item_id) AS nb_articles
     FROM products
-    WHERE manufacturer ILIKE $1 AND manufacturer IS NOT NULL
+    WHERE tenant_id = $1 AND manufacturer ILIKE $2 AND manufacturer IS NOT NULL
     GROUP BY manufacturer
     ORDER BY manufacturer
     LIMIT 20
-  `, [`%${query}%`]);
+  `, [tenantId, `%${query}%`]);
   return { resultats: rows.map(r => ({ marque: r.manufacturer, nb_articles: Number(r.nb_articles) })) };
 }
 
-async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tags, exclude_tags, season, shop_id, period, sort = 'st_desc', limit = 200 }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, getSeasonsConfig });
+async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tags, exclude_tags, season, shop_id, period, sort = 'st_desc', limit = 200 }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
   const today = new Date().toISOString().slice(0, 10);
   let from, to, periodLabel = null;
 
@@ -1069,6 +1087,9 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   const shopSaleCond   = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
   const shopStockWhere = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : "WHERE inv.shop_id != '0'";
 
+  // tenant isolation — appended once, all CTEs reference $tenantIdx
+  const tenantIdx = (params.push(tenantId), params.length);
+
   const orderBy = sort === 'st_asc'    ? 'st_pct ASC  NULLS LAST, sold DESC'
                : sort === 'sold_desc' ? 'sold DESC, st_pct DESC'
                : /* st_desc default */ 'st_pct DESC NULLS LAST, sold DESC';
@@ -1084,20 +1105,23 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
       SELECT sl2.item_id, SUM(sl2.qty) AS sold
       FROM sale_lines sl2
       WHERE (sl2.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl2.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date
+        AND sl2.tenant_id = $${tenantIdx}
         ${shopSaleCond}
       GROUP BY sl2.item_id
     ),
     stock_by_item AS (
       SELECT inv.item_id, SUM(inv.qty_on_hand) AS stock
       FROM inventory inv
-      JOIN products px ON px.item_id = inv.item_id AND px.archived = false
+      JOIN products px ON px.item_id = inv.item_id AND px.tenant_id = inv.tenant_id AND px.archived = false
       ${shopStockWhere}
+        AND inv.tenant_id = $${tenantIdx}
       GROUP BY inv.item_id
     ),
     transfers_in AS (
       SELECT t.item_id, SUM(t.qty_received) AS qty_in
       FROM transfers t
       WHERE ${transferInCond}
+        AND t.tenant_id = $${tenantIdx}
         AND t.transfer_date BETWEEN $1 AND $2
       GROUP BY t.item_id
     ),
@@ -1108,6 +1132,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
         SUM(CASE WHEN t.transfer_received THEN t.qty_received ELSE t.qty_sent END) AS qty_out
       FROM transfers t
       WHERE ${transferOutCond}
+        AND t.tenant_id = $${tenantIdx}
         AND t.transfer_date BETWEEN $1 AND $2
       GROUP BY t.item_id
     ),
@@ -1146,7 +1171,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
       LEFT JOIN stock_by_item  st   ON st.item_id   = p.item_id
       LEFT JOIN transfers_in   ti   ON ti.item_id   = p.item_id
       LEFT JOIN transfers_out  to2  ON to2.item_id  = p.item_id
-      WHERE ${prodWhere.length ? prodWhere.join(' AND ') + ' AND' : ''}
+      WHERE p.tenant_id = $${tenantIdx} AND ${prodWhere.length ? prodWhere.join(' AND ') + ' AND' : ''}
         -- Include any item with sales, stock, OR transfer activity.
         -- Items transferred out with 0 sales and 0 stock still have real supplier received.
         (GREATEST(0, COALESCE(s.sold, 0)) + COALESCE(st.stock, 0) + COALESCE(ti.qty_in, 0) + COALESCE(to2.qty_out, 0)) > 0
@@ -1163,7 +1188,7 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   `, params);
 
   if (rows.length === 0 && manufacturer) {
-    const notFound = await buildBrandNotFoundResult(pool, manufacturer);
+    const notFound = await buildBrandNotFoundResult(pool, tenantId, manufacturer);
     if (notFound) return notFound;
   }
 
@@ -1229,11 +1254,11 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   };
 }
 
-async function toolGetCategories({ manufacturer }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer }, { pool, getSeasonsConfig });
+async function toolGetCategories({ manufacturer }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  const conditions = ['p.category IS NOT NULL', "p.category != ''", 'p.archived = false'];
-  const params     = [];
+  const conditions = ['p.category IS NOT NULL', "p.category != ''", 'p.archived = false', 'p.tenant_id = $1'];
+  const params     = [tenantId];
 
   if (manufacturer) {
     conditions.push(`p.manufacturer ILIKE $${params.length + 1}`);
@@ -1273,10 +1298,10 @@ async function toolGetCategories({ manufacturer }, { pool, getSeasonsConfig }) {
   };
 }
 
-async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1, receiving_shop_id, category, exclude_nos = false }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ category, shop_id: receiving_shop_id }, { pool, getSeasonsConfig });
+async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1, receiving_shop_id, category, exclude_nos = false }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ category, shop_id: receiving_shop_id }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  const params = [days_dormant, min_stock];
+  const params = [days_dormant, min_stock, tenantId];
   const nosFilter = exclude_nos ? "AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')" : '';
   let catFilter = '';
   if (category) { params.push(`%${category}%`); catFilter = `AND p.category ILIKE $${params.length}`; }
@@ -1288,31 +1313,35 @@ async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1
         MAX(sl.completed_time) AS last_sale_date,
         SUM(CASE WHEN sl.completed_time >= now() - interval '30 days' THEN sl.qty ELSE 0 END)::int AS units_sold_30d
       FROM sale_lines sl
-      JOIN products p ON p.item_id = sl.item_id
+      JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
       WHERE sl.completed_time >= now() - interval '90 days'
         AND sl.completed_time IS NOT NULL
+        AND sl.tenant_id = $3
         AND p.matrix_id IS NOT NULL AND p.archived = false
       GROUP BY p.matrix_id, sl.shop_id
     ),
     matrix_ever_sold AS (
       SELECT DISTINCT p.matrix_id, sl.shop_id
-      FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+      FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
       WHERE sl.completed_time >= now() - interval '3 years'
+        AND sl.tenant_id = $3
         AND p.matrix_id IS NOT NULL AND p.archived = false
     ),
     item_ever_sold AS (
       SELECT DISTINCT item_id, shop_id FROM sale_lines
       WHERE completed_time >= now() - interval '3 years'
+        AND tenant_id = $3
     ),
     dormant_matrix AS (
       SELECT DISTINCT p.matrix_id, i.shop_id,
         CASE WHEN mls.last_sale_date IS NULL THEN NULL
              ELSE EXTRACT(DAY FROM now() - mls.last_sale_date)::int END AS days_dormant
       FROM inventory i
-      JOIN products p ON p.item_id = i.item_id AND p.matrix_id IS NOT NULL AND p.archived = false
+      JOIN products p ON p.item_id = i.item_id AND p.tenant_id = i.tenant_id AND p.matrix_id IS NOT NULL AND p.archived = false
       JOIN matrix_ever_sold mes ON mes.matrix_id = p.matrix_id AND mes.shop_id = i.shop_id
       LEFT JOIN matrix_last_sale mls ON mls.matrix_id = p.matrix_id AND mls.shop_id = i.shop_id
       WHERE i.qty_on_hand > 0
+        AND i.tenant_id = $3
         AND (mls.last_sale_date IS NULL OR mls.last_sale_date < now() - (interval '1 day' * $1))
       GROUP BY p.matrix_id, i.shop_id, mls.last_sale_date
     ),
@@ -1347,12 +1376,12 @@ async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1
         CASE WHEN p.raw->'ItemAttributes'->>'attribute2' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute2' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute2' END
       )) AS tailles
     FROM best_active ba
-    JOIN products p ON p.matrix_id = ba.matrix_id AND p.archived = false
+    JOIN products p ON p.matrix_id = ba.matrix_id AND p.tenant_id = $3 AND p.archived = false
     JOIN item_ever_sold ies ON ies.item_id = p.item_id AND ies.shop_id = ba.active_shop_id
-    JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = ba.dormant_shop_id AND i.qty_on_hand >= $2
-    JOIN shops sh_d ON sh_d.shop_id = ba.dormant_shop_id
-    JOIN shops sh_a ON sh_a.shop_id = ba.active_shop_id
-    LEFT JOIN item_matrices im ON im.matrix_id = p.matrix_id
+    JOIN inventory i ON i.item_id = p.item_id AND i.tenant_id = $3 AND i.shop_id = ba.dormant_shop_id AND i.qty_on_hand >= $2
+    JOIN shops sh_d ON sh_d.shop_id = ba.dormant_shop_id AND sh_d.tenant_id = $3
+    JOIN shops sh_a ON sh_a.shop_id = ba.active_shop_id AND sh_a.tenant_id = $3
+    LEFT JOIN item_matrices im ON im.matrix_id = p.matrix_id AND im.tenant_id = $3
     WHERE NOT (p.default_cost = 0 AND p.default_price = 0)
       AND p.description NOT ILIKE '%shopify%'
       ${nosFilter} ${catFilter}
@@ -1382,17 +1411,19 @@ async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1
   };
 }
 
-async function toolGetMatrixInfo({ manufacturer, description_search, category, shop_id }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, getSeasonsConfig });
+async function toolGetMatrixInfo({ manufacturer, description_search, category, shop_id }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool);
-  const conditions = ['p.archived = false', 'p.matrix_id IS NOT NULL'];
-  const params = [];
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  const conditions = ['p.archived = false', 'p.matrix_id IS NOT NULL', 'p.tenant_id = $1'];
+  const params = [tenantId];
   if (manufacturer)      { conditions.push(`p.manufacturer ILIKE $${params.length+1}`); params.push(`%${manufacturer}%`); }
   if (description_search){ conditions.push(`p.description  ILIKE $${params.length+1}`); params.push(`%${description_search}%`); }
   if (category)          { conditions.push(`p.category     ILIKE $${params.length+1}`); params.push(`%${category}%`); }
 
-  const shopJoin  = shop_id ? `JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = $${params.length+1}` : 'LEFT JOIN inventory i ON i.item_id = p.item_id';
+  const shopJoin  = shop_id
+    ? `JOIN inventory i ON i.item_id = p.item_id AND i.tenant_id = p.tenant_id AND i.shop_id = $${params.length+1}`
+    : 'LEFT JOIN inventory i ON i.item_id = p.item_id AND i.tenant_id = p.tenant_id';
   if (shop_id) params.push(shop_id);
 
   const { rows } = await pool.query(`
@@ -1408,12 +1439,13 @@ async function toolGetMatrixInfo({ manufacturer, description_search, category, s
         CASE WHEN p.raw->'ItemAttributes'->>'attribute3' ~ '^[0-9]' OR p.raw->'ItemAttributes'->>'attribute3' ~* '^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$' THEN p.raw->'ItemAttributes'->>'attribute3' END
       ), ', ') AS tailles_disponibles,
       (SELECT SUM(sl2.qty) FROM sale_lines sl2
-       JOIN products p2 ON p2.item_id = sl2.item_id
+       JOIN products p2 ON p2.item_id = sl2.item_id AND p2.tenant_id = sl2.tenant_id
        WHERE p2.matrix_id = p.matrix_id
+         AND sl2.tenant_id = p.tenant_id
          AND sl2.completed_time >= now() - interval '365 days')::int AS ventes_12m
     FROM products p
     ${shopJoin}
-    LEFT JOIN item_matrices im ON im.matrix_id = p.matrix_id
+    LEFT JOIN item_matrices im ON im.matrix_id = p.matrix_id AND im.tenant_id = p.tenant_id
     WHERE ${conditions.join(' AND ')}
     GROUP BY p.matrix_id, p.manufacturer
     ORDER BY stock_total DESC NULLS LAST
@@ -1447,10 +1479,10 @@ async function toolGetSeasonsList(_, { getSeasonsConfig }) {
   };
 }
 
-async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, getSeasonsConfig });
+async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
   const allSeasons = await getSeasonsConfig();
 
   if (!seasonCodes?.length) return { erreur: 'Fournir au moins une saison dans seasons (ex: ["p26", "p25"]).' };
@@ -1462,14 +1494,14 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
     const seasonTag = s.tag_pattern ?? s.code;
     // reception_from → sell_to matches Lightspeed "Ventes par Marque" methodology:
     // start from when items arrive (reception_from), end at sell_to.
-    const conds  = ["(sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date", `p.tags ILIKE $3`];
-    const params = [s.reception_from ?? s.sell_from, s.sell_to, `%${seasonTag}%`];
+    const conds  = ["(sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date", `p.tags ILIKE $3`, `sl.tenant_id = $4`];
+    const params = [s.reception_from ?? s.sell_from, s.sell_to, `%${seasonTag}%`, tenantId];
 
     if (manufacturer) { conds.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
     if (shop_id)      { conds.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
 
-    const stockConds  = ['p.archived = false', `p.tags ILIKE $1`];
-    const stockParams = [`%${seasonTag}%`];
+    const stockConds  = ['p.archived = false', `p.tags ILIKE $1`, `i.tenant_id = $2`];
+    const stockParams = [`%${seasonTag}%`, tenantId];
     if (manufacturer) { stockConds.push(`p.manufacturer ILIKE $${stockParams.length + 1}`); stockParams.push(`%${manufacturer}%`); }
     if (shop_id)      { stockConds.push(`i.shop_id = $${stockParams.length + 1}`);           stockParams.push(shop_id); }
 
@@ -1482,7 +1514,7 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
           MIN(sl.completed_time::date)::text AS premiere_vente,
           MAX(sl.completed_time::date)::text AS derniere_vente
         FROM sale_lines sl
-        JOIN products p ON p.item_id = sl.item_id
+        JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
         WHERE ${conds.join(' AND ')}
       `, params),
       pool.query(`
@@ -1490,7 +1522,7 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
           COALESCE(SUM(i.qty_on_hand), 0)::int AS stock_restant,
           COALESCE(SUM(i.qty_on_hand * COALESCE(p.default_cost, 0)), 0)::numeric(12,2) AS valeur_stock_restant
         FROM inventory i
-        JOIN products p ON p.item_id = i.item_id
+        JOIN products p ON p.item_id = i.item_id AND p.tenant_id = i.tenant_id
         WHERE ${stockConds.join(' AND ')}
       `, stockParams),
     ]);
@@ -1520,10 +1552,10 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
   };
 }
 
-async function toolGetSalesByCategory({ season, period, date_from, date_to, manufacturer, shop_id }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, getSeasonsConfig });
+async function toolGetSalesByCategory({ season, period, date_from, date_to, manufacturer, shop_id }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
   let from = date_from, to = date_to;
   let seasonTag = null, periodLabel = null;
   let avertissementPeriode = null;
@@ -1558,8 +1590,9 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
     "(sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $1::date AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $2::date",
     "p.category IS NOT NULL",
     "p.category != ''",
+    "sl.tenant_id = $3",
   ];
-  const params = [from, to];
+  const params = [from, to, tenantId];
 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
   if (shop_id)      { conditions.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
@@ -1576,7 +1609,7 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
       SUM(SUM(COALESCE((sl.raw->>'calcSubtotal')::numeric, sl.qty * sl.unit_price) - COALESCE(sl.discount, 0))) OVER () AS total_ventes_all,
       COUNT(*)                            OVER () AS nb_categories_total
     FROM sale_lines sl
-    JOIN products p ON p.item_id = sl.item_id
+    JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
     WHERE ${conditions.join(' AND ')}
     GROUP BY p.category
     ORDER BY ventes_brutes DESC NULLS LAST
@@ -1608,14 +1641,15 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
 // get_inventory_at_date — snapshot d'inventaire à une date donnée
 // Retourne une erreur explicite si la date est antérieure au premier snapshot.
 // ---------------------------------------------------------------------------
-async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, tags, exclude_tags }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, getSeasonsConfig });
+async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, tags, exclude_tags }, { pool, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
 
   const { rows: meta } = await pool.query(
     `SELECT MIN(snapshot_date)::text AS first_date, MAX(snapshot_date)::text AS last_date
-     FROM inventory_snapshots`,
+     FROM inventory_snapshots WHERE tenant_id = $1`,
+    [tenantId],
   );
   const firstDate = meta[0]?.first_date ?? null;
   const lastDate  = meta[0]?.last_date  ?? null;
@@ -1634,7 +1668,8 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, t
     };
   }
 
-  const params = [date];
+  // $1 = date, $2 = tenantId (fixed positions); dynamic filters start at $3
+  const params = [date, tenantId];
   const shopCond = shop_id      ? `AND s.shop_id = $${params.push(shop_id)}`                         : '';
   const mfrCond  = manufacturer ? `AND p.manufacturer ILIKE $${params.push('%' + manufacturer + '%')}` : '';
   const catCond  = category     ? `AND p.category ILIKE $${params.push('%' + category + '%')}`         : '';
@@ -1651,8 +1686,8 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, t
       ROUND(SUM(s.qty * COALESCE(s.unit_cost,0))::numeric, 2)         AS valeur_cout,
       ROUND(SUM(s.qty * COALESCE(s.unit_price,0))::numeric, 2)        AS valeur_detail
     FROM inventory_snapshots s
-    JOIN products p ON p.item_id = s.item_id
-    WHERE s.snapshot_date = $1 ${filterCond}
+    JOIN products p ON p.item_id = s.item_id AND p.tenant_id = s.tenant_id
+    WHERE s.snapshot_date = $1 AND s.tenant_id = $2 ${filterCond}
   `, params);
 
   if (!totals[0]?.unites) {
@@ -1665,9 +1700,9 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, t
       SUM(s.qty)::int                                         AS unites,
       ROUND(SUM(s.qty * COALESCE(s.unit_cost,0))::numeric,2) AS valeur_cout
     FROM inventory_snapshots s
-    JOIN products p  ON p.item_id  = s.item_id
-    JOIN shops    sh ON sh.shop_id = s.shop_id
-    WHERE s.snapshot_date = $1 ${filterCond}
+    JOIN products p  ON p.item_id  = s.item_id AND p.tenant_id = s.tenant_id
+    JOIN shops    sh ON sh.shop_id = s.shop_id AND sh.tenant_id = s.tenant_id
+    WHERE s.snapshot_date = $1 AND s.tenant_id = $2 ${filterCond}
     GROUP BY 1
     ORDER BY unites DESC
     LIMIT 15
@@ -1701,7 +1736,7 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, t
 // get_payment_terms_analysis — analyse des termes de paiement fournisseur
 // ---------------------------------------------------------------------------
 async function toolGetPaymentTermsAnalysis({ manufacturer }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer }, { pool, getSeasonsConfig });
+  const invalid = await validateFilters({ manufacturer }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
   const { rows: capRow } = await pool.query(
     `SELECT value FROM app_settings WHERE tenant_id = $1 AND key = 'cost_of_capital'`,
@@ -1923,10 +1958,10 @@ async function toolResolveSearchTerm({ terme }, { pool, tenantId }) {
 // Même logique que toolGetSellthroughBySize mais filtré par matrix_id.
 // ---------------------------------------------------------------------------
 async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ shop_id, season }, { pool, getSeasonsConfig });
+  const invalid = await validateFilters({ shop_id, season }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
   if (!matrix_id) return { erreur: 'matrix_id is required' };
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
 
   const today = new Date().toISOString().slice(0, 10);
   let from = null, to = today, seasonTag = null;
@@ -2088,10 +2123,10 @@ async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, 
 // Utiliser quand resolved_type='description' (matrix_matches > 1).
 // ---------------------------------------------------------------------------
 async function toolGetProductByDescription({ terme, season, shop_id }, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ shop_id, season }, { pool, getSeasonsConfig });
+  const invalid = await validateFilters({ shop_id, season }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
   if (!terme) return { erreur: 'terme is required' };
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
 
   const today = new Date().toISOString().slice(0, 10);
   let from = null, to = today, seasonTag = null;
@@ -2276,9 +2311,9 @@ async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, sho
 // toolGetBrandRanking — classement des marques par ST, revenue, stock dormant.
 // ---------------------------------------------------------------------------
 async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20, include_nos = false, manufacturer, max_st, min_st, period }, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, getSeasonsConfig });
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
   const today = new Date().toISOString().slice(0, 10);
   limit = Math.min(Math.max(1, parseInt(limit) || 20), 50);
 
@@ -2467,10 +2502,10 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
 // Utilise computeSeasonMetrics en parallèle pour éviter la duplication SQL.
 // ---------------------------------------------------------------------------
 async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id, include_nos = false, comparable_window = true }, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, getSeasonsConfig });
+  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
   if (!season1 || !season2) return { erreur: 'season1 et season2 sont obligatoires.' };
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
   const today = new Date().toISOString().slice(0, 10);
   const allSeasons = await getSeasonsConfig();
 
@@ -2572,13 +2607,13 @@ async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id
 // Agrégation au niveau matrice (matrix_id = un modèle = toutes ses variantes).
 // ---------------------------------------------------------------------------
 async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_stock, max_stock, has_sales, manufacturer, sort_by = 'st', limit = 50, period }, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, getSeasonsConfig });
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
   if (min_st == null && max_st == null && min_stock == null && max_stock == null && has_sales == null && !manufacturer) {
     return { erreur: 'Spécifiez au moins un critère de filtre (min_st, max_st, min_stock, max_stock, has_sales, ou manufacturer).' };
   }
 
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
   const today = new Date().toISOString().slice(0, 10);
   limit = Math.min(Math.max(1, parseInt(limit) || 50), 200);
 
@@ -2782,13 +2817,13 @@ async function toolGetRestockRecommendations(
   { pool, getSeasonsConfig, tenantId }
 ) {
   if (!season) return { erreur: 'Le paramètre "season" est obligatoire.' };
-  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, getSeasonsConfig });
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
   season  = season.toLowerCase();
   limit   = Math.min(Math.max(1, parseInt(limit) || 30), 100);
   min_st  = Number(min_st ?? 70);
 
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
 
   // Season config
   const seasons = await getSeasonsConfig();
@@ -3121,9 +3156,9 @@ async function toolGetPricingAnalysis({
   sort_by = 'taux_remise',
   limit = 25,
 }, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, getSeasonsConfig });
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool);
+  shop_id = await resolveShopId(shop_id, pool, tenantId);
   const today = new Date().toISOString().slice(0, 10);
   limit     = Math.min(Math.max(1, parseInt(limit)     || 25), 50);
   min_lignes = Math.max(1, parseInt(min_lignes) || 20);
