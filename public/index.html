@@ -264,7 +264,7 @@
 
   <nav class="flex-1 overflow-y-auto pb-4">
     <div class="vs-group-label">Achats</div>
-    <button class="tab tab-active"   data-tab="budget"><span class="vs-nav-icon">📊</span><span class="vs-nav-label" data-i18n="tab_budget">Budget</span></button>
+    <button class="tab tab-active"   data-tab="budget"><span class="vs-nav-icon">📊</span><span class="vs-nav-label" data-i18n="tab_budget">Budget</span><span class="vs-nav-badge" id="budgetCountBadge" style="display:none"></span></button>
     <button class="tab tab-inactive" data-tab="nos"><span class="vs-nav-icon">🔄</span><span class="vs-nav-label" data-i18n="tab_nos">NOS</span></button>
     <button class="tab tab-inactive" data-tab="sizes"><span class="vs-nav-icon">📐</span><span class="vs-nav-label" data-i18n="tab_sizes">Courbes tailles</span></button>
     <button class="tab tab-inactive" data-tab="transfers"><span class="vs-nav-icon">🔀</span><span class="vs-nav-label" data-i18n="tab_transfers">Transferts / Actions</span></button>
@@ -2188,14 +2188,17 @@ function applyRoleUI() {
 }
 
 function updateUserPill() {
-  const email = (() => { try { return localStorage.getItem('auth_email') || ''; } catch { return ''; } })();
-  const role  = getRole() || '';
+  const email  = (() => { try { return localStorage.getItem('auth_email')       || ''; } catch { return ''; } })();
+  const tenant = (() => { try { return localStorage.getItem('auth_tenant_name') || ''; } catch { return ''; } })();
+  const role   = getRole() || '';
   const av = document.getElementById('userAvatar');
   const nm = document.getElementById('userName');
   const rl = document.getElementById('userRole');
+  const tb = document.getElementById('tenantBadge');
   if (av) av.textContent = email ? (email[0].toUpperCase() + (email.split('@')[0][1]||'').toUpperCase()) : '·';
   if (nm) nm.textContent = email ? email.split('@')[0] : '—';
   if (rl) rl.textContent = role ? (role === 'superadmin' ? 'Superadmin' : role) : '—';
+  if (tb && tenant) tb.textContent = tenant;
 }
 
 function showLogin() { document.getElementById('loginOverlay').classList.remove('hidden'); }
@@ -2239,6 +2242,7 @@ async function handleLogin(e) {
     if (data.role) setRole(data.role);
     if (data.tenant?.name) {
       document.getElementById('tenantBadge').textContent = data.tenant.name;
+      try { localStorage.setItem('auth_tenant_name', data.tenant.name); } catch {}
     }
     try { localStorage.setItem('auth_email', document.getElementById('loginEmail').value); } catch {}
     applyRoleUI();
@@ -2871,6 +2875,9 @@ const BudgetTab = (() => {
         setText('kpiBrandCount', String(data.length));
         setText('kpiHistRef',    fmtC(hist));
         setText('kpiCarryover',  fmtC(coDeduct));
+        // Populate the sidebar badge next to "Budget"
+        const badge = document.getElementById('budgetCountBadge');
+        if (badge) { badge.textContent = String(data.length); badge.style.display = ''; }
       }
     }
     if (grandNet > 0) {
