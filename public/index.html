@@ -97,16 +97,12 @@
       transition: background 0.12s, color 0.12s;
     }
     .vs-sidebar .tab:hover, .vs-sidebar .vs-nav-link:hover { background: #efeae1; color: #2a2620; }
-    /* Override the old border-bottom tab-active — sidebar uses bg + white text */
-    /* Active item spans FULL sidebar width (edge-to-edge) — feels more "complete" than the pill */
+    /* Active item: filled émeraude pill with rounded corners + margin (matches prototype) */
     .vs-sidebar .tab.tab-active {
-      background: #213b39; color: white; border: none; font-weight: 600;
-      margin-left: 0; margin-right: 0; border-radius: 0;
-      padding: 10px 22px;
-      box-shadow: none;
+      background: #213b39; color: white; border: none;
+      box-shadow: 0 1px 3px rgba(33, 59, 57, 0.25); font-weight: 600;
     }
     .vs-sidebar .tab.tab-active:hover { background: #152826; }
-    .vs-sidebar.collapsed .tab.tab-active { padding: 12px 8px; justify-content: center; }
     .vs-sidebar .tab.tab-inactive { border: none; color: #4d4640; }
     .vs-nav-icon { width: 18px; text-align: center; font-size: 15px; flex-shrink: 0; }
     .vs-nav-badge { margin-left: auto; font-size: 10px; padding: 1px 6px; background: rgba(255,255,255,0.25); border-radius: 8px; }
