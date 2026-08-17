@@ -2,19 +2,6 @@
 # Each line is a known-existing violation. New violations (not listed here)
 # will fail the scanner. Drain this list as multi-tenant hardening progresses.
 
-lib/import-routes.js:1105:import_batches,import_order_lines
-lib/import-routes.js:1112:import_batches,import_order_lines
-lib/import-routes.js:1119:import_batches
-lib/import-routes.js:1804:import_files
-lib/import-routes.js:719:import_batches,import_order_lines
-lib/import-routes.js:802:parse_recipes
-lib/import-routes.js:821:import_batches,import_order_lines
-lib/import-routes.js:844:import_batches,import_order_lines
-lib/import-routes.js:869:import_queue
-lib/import-routes.js:878:import_queue
-lib/import-routes.js:888:import_queue
-lib/import-routes.js:968:import_batches,import_order_lines
-lib/import-routes.js:976:import_batches,import_order_lines
 server.js:2167:sync_state
 server.js:2262:orders
 server.js:2268:transfers
@@ -68,19 +55,9 @@ server.js:3337:products,transfers
 server.js:3694:products
 server.js:3695:products
 server.js:3696:products
-server.js:3844:products,sale_lines
-server.js:3997:products,sale_lines
-server.js:4038:products,sale_lines
-server.js:4057:products,sale_lines
-server.js:4093:products,sale_lines
 server.js:465:users
-server.js:4737:products,transfers
-server.js:4760:products,sale_lines
 server.js:541:sync_state
-server.js:5598:inventory,products,sale_lines
-server.js:6510:sync_state
 server.js:653:sale_lines
-server.js:6552:import_files
 server.js:685:inventory,shops
 server.js:810:budget_plan_drops,budget_plans
 sync.js:1193:sync_state

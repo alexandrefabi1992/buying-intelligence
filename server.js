@@ -3845,7 +3845,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
                SUM(sl.qty)::float8 AS qty_sold_all,
                SUM(sl.qty * COALESCE(p.default_cost, 0))::float8 AS sold_cost
-        FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+        FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id AND sl.tenant_id = p.tenant_id
         WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${irSlFromIdx}::date
           AND sl.completed_time IS NOT NULL
           AND p.tags ILIKE $${irSlTagIdx} AND p.tags NOT ILIKE '%nos%'
@@ -3880,7 +3880,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
                SUM(sl.qty)::float8 AS units_sold,
                SUM(sl.qty * COALESCE(p.default_cost, 0))::float8 AS sold_cost
-        FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+        FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id AND sl.tenant_id = p.tenant_id
         WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${slFromIdx}::date
           AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${slToIdx}::date
           AND sl.completed_time IS NOT NULL
@@ -3998,7 +3998,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
               SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
                      SUM(sl.qty * COALESCE(p.default_cost, 0))::float8 AS remaining_cost,
                      SUM(sl.qty)::float8 AS remaining_units
-              FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+              FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id AND sl.tenant_id = p.tenant_id
               WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${rwFromIdx}::date
                 AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${rwToIdx}::date
                 AND sl.completed_time IS NOT NULL
@@ -4038,7 +4038,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
           const { rows: heSoldRows } = await pool.query(`
             SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
                    SUM(sl.qty)::float8 AS sold_elapsed
-            FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+            FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id AND sl.tenant_id = p.tenant_id
             WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${heSoldFromIdx}::date
               AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${heSoldToIdx}::date
               AND sl.completed_time IS NOT NULL
@@ -4057,7 +4057,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
           const { rows: heRecvRows } = await pool.query(`
             SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
                    SUM(sl.qty)::float8 AS recv_elapsed
-            FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+            FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id AND sl.tenant_id = p.tenant_id
             WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${heRecvFromIdx}::date
               AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${heRecvToIdx}::date
               AND sl.completed_time IS NOT NULL
@@ -4093,7 +4093,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         const { rows: rvRows } = await pool.query(`
           SELECT COALESCE(p.manufacturer, 'Sans marque') AS manufacturer,
                  SUM(sl.qty)::float8 AS units
-          FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id
+          FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id AND sl.tenant_id = p.tenant_id
           WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${rvFromIdx}::date
             AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${rvToIdx}::date
             AND sl.completed_time IS NOT NULL
@@ -4739,7 +4739,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
             COALESCE(SUM(CASE WHEN t.to_shop_id   = $2 THEN t.qty_received ELSE 0 END), 0)::float8 AS received_in,
             COALESCE(SUM(CASE WHEN t.from_shop_id = $2 THEN t.qty_received ELSE 0 END), 0)::float8 AS sent_out
           FROM transfers t
-          JOIN products p ON p.item_id = t.item_id
+          JOIN products p ON p.item_id = t.item_id AND t.tenant_id = p.tenant_id
           WHERE p.manufacturer ILIKE $1
             AND t.transfer_received = true
             AND t.item_id IS NOT NULL
@@ -4768,7 +4768,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
                          THEN sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0) ELSE 0 END), 2)::float8
                                                         AS revenue_12w
         FROM sale_lines sl
-        JOIN products p ON p.item_id = sl.item_id
+        JOIN products p ON p.item_id = sl.item_id AND sl.tenant_id = p.tenant_id
         WHERE p.manufacturer ILIKE $1
           AND sl.completed_time IS NOT NULL
           ${tenantCondP}
@@ -5594,7 +5594,13 @@ function velocityAction(weeksElapsed, st_s4, st_s7, st_s10, residual_pct, season
 }
 
 // Shared CTE builder — items tagged with season + their sales within the window
+// tenantCond: SQL fragment scoped to `products` (`AND tenant_id = '<id>'`).
+// Defense-in-depth: the same tenant filter is also applied inline to sale_lines
+// (sl.tenant_id) and inventory (i.tenant_id) so a stray join can't leak rows
+// from another tenant even if products isolation slips.
 function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam, tenantCond = '', shopJoin = '') {
+  const slTenantCond = tenantCond.replace(/\btenant_id\b/, 'sl.tenant_id');
+  const invTenantCond = tenantCond.replace(/\btenant_id\b/, 'i.tenant_id');
   return `
     season_items AS (
       SELECT item_id, manufacturer, category, default_price, default_cost,
@@ -5624,6 +5630,7 @@ function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam, t
       WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= '${seasonFrom}'::date
         AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= LEAST('${seasonTo}'::date, CURRENT_DATE)
         AND sl.completed_time IS NOT NULL
+        ${slTenantCond}
         ${shopCondSL}
     ),
     item_agg AS (
@@ -5645,7 +5652,7 @@ function velocityCTEs(seasonFrom, seasonTo, shopCondSL, shopCondInv, tagParam, t
              SUM(COALESCE(i.qty_on_hand, 0) + COALESCE(i.qty_on_order, 0)) AS stock
       FROM inventory i
       ${shopJoin}
-      WHERE 1=1 ${shopCondInv.replace('AND shop_id', 'AND i.shop_id')}
+      WHERE 1=1 ${invTenantCond} ${shopCondInv.replace('AND shop_id', 'AND i.shop_id')}
       GROUP BY i.item_id
     ),
     item_full AS (
@@ -5841,8 +5848,9 @@ app.get('/api/velocity/articles', async (req, res, next) => {
                THEN sl.qty ELSE 0 END AS qty_fp,
           CASE WHEN sl.qty > 0 THEN sl.qty ELSE 0 END AS qty_gross
         FROM sale_lines sl
-        JOIN products p ON p.item_id = sl.item_id
+        JOIN products p ON p.item_id = sl.item_id AND sl.tenant_id = p.tenant_id
         WHERE sl.item_id = ANY($1)
+          AND sl.tenant_id = $2
           AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= '${season.from}'::date
           AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= LEAST('${season.to}'::date, CURRENT_DATE)
           AND sl.completed_time IS NOT NULL
@@ -6507,6 +6515,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   // Auto-resume a sync that was killed mid-way (e.g. by a redeploy)
   try {
     const { rows } = await pool.query(
+      // tenant-scan: allow — startup boot: probe ANY tenant for a partial sync
       `SELECT step FROM sync_state WHERE next_url != 'COMPLETED' LIMIT 1`
     );
     if (rows.length > 0 && !syncRunning && process.env.LIGHTSPEED_REFRESH_TOKEN) {
@@ -6549,6 +6558,7 @@ app.listen(PORT, '0.0.0.0', async () => {
       // the previous run left off — no double-inserts in Lightspeed.
       const fileIds = stalePush.map(r => r.file_id);
       await pool.query(
+        // tenant-scan: allow — startup boot: orphan recovery across all tenants
         `UPDATE import_files SET status = 'previewed'
          WHERE file_id = ANY($1::int[]) AND status = 'pushing'`,
         [fileIds],
