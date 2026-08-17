@@ -1608,8 +1608,8 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
 // get_inventory_at_date — snapshot d'inventaire à une date donnée
 // Retourne une erreur explicite si la date est antérieure au premier snapshot.
 // ---------------------------------------------------------------------------
-async function toolGetInventoryAtDate({ date, shop_id, manufacturer }, { pool, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, getSeasonsConfig });
+async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, tags, exclude_tags }, { pool, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, getSeasonsConfig });
   if (invalid) return invalid;
   shop_id = await resolveShopId(shop_id, pool);
 
@@ -1637,6 +1637,12 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer }, { pool, g
   const params = [date];
   const shopCond = shop_id      ? `AND s.shop_id = $${params.push(shop_id)}`                         : '';
   const mfrCond  = manufacturer ? `AND p.manufacturer ILIKE $${params.push('%' + manufacturer + '%')}` : '';
+  const catCond  = category     ? `AND p.category ILIKE $${params.push('%' + category + '%')}`         : '';
+  // tags + exclude_tags share the same helper as other tools
+  const tagConds = buildTagConditions(tags, exclude_tags, params);
+  const tagCondStr = tagConds.length ? `AND ${tagConds.join(' AND ')}` : '';
+
+  const filterCond = `${shopCond} ${mfrCond} ${catCond} ${tagCondStr}`;
 
   const { rows: totals } = await pool.query(`
     SELECT
@@ -1646,7 +1652,7 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer }, { pool, g
       ROUND(SUM(s.qty * COALESCE(s.unit_price,0))::numeric, 2)        AS valeur_detail
     FROM inventory_snapshots s
     JOIN products p ON p.item_id = s.item_id
-    WHERE s.snapshot_date = $1 ${shopCond} ${mfrCond}
+    WHERE s.snapshot_date = $1 ${filterCond}
   `, params);
 
   if (!totals[0]?.unites) {
@@ -1661,7 +1667,7 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer }, { pool, g
     FROM inventory_snapshots s
     JOIN products p  ON p.item_id  = s.item_id
     JOIN shops    sh ON sh.shop_id = s.shop_id
-    WHERE s.snapshot_date = $1 ${shopCond} ${mfrCond}
+    WHERE s.snapshot_date = $1 ${filterCond}
     GROUP BY 1
     ORDER BY unites DESC
     LIMIT 15
@@ -1670,11 +1676,17 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer }, { pool, g
   return {
     date,
     premier_snapshot: firstDate,
-    filtre: { boutique: shop_id ?? 'toutes', marque: manufacturer ?? 'toutes' },
+    filtre: {
+      boutique:     shop_id ?? 'toutes',
+      marque:       manufacturer ?? 'toutes',
+      categorie:    category ?? null,
+      tags:         normalizeTags(tags),
+      exclude_tags: normalizeTags(exclude_tags),
+    },
     totaux: {
-      nb_articles: totals[0].nb_articles,
-      unites:      totals[0].unites,
-      valeur_cout: totals[0].valeur_cout,
+      nb_articles:   totals[0].nb_articles,
+      unites:        totals[0].unites,
+      valeur_cout:   totals[0].valeur_cout,
       valeur_detail: totals[0].valeur_detail,
     },
     breakdown: breakdown.map(r => ({

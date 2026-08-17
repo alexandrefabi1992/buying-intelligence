@@ -261,13 +261,16 @@ const TOOL_DEFS = [
   },
   {
     name: 'get_inventory_at_date',
-    description: 'Obtenir le stock réel (unités, valeur coût, valeur détail) à une date donnée — aujourd\'hui ou dans le passé. Utiliser pour TOUTE question sur la quantité ou la valeur du stock : "quels sont mes stocks", "valeur totale de l\'inventaire", "stock par boutique aujourd\'hui", "quel était le stock le [date]", "combien d\'unités [marque] avons-nous". Sans date = snapshot le plus récent (hier soir). Le résultat contient un champ "totaux" avec les vrais totaux compagnie — TOUJOURS lire ce champ pour répondre. JAMAIS inventer ni calculer un total. Si la date précède le premier snapshot, l\'outil retourne une erreur explicite.',
+    description: 'Stock réel (unités + valeur coût + valeur détail en $) à une date donnée — aujourd\'hui ou dans le passé. UTILISER pour TOUTE question sur la quantité ou la valeur du stock : "quels sont mes stocks", "valeur totale de l\'inventaire", "stock par boutique aujourd\'hui", "combien de $ de stock [marque/catégorie/tag]". Supporte les filtres : shop_id, manufacturer, category (ex: "Femme" pour toutes les sous-catégories Femme/*), tags (ex: ["p26"] pour uniquement la collection P26), exclude_tags. Sans date = snapshot le plus récent. Le résultat contient un champ "totaux" avec les vrais totaux (nb_articles, unites, valeur_cout, valeur_detail) — TOUJOURS lire ce champ pour répondre. JAMAIS inventer ni calculer un total. Si la date précède le premier snapshot, l\'outil retourne une erreur explicite.',
     parameters: {
       type: 'object',
       properties: {
-        date:         { type: 'string', description: 'Date ISO (YYYY-MM-DD). Omettre ou utiliser la date du jour pour le stock actuel.' },
-        shop_id:      { type: 'string', description: 'Nom ou ID de la boutique (optionnel). Sans ce paramètre : retourne le breakdown par boutique.' },
-        manufacturer: { type: 'string', description: 'Nom de la marque (optionnel)' },
+        date:         { type: 'string',  description: 'Date ISO (YYYY-MM-DD). Omettre pour le stock actuel.' },
+        shop_id:      { type: 'string',  description: 'Nom ou ID de la boutique (optionnel). Sans ce paramètre : breakdown par boutique.' },
+        manufacturer: { type: 'string',  description: 'Nom de la marque (optionnel).' },
+        category:     { type: 'string',  description: 'Filtre par catégorie ou préfixe (ex: "Femme" matche Femme/Hauts, Femme/Bas, etc. ; "Chemise" matche toutes les catégories chemises). Combinable avec tags pour ex. "P26 Femme".' },
+        tags:         { type: 'array', items: { type: 'string' }, description: 'Tags à inclure (AND). Ex: ["p26"] pour uniquement la collection P26.' },
+        exclude_tags: { type: 'array', items: { type: 'string' }, description: 'Tags à exclure (OR). Ex: ["nos"] pour exclure les articles NOS permanents.' },
       },
       required: [],
     },
