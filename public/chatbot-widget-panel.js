@@ -80,21 +80,19 @@
   // ── CSS ─────────────────────────────────────────────────────────────────
   const css = `
   /* ══ PUSH LAYOUT (main content shrinks, no overlay on top) ══ */
-  /* Applies padding-right to the outer app flex wrapper so <main> shrinks
-     smoothly when the panel is open. Selector matches the wrappers used
-     in index-v2.html (.flex.h-screen) and index.html (also .flex.h-screen). */
-  body.ai-panel-open .flex.h-screen {
-    padding-right: 408px;
-    transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  body.ai-panel-open.ai-panel-wide .flex.h-screen {
-    padding-right: 612px;
-  }
-  .flex.h-screen { transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  /* Applies padding-right to <body> directly so it works on EVERY page
+     regardless of wrapper structure — index.html + index-v2.html have a
+     .flex.h-screen wrapper, but brand.html / matrix.html / velocity.html
+     don't. Putting padding on body shrinks all children uniformly. The
+     panel itself is position:fixed and ignores body padding — it stays
+     glued to the right viewport edge. */
+  body { transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  body.ai-panel-open { padding-right: 408px; }
+  body.ai-panel-open.ai-panel-wide { padding-right: 612px; }
   @media (max-width: 900px) {
     /* On small screens, panel takes full width — no padding shift needed,
        treat like an overlay to avoid squeezing content into nothing. */
-    body.ai-panel-open .flex.h-screen { padding-right: 0; }
+    body.ai-panel-open { padding-right: 0; }
   }
 
   /* Overlay only visible under 900px (as fallback since panel becomes full-screen) */
