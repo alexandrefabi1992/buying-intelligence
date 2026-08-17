@@ -91,12 +91,20 @@
     .vs-group-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #a89f92; padding: 14px 20px 6px; }
 
     /* Sidebar nav items — reuses .tab class so existing JS keeps working */
+    /* width: calc(100% - 20px) + box-sizing: border-box force <button> to match
+       the natural block-level width that <a> gets in the prototype. Without
+       this, the button shrinks to content width and the active pill looks
+       narrower than in index-v2.html. */
     .vs-sidebar .tab, .vs-sidebar .vs-nav-link {
       display: flex; align-items: center; gap: 11px; padding: 8px 12px;
       margin: 1px 10px; border-radius: 8px; cursor: pointer;
       color: #4d4640; font-size: 13px; font-weight: 500; text-align: left;
-      border: none; background: transparent; width: auto; text-decoration: none;
+      border: none; background: transparent; text-decoration: none;
+      width: calc(100% - 20px); box-sizing: border-box;
       transition: background 0.12s, color 0.12s;
+    }
+    .vs-sidebar.collapsed .tab, .vs-sidebar.collapsed .vs-nav-link {
+      width: calc(100% - 16px); margin: 1px 8px;
     }
     .vs-sidebar .tab:hover, .vs-sidebar .vs-nav-link:hover { background: #efeae1; color: #2a2620; }
     /* Active item: filled émeraude pill with rounded corners + margin (matches prototype) */
