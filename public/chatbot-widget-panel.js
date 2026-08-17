@@ -84,11 +84,11 @@
      smoothly when the panel is open. Selector matches the wrappers used
      in index-v2.html (.flex.h-screen) and index.html (also .flex.h-screen). */
   body.ai-panel-open .flex.h-screen {
-    padding-right: 480px;
+    padding-right: 408px;
     transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   body.ai-panel-open.ai-panel-wide .flex.h-screen {
-    padding-right: 720px;
+    padding-right: 612px;
   }
   .flex.h-screen { transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
   @media (max-width: 900px) {
@@ -110,7 +110,7 @@
   /* ══ SIDE PANEL ══ */
   #ai-panel {
     position: fixed; top: 0; right: 0; bottom: 0;
-    width: 480px; max-width: 92vw;
+    width: 408px; max-width: 92vw;
     background: white;
     box-shadow: -8px 0 40px rgba(0,0,0,0.12);
     z-index: 1000;
@@ -119,7 +119,7 @@
     display: flex; flex-direction: column;
   }
   #ai-panel.open { transform: translateX(0); }
-  #ai-panel.wide { width: 720px; max-width: 96vw; }
+  #ai-panel.wide { width: 612px; max-width: 96vw; }
   @media (max-width: 520px) {
     #ai-panel { width: 100vw; max-width: 100vw; }
   }
