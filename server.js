@@ -698,6 +698,63 @@ async function runMigrations() {
     console.log('[migration] mv_inventory_stock recreated.');
   }
 
+  // Multi-tenant migration: add tenant_id to mv_sales_velocity and
+  // mv_inventory_stock. Without tenant_id, aggregations mix rows from
+  // different tenants that happen to share an item_id, so queries against
+  // the views return corrupted velocities and phantom stock.
+  //
+  // Callers must add `AND v.tenant_id = $N` when reading these views.
+  const { rows: mvV3 } = await pool.query(
+    "SELECT 1 FROM sync_state WHERE step = 'mv_velocity_v3'"
+  );
+  if (!mvV3.length) {
+    console.log('[migration] Recreating mv_sales_velocity with tenant_id column…');
+    await pool.query('DROP MATERIALIZED VIEW IF EXISTS mv_sales_velocity CASCADE');
+    await pool.query(`
+      CREATE MATERIALIZED VIEW mv_sales_velocity AS
+      SELECT
+        sl.tenant_id,
+        sl.item_id,
+        sl.shop_id,
+        date_trunc('week', sl.completed_time) AS week,
+        SUM(sl.qty)                           AS units_sold,
+        SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS revenue
+      FROM sale_lines sl
+      WHERE sl.completed_time IS NOT NULL
+      GROUP BY sl.tenant_id, sl.item_id, sl.shop_id, date_trunc('week', sl.completed_time)
+    `);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_velocity ON mv_sales_velocity(tenant_id, item_id, shop_id, week)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_mv_velocity_week ON mv_sales_velocity(week)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_mv_velocity_tenant_week ON mv_sales_velocity(tenant_id, week)`);
+    await pool.query(
+      "INSERT INTO sync_state(step, next_url) VALUES ('mv_velocity_v3', 'COMPLETED') ON CONFLICT(step) DO NOTHING"
+    );
+    console.log('[migration] mv_sales_velocity now includes tenant_id.');
+  }
+
+  const { rows: mvIV3 } = await pool.query(
+    "SELECT 1 FROM sync_state WHERE step = 'mv_inventory_v3'"
+  );
+  if (!mvIV3.length) {
+    console.log('[migration] Recreating mv_inventory_stock with tenant_id column…');
+    await pool.query('DROP MATERIALIZED VIEW IF EXISTS mv_inventory_stock CASCADE');
+    await pool.query(`
+      CREATE MATERIALIZED VIEW mv_inventory_stock AS
+      SELECT
+        i.tenant_id,
+        i.item_id,
+        SUM(COALESCE(i.qty_on_hand, 0) + COALESCE(i.qty_on_order, 0)) AS current_stock_all
+      FROM inventory i
+      JOIN shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = i.tenant_id
+      GROUP BY i.tenant_id, i.item_id
+    `);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_inventory_stock ON mv_inventory_stock(tenant_id, item_id)`);
+    await pool.query(
+      "INSERT INTO sync_state(step, next_url) VALUES ('mv_inventory_v3', 'COMPLETED') ON CONFLICT(step) DO NOTHING"
+    );
+    console.log('[migration] mv_inventory_stock now includes tenant_id.');
+  }
+
   // Migration: add drop_id to budget_plans + budget_plan_drops table
   // Each step is idempotent — checks actual DB state, never deletes rows.
   await pool.query(`ALTER TABLE budget_plans ADD COLUMN IF NOT EXISTS drop_id TEXT NOT NULL DEFAULT 'drop_1'`);
@@ -1500,11 +1557,6 @@ app.get('/api/manufacturers', async (req, res, next) => {
 app.get('/api/nos', async (req, res, next) => {
   try {
     const weeks = parseInt(req.query.weeks ?? '4', 10);
-    // Tenant isolation: mv_sales_velocity is a global materialized view
-    // (no tenant_id column yet — TODO: add in Sprint B). Isolation is
-    // enforced via the downstream JOINs on products/inventory/shops which
-    // ALL filter by tenant_id. An item_id that doesn't belong to the
-    // caller's tenant simply gets dropped by the INNER JOIN.
     const { rows } = await pool.query(`
       WITH velocity AS (
         SELECT
@@ -1513,6 +1565,7 @@ app.get('/api/nos', async (req, res, next) => {
           AVG(v.units_sold) AS avg_weekly_units
         FROM mv_sales_velocity v
         WHERE v.week >= date_trunc('week', now()) - interval '12 weeks'
+          AND v.tenant_id = $2
         GROUP BY v.item_id, v.shop_id
       )
       SELECT
@@ -2025,6 +2078,7 @@ app.get('/api/budget/nos', async (req, res, next) => {
         SELECT item_id, shop_id, SUM(units_sold) / 12.0 AS avg_weekly_units
         FROM mv_sales_velocity
         WHERE week >= date_trunc('week', now()) - INTERVAL '12 weeks'
+          AND tenant_id = $${tidN}
         GROUP BY item_id, shop_id
       ),
       shortage AS (
@@ -2041,7 +2095,7 @@ app.get('/api/budget/nos', async (req, res, next) => {
           COALESCE(p.default_cost, 0)                                       AS unit_cost
         FROM products p
         JOIN velocity  v ON v.item_id = p.item_id
-        JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = v.shop_id
+        JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = v.shop_id AND i.tenant_id = $${tidN}
         WHERE p.tags ILIKE '%nos%'
           AND p.archived = false
           AND p.tenant_id = $${tidN}
@@ -3522,6 +3576,7 @@ app.get('/api/nos/urgent', async (req, res, next) => {
           ) AS avg_weekly_units
         FROM mv_sales_velocity
         WHERE week >= date_trunc('week', now()) - INTERVAL '12 weeks'
+          AND tenant_id = $${tidN}
         GROUP BY item_id, shop_id
       )
       SELECT
@@ -3542,9 +3597,9 @@ app.get('/api/nos/urgent', async (req, res, next) => {
         )                                        AS weeks_of_cover,
         COALESCE(p.default_cost, 0)              AS unit_cost
       FROM velocity v
-      JOIN inventory i ON i.item_id = v.item_id AND i.shop_id = v.shop_id
-      JOIN products  p ON p.item_id = v.item_id
-      JOIN shops     s ON s.shop_id = i.shop_id
+      JOIN inventory i ON i.item_id = v.item_id AND i.shop_id = v.shop_id AND i.tenant_id = $${tidN}
+      JOIN products  p ON p.item_id = v.item_id AND p.tenant_id = $${tidN}
+      JOIN shops     s ON s.shop_id = i.shop_id AND s.tenant_id = $${tidN}
       WHERE p.tags ILIKE '%nos%'
         AND p.archived = false
         AND p.tenant_id = $${tidN}

@@ -97,9 +97,13 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE INDEX IF NOT EXISTS idx_orders_shop   ON orders(shop_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 
--- Materialized view: weekly sales velocity per item per shop (refreshed after each sync)
+-- Materialized view: weekly sales velocity per tenant per item per shop.
+-- tenant_id is part of the grouping so aggregations never mix rows from
+-- different tenants that happen to share an item_id. All queries against
+-- this view MUST filter by tenant_id.
 CREATE MATERIALIZED VIEW IF NOT EXISTS mv_sales_velocity AS
 SELECT
+  sl.tenant_id,
   sl.item_id,
   sl.shop_id,
   date_trunc('week', sl.completed_time) AS week,
@@ -107,24 +111,25 @@ SELECT
   SUM(sl.qty * sl.unit_price - COALESCE((sl.raw->>'calcLineDiscount')::numeric, 0)) AS revenue
 FROM sale_lines sl
 WHERE sl.completed_time IS NOT NULL
-GROUP BY sl.item_id, sl.shop_id, date_trunc('week', sl.completed_time);
+GROUP BY sl.tenant_id, sl.item_id, sl.shop_id, date_trunc('week', sl.completed_time);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_velocity      ON mv_sales_velocity(item_id, shop_id, week);
--- Dedicated week index so "WHERE week >= now()-12weeks" uses a range scan (week is 3rd col above)
-CREATE INDEX        IF NOT EXISTS idx_mv_velocity_week  ON mv_sales_velocity(week);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_velocity      ON mv_sales_velocity(tenant_id, item_id, shop_id, week);
+CREATE INDEX        IF NOT EXISTS idx_mv_velocity_week ON mv_sales_velocity(week);
+CREATE INDEX        IF NOT EXISTS idx_mv_velocity_tenant_week ON mv_sales_velocity(tenant_id, week);
 
--- Pre-aggregated inventory stock per item across all shops.
+-- Pre-aggregated inventory stock per tenant per item across all shops.
 -- Eliminates the 412ms Seq Scan + HashAggregate on 662k inventory rows in /api/budget/saisonnier.
 -- Refreshed CONCURRENTLY after each sync alongside mv_sales_velocity.
 CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inventory_stock AS
 SELECT
+  i.tenant_id,
   i.item_id,
   SUM(COALESCE(i.qty_on_hand, 0) + COALESCE(i.qty_on_order, 0)) AS current_stock_all
 FROM inventory i
-JOIN shops sh ON sh.shop_id = i.shop_id
-GROUP BY i.item_id;
+JOIN shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = i.tenant_id
+GROUP BY i.tenant_id, i.item_id;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_inventory_stock ON mv_inventory_stock(item_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_inventory_stock ON mv_inventory_stock(tenant_id, item_id);
 
 -- Trigram extension for ILIKE '%…%' acceleration on tags
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
