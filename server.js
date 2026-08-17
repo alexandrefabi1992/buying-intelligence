@@ -1492,6 +1492,11 @@ app.get('/api/manufacturers', async (req, res, next) => {
 app.get('/api/nos', async (req, res, next) => {
   try {
     const weeks = parseInt(req.query.weeks ?? '4', 10);
+    // Tenant isolation: mv_sales_velocity is a global materialized view
+    // (no tenant_id column yet — TODO: add in Sprint B). Isolation is
+    // enforced via the downstream JOINs on products/inventory/shops which
+    // ALL filter by tenant_id. An item_id that doesn't belong to the
+    // caller's tenant simply gets dropped by the INNER JOIN.
     const { rows } = await pool.query(`
       WITH velocity AS (
         SELECT
@@ -1521,9 +1526,9 @@ app.get('/api/nos', async (req, res, next) => {
           v.avg_weekly_units * $1 - (i.qty_on_hand + i.qty_on_order), 0
         ))                               AS suggested_order_qty
       FROM velocity v
-      JOIN inventory  i ON i.item_id = v.item_id AND i.shop_id = v.shop_id
-      JOIN products   p ON p.item_id = v.item_id
-      JOIN shops      s ON s.shop_id = i.shop_id
+      JOIN inventory  i ON i.item_id = v.item_id AND i.shop_id = v.shop_id AND i.tenant_id = $2
+      JOIN products   p ON p.item_id = v.item_id AND p.tenant_id = $2
+      JOIN shops      s ON s.shop_id = i.shop_id AND s.tenant_id = $2
       WHERE v.avg_weekly_units > 0
         AND (i.qty_on_hand + i.qty_on_order) / v.avg_weekly_units < $1
         AND p.archived = false
@@ -1531,7 +1536,7 @@ app.get('/api/nos', async (req, res, next) => {
         AND p.description NOT ILIKE '%shopify%'
         AND NOT (p.default_cost = 0 AND p.default_price = 0)
       ORDER BY weeks_of_cover ASC NULLS LAST, suggested_order_qty DESC
-    `, [weeks]);
+    `, [weeks, req.tenantId]);
     res.json({ weeks_threshold: weeks, count: rows.length, items: rows });
   } catch (err) { next(err); }
 });
@@ -1919,8 +1924,9 @@ app.get('/api/sizes/brands', async (req, res, next) => {
         FROM products
         WHERE matrix_id IS NOT NULL AND archived = false
           AND category NOT ILIKE 'Alt%ration%' AND description NOT ILIKE '%shopify%'
+          AND tenant_id = $1
         ORDER BY category
-      `),
+      `, [req.tenantId]),
     ]);
 
     res.json({ count: rows.length, sizes: rows, categories: catRows.map(r => r.category) });
@@ -1992,7 +1998,9 @@ app.get('/api/budget/nos', async (req, res, next) => {
     const colls = req.query.collections ? req.query.collections.split(',').map(s => s.toLowerCase().trim()).filter(Boolean) : null;
     const sizes = req.query.sizes       ? req.query.sizes.split(',').filter(Boolean)                                  : null;
 
-    const cacheKey = JSON.stringify({ r: 'nos', weeks, shops, colls, sizes });
+    // Tenant isolation: cache key MUST include tenantId, otherwise the first
+    // tenant's response poisons the cache for all others during TTL.
+    const cacheKey = JSON.stringify({ r: 'nos', tid: req.tenantId, weeks, shops, colls, sizes });
     const hit = cacheGet(cacheKey);
     if (hit) return res.json({ ...hit, cached: true });
 
@@ -2134,11 +2142,17 @@ app.get('/api/token/status', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/sync/checkpoints', async (req, res, next) => {
   try {
+    // Tenant isolation: sync_state rows have tenant_id (nullable for legacy
+    // global markers). Only return rows for the caller's tenant PLUS any
+    // truly global markers (tenant_id IS NULL). Sync metadata should never
+    // leak cross-tenant since it exposes cursor positions and cadence.
     const { rows } = await pool.query(
       `SELECT step, next_url, processed_count, started_at, updated_at
        FROM sync_state
        WHERE step != 'refresh_token'
+         AND (tenant_id = $1 OR tenant_id IS NULL)
        ORDER BY updated_at DESC NULLS LAST`,
+      [req.tenantId]
     );
     const formatted = rows.map(r => ({
       step:            r.step,
