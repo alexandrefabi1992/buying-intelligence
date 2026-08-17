@@ -7885,7 +7885,7 @@ const HelpPanel = (() => {
   }
 
   async function load(forceReload) {
-    const lang = currentLang || 'fr';
+    const lang = (typeof _lang !== 'undefined' ? _lang : null) || 'fr';
     if (helpData && helpData.__lang === lang && !forceReload) return;
     const r = await fetch('/api/help?lang=' + lang, { headers: { Authorization: 'Bearer ' + (getToken() || '') } });
     if (!r.ok) throw new Error('HTTP ' + r.status + ' — vérifie ta session');
