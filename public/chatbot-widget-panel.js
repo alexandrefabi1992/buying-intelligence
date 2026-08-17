@@ -223,6 +223,24 @@
     border-top: 1px solid #e6ded7; padding: 12px 16px 16px;
     background: white; flex-shrink: 0;
   }
+  /* Attachment chip preview */
+  #ai-attachment-chip {
+    display: none; align-items: center; gap: 8px;
+    background: #f5ede4; border: 1px solid #d4afa1; border-radius: 8px;
+    padding: 6px 10px; margin-bottom: 8px;
+    font-size: 12px; color: #6d4535;
+  }
+  #ai-attachment-chip.show { display: inline-flex; }
+  .ai-chip-icon { font-size: 14px; }
+  .ai-chip-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .ai-chip-size { color: #8a5a48; font-size: 10px; }
+  .ai-chip-remove {
+    background: transparent; border: none; cursor: pointer;
+    color: #8a5a48; font-size: 14px; padding: 0 2px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px;
+  }
+  .ai-chip-remove:hover { background: rgba(138,90,72,0.15); color: #6d4535; }
   #ai-input-inner {
     display: flex; align-items: flex-end; gap: 6px;
     border: 1px solid #e6ded7; border-radius: 12px;
@@ -303,8 +321,15 @@
     </div>
 
     <div id="ai-input-wrap">
+      <div id="ai-attachment-chip">
+        <span class="ai-chip-icon">📎</span>
+        <span class="ai-chip-name" id="ai-chip-name">—</span>
+        <span class="ai-chip-size" id="ai-chip-size">—</span>
+        <button class="ai-chip-remove" id="ai-chip-remove" title="Retirer">×</button>
+      </div>
       <div id="ai-input-inner">
-        <button class="ai-input-btn ai-attach-btn" title="Attacher (bientôt)" disabled>+</button>
+        <input type="file" id="ai-file-input" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf" style="display:none">
+        <button class="ai-input-btn ai-attach-btn" id="ai-attach-btn" title="Joindre une image ou un PDF (max 10 MB)">+</button>
         <textarea id="ai-input" placeholder="Écris ta question…" rows="1"></textarea>
         <button class="ai-input-btn ai-send-btn" id="ai-send" title="Envoyer">↑</button>
       </div>
@@ -506,26 +531,44 @@
     // ── Send message ─────────────────────────────────────────────────────
     async function sendMessage() {
       const text = input.value.trim();
-      if (!text || sendBtn.disabled) return;
+      const file = window.__cortexAttachment && window.__cortexAttachment();
+      if ((!text && !file) || sendBtn.disabled) return;
       input.value = '';
       input.style.height = '24px';
       sendBtn.disabled = true;
-      lastUserMessage = text;
 
-      appendMsg('user', text);
-      history.push({ role: 'user', content: text });
+      const displayText = text || (file ? `Analyse ce document (${file.name})` : '');
+      lastUserMessage = displayText;
 
-      const thinking = appendMsg('thinking', 'Analyse en cours');
+      const userBubbleText = file ? `${displayText}\n\n📎 ${file.name}` : displayText;
+      appendMsg('user', userBubbleText);
+      history.push({ role: 'user', content: displayText || 'Analyse ce document.' });
+
+      const thinking = appendMsg('thinking', file ? 'Analyse du fichier…' : 'Analyse en cours');
       let assistantDiv = null;
       let fullText = '';
       function removeThinking() { if (thinking.parentNode === content) content.removeChild(thinking); }
 
       try {
-        const res = await apiFetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-          body: JSON.stringify({ messages: history, pageContext }),
-        });
+        let res;
+        if (file) {
+          // Multipart path: attach the file + JSON-encoded messages / pageContext
+          const fd = new FormData();
+          fd.append('messages', JSON.stringify(history));
+          fd.append('pageContext', JSON.stringify(pageContext));
+          fd.append('attachment', file);
+          res = await apiFetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'Accept': 'text/event-stream' },
+            body: fd,
+          });
+        } else {
+          res = await apiFetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+            body: JSON.stringify({ messages: history, pageContext }),
+          });
+        }
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: res.statusText }));
           throw new Error(err.error || 'Erreur ' + res.status);
@@ -576,6 +619,9 @@
       }
       sendBtn.disabled = false;
       input.focus();
+      // Clear any attachment after send (successful or errored) — the file was
+      // consumed by this exchange, next message starts fresh.
+      if (window.__cortexClearAttachment) window.__cortexClearAttachment();
     }
 
     sendBtn.addEventListener('click', sendMessage);
@@ -586,6 +632,45 @@
       input.style.height = '24px';
       input.style.height = Math.min(input.scrollHeight, 160) + 'px';
     });
+
+    // ── Attachment picker ────────────────────────────────────────────────
+    const attachBtn = document.getElementById('ai-attach-btn');
+    const fileInput = document.getElementById('ai-file-input');
+    const chip      = document.getElementById('ai-attachment-chip');
+    const chipName  = document.getElementById('ai-chip-name');
+    const chipSize  = document.getElementById('ai-chip-size');
+    const chipRm    = document.getElementById('ai-chip-remove');
+
+    attachBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) {
+        appendError('Fichier trop lourd (max 10 MB). Compresse-le ou envoie une capture d\'écran.');
+        fileInput.value = '';
+        return;
+      }
+      attachedFile = file;
+      chipName.textContent = file.name;
+      chipSize.textContent = '· ' + formatSize(file.size);
+      chip.classList.add('show');
+      input.focus();
+    });
+    chipRm.addEventListener('click', () => clearAttachment());
+    function clearAttachment() {
+      attachedFile = null;
+      fileInput.value = '';
+      chip.classList.remove('show');
+    }
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+      return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    }
+    // Expose clearAttachment + attachment state to sendMessage via closure vars
+    var attachedFile = null;
+    window.__cortexAttachment = () => attachedFile;
+    window.__cortexClearAttachment = clearAttachment;
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

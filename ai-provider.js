@@ -805,7 +805,10 @@ class AnthropicProvider {
           })),
         });
       } else {
-        result.push({ role: m.role, content: m.content ?? '' });
+        // If content is already an array (multi-part with image/document blocks),
+        // pass it through untouched — it's already in Anthropic's native format.
+        // Otherwise wrap the string as-is.
+        result.push({ role: m.role, content: Array.isArray(m.content) ? m.content : (m.content ?? '') });
       }
     }
     return result;

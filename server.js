@@ -10,6 +10,7 @@ try {
 require('dotenv').config();
 const express = require('express');
 const axios   = require('axios');
+const multer  = require('multer');
 const { Pool } = require('pg');
 const fs      = require('fs');
 const path    = require('path');
@@ -17,6 +18,17 @@ const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 const { runAgentLoop, runAgentLoopStream } = require('./ai-agent');
 const HELP             = require('./help-content');
+
+// Multer for chat attachments (images + PDFs, 10MB limit, in-memory)
+const chatUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = /^(image\/(png|jpe?g|webp|gif)|application\/pdf)$/i.test(file.mimetype);
+    if (!ok) return cb(new Error('Format non supporté: ' + file.mimetype + ' (images ou PDF uniquement)'));
+    cb(null, true);
+  },
+});
 
 const app  = express();
 
@@ -5873,16 +5885,71 @@ app.get('/api/help', requireAuth, (req, res) => {
 //   AI_PROVIDER=anthropic ANTHROPIC_API_KEY=... AI_MODEL=claude-haiku-4-5-20251001
 //   (self-hosted) MISTRAL_BASE_URL=http://your-server:8000/v1
 // ---------------------------------------------------------------------------
-app.post('/api/ai/chat', async (req, res, next) => {
+// Strips base64 image/document data from message content arrays before saving
+// to the conversations table (a 5MB PDF encoded is ~7MB JSON — would bloat DB).
+// Replaces attachments with a small text marker so the conversation history
+// still reads meaningfully. Preserves everything else.
+function sanitizeMessagesForDb(messages) {
+  return messages.map(m => {
+    if (!Array.isArray(m.content)) return m;
+    const parts = [];
+    let attachmentNote = '';
+    for (const block of m.content) {
+      if (block?.type === 'text') parts.push(block.text || '');
+      else if (block?.type === 'image')    attachmentNote = ' [Image jointe]';
+      else if (block?.type === 'document') attachmentNote = ' [Document PDF joint]';
+      // tool_result / tool_use blocks stay as-is if array is other kind — skip in this path
+    }
+    const textJoined = parts.join(' ').trim();
+    const content_preview = (textJoined + attachmentNote).slice(0, 200);
+    return { ...m, content: textJoined + attachmentNote, content_preview };
+  });
+}
+
+// Middleware that accepts EITHER multipart/form-data (with attachment) OR JSON body.
+// Multer's .single() is a no-op when Content-Type is application/json.
+app.post('/api/ai/chat', chatUpload.single('attachment'), async (req, res, next) => {
   try {
     if (!process.env.MISTRAL_API_KEY && !process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
       return res.status(503).json({
         error: 'Agent IA non configuré. Ajouter MISTRAL_API_KEY (ou OPENAI_API_KEY / ANTHROPIC_API_KEY) dans les variables d\'environnement.',
       });
     }
-    const { messages, pageContext } = req.body;
+    // In multipart mode, messages + pageContext arrive as JSON strings in req.body
+    let { messages, pageContext } = req.body;
+    if (typeof messages === 'string')     { try { messages = JSON.parse(messages); } catch { messages = null; } }
+    if (typeof pageContext === 'string')  { try { pageContext = JSON.parse(pageContext); } catch { pageContext = null; } }
     if (!Array.isArray(messages) || !messages.length) {
       return res.status(400).json({ error: 'messages array required' });
+    }
+
+    // If a file is attached, inject it as a content block on the last user message.
+    // Anthropic multi-part format: content = [ { type: 'text', text }, { type: 'image'|'document', source: {...} } ].
+    if (req.file) {
+      if (process.env.AI_PROVIDER !== 'anthropic') {
+        return res.status(400).json({
+          error: 'attachments_require_anthropic',
+          message: 'Les pièces jointes ne sont supportées que par Claude (AI_PROVIDER=anthropic).',
+        });
+      }
+      const isPdf = req.file.mimetype === 'application/pdf';
+      const base64 = req.file.buffer.toString('base64');
+      const block = {
+        type: isPdf ? 'document' : 'image',
+        source: { type: 'base64', media_type: req.file.mimetype, data: base64 },
+      };
+      // Locate the last user message and convert its content to a multi-part array
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'user') {
+          const text = typeof messages[i].content === 'string' ? messages[i].content : '';
+          messages[i] = {
+            role: 'user',
+            content: [ { type: 'text', text: text || 'Analyse ce document.' }, block ],
+            _attachment_meta: { filename: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype },
+          };
+          break;
+        }
+      }
     }
     const [tenantConfig, seasons, shopsResult] = await Promise.all([
       getTenantConfig(req.tenantId),
@@ -5913,12 +5980,15 @@ app.post('/api/ai/chat', async (req, res, next) => {
         await runAgentLoopStream(messages, ctx, (event) => {
           send(event);
           if (event.type === 'done') {
-            const userMsgs = (event.messages ?? []).filter(m => m.role === 'user');
+            const sanitized = sanitizeMessagesForDb(event.messages ?? []);
+            const userMsgs = sanitized.filter(m => m.role === 'user');
             if (userMsgs.length) {
-              const preview = userMsgs[userMsgs.length - 1].content?.slice(0, 120) ?? '';
+              const lastUser = userMsgs[userMsgs.length - 1];
+              const previewText = typeof lastUser.content === 'string' ? lastUser.content : (lastUser.content_preview || '');
+              const preview = String(previewText).slice(0, 120);
               pool.query(
                 `INSERT INTO conversations(tenant_id, preview, messages) VALUES($1, $2, $3::jsonb)`,
-                [req.tenantId, preview, JSON.stringify(event.messages ?? [])]
+                [req.tenantId, preview, JSON.stringify(sanitized)]
               ).catch(() => {});
             }
           }
@@ -5932,13 +6002,15 @@ app.post('/api/ai/chat', async (req, res, next) => {
       res.end();
     } else {
       const result = await runAgentLoop(messages, ctx);
-
-      const userMsgs = (result.messages ?? []).filter(m => m.role === 'user');
+      const sanitized = sanitizeMessagesForDb(result.messages ?? []);
+      const userMsgs = sanitized.filter(m => m.role === 'user');
       if (userMsgs.length) {
-        const preview = userMsgs[userMsgs.length - 1].content?.slice(0, 120) ?? '';
+        const lastUser = userMsgs[userMsgs.length - 1];
+        const previewText = typeof lastUser.content === 'string' ? lastUser.content : (lastUser.content_preview || '');
+        const preview = String(previewText).slice(0, 120);
         pool.query(
           `INSERT INTO conversations(tenant_id, preview, messages) VALUES($1, $2, $3::jsonb)`,
-          [req.tenantId, preview, JSON.stringify(result.messages ?? [])]
+          [req.tenantId, preview, JSON.stringify(sanitized)]
         ).catch(() => {});
       }
 
