@@ -10,7 +10,9 @@
     "test": "node scripts/test-par-taille-invariant.js",
     "test:isolation": "bash tests/isolation.test.sh",
     "scan:isolation": "node scripts/scan-tenant-isolation.js",
-    "scan:isolation:baseline": "node scripts/scan-tenant-isolation.js --update-baseline"
+    "scan:isolation:baseline": "node scripts/scan-tenant-isolation.js --update-baseline",
+    "sync:worker": "node sync-worker.js",
+    "test:sync-queue": "railway run node scripts/test-sync-queue-dedup.js"
   },
   "dependencies": {
     "axios": "^1.7.2",
