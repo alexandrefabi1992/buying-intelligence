@@ -698,6 +698,32 @@ async function runMigrations() {
     console.log('[migration] mv_inventory_stock recreated.');
   }
 
+  // Multi-tenant sync queue — one row per (tenant_id × sync attempt).
+  // Producer (cron) inserts a 'pending' row for every tenant with a
+  // Lightspeed token; N workers claim them via FOR UPDATE SKIP LOCKED,
+  // run sync, mark done/failed. Failures under 3 attempts go back to
+  // 'pending' with exponential backoff (see lib/sync-queue.js).
+  //
+  // Status lifecycle: pending → running → done | failed
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sync_jobs (
+      id             SERIAL PRIMARY KEY,
+      tenant_id      TEXT        NOT NULL REFERENCES tenants(id),
+      status         TEXT        NOT NULL DEFAULT 'pending',
+      attempts       INT         NOT NULL DEFAULT 0,
+      error          TEXT,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      started_at     TIMESTAMPTZ,
+      finished_at    TIMESTAMPTZ,
+      next_retry_at  TIMESTAMPTZ,
+      CHECK (status IN ('pending','running','done','failed'))
+    )
+  `);
+  // Covers the worker's claim query: WHERE status='pending' ORDER BY created_at
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_sync_jobs_status_created ON sync_jobs(status, created_at)`);
+  // Covers the producer's dedup check: WHERE tenant_id=$1 AND status IN ('pending','running')
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_sync_jobs_tenant_status  ON sync_jobs(tenant_id, status)`);
+
   // Multi-tenant migration: add tenant_id to mv_sales_velocity and
   // mv_inventory_stock. Without tenant_id, aggregations mix rows from
   // different tenants that happen to share an item_id, so queries against
