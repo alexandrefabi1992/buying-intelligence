@@ -108,35 +108,67 @@ Postgres via internal DNS).
 
 ## Step 2 — Set env vars on Railway
 
-**Web service** (add these):
+**Ordering rationale**: use `--skip-deploys` to stage all changes without
+triggering redeploys, then trigger redeploys manually in a specific
+order so the system is always in a valid state:
+
+1. Worker first: activate WORKER_COUNT=1. Queue is still empty (producer
+   not yet active), worker sits idle. Zero user-visible change; no
+   effect on UptimeRobot (health endpoint lives on the web service).
+2. Web second: SYNC_DISABLED=1 stops the legacy cron, SYNC_PRODUCER_ENABLED=1
+   starts enqueueing. Worker immediately picks up jobs. This is the
+   ONE moment where UptimeRobot might catch a redeploy blip → 1 possible
+   spurious 401 alert (documented; treat as expected).
+
+**Worker service env vars already set tonight** (Tuesday) — just verify
+they're still there:
 ```bash
-railway variables --set SYNC_DISABLED=1 --set SYNC_PRODUCER_ENABLED=1
+railway service sync-worker
+railway variables --json | node -e "let s=''; process.stdin.on('data', c => s+=c); process.stdin.on('end', () => { const j = JSON.parse(s); ['SERVICE_ROLE','SYNC_WORKER_COUNT','SYNC_RECLAIM_MINUTES','DATABASE_URL','TENANT_TOKEN_KEY','LIGHTSPEED_CLIENT_ID','LIGHTSPEED_CLIENT_SECRET','LIGHTSPEED_ACCOUNT_ID','LIGHTSPEED_REFRESH_TOKEN','LIGHTSPEED_PRIMARY_TENANT'].forEach(k => console.log((j[k] ? '✓' : '✗') + ' ' + k)); });"
+```
+All should show ✓. If any ✗, fix before proceeding.
+
+**Stage the switch env vars (both services, no redeploys yet)**:
+```bash
+# Worker: flip WORKER_COUNT 0 → 1 with --skip-deploys
+railway service sync-worker
+railway variables --set SYNC_WORKER_COUNT=1 --skip-deploys
+
+# Web: enable SYNC_DISABLED + SYNC_PRODUCER_ENABLED with --skip-deploys
+railway service buying-intelligence
+railway variables --set SYNC_DISABLED=1 --set SYNC_PRODUCER_ENABLED=1 --skip-deploys
 ```
 
-- `SYNC_DISABLED=1` → disables the legacy sync.js hourly cron
-- `SYNC_PRODUCER_ENABLED=1` → activates the multi-tenant producer
-
-**Sync-worker service** (add these — MUST be on the worker service, not web):
+**Trigger redeploys in order**:
 ```bash
-railway service sync-worker  # switch context to the new service
-railway variables --set SYNC_WORKER_COUNT=1 \
-                  --set LIGHTSPEED_CLIENT_ID=$(railway variables --json --service web | jq -r .LIGHTSPEED_CLIENT_ID) \
-                  --set LIGHTSPEED_CLIENT_SECRET=$(...) \
-                  --set LIGHTSPEED_ACCOUNT_ID=$(...) \
-                  --set TENANT_TOKEN_KEY=$(...) \
-                  --set DATABASE_URL=\$\{{Postgres.DATABASE_URL\}\}
+# 1. Worker first (invisible to users, no health-check impact)
+railway service sync-worker
+railway redeploy
+
+# Wait ~60s for the worker to come up. Verify:
+railway logs --service sync-worker --lines 10 | grep -E "boot|worker:1|stats"
+# Expected: "[sync-worker] boot — WORKER_COUNT=1" AND "[worker:1] started"
+
+# 2. Web second (this is the one that might blip UptimeRobot briefly)
+railway service buying-intelligence
+railway redeploy
+
+# Wait ~60s. Verify:
+railway logs --service web --lines 15 | grep -E "sync/cron|producer"
+# Expected: "[sync/cron] DISABLED" AND "[producer] scheduled"
 ```
 
-**Sanity checklist** on sync-worker service env vars:
-- [ ] `DATABASE_URL` (Railway ref var to Postgres)
-- [ ] `SYNC_WORKER_COUNT=1`
-- [ ] `LIGHTSPEED_CLIENT_ID` + `_SECRET` (needed by fromTenant() fallback)
-- [ ] `TENANT_TOKEN_KEY` (for decrypting ls_refresh_token from tenants table)
-- [ ] `LIGHTSPEED_REFRESH_TOKEN` (still needed until VS is re-OAuth'd off env fallback
+**Sanity checklist** on sync-worker service (re-check these were set
+in the Tuesday session — should all be ✓ from the verification above):
+- [x] `SERVICE_ROLE=sync-worker`
+- [x] `DATABASE_URL` (Railway ref var to Postgres)
+- [x] `SYNC_WORKER_COUNT=1` (flipped from 0 in the staging step above)
+- [x] `SYNC_RECLAIM_MINUTES=60` (worker only — override the 30-min default)
+- [x] `LIGHTSPEED_CLIENT_ID` + `_SECRET` + `_ACCOUNT_ID` + `_PRIMARY_TENANT`
+- [x] `TENANT_TOKEN_KEY` (for decrypting ls_refresh_token from tenants table)
+- [x] `LIGHTSPEED_REFRESH_TOKEN` (still needed until VS is re-OAuth'd off env fallback
       — see the Scope caveat block above). Post-bake, once VS's token lives in
       `tenants.ls_refresh_token`, this env var can be removed.
-- [ ] `SYNC_RECLAIM_MINUTES=60` (worker only) — override the 30-min default to
-      accommodate a full-catchup sync that can exceed 30 min on delta-heavy days
 
 ## Step 3 — Deploy & watch
 
