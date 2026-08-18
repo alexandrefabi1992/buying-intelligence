@@ -12,7 +12,7 @@
 
 ```bash
 # 1. Web service — re-enable legacy sync, kill the producer
-railway service web
+railway service buying-intelligence
 railway variables --set SYNC_DISABLED=0 --set SYNC_PRODUCER_ENABLED=0
 
 # 2. Worker service — force drain
@@ -20,7 +20,7 @@ railway service sync-worker
 railway variables --set SYNC_WORKER_COUNT=0
 
 # 3. Return to web service so subsequent commands hit the right place
-railway service web
+railway service buying-intelligence
 ```
 
 Both services restart automatically on env-var change (~30-60s).
@@ -29,11 +29,12 @@ After the restart:
 - Sync-worker returns to idle observer (reclaim + stats loops only).
 - Any job in `status='running'` at the moment of rollback stays stuck
   in that state until `reclaimStuckJobs()` bumps it back to `'pending'`
-  after 30 min — cosmetic only, no data loss (no worker to consume it).
+  after 60 min (per `SYNC_RECLAIM_MINUTES=60` on the worker) — cosmetic
+  only, no data loss (no worker to consume it).
 
 **Verify rollback worked** (must all be true within 2 min):
 ```bash
-railway logs --service web        --lines 10 | grep -E "sync/cron|producer"
+railway logs --service buying-intelligence --lines 10 | grep -E "sync/cron|producer"
 # Expected: "[sync/cron] Hourly sync scheduled" AND "[producer] disabled"
 
 railway logs --service sync-worker --lines 10 | grep -E "sync-worker|worker:1"
@@ -41,18 +42,30 @@ railway logs --service sync-worker --lines 10 | grep -E "sync-worker|worker:1"
 ```
 
 Only *after* the deployment is stable via env-var rollback, consider
-a full code revert:
+a full code revert. Full Bloc B history, most recent first:
 ```bash
-git revert ca50bba  # entrypoint dispatcher
-git revert 7bdaff7  # admin UI
-git revert ebe26da  # env fallback gate
-git revert 79a23ae  # playbook caveat (docs only)
-git revert 67eb1f8  # SYNC_DISABLED gate + playbook
+git revert b05fd03  # playbook: --skip-deploys + ordered redeploys (docs only)
+git revert 65fa503  # health endpoint whitelist + redeploy race docs
+git revert 6d4bfd3  # bake-health-check.sh shell fixes
+git revert 4c3dd03  # /api/health/sync HEALTH_CHECK_SECRET redaction
+git revert fdada37  # cold review: 3 blockers + 3 tightenings
+git revert 5a66f6e  # /api/health/sync endpoint + bake-health-check.sh
+git revert ca50bba  # entrypoint dispatcher (web + sync-worker)
+git revert 79a23ae  # playbook: scope caveat (docs only)
+git revert 7bdaff7  # admin UI (public/admin.html)
+git revert ebe26da  # env fallback gate primary-only
+git revert 67eb1f8  # SYNC_DISABLED gate + switch playbook
 git revert 7214f99  # producer + sync_checkpoints migration
-git revert 511257a  # sync-worker.js
+git revert 511257a  # sync-worker.js + test dédup
 git revert 32c94ee  # lib/sync-tenant.js
+git revert d6a4124  # scanner baseline refresh (docs only)
+git revert a417452  # sync_jobs table + lib/sync-queue.js
+git revert 0c0d2bd  # 4 fromEnv → fromTenant in import-routes.js
 git push
 ```
+Docs-only reverts are safe to skip if the diff is trivial; runtime
+reverts (32c94ee, 511257a, 7214f99, ebe26da, ca50bba, 4c3dd03, 65fa503,
+fdada37, a417452, 0c0d2bd) are the ones that actually restore behaviour.
 
 ---
 
@@ -89,22 +102,28 @@ After that smoke test passes, VS can be migrated off env-var and onto
 DB-stored token via `/oauth/start?tenant_id=valerie-simon` — one final
 change to make the deployment fully symmetric.
 
-## Step 1 — Create the sync-worker service on Railway
+## Step 1 — Verify sync-worker service exists and is idle
 
-Via Railway UI (easiest) or CLI:
+The sync-worker Railway service was created in the pre-flight session
+(via `railway add --service sync-worker`) and has been running in idle
+observer mode (`SYNC_WORKER_COUNT=0`) since. Both services share the
+same GitHub repo; the `entrypoint.js` dispatcher picks the right
+top-level module based on `SERVICE_ROLE`.
+
+Verify the service is up and idle before proceeding:
 
 ```bash
-# CLI: link to project, then add service
-railway link 8fb70d93-bfd0-4493-8a09-326aa822dd61  # noble-compassion
-railway environment production
-# via UI: New Service → GitHub Repo → same repo → deploy from main
-# Set start command: node sync-worker.js
-# Set service name: sync-worker
+railway service sync-worker
+railway logs --lines 10 | grep -E "boot|stats|worker:1"
+# Expected:
+#   [sync-worker] boot — WORKER_COUNT=0 POLL=5000ms RECLAIM=…
+#   [sync-worker] idle observer mode — no workers spawned
+#   [stats] sync_jobs pending=0 running=0 done=0 failed=0
+# Expected NOT to see: [worker:1] started (that shows up after switch)
 ```
 
-The new service will use the SAME repo but a different start command.
-It shares the DATABASE_URL with the web service (both point at the same
-Postgres via internal DNS).
+If the service is missing, down, or spawning workers already, STOP and
+debug before proceeding — the switch procedure below assumes idle state.
 
 ## Step 2 — Set env vars on Railway
 
@@ -120,8 +139,8 @@ order so the system is always in a valid state:
    ONE moment where UptimeRobot might catch a redeploy blip → 1 possible
    spurious 401 alert (documented; treat as expected).
 
-**Worker service env vars already set tonight** (Tuesday) — just verify
-they're still there:
+**Worker service env vars already set in the pre-flight session** — just
+verify they're still there:
 ```bash
 railway service sync-worker
 railway variables --json | node -e "let s=''; process.stdin.on('data', c => s+=c); process.stdin.on('end', () => { const j = JSON.parse(s); ['SERVICE_ROLE','SYNC_WORKER_COUNT','SYNC_RECLAIM_MINUTES','DATABASE_URL','TENANT_TOKEN_KEY','LIGHTSPEED_CLIENT_ID','LIGHTSPEED_CLIENT_SECRET','LIGHTSPEED_ACCOUNT_ID','LIGHTSPEED_REFRESH_TOKEN','LIGHTSPEED_PRIMARY_TENANT'].forEach(k => console.log((j[k] ? '✓' : '✗') + ' ' + k)); });"
@@ -154,12 +173,12 @@ railway service buying-intelligence
 railway redeploy
 
 # Wait ~60s. Verify:
-railway logs --service web --lines 15 | grep -E "sync/cron|producer"
+railway logs --service buying-intelligence --lines 15 | grep -E "sync/cron|producer"
 # Expected: "[sync/cron] DISABLED" AND "[producer] scheduled"
 ```
 
 **Sanity checklist** on sync-worker service (re-check these were set
-in the Tuesday session — should all be ✓ from the verification above):
+in the pre-flight session — should all be ✓ from the verification above):
 - [x] `SERVICE_ROLE=sync-worker`
 - [x] `DATABASE_URL` (Railway ref var to Postgres)
 - [x] `SYNC_WORKER_COUNT=1` (flipped from 0 in the staging step above)
@@ -176,7 +195,7 @@ Both services should redeploy automatically when env vars change.
 
 Watch Railway logs live:
 ```bash
-railway logs --service web        # tail #1 — should show [producer] scheduled + [sync/cron] DISABLED
+railway logs --service buying-intelligence # tail #1 — should show [producer] scheduled + [sync/cron] DISABLED
 railway logs --service sync-worker # tail #2 — should show [sync-worker] boot WORKER_COUNT=1
 ```
 
@@ -184,7 +203,7 @@ Expected first-minute output:
 ```
 [web]         [producer] scheduled: 0 5 * * * (SYNC_PURGE_DAYS=30)
 [web]         [sync/cron] DISABLED via SYNC_DISABLED=1 — legacy sync.js will not run.
-[sync-worker] [sync-worker] boot — WORKER_COUNT=1 POLL=5000ms RECLAIM=300000ms/30min
+[sync-worker] [sync-worker] boot — WORKER_COUNT=1 POLL=5000ms RECLAIM=300000ms/60min
 [sync-worker] [worker:1] started
 [sync-worker] [stats] sync_jobs pending=0 running=0 done=0 failed=0
 ```
@@ -251,7 +270,7 @@ Fastest rollback = disable the switch without redeploying:
 
 ```bash
 # 1. Turn off the multi-tenant sync
-railway service web
+railway service buying-intelligence
 railway variables --set SYNC_DISABLED=0 --set SYNC_PRODUCER_ENABLED=0
 
 # 2. Turn off the worker
@@ -259,16 +278,12 @@ railway service sync-worker
 railway variables --set SYNC_WORKER_COUNT=0
 
 # Both services will restart. Legacy sync.js resumes on the hourly cron.
-# In-flight jobs stay in 'running' state and will be reclaimed after 30 min.
+# In-flight jobs stay in 'running' state and will be reclaimed after 60 min.
 ```
 
-Then debug offline. To revert the code entirely:
-```bash
-git revert 7214f99  # producer + migration + checkpoints
-git revert 511257a  # sync-worker
-git revert 32c94ee  # lib/sync-tenant.js
-git push
-```
+Then debug offline. **For the full code revert list**, use the block in
+the top-of-file 🚨 EMERGENCY ROLLBACK section — it's kept in sync with
+the git log. Copy-pasting from there guarantees you don't miss a commit.
 
 ## Step 7 — Bake period (48h after successful cycle #1)
 
@@ -305,75 +320,62 @@ follow through on.
   a valid X-Health-Secret header. Uptime monitors only need the status
   code — no header setup required for the free tier flow.
 
-**⚠️ Required UptimeRobot config to avoid false alerts on redeploys**
+**⚠️ Deploy-related false-alert window (free tier limitation)**
 
-Every `railway variables --set …` triggers a container swap ~30-60s.
-During the swap window, the old container may briefly serve requests
-that hit the auth middleware fallback instead of the health handler,
-returning HTTP 401. This is a Railway rolling-deploy artefact, NOT a
-real sync failure.
+Every `railway variables --set …` or `railway redeploy` triggers a
+container swap ~30-60s. During the swap window, the old container may
+briefly serve requests that hit the auth middleware fallback instead
+of the health handler, returning HTTP 401. This is a Railway rolling-
+deploy artefact, NOT a real sync failure.
 
-To prevent every deploy from firing a false alert, configure the
-monitor with:
+**Free-tier UptimeRobot has NO configurable "N consecutive failures"
+setting** — an alert fires as soon as the internal retry (~30s, 3
+attempts, hard-coded) still shows a failure. That means the deploy-race
+window can plausibly cause 1 spurious alert per redeploy.
 
-- **Send alert after: 2 consecutive failures** (UptimeRobot: "Confirmed
-  down after N tries" setting)
-- **Notification delay: 5 minutes minimum** (i.e. don't page on the very
-  first failed check)
+**Mitigations in use (already implemented):**
 
-At the free-tier 5-min poll interval, this gives a real 10+ min outage
-window before an alert fires — enough to filter out any deploy-race
-blip. A genuine sync failure will still page within 10-15 min.
+1. Step 2 of this playbook uses `railway variables --skip-deploys` +
+   an explicit `railway redeploy` in a specific order → reduces the
+   switch to **ONE redeploy on the web service** (the only service
+   hosting `/api/health/sync`). Worker redeploys are invisible to the
+   monitor.
+2. If a spurious 401 alert fires during the switch, ignore it —
+   confirm the state via the manual `./scripts/bake-health-check.sh`
+   which returns to GREEN within 60-90s of the redeploy completing.
+3. During the 48h bake, no planned redeploys — the monitor should
+   stay quiet unless something real happens.
 
-(A real failure — e.g. token revoked, DB down, worker crashed — will
-NOT self-heal in <10 min, so this filter has zero false-negative cost.)
+If false alerts still bother you post-switch, upgrade UptimeRobot to a
+paid tier (starts at ~$7/month) which unlocks the "confirmed down after
+N tries" setting.
 
-### End-to-end alerting test (do this BEFORE relying on the monitor)
+### End-to-end alerting test — ALREADY VALIDATED
 
-After setting up UptimeRobot (or equivalent), verify you actually receive
-the alert — don't trust "the endpoint returns JSON in theory".
+Tuesday evening (2026-08-17 21:48 EDT) we ran the full loop end-to-end:
 
-1. Confirm baseline: monitor shows GREEN, no alerts fired.
+1. Inserted a fake `failed` job into `sync_jobs` → endpoint 503.
+2. UptimeRobot polled ~2 min later → alert notification received.
+3. Deleted the fake job → endpoint 200.
+4. UptimeRobot polled ~2 min later → resolve notification received.
 
-2. Force a temporary RED state without touching production data. On your
-   laptop:
+Total round-trip: ~7 min. Both alert and resolve delivered to the
+configured channel. If you want to re-run this test at any point:
 
-   ```bash
-   # Temporarily override the threshold to something impossible via env
-   # var on the web service — makes freshness check fail immediately
-   railway service buying-intelligence
-   railway variables --set "HEALTH_FRESHNESS_HOURS_OVERRIDE=0"
-   ```
+```bash
+# 1. Force RED: insert a fake failed job
+railway connect Postgres
+INSERT INTO sync_jobs (tenant_id, status, attempts, error, finished_at, created_at)
+VALUES ('valerie-simon', 'failed', 3, 'ALERTING TEST — will be deleted', now(), now());
+\q
+# Wait for alert (typically ≤ 5 min on free tier)
 
-   (This env override is NOT yet implemented — the "cleaner" test is:)
-
-3. Alternative simpler test: temporarily insert a fake failed job:
-
-   ```bash
-   # via psql on Railway
-   railway connect Postgres
-   INSERT INTO sync_jobs (tenant_id, status, error, finished_at)
-   VALUES ('valerie-simon', 'failed', 'monitoring alert test', now());
-   \q
-   ```
-
-4. Wait ≤ 5 min for UptimeRobot to poll → HTTP 503 → alert fires.
-   Confirm you receive the notification via your chosen channel.
-
-5. Clean up:
-
-   ```bash
-   railway connect Postgres
-   DELETE FROM sync_jobs WHERE error = 'monitoring alert test';
-   \q
-   ```
-
-6. Wait ≤ 5 min for next poll → HTTP 200 → resolve notification fires.
-   Confirm you receive that too.
-
-If both notifications arrive within their expected windows, the alerting
-loop is proven end-to-end. If not, debug BEFORE the switch — a silent
-monitor is worse than no monitor.
+# 2. Clean up: DELETE the fake job
+railway connect Postgres
+DELETE FROM sync_jobs WHERE error = 'ALERTING TEST — will be deleted';
+\q
+# Wait for resolve (typically ≤ 5 min after cleanup)
+```
 
 **Option B: Manual check at fixed hours (fallback if you don't want a monitor)**
 Run this cron in a screen/tmux session on your laptop, or on any always-on
