@@ -273,6 +273,29 @@ follow through on.
   a valid X-Health-Secret header. Uptime monitors only need the status
   code — no header setup required for the free tier flow.
 
+**⚠️ Required UptimeRobot config to avoid false alerts on redeploys**
+
+Every `railway variables --set …` triggers a container swap ~30-60s.
+During the swap window, the old container may briefly serve requests
+that hit the auth middleware fallback instead of the health handler,
+returning HTTP 401. This is a Railway rolling-deploy artefact, NOT a
+real sync failure.
+
+To prevent every deploy from firing a false alert, configure the
+monitor with:
+
+- **Send alert after: 2 consecutive failures** (UptimeRobot: "Confirmed
+  down after N tries" setting)
+- **Notification delay: 5 minutes minimum** (i.e. don't page on the very
+  first failed check)
+
+At the free-tier 5-min poll interval, this gives a real 10+ min outage
+window before an alert fires — enough to filter out any deploy-race
+blip. A genuine sync failure will still page within 10-15 min.
+
+(A real failure — e.g. token revoked, DB down, worker crashed — will
+NOT self-heal in <10 min, so this filter has zero false-negative cost.)
+
 ### End-to-end alerting test (do this BEFORE relying on the monitor)
 
 After setting up UptimeRobot (or equivalent), verify you actually receive

@@ -344,6 +344,12 @@ app.use('/api', (req, res, next) => {
   const p = req.path;
   // Public: auth login
   if (p === '/auth/login') return next();
+  // Public: health check for uptime monitors. MUST be whitelisted here in
+  // addition to being registered as a route earlier — during a Railway
+  // container swap on redeploy, an older image without the route would
+  // otherwise fall through to requireAuth() and return 401, tripping
+  // false alerts.
+  if (p === '/health/sync') return next();
   // Admin-only system routes (protected by X-Admin-Secret, not JWT)
   if (p.startsWith('/admin') ||
       p === '/sync/run' || p === '/sync/reset' || p === '/sync/full-history' ||
