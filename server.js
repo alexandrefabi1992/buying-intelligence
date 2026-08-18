@@ -239,11 +239,13 @@ app.get('/api/health/sync', async (_req, res) => {
     const now = new Date();
     const checks = {};
 
-    // 1. No jobs stuck in 'failed'
+    // 1. No jobs stuck in 'failed' within the bake window.
+    // Older 'failed' rows (from smoke tests etc.) are ignored so their
+    // presence doesn't keep the health check RED forever.
     const { rows: failed } = await pool.query(
-      "SELECT COUNT(*)::int AS n FROM sync_jobs WHERE status='failed'"
+      "SELECT COUNT(*)::int AS n FROM sync_jobs WHERE status='failed' AND finished_at > now() - interval '48 hours'"
     );
-    checks.no_failed_jobs = { pass: failed[0].n === 0, value: failed[0].n, threshold: 0 };
+    checks.no_failed_jobs = { pass: failed[0].n === 0, value: failed[0].n, threshold: 0, window_hours: 48 };
 
     // 2. Freshness — MAX(sale_lines.completed_time) within 28h for primary tenant
     const primary = process.env.LIGHTSPEED_PRIMARY_TENANT || 'valerie-simon';
@@ -1479,6 +1481,11 @@ async function runMigrations() {
 let syncRunning = false;
 
 app.post('/api/sync/run', async (req, res) => {
+  if (process.env.SYNC_DISABLED === '1') {
+    return res.status(409).json({
+      error: 'Legacy sync is disabled (SYNC_DISABLED=1). Use the multi-tenant queue instead — enqueue via INSERT INTO sync_jobs or via the admin UI once implemented.',
+    });
+  }
   if (!process.env.LIGHTSPEED_REFRESH_TOKEN) {
     return res.status(400).json({ error: 'LIGHTSPEED_REFRESH_TOKEN is not set. Complete the OAuth2 flow at /oauth/start first.' });
   }
@@ -1514,6 +1521,11 @@ app.post('/api/sync/reset', (req, res) => {
 // Safe: upsertSaleLines uses ON CONFLICT UPDATE — no duplicates.
 app.use('/api/sync/full-history', requireAdmin);
 app.post('/api/sync/full-history', async (req, res) => {
+  if (process.env.SYNC_DISABLED === '1') {
+    return res.status(409).json({
+      error: 'Legacy sync is disabled (SYNC_DISABLED=1). Full-history is only available via legacy sync.js for now.',
+    });
+  }
   if (!process.env.LIGHTSPEED_REFRESH_TOKEN) {
     return res.status(400).json({ error: 'LIGHTSPEED_REFRESH_TOKEN is not set.' });
   }
@@ -6813,9 +6825,15 @@ app.listen(PORT, '0.0.0.0', async () => {
       console.error('[producer] purge failed:', err.message);
     }
 
-    // 4. Enqueue one job per tenant with a Lightspeed token
+    // 4. Enqueue one job per tenant with a Lightspeed token.
+    // Also include the primary tenant even if ls_refresh_token IS NULL —
+    // that tenant reads the token from LIGHTSPEED_REFRESH_TOKEN env var
+    // via getAccessToken()'s guarded fallback (lib/sync-tenant.js), and
+    // will populate ls_refresh_token itself on first successful sync.
+    const primaryTenantId = process.env.LIGHTSPEED_PRIMARY_TENANT || 'valerie-simon';
     const { rows: tenants } = await pool.query(
-      `SELECT id FROM tenants WHERE ls_refresh_token IS NOT NULL ORDER BY id`,
+      `SELECT id FROM tenants WHERE ls_refresh_token IS NOT NULL OR id = $1 ORDER BY id`,
+      [primaryTenantId],
     );
     let enqueued = 0;
     for (const t of tenants) {

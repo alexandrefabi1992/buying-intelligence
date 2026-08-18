@@ -132,7 +132,11 @@ railway variables --set SYNC_WORKER_COUNT=1 \
 - [ ] `SYNC_WORKER_COUNT=1`
 - [ ] `LIGHTSPEED_CLIENT_ID` + `_SECRET` (needed by fromTenant() fallback)
 - [ ] `TENANT_TOKEN_KEY` (for decrypting ls_refresh_token from tenants table)
-- [ ] NO `LIGHTSPEED_REFRESH_TOKEN` (worker reads from tenants.ls_refresh_token per tenant)
+- [ ] `LIGHTSPEED_REFRESH_TOKEN` (still needed until VS is re-OAuth'd off env fallback
+      — see the Scope caveat block above). Post-bake, once VS's token lives in
+      `tenants.ls_refresh_token`, this env var can be removed.
+- [ ] `SYNC_RECLAIM_MINUTES=60` (worker only) — override the 30-min default to
+      accommodate a full-catchup sync that can exceed 30 min on delta-heavy days
 
 ## Step 3 — Deploy & watch
 
