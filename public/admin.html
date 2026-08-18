@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Buying Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: {
+        indigo: { 50:'#eef2f1',100:'#dbe4e2',200:'#b7c9c6',300:'#8fa9a4',400:'#5b7f78',500:'#3a635e',600:'#213b39',700:'#152826',800:'#0e1c1a',900:'#040807' },
+        vs: { taupe:'#e6ded7', cream:'#f7f4ef', sage:'#a1aea3', emerald:'#213b39', brique:'#ad7460' },
+      },
+      fontFamily: { sans:['Inter','system-ui','sans-serif'], heading:['Poppins','Inter','sans-serif'] },
+    }}};
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-vs-cream min-h-screen font-sans">
+
+<div class="max-w-6xl mx-auto p-6">
+  <header class="mb-8 flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-heading font-bold text-vs-emerald">Administration multi-tenant</h1>
+      <p class="text-sm text-gray-600 mt-1">Créer / gérer les tenants et lier leur compte Lightspeed</p>
+    </div>
+    <div id="auth-status" class="text-sm text-gray-500">…</div>
+  </header>
+
+  <!-- Alert bar (hidden by default) -->
+  <div id="alert" class="hidden mb-4 p-4 rounded-lg"></div>
+
+  <!-- Tenants list -->
+  <section class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
+    <div class="p-5 border-b border-gray-200 flex items-center justify-between">
+      <h2 class="text-lg font-heading font-semibold text-vs-emerald">Tenants existants</h2>
+      <button onclick="loadTenants()" class="text-sm text-vs-emerald hover:underline">Rafraîchir</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-vs-taupe/30 text-left text-xs uppercase tracking-wide text-gray-700">
+          <tr>
+            <th class="px-4 py-3">ID</th>
+            <th class="px-4 py-3">Nom</th>
+            <th class="px-4 py-3 text-right">Users</th>
+            <th class="px-4 py-3 text-right">Produits</th>
+            <th class="px-4 py-3 text-right">Ventes</th>
+            <th class="px-4 py-3">Dernier sync</th>
+            <th class="px-4 py-3">Lightspeed</th>
+            <th class="px-4 py-3">Actif</th>
+            <th class="px-4 py-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tenants-body" class="divide-y divide-gray-100">
+          <tr><td colspan="9" class="px-4 py-8 text-center text-gray-400">Chargement…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Create tenant form -->
+  <section class="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div class="p-5 border-b border-gray-200">
+      <h2 class="text-lg font-heading font-semibold text-vs-emerald">Créer un tenant</h2>
+      <p class="text-xs text-gray-500 mt-1">Crée le tenant + le premier utilisateur (rôle : admin). Le lien Lightspeed se fait après.</p>
+    </div>
+    <form id="create-form" class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Slug (id) *</label>
+        <input name="id" required pattern="[a-z0-9-]+" placeholder="ex: boutique-x" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-vs-emerald" />
+        <p class="text-xs text-gray-500 mt-1">Lowercase, chiffres et tirets. Devient l'ID technique.</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nom affiché *</label>
+        <input name="name" required placeholder="ex: Boutique X" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-vs-emerald" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Email du 1er utilisateur *</label>
+        <input name="email" type="email" required placeholder="admin@boutique-x.com" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-vs-emerald" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Mot de passe temporaire *</label>
+        <input name="password" type="text" required minlength="8" placeholder="min 8 caractères" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-vs-emerald" />
+        <p class="text-xs text-gray-500 mt-1">À communiquer au client. Il pourra le changer via la fonction reset.</p>
+      </div>
+      <div class="md:col-span-2 flex items-center gap-3 pt-2">
+        <button type="submit" class="px-4 py-2 bg-vs-emerald text-white text-sm font-medium rounded hover:bg-vs-emerald/90">
+          Créer le tenant
+        </button>
+        <button type="reset" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Effacer</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<!-- User management modal (hidden) -->
+<div id="users-modal" class="hidden fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4" onclick="if(event.target === this) closeUsersModal()">
+  <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-heading font-semibold text-vs-emerald" id="users-modal-title">Utilisateurs</h3>
+      <button onclick="closeUsersModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+    </div>
+    <div id="users-list" class="mb-4"></div>
+    <form id="add-user-form" class="border-t border-gray-200 pt-4 grid grid-cols-3 gap-3">
+      <input name="email" type="email" required placeholder="Email" class="col-span-2 px-3 py-2 border border-gray-300 rounded text-sm" />
+      <input name="password" type="text" required minlength="8" placeholder="Mot de passe" class="px-3 py-2 border border-gray-300 rounded text-sm" />
+      <div class="col-span-3 flex justify-end">
+        <button type="submit" class="px-3 py-1.5 bg-vs-emerald text-white text-sm rounded hover:bg-vs-emerald/90">Ajouter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const TOKEN_KEY = 'auth_token';
+
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+
+function alertMsg(text, kind = 'success') {
+  const el = document.getElementById('alert');
+  const colors = {
+    success: 'bg-green-50 border-green-200 text-green-800',
+    error:   'bg-red-50 border-red-200 text-red-800',
+    info:    'bg-blue-50 border-blue-200 text-blue-800',
+  };
+  el.className = `mb-4 p-4 rounded-lg border ${colors[kind]}`;
+  el.textContent = text;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 6000);
+}
+
+async function api(method, path, body) {
+  const token = getToken();
+  if (!token) { window.location.href = '/index.html'; throw new Error('no token'); }
+  const res = await fetch(path, {
+    method,
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  const data = text ? (() => { try { return JSON.parse(text); } catch { return { raw: text }; }})() : null;
+  if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+  return data;
+}
+
+async function loadTenants() {
+  document.getElementById('tenants-body').innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-gray-400">Chargement…</td></tr>';
+  try {
+    const tenants = await api('GET', '/api/superadmin/dashboard');
+    document.getElementById('auth-status').textContent = `Connecté (superadmin) — ${tenants.length} tenant(s)`;
+    renderTenants(tenants);
+  } catch (err) {
+    document.getElementById('tenants-body').innerHTML = `<tr><td colspan="9" class="px-4 py-8 text-center text-red-500">Erreur : ${err.message}</td></tr>`;
+    if (err.message.includes('403') || err.message.includes('Superadmin')) {
+      document.getElementById('auth-status').innerHTML = '<span class="text-red-600">Accès refusé — rôle superadmin requis</span>';
+    }
+  }
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const now = new Date();
+  const diffH = (now - d) / 3_600_000;
+  if (diffH < 24) return `il y a ${diffH.toFixed(0)}h`;
+  if (diffH < 24 * 30) return `il y a ${(diffH / 24).toFixed(0)}j`;
+  return d.toLocaleDateString('fr-CA');
+}
+
+function renderTenants(tenants) {
+  if (!tenants.length) {
+    document.getElementById('tenants-body').innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-gray-400">Aucun tenant</td></tr>';
+    return;
+  }
+  document.getElementById('tenants-body').innerHTML = tenants.map(t => {
+    const activeChip = t.active
+      ? '<span class="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded-full">actif</span>'
+      : '<span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">inactif</span>';
+    const lsChip = t.has_lightspeed_token
+      ? '<span class="px-2 py-0.5 text-xs bg-vs-emerald/10 text-vs-emerald rounded-full">✓ connecté</span>'
+      : '<span class="px-2 py-0.5 text-xs bg-vs-brique/10 text-vs-brique rounded-full">non connecté</span>';
+    return `
+      <tr class="hover:bg-vs-taupe/10">
+        <td class="px-4 py-3 font-mono text-xs">${t.id}</td>
+        <td class="px-4 py-3 font-medium">${escapeHtml(t.name)}</td>
+        <td class="px-4 py-3 text-right">${t.user_count}</td>
+        <td class="px-4 py-3 text-right">${Number(t.product_count).toLocaleString('fr-CA')}</td>
+        <td class="px-4 py-3 text-right">${Number(t.sale_line_count).toLocaleString('fr-CA')}</td>
+        <td class="px-4 py-3 text-gray-600 text-xs">${fmtDate(t.last_sync_at)}</td>
+        <td class="px-4 py-3">${lsChip}</td>
+        <td class="px-4 py-3">${activeChip}</td>
+        <td class="px-4 py-3 whitespace-nowrap">
+          <button onclick="openOAuth('${t.id}')" class="text-vs-emerald hover:underline text-xs mr-2" title="Lier Lightspeed">Lightspeed</button>
+          <button onclick="openUsers('${t.id}','${escapeHtml(t.name).replace(/'/g, "\\'")}')" class="text-vs-emerald hover:underline text-xs mr-2">Users</button>
+          <button onclick="toggleActive('${t.id}', ${!t.active})" class="text-gray-500 hover:text-gray-800 text-xs">${t.active ? 'Désactiver' : 'Activer'}</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
+}
+
+async function toggleActive(id, active) {
+  try {
+    await api('PUT', `/api/superadmin/tenants/${id}`, { active });
+    alertMsg(`Tenant ${id} → ${active ? 'actif' : 'inactif'}`);
+    loadTenants();
+  } catch (err) { alertMsg(err.message, 'error'); }
+}
+
+function openOAuth(tenantId) {
+  const url = `/oauth/start?tenant_id=${encodeURIComponent(tenantId)}`;
+  window.open(url, '_blank', 'noopener');
+  alertMsg(`Onglet ouvert pour lier Lightspeed à ${tenantId}. Le tenant doit se connecter à son compte.`, 'info');
+}
+
+// User modal
+let currentUserTenantId = null;
+async function openUsers(tenantId, tenantName) {
+  currentUserTenantId = tenantId;
+  document.getElementById('users-modal-title').textContent = `Utilisateurs — ${tenantName}`;
+  document.getElementById('users-list').innerHTML = '<p class="text-gray-400 text-sm">Chargement…</p>';
+  document.getElementById('users-modal').classList.remove('hidden');
+  try {
+    const users = await api('GET', `/api/superadmin/tenants/${tenantId}/users`);
+    document.getElementById('users-list').innerHTML = users.length
+      ? users.map(u => `
+          <div class="flex items-center justify-between py-2 border-b border-gray-100 text-sm">
+            <div>
+              <div class="font-medium">${escapeHtml(u.email)}</div>
+              <div class="text-xs text-gray-500">rôle: ${u.role} — créé le ${new Date(u.created_at).toLocaleDateString('fr-CA')}</div>
+            </div>
+            <button onclick="resetPassword('${u.id}', '${escapeHtml(u.email).replace(/'/g, "\\'")}')" class="text-xs text-vs-brique hover:underline">Reset mot de passe</button>
+          </div>
+        `).join('')
+      : '<p class="text-gray-400 text-sm">Aucun utilisateur</p>';
+  } catch (err) {
+    document.getElementById('users-list').innerHTML = `<p class="text-red-500 text-sm">Erreur : ${err.message}</p>`;
+  }
+}
+
+function closeUsersModal() {
+  document.getElementById('users-modal').classList.add('hidden');
+  currentUserTenantId = null;
+}
+
+async function resetPassword(userId, email) {
+  const password = prompt(`Nouveau mot de passe pour ${email} (min 8 caractères) :`);
+  if (!password || password.length < 8) return;
+  try {
+    await api('PUT', `/api/superadmin/users/${userId}/password`, { password });
+    alertMsg(`Mot de passe reset pour ${email}`);
+  } catch (err) { alertMsg(err.message, 'error'); }
+}
+
+// Add-user form
+document.getElementById('add-user-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!currentUserTenantId) return;
+  const data = Object.fromEntries(new FormData(e.target));
+  try {
+    await api('POST', `/api/superadmin/tenants/${currentUserTenantId}/users`, data);
+    alertMsg(`Utilisateur ${data.email} ajouté`);
+    e.target.reset();
+    openUsers(currentUserTenantId, ''); // reload list
+  } catch (err) { alertMsg(err.message, 'error'); }
+});
+
+// Create tenant form
+document.getElementById('create-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  try {
+    await api('POST', '/api/superadmin/tenants', data);
+    alertMsg(`Tenant ${data.id} créé avec succès. Clique "Lightspeed" dans la liste pour lier le compte.`);
+    e.target.reset();
+    loadTenants();
+  } catch (err) { alertMsg(err.message, 'error'); }
+});
+
+// Init
+loadTenants();
+</script>
+</body>
+</html>

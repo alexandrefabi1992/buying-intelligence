@@ -416,6 +416,7 @@ app.get('/api/superadmin/dashboard', requireAuth, requireSuperAdmin, async (req,
   try {
     const { rows: tenants } = await pool.query(
       `SELECT t.id, t.name, t.active, t.created_at,
+        (t.ls_refresh_token IS NOT NULL) AS has_lightspeed_token,
         (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id) AS user_count,
         (SELECT COUNT(*) FROM products p WHERE p.tenant_id = t.id) AS product_count,
         (SELECT COUNT(*) FROM sale_lines sl WHERE sl.tenant_id = t.id) AS sale_line_count,
