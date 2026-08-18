@@ -230,6 +230,90 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
+// Sync bake health check — no auth (public, but reveals only aggregates).
+// Returns each threshold from docs/switch-to-sync-worker.md § 7 with pass/fail
+// and an overall boolean. Designed for external uptime monitors + shell scripts.
+// Exit codes to translate: pass = HTTP 200 { healthy: true }, warn/fail = HTTP 503.
+app.get('/api/health/sync', async (_req, res) => {
+  try {
+    const now = new Date();
+    const checks = {};
+
+    // 1. No jobs stuck in 'failed'
+    const { rows: failed } = await pool.query(
+      "SELECT COUNT(*)::int AS n FROM sync_jobs WHERE status='failed'"
+    );
+    checks.no_failed_jobs = { pass: failed[0].n === 0, value: failed[0].n, threshold: 0 };
+
+    // 2. Freshness — MAX(sale_lines.completed_time) within 28h for primary tenant
+    const primary = process.env.LIGHTSPEED_PRIMARY_TENANT || 'valerie-simon';
+    const { rows: fresh } = await pool.query(
+      "SELECT MAX(completed_time) AS t FROM sale_lines WHERE tenant_id = $1",
+      [primary]
+    );
+    const saleAgeHours = fresh[0].t ? (now - new Date(fresh[0].t)) / 3_600_000 : Infinity;
+    checks.sale_lines_freshness = {
+      pass: saleAgeHours <= 28,
+      value_hours: Math.round(saleAgeHours * 10) / 10,
+      threshold_hours: 28,
+      latest: fresh[0].t,
+    };
+
+    // 3. Freshness — MAX(inventory.synced_at) within 28h
+    const { rows: freshInv } = await pool.query(
+      "SELECT MAX(synced_at) AS t FROM inventory WHERE tenant_id = $1",
+      [primary]
+    );
+    const invAgeHours = freshInv[0].t ? (now - new Date(freshInv[0].t)) / 3_600_000 : Infinity;
+    checks.inventory_freshness = {
+      pass: invAgeHours <= 28,
+      value_hours: Math.round(invAgeHours * 10) / 10,
+      threshold_hours: 28,
+      latest: freshInv[0].t,
+    };
+
+    // 4. Sync checkpoints — no step stuck in error (next_url starting with 'Error:')
+    const { rows: chkErr } = await pool.query(
+      "SELECT step FROM sync_checkpoints WHERE tenant_id = $1 AND next_url LIKE 'Error:%'",
+      [primary]
+    );
+    checks.no_checkpoint_errors = {
+      pass: chkErr.length === 0,
+      errored_steps: chkErr.map(r => r.step),
+    };
+
+    // 5. Row counts — informational, not gated (deltas require historical baseline)
+    const { rows: counts } = await pool.query(
+      `SELECT
+        (SELECT COUNT(*) FROM sale_lines WHERE tenant_id = $1) AS sale_lines,
+        (SELECT COUNT(*) FROM products   WHERE tenant_id = $1) AS products,
+        (SELECT COUNT(*) FROM inventory  WHERE tenant_id = $1) AS inventory,
+        (SELECT COUNT(*) FROM orders     WHERE tenant_id = $1) AS orders
+      `,
+      [primary]
+    );
+    checks.counts = counts[0];
+
+    // 6. Sync jobs summary
+    const { rows: jobs } = await pool.query(
+      "SELECT status, COUNT(*)::int AS n FROM sync_jobs GROUP BY status"
+    );
+    const jobsMap = { pending: 0, running: 0, done: 0, failed: 0 };
+    for (const r of jobs) jobsMap[r.status] = r.n;
+    checks.sync_jobs = jobsMap;
+
+    const healthy = Object.values(checks).every(c => c.pass !== false);
+    res.status(healthy ? 200 : 503).json({
+      healthy,
+      tenant: primary,
+      generated_at: now.toISOString(),
+      checks,
+    });
+  } catch (err) {
+    res.status(500).json({ healthy: false, error: err.message });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Route-level auth — global middleware for /api/* routes
 // - JWT required for all client routes

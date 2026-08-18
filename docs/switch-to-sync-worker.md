@@ -4,6 +4,58 @@
 **Duration**: ~10 min execution + 1h active monitoring
 **Rollback window**: any time within 48h via `git revert`
 
+---
+
+## 🚨 EMERGENCY ROLLBACK — copy-paste block
+
+**If anything looks wrong**, run these three commands. Zero thinking required.
+
+```bash
+# 1. Web service — re-enable legacy sync, kill the producer
+railway service web
+railway variables --set SYNC_DISABLED=0 --set SYNC_PRODUCER_ENABLED=0
+
+# 2. Worker service — force drain
+railway service sync-worker
+railway variables --set SYNC_WORKER_COUNT=0
+
+# 3. Return to web service so subsequent commands hit the right place
+railway service web
+```
+
+Both services restart automatically on env-var change (~30-60s).
+After the restart:
+- Legacy `sync.js` resumes on its hourly cron (`0 * * * *`).
+- Sync-worker returns to idle observer (reclaim + stats loops only).
+- Any job in `status='running'` at the moment of rollback stays stuck
+  in that state until `reclaimStuckJobs()` bumps it back to `'pending'`
+  after 30 min — cosmetic only, no data loss (no worker to consume it).
+
+**Verify rollback worked** (must all be true within 2 min):
+```bash
+railway logs --service web        --lines 10 | grep -E "sync/cron|producer"
+# Expected: "[sync/cron] Hourly sync scheduled" AND "[producer] disabled"
+
+railway logs --service sync-worker --lines 10 | grep -E "sync-worker|worker:1"
+# Expected: "idle observer mode" (no worker:N spawned)
+```
+
+Only *after* the deployment is stable via env-var rollback, consider
+a full code revert:
+```bash
+git revert ca50bba  # entrypoint dispatcher
+git revert 7bdaff7  # admin UI
+git revert ebe26da  # env fallback gate
+git revert 79a23ae  # playbook caveat (docs only)
+git revert 67eb1f8  # SYNC_DISABLED gate + playbook
+git revert 7214f99  # producer + sync_checkpoints migration
+git revert 511257a  # sync-worker.js
+git revert 32c94ee  # lib/sync-tenant.js
+git push
+```
+
+---
+
 ## Pre-flight (do before 02:00 EDT)
 
 - [ ] Everyone who could push a PO or trigger a manual sync is asleep / notified
@@ -186,17 +238,64 @@ git push
 
 The switch is only "committed" after 48h of clean operation. During bake:
 - Do NOT re-enable the legacy sync.js (SYNC_DISABLED stays 1)
+- Do NOT re-OAuth VS to move its token off the env fallback — one change at a time
 - Run `npm run test:isolation` daily — must stay 0 fail
-- Check `sync_jobs` via `SELECT status, COUNT(*) FROM sync_jobs GROUP BY status` — no persistent 'failed' rows
 
-**Bake success criteria** (all must hold for 48h):
-- 0 jobs in `status='failed'`
-- `MAX(sale_lines.completed_time)` never > 28h from `now()`
-- `MAX(inventory.synced_at)` never > 28h from `now()`
+### Automated health endpoint
+
+`GET /api/health/sync` returns JSON with every bake threshold + an overall
+`healthy: boolean`. HTTP 200 = green, HTTP 503 = red.
+
+Quick manual check anytime:
+```bash
+./scripts/bake-health-check.sh
+# → pretty-printed output with ✓/✗ per threshold, exit 0/1/2
+```
+
+### Recommended monitoring cadence during bake
+
+Since there's no in-house alerting stack, the plan is scheduled manual
+checks. Pick ONE of these three options — pick the one you'll actually
+follow through on.
+
+**Option A: External uptime monitor (recommended, zero manual effort)**
+- Sign up for a free tier: [UptimeRobot](https://uptimerobot.com/) (free
+  50 monitors, 5-min interval) or [Better Uptime](https://betterstack.com/)
+- Monitor URL: `https://buying-intelligence-production.up.railway.app/api/health/sync`
+- Alert on: HTTP status != 200 (so anything other than green)
+- Alert to: SMS / email — your choice
+- Setup: 5 minutes. Runs unattended for the whole 48h.
+
+**Option B: Manual check at fixed hours (fallback if you don't want a monitor)**
+Run this cron in a screen/tmux session on your laptop, or on any always-on
+machine you have:
+```bash
+# In your shell profile or a cron entry:
+0 8,12,18,22 * * *  cd ~/Documents/buying-intelligence && ./scripts/bake-health-check.sh || osascript -e 'display notification "sync bake RED" with title "Buying Intelligence"'
+```
+That's 4 checks per day (~every 5h) — enough that a persistent red
+issue can't hide for more than 5h before you see it.
+
+**Option C: Just run it manually 3× a day**
+Morning coffee, lunch, dinner:
+```bash
+./scripts/bake-health-check.sh
+```
+Least reliable — a red state at 3am goes unnoticed until morning. Only
+use this if you're OK with up to ~8h of blindness overnight.
+
+### Bake success criteria (must all hold for 48h)
+
+- `no_failed_jobs`: 0 jobs in `status='failed'`
+- `sale_lines_freshness`: MAX(completed_time) never > 28h old
+- `inventory_freshness`: MAX(synced_at) never > 28h old
+- `no_checkpoint_errors`: no sync_checkpoints row with next_url starting `Error:`
 - `sale_lines` row count grows monotonically (never decreases)
 - `products` row count delta between cycles ≤ 500
-- `orphan_rescued` count per cycle stays under baseline × 1.5 (baseline = value in
-  sync_checkpoints at end of first successful cycle)
+- `orphan_rescued` count per cycle stays under baseline × 1.5 (baseline = value
+  captured in /tmp/pre-switch-baseline.json before the switch)
+
+If ANY criterion fails and doesn't self-heal within 1 cycle (~24h): rollback.
 
 ## Step 8 — Cleanup (commit B.5, after bake success)
 
