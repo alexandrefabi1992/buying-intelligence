@@ -10,6 +10,33 @@
 - [ ] Take a snapshot of pre-migration state (§ 5 below)
 - [ ] Confirm `Monitor` tool is armed to watch Railway logs
 
+## Scope caveat — what this switch actually validates
+
+VS (valerie-simon) today has **no token** in `tenants.ls_refresh_token`;
+it authenticates via the `LIGHTSPEED_REFRESH_TOKEN` env var. The
+`getAccessToken()` helper in `lib/sync-tenant.js` has a guarded
+fallback: when `ctx.tenantId === LIGHTSPEED_PRIMARY_TENANT` and no DB
+token is present, it uses the env var.
+
+**Consequence**: the first sync cycle post-switch exercises the **env-var
+fallback path**, not the normal `fromTenant()` → decrypt-DB-token path
+that any future tenant #2 will take.
+
+That's fine for validating the switch itself (queue → worker →
+syncTenant → DB writes are all shared), but **the full end-to-end
+"DB-encrypted-token → decrypt → Lightspeed → per-tenant write" path
+stays untested until a real tenant #2 is onboarded**. Plan a follow-up
+smoke test with T2 after 48h bake completes:
+1. Create T2 via /admin.html
+2. Click "Lightspeed" → OAuth flow → token lands encrypted in
+   `tenants.ls_refresh_token`
+3. Manually enqueue a sync_jobs row for T2 → observe worker uses
+   `fromTenant()` (not env fallback), decrypts, syncs T2's own account.
+
+After that smoke test passes, VS can be migrated off env-var and onto
+DB-stored token via `/oauth/start?tenant_id=valerie-simon` — one final
+change to make the deployment fully symmetric.
+
 ## Step 1 — Create the sync-worker service on Railway
 
 Via Railway UI (easiest) or CLI:
