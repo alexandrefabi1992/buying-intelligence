@@ -74,6 +74,13 @@ fdada37, a417452, 0c0d2bd) are the ones that actually restore behaviour.
 - [ ] Everyone who could push a PO or trigger a manual sync is asleep / notified
 - [ ] Take a snapshot of pre-migration state (§ 5 below)
 - [ ] Confirm `Monitor` tool is armed to watch Railway logs
+- [ ] **Trigger a Railway Postgres backup manually** (belt-and-braces):
+      Dashboard → Postgres service → Backups tab → click "New backup".
+      Wait for it to complete (~30s-2min, depends on DB size). This gives
+      you a timestamped snapshot dedicated to the switch, in addition to
+      the daily auto-backup. Restore path if needed: same Backups tab →
+      hover the snapshot → "Restore". Restore is ~5-15min and creates a
+      new volume, not in-place — safe.
 
 ## Scope caveat — what this switch actually validates
 
