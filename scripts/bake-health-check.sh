@@ -13,8 +13,15 @@
 
 set -u
 HOST="${BAKE_HOST:-https://buying-intelligence-production.up.railway.app}"
+# HEALTH_CHECK_SECRET unlocks the detailed JSON body (row counts, freshness values).
+# Without it, the endpoint returns just { healthy: bool } — still enough to know
+# the state, but the pretty-print will show fewer per-check details.
+HEADER=()
+if [ -n "${HEALTH_CHECK_SECRET:-}" ]; then
+  HEADER=(-H "X-Health-Secret: $HEALTH_CHECK_SECRET")
+fi
 
-resp=$(curl -sS -w "\n---HTTP:%{http_code}---" --max-time 30 "$HOST/api/health/sync" 2>&1)
+resp=$(curl -sS "${HEADER[@]}" -w "\n---HTTP:%{http_code}---" --max-time 30 "$HOST/api/health/sync" 2>&1)
 status=$(echo "$resp" | grep -oE "HTTP:[0-9]+" | sed 's/HTTP://')
 body=$(echo "$resp"  | sed '/---HTTP:/,$d')
 
@@ -29,10 +36,13 @@ fi
 # Pretty-print with node (jq alternative — assume node is always installed on the dev laptop)
 echo "$body" | node -e "
 const j = JSON.parse(require('fs').readFileSync(0, 'utf8'));
-const c = j.checks || {};
+console.log(\`Overall: \${j.healthy ? '✓ GREEN' : '✗ RED'}\${j.tenant ? '  (tenant: ' + j.tenant + ')' : ''}\`);
+if (!j.checks) {
+  console.log('  (set HEALTH_CHECK_SECRET env var to see per-check details)');
+  return;
+}
+const c = j.checks;
 const line = (label, ok, detail) => console.log(\`  \${ok ? '✓' : '✗'} \${label}\${detail ? '  ' + detail : ''}\`);
-
-console.log(\`Overall: \${j.healthy ? '✓ GREEN' : '✗ RED'}  (tenant: \${j.tenant})\`);
 if (c.no_failed_jobs)         line('no failed jobs',          c.no_failed_jobs.pass,          \`(\${c.no_failed_jobs.value} / max \${c.no_failed_jobs.threshold})\`);
 if (c.sale_lines_freshness)   line('sale_lines freshness',    c.sale_lines_freshness.pass,    \`(\${c.sale_lines_freshness.value_hours}h / max \${c.sale_lines_freshness.threshold_hours}h — latest \${c.sale_lines_freshness.latest})\`);
 if (c.inventory_freshness)    line('inventory freshness',     c.inventory_freshness.pass,     \`(\${c.inventory_freshness.value_hours}h / max \${c.inventory_freshness.threshold_hours}h)\`);

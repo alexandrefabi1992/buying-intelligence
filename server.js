@@ -230,11 +230,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
-// Sync bake health check — no auth (public, but reveals only aggregates).
-// Returns each threshold from docs/switch-to-sync-worker.md § 7 with pass/fail
-// and an overall boolean. Designed for external uptime monitors + shell scripts.
-// Exit codes to translate: pass = HTTP 200 { healthy: true }, warn/fail = HTTP 503.
-app.get('/api/health/sync', async (_req, res) => {
+// Sync bake health check.
+// - Without HEALTH_CHECK_SECRET header: returns { healthy: bool } only.
+//   HTTP status is 200 (healthy) or 503 (unhealthy), suitable for uptime
+//   monitors that just check the status code.
+// - With correct HEALTH_CHECK_SECRET header: returns full detail (row
+//   counts, freshness values, sync_jobs breakdown). Same env var name
+//   used elsewhere is ADMIN_SECRET, but health check gets its own so it
+//   can be shared with monitoring tools without granting admin.
+//
+// If HEALTH_CHECK_SECRET is not configured, the detailed body is only
+// available from localhost — belt and suspenders during initial rollout.
+app.get('/api/health/sync', async (req, res) => {
   try {
     const now = new Date();
     const checks = {};
@@ -305,12 +312,24 @@ app.get('/api/health/sync', async (_req, res) => {
     checks.sync_jobs = jobsMap;
 
     const healthy = Object.values(checks).every(c => c.pass !== false);
-    res.status(healthy ? 200 : 503).json({
-      healthy,
-      tenant: primary,
-      generated_at: now.toISOString(),
-      checks,
-    });
+
+    // Redact detail unless the caller provides the shared secret.
+    const providedSecret = req.headers['x-health-secret'] || req.query.secret;
+    const expected = process.env.HEALTH_CHECK_SECRET;
+    const authorized = expected && providedSecret === expected;
+
+    if (authorized) {
+      res.status(healthy ? 200 : 503).json({
+        healthy,
+        tenant: primary,
+        generated_at: now.toISOString(),
+        checks,
+      });
+    } else {
+      // Minimal body: enough for uptime monitors that check status code,
+      // no business metrics exposed.
+      res.status(healthy ? 200 : 503).json({ healthy });
+    }
   } catch (err) {
     res.status(500).json({ healthy: false, error: err.message });
   }

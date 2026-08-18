@@ -269,6 +269,56 @@ follow through on.
 - Alert on: HTTP status != 200 (so anything other than green)
 - Alert to: SMS / email — your choice
 - Setup: 5 minutes. Runs unattended for the whole 48h.
+- Note: the endpoint is public but returns only `{healthy: bool}` without
+  a valid X-Health-Secret header. Uptime monitors only need the status
+  code — no header setup required for the free tier flow.
+
+### End-to-end alerting test (do this BEFORE relying on the monitor)
+
+After setting up UptimeRobot (or equivalent), verify you actually receive
+the alert — don't trust "the endpoint returns JSON in theory".
+
+1. Confirm baseline: monitor shows GREEN, no alerts fired.
+
+2. Force a temporary RED state without touching production data. On your
+   laptop:
+
+   ```bash
+   # Temporarily override the threshold to something impossible via env
+   # var on the web service — makes freshness check fail immediately
+   railway service buying-intelligence
+   railway variables --set "HEALTH_FRESHNESS_HOURS_OVERRIDE=0"
+   ```
+
+   (This env override is NOT yet implemented — the "cleaner" test is:)
+
+3. Alternative simpler test: temporarily insert a fake failed job:
+
+   ```bash
+   # via psql on Railway
+   railway connect Postgres
+   INSERT INTO sync_jobs (tenant_id, status, error, finished_at)
+   VALUES ('valerie-simon', 'failed', 'monitoring alert test', now());
+   \q
+   ```
+
+4. Wait ≤ 5 min for UptimeRobot to poll → HTTP 503 → alert fires.
+   Confirm you receive the notification via your chosen channel.
+
+5. Clean up:
+
+   ```bash
+   railway connect Postgres
+   DELETE FROM sync_jobs WHERE error = 'monitoring alert test';
+   \q
+   ```
+
+6. Wait ≤ 5 min for next poll → HTTP 200 → resolve notification fires.
+   Confirm you receive that too.
+
+If both notifications arrive within their expected windows, the alerting
+loop is proven end-to-end. If not, debug BEFORE the switch — a silent
+monitor is worse than no monitor.
 
 **Option B: Manual check at fixed hours (fallback if you don't want a monitor)**
 Run this cron in a screen/tmux session on your laptop, or on any always-on
