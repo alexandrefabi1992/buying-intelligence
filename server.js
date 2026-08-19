@@ -379,7 +379,7 @@ app.post('/api/auth/login', async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
   try {
     const { rows } = await pool.query(
-      'SELECT id, tenant_id, role, password_hash FROM users WHERE email = $1',
+      'SELECT id, tenant_id, role, password_hash, must_change_password FROM users WHERE email = $1',
       [email.toLowerCase().trim()]
     );
     const user = rows[0];
@@ -400,10 +400,66 @@ app.post('/api/auth/login', async (req, res) => {
       process.env.JWT_SECRET ?? 'dev-secret',
       { expiresIn: '7d' }
     );
-    res.json({ token, tenant: tenantRows[0], role: user.role });
+    res.json({
+      token,
+      tenant: tenantRows[0],
+      role: user.role,
+      must_change_password: !!user.must_change_password,
+    });
   } catch (err) {
     console.error('[auth/login]', err.message);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/change-password — user changes their own password.
+// Also clears must_change_password so the login flow stops prompting.
+// Auth: standard JWT (requireAuth via global /api middleware).
+// ---------------------------------------------------------------------------
+app.post('/api/auth/change-password', async (req, res) => {
+  const { new_password } = req.body ?? {};
+  if (!new_password || new_password.length < 8) {
+    return res.status(400).json({ error: 'new_password required, min 8 characters' });
+  }
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const password_hash = await bcrypt.hash(new_password, 12);
+    const { rowCount } = await pool.query(
+      `UPDATE users SET password_hash = $1, must_change_password = false
+       WHERE id = $2 AND tenant_id = $3`,
+      [password_hash, req.userId, req.tenantId]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'User not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[auth/change-password]', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/tenant/lightspeed-status — returns { connected: bool } for the
+// caller's tenant. Used by the dashboard to show a "Connect Lightspeed"
+// banner if the tenant hasn't linked their account yet.
+// ---------------------------------------------------------------------------
+app.get('/api/tenant/lightspeed-status', async (req, res) => {
+  if (!req.tenantId) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT (ls_refresh_token IS NOT NULL) AS connected,
+              ls_account_id
+       FROM tenants WHERE id = $1`,
+      [req.tenantId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Tenant not found' });
+    res.json({
+      connected: !!rows[0].connected,
+      account_id: rows[0].ls_account_id,
+      oauth_url: `/oauth/start?tenant_id=${encodeURIComponent(req.tenantId)}`,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -551,13 +607,16 @@ app.get('/api/superadmin/tenants/:id/users', requireAuth, requireSuperAdmin, asy
 });
 
 // POST /api/superadmin/tenants/:id/users — create user
+// New users are always created with must_change_password=true so the operator's
+// temporary password gets replaced at the client's first login.
 app.post('/api/superadmin/tenants/:id/users', requireAuth, requireSuperAdmin, async (req, res) => {
   const { email, password, role = 'user' } = req.body ?? {};
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
   try {
     const password_hash = await bcrypt.hash(password, 12);
     const { rows } = await pool.query(
-      `INSERT INTO users (tenant_id, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id`,
+      `INSERT INTO users (tenant_id, email, password_hash, role, must_change_password)
+       VALUES ($1, $2, $3, $4, true) RETURNING id`,
       [req.params.id, email.toLowerCase().trim(), password_hash, role]
     );
     res.json({ ok: true, userId: rows[0].id });
@@ -568,13 +627,16 @@ app.post('/api/superadmin/tenants/:id/users', requireAuth, requireSuperAdmin, as
 });
 
 // PUT /api/superadmin/users/:id/password — reset password
+// Also sets must_change_password=true so the client is forced to pick their
+// own password after an operator reset (rather than continuing with the
+// temporary one the operator communicated).
 app.put('/api/superadmin/users/:id/password', requireAuth, requireSuperAdmin, async (req, res) => {
   const { password } = req.body ?? {};
   if (!password) return res.status(400).json({ error: 'password required' });
   try {
     const password_hash = await bcrypt.hash(password, 12);
     const { rowCount } = await pool.query(
-      `UPDATE users SET password_hash = $1 WHERE id = $2`,
+      `UPDATE users SET password_hash = $1, must_change_password = true WHERE id = $2`,
       [password_hash, req.params.id]
     );
     if (!rowCount) return res.status(404).json({ error: 'User not found' });
@@ -607,7 +669,8 @@ app.post('/api/superadmin/tenants', requireAuth, requireSuperAdmin, async (req, 
     await client.query(`INSERT INTO tenants (id, name) VALUES ($1, $2)`, [id.toLowerCase().trim(), name.trim()]);
     const password_hash = await bcrypt.hash(password, 12);
     await client.query(
-      `INSERT INTO users (tenant_id, email, password_hash, role) VALUES ($1, $2, $3, 'user')`,
+      `INSERT INTO users (tenant_id, email, password_hash, role, must_change_password)
+       VALUES ($1, $2, $3, 'user', true)`,
       [id.toLowerCase().trim(), email.toLowerCase().trim(), password_hash]
     );
     await client.query('COMMIT');
@@ -999,6 +1062,18 @@ async function runMigrations() {
       created_at    TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+
+  // First-login onboarding — force password change when a superadmin
+  // provisions a new user. Default TRUE for new rows; the migration
+  // below marks existing users as already-changed so we don't lock
+  // out anyone who's been using the system before this feature.
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT true`);
+  await pool.query(`UPDATE users SET must_change_password = false WHERE must_change_password IS NULL`);
+  // Backfill: any user that already logged in AND has a set password
+  // hash before this migration is assumed to have chosen their own
+  // password (no forced change). Only newly-provisioned users after
+  // the deploy will have must_change_password = true.
+  await pool.query(`UPDATE users SET must_change_password = false WHERE created_at < now() - interval '1 minute'`);
 
   // Seed first tenant (existing Valérie Simon data)
   await pool.query(
