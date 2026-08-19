@@ -1,3 +1,4 @@
+// Switch deploy trigger: 2026-08-19T00:28:46.526Z
 'use strict';
 // Entrypoint dispatcher — both Railway services (web + sync-worker) run the
 // same image; the SERVICE_ROLE env var picks which top-level module to load.
