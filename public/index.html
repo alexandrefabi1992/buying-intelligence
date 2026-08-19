@@ -2256,6 +2256,14 @@ async function handleLogin(e) {
       try { localStorage.setItem('auth_tenant_name', data.tenant.name); } catch {}
     }
     try { localStorage.setItem('auth_email', document.getElementById('loginEmail').value); } catch {}
+    // First-login guard: if the operator provisioned the account with a
+    // temporary password, force the user to pick their own before they
+    // reach the dashboard. change-password.html clears the flag then
+    // sends them back to /.
+    if (data.must_change_password) {
+      window.location.href = '/change-password.html';
+      return;
+    }
     applyRoleUI();
     updateUserPill();
     hideLogin();
@@ -7944,11 +7952,49 @@ function initApp() {
     RecipesList.init();
     TransfersTab.init();
     loadSyncStatus();
+    checkLightspeedStatus();
     tabLoaded['budget'] = true;
     // Apply saved language (updates static elements + button styling)
     setLanguage(_lang);
     BudgetTab.load();
   });
+}
+
+// Show a "Connect Lightspeed" banner if the current tenant hasn't
+// linked their Lightspeed account yet. Fetched on every app boot so
+// the banner disappears automatically after OAuth completes.
+async function checkLightspeedStatus() {
+  try {
+    const res = await apiFetch(`${BASE}/api/tenant/lightspeed-status`);
+    if (!res.ok) return; // silently skip on any error — banner is best-effort
+    const data = await res.json();
+    if (data.connected) return; // all good, nothing to show
+    renderLightspeedBanner(data.oauth_url);
+  } catch { /* silent */ }
+}
+
+function renderLightspeedBanner(oauthUrl) {
+  // Insert the banner at the very top of body (above the sidebar) so it's
+  // impossible to miss. Only rendered when Lightspeed isn't connected.
+  if (document.getElementById('ls-banner')) return; // already rendered
+  const banner = document.createElement('div');
+  banner.id = 'ls-banner';
+  banner.className = 'bg-vs-brique text-white px-4 py-3 flex items-center justify-between shadow-md';
+  banner.style.cssText = 'position:sticky; top:0; z-index:60;';
+  banner.innerHTML = `
+    <div class="flex items-center gap-3">
+      <span class="text-xl">⚡</span>
+      <div>
+        <div class="font-semibold text-sm">Connectez votre compte Lightspeed</div>
+        <div class="text-xs opacity-90">Les données ne se synchronisent pas tant que vous n'avez pas lié votre compte.</div>
+      </div>
+    </div>
+    <a href="${oauthUrl}" target="_blank" rel="noopener"
+       class="bg-white text-vs-brique font-semibold text-sm px-4 py-2 rounded hover:bg-gray-50 whitespace-nowrap">
+      Se connecter à Lightspeed →
+    </a>
+  `;
+  document.body.insertBefore(banner, document.body.firstChild);
 }
 
 if (getToken()) {
