@@ -12,7 +12,10 @@
     "scan:isolation": "node scripts/scan-tenant-isolation.js",
     "scan:isolation:baseline": "node scripts/scan-tenant-isolation.js --update-baseline",
     "sync:worker": "node sync-worker.js",
-    "test:sync-queue": "railway run node scripts/test-sync-queue-dedup.js"
+    "test:sync-queue": "railway run node scripts/test-sync-queue-dedup.js",
+    "test:permissions": "node tests/permissions.test.js",
+    "test:shop-scope": "node tests/shop-scope.test.js",
+    "test:settings": "node tests/settings.test.js"
   },
   "dependencies": {
     "axios": "^1.7.2",

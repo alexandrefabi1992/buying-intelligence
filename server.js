@@ -17,6 +17,8 @@ const path    = require('path');
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 const { runAgentLoop, runAgentLoopStream } = require('./ai-agent');
+const PERMS            = require('./lib/permissions');
+const SETTINGS        = require('./lib/settings');
 const HELP             = require('./help-content');
 
 // Multer for chat attachments (images + PDFs, 10MB limit, in-memory)
@@ -47,6 +49,11 @@ pool.on('error', (err) => {
   console.error('[pool] Unexpected idle client error:', err.message);
 });
 
+// Per-user permissions loader (tabs + shops). Backed by users.permissions,
+// cached in-process so the extra lookup in requireAuth stays cheap. Any write
+// to users.permissions must call loadPermissions.invalidate(userId).
+const loadPermissions = PERMS.createPermissionLoader(pool);
+
 // Log unhandled promise rejections instead of crashing
 process.on('unhandledRejection', (reason) => {
   console.error('[process] Unhandled rejection:', reason?.message ?? reason);
@@ -55,17 +62,46 @@ process.on('unhandledRejection', (reason) => {
 // ---------------------------------------------------------------------------
 // Auth middleware
 // ---------------------------------------------------------------------------
-function requireAuth(req, res, next) {
+// Verifies the JWT and resolves the caller's permissions.
+//
+// req.allowedTabs / req.allowedShops are null when the user is unrestricted —
+// every downstream helper treats null as "no restriction", so unrestricted
+// users keep the exact behaviour they had before permissions existed.
+//
+// The permission lookup fails CLOSED: a DB error returns 503 rather than
+// serving unscoped data. That costs nothing in practice — every route behind
+// this middleware queries the same database anyway.
+async function requireAuth(req, res, next) {
   const token = (req.headers.authorization ?? '').replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  let payload;
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET ?? 'dev-secret');
-    req.tenantId = payload.tenantId;
-    req.userId   = payload.userId;
-    req.role     = payload.role;
-    next();
+    payload = jwt.verify(token, process.env.JWT_SECRET ?? 'dev-secret');
   } catch {
-    res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+  req.tenantId = payload.tenantId;
+  req.userId   = payload.userId;
+  req.role     = payload.role;
+
+  // superadmin is never restricted. The userId guard covers legacy tokens
+  // minted without one — they carry no user row to look permissions up in.
+  if (req.role === 'superadmin' || req.userId == null) {
+    req.allowedTabs  = null;
+    req.allowedShops = null;
+    return next();
+  }
+  try {
+    const perms = await loadPermissions(req.userId);
+    req.allowedTabs  = perms.tabs;
+    req.allowedShops = perms.shops;
+    next();
+  } catch (err) {
+    if (err instanceof PERMS.ForbiddenError) {
+      return res.status(403).json({ error: err.message });
+    }
+    console.error('[auth] Permission lookup failed:', err.message);
+    res.status(503).json({ error: 'Service momentanément indisponible' });
   }
 }
 
@@ -96,15 +132,14 @@ const DEFAULT_MULTIPLIER_TIERS = [
   { st_min: 0.00, multiplier: 0.50, label: 'Couper'        },
 ];
 
+// Per-tenant settings reader — see lib/settings.js for the logging policy that
+// distinguishes an unconfigured setting, a malformed one, and a DB failure.
+const readSetting = SETTINGS.createSettingsReader(pool);
+
 async function getMultiplierTiers(tenantId) {
-  try {
-    const { rows } = await pool.query(
-      "SELECT value FROM app_settings WHERE key = 'multiplier_tiers' AND tenant_id = $1",
-      [tenantId]
-    );
-    if (rows.length && Array.isArray(rows[0].value)) return rows[0].value;
-  } catch {}
-  return DEFAULT_MULTIPLIER_TIERS;
+  const value = await readSetting(tenantId, 'multiplier_tiers',
+    v => Array.isArray(v), 'un tableau de paliers');
+  return value ?? DEFAULT_MULTIPLIER_TIERS;
 }
 
 function applyMultiplierTiers(st, tiers) {
@@ -128,18 +163,23 @@ function applyMultiplierTiers(st, tiers) {
 // Seasons config and budget params — defaults; overridden by app_settings DB table.
 // Each season: { code, label, reception_from, reception_to, sell_from, sell_to, tag_pattern }
 // ---------------------------------------------------------------------------
-const DEFAULT_SEASONS_CONFIG = [
-  { code:'p23', label:'P23 — Printemps 2023', reception_from:'2022-10-01', reception_to:'2023-09-30', sell_from:'2023-02-01', sell_to:'2023-09-30', tag_pattern:'p23' },
-  { code:'a23', label:'A23 — Automne 2023',   reception_from:'2023-05-01', reception_to:'2024-02-28', sell_from:'2023-09-01', sell_to:'2024-02-28', tag_pattern:'a23' },
-  { code:'p24', label:'P24 — Printemps 2024', reception_from:'2023-10-01', reception_to:'2024-09-30', sell_from:'2024-02-01', sell_to:'2024-09-30', tag_pattern:'p24' },
-  { code:'a24', label:'A24 — Automne 2024',   reception_from:'2024-05-01', reception_to:'2025-02-28', sell_from:'2024-09-01', sell_to:'2025-02-28', tag_pattern:'a24' },
-  { code:'p25', label:'P25 — Printemps 2025', reception_from:'2024-10-01', reception_to:'2025-09-30', sell_from:'2025-02-01', sell_to:'2025-09-30', tag_pattern:'p25' },
-  { code:'a25', label:'A25 — Automne 2025',   reception_from:'2025-05-01', reception_to:'2026-02-28', sell_from:'2025-09-01', sell_to:'2026-02-28', tag_pattern:'a25' },
-  { code:'p26', label:'P26 — Printemps 2026', reception_from:'2025-10-01', reception_to:'2026-09-30', sell_from:'2026-02-01', sell_to:'2026-09-30', tag_pattern:'p26' },
-  { code:'a26', label:'A26 — Automne 2026',   reception_from:'2026-05-01', reception_to:'2027-02-28', sell_from:'2026-09-01', sell_to:'2027-02-28', tag_pattern:'a26' },
-  { code:'p27', label:'P27 — Printemps 2027', reception_from:'2026-10-01', reception_to:'2027-09-30', sell_from:'2027-02-01', sell_to:'2027-09-30', tag_pattern:'p27' },
-  { code:'a27', label:'A27 — Automne 2027',   reception_from:'2027-05-01', reception_to:'2028-02-28', sell_from:'2027-09-01', sell_to:'2028-02-28', tag_pattern:'a27' },
-];
+// Seasons are per-tenant data, not a built-in constant.
+//
+// This file used to carry a DEFAULT_SEASONS_CONFIG covering p23→a27 with the
+// tag patterns 'p26', 'a26'… — i.e. Valérie Simon's own calendar. Every tenant
+// without a saved configuration silently inherited it, so a shop tagging its
+// products 'SS26' would have had budgets computed against tags matching nothing,
+// with no error anywhere. The calendar now lives only in app_settings; existing
+// tenants were backfilled by scripts/seed-seasons-config.js.
+class SeasonsNotConfiguredError extends Error {
+  constructor(tenantId) {
+    super("Aucune saison n'est configurée pour ce compte. Configurez vos saisons dans " +
+          "Paramètres → Saisons (PUT /api/settings/seasons) avant de calculer un budget.");
+    this.name     = 'SeasonsNotConfiguredError';
+    this.status   = 409;
+    this.tenantId = tenantId;
+  }
+}
 
 const DEFAULT_BUDGET_PARAMS = {
   nb_saisons_reference:       3,
@@ -161,39 +201,37 @@ const DEFAULT_BUDGET_PROJECTION_CONFIG = {
 };
 
 async function getTenantConfig(tenantId) {
-  try {
-    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'tenant_config' AND tenant_id = $1", [tenantId]);
-    if (rows.length && rows[0].value) return rows[0].value;
-  } catch {}
-  return {};
+  const value = await readSetting(tenantId, 'tenant_config',
+    v => !!v, 'un objet de configuration');
+  return value ?? {};
 }
 
+// Returns [] when the tenant has no usable configuration. Callers that merely
+// display the calendar tolerate the empty list; callers that compute on it use
+// requireSeasonsConfig() below and fail loudly instead.
 async function getSeasonsConfig(tenantId) {
-  try {
-    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'seasons_config' AND tenant_id = $1", [tenantId]);
-    if (rows.length && Array.isArray(rows[0].value) && rows[0].value.length > 0) return rows[0].value;
-  } catch {}
-  return DEFAULT_SEASONS_CONFIG;
+  const value = await readSetting(tenantId, 'seasons_config',
+    v => Array.isArray(v) && v.length > 0, 'un tableau non vide de saisons');
+  return value ?? [];
+}
+
+// Same read, but refuses to continue on an unconfigured tenant.
+async function requireSeasonsConfig(tenantId) {
+  const config = await getSeasonsConfig(tenantId);
+  if (!config.length) throw new SeasonsNotConfiguredError(tenantId);
+  return config;
 }
 
 async function getBudgetParams(tenantId) {
-  try {
-    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'budget_params' AND tenant_id = $1", [tenantId]);
-    if (rows.length && rows[0].value && typeof rows[0].value === 'object') {
-      return { ...DEFAULT_BUDGET_PARAMS, ...rows[0].value };
-    }
-  } catch {}
-  return { ...DEFAULT_BUDGET_PARAMS };
+  const value = await readSetting(tenantId, 'budget_params',
+    v => v && typeof v === 'object', 'un objet de paramètres');
+  return { ...DEFAULT_BUDGET_PARAMS, ...(value ?? {}) };
 }
 
 async function getBudgetProjectionConfig(tenantId) {
-  try {
-    const { rows } = await pool.query("SELECT value FROM app_settings WHERE key = 'budget_projection_config' AND tenant_id = $1", [tenantId]);
-    if (rows.length && rows[0].value && typeof rows[0].value === 'object') {
-      return { ...DEFAULT_BUDGET_PROJECTION_CONFIG, ...rows[0].value };
-    }
-  } catch {}
-  return { ...DEFAULT_BUDGET_PROJECTION_CONFIG };
+  const value = await readSetting(tenantId, 'budget_projection_config',
+    v => v && typeof v === 'object', 'un objet de configuration');
+  return { ...DEFAULT_BUDGET_PROJECTION_CONFIG, ...(value ?? {}) };
 }
 
 function getReferenceSeasonsFromConfig(targetCode, config, n) {
@@ -379,7 +417,7 @@ app.post('/api/auth/login', async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
   try {
     const { rows } = await pool.query(
-      'SELECT id, tenant_id, role, password_hash, must_change_password FROM users WHERE email = $1',
+      'SELECT id, tenant_id, role, password_hash, must_change_password, permissions FROM users WHERE email = $1',
       [email.toLowerCase().trim()]
     );
     const user = rows[0];
@@ -405,11 +443,31 @@ app.post('/api/auth/login', async (req, res) => {
       tenant: tenantRows[0],
       role: user.role,
       must_change_password: !!user.must_change_password,
+      // null lists = unrestricted. superadmin is never restricted.
+      permissions: user.role === 'superadmin'
+        ? { tabs: null, shops: null }
+        : PERMS.normalizePermissions(user.permissions),
     });
   } catch (err) {
     console.error('[auth/login]', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/me — caller identity and effective permissions. The client uses
+// this on bootstrap, since a stored token outlives the login response and
+// permissions may have changed since.
+// Auth: standard JWT (requireAuth via global /api middleware).
+// ---------------------------------------------------------------------------
+app.get('/api/me', (req, res) => {
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
+  res.json({
+    userId:   req.userId,
+    tenantId: req.tenantId,
+    role:     req.role,
+    permissions: { tabs: req.allowedTabs, shops: req.allowedShops },
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1074,6 +1132,11 @@ async function runMigrations() {
   // password (no forced change). Only newly-provisioned users after
   // the deploy will have must_change_password = true.
   await pool.query(`UPDATE users SET must_change_password = false WHERE created_at < now() - interval '1 minute'`);
+
+  // Per-user permissions: { tabs: [...], shops: [...] }. An empty object —
+  // the default, and what every pre-existing user gets — means unrestricted,
+  // so this migration changes no one's access.
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb`);
 
   // Seed first tenant (existing Valérie Simon data)
   await pool.query(
@@ -1797,6 +1860,9 @@ app.get('/api/manufacturers', async (req, res, next) => {
 app.get('/api/nos', async (req, res, next) => {
   try {
     const weeks = parseInt(req.query.weeks ?? '4', 10);
+    const shopIds  = PERMS.scopeShops(req, null);
+    const params   = [weeks, req.tenantId];
+    const shopCond = shopIds?.length ? `AND i.shop_id = ANY($${params.push(shopIds)})` : '';
     const { rows } = await pool.query(`
       WITH velocity AS (
         SELECT
@@ -1831,13 +1897,14 @@ app.get('/api/nos', async (req, res, next) => {
       JOIN products   p ON p.item_id = v.item_id AND p.tenant_id = $2
       JOIN shops      s ON s.shop_id = i.shop_id AND s.tenant_id = $2
       WHERE v.avg_weekly_units > 0
+        ${shopCond}
         AND (i.qty_on_hand + i.qty_on_order) / v.avg_weekly_units < $1
         AND p.archived = false
         AND p.category    NOT ILIKE 'Alt%ration%'
         AND p.description NOT ILIKE '%shopify%'
         AND NOT (p.default_cost = 0 AND p.default_price = 0)
       ORDER BY weeks_of_cover ASC NULLS LAST, suggested_order_qty DESC
-    `, [weeks, req.tenantId]);
+    `, params);
     res.json({ weeks_threshold: weeks, count: rows.length, items: rows });
   } catch (err) { next(err); }
 });
@@ -1847,6 +1914,10 @@ app.get('/api/nos', async (req, res, next) => {
 // Only shops that have EVER sold this matrix are considered dormant candidates
 // active_sold_30d >= 1 required to avoid false positives from returns
 // ---------------------------------------------------------------------------
+// shop-scope: exempt (tab 'transfers'). Every row is a (dormant shop → active
+// shop) pair; scoping it to one side would hide half of each recommendation.
+// Granting the Transfers tab therefore grants cross-shop visibility — a
+// deliberate product decision, see PERMS.SHOP_EXEMPT_TABS.
 app.get('/api/transfers', async (req, res, next) => {
   try {
     const daysDormant   = parseInt(req.query.days_dormant ?? '14', 10);
@@ -1997,6 +2068,7 @@ app.get('/api/transfers', async (req, res, next) => {
 // POST /api/transfers/dismiss — dismiss a transfer recommendation
 // Body: { item_id, from_shop_id, to_shop_id, duration } ('30d'|'90d'|'permanent')
 // ---------------------------------------------------------------------------
+// shop-scope: exempt (tab 'transfers') — see GET /api/transfers above.
 app.post('/api/transfers/dismiss', async (req, res, next) => {
   try {
     const { item_id, from_shop_id, to_shop_id, duration } = req.body ?? {};
@@ -2024,6 +2096,7 @@ app.post('/api/transfers/dismiss', async (req, res, next) => {
 // DELETE /api/transfers/dismiss — restore a dismissed transfer recommendation
 // Query: ?item_id=&from_shop_id=&to_shop_id=
 // ---------------------------------------------------------------------------
+// shop-scope: exempt (tab 'transfers') — see GET /api/transfers above.
 app.delete('/api/transfers/dismiss', async (req, res, next) => {
   try {
     const { item_id, from_shop_id, to_shop_id } = req.query;
@@ -2046,7 +2119,8 @@ app.delete('/api/transfers/dismiss', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/sizes', async (req, res, next) => {
   try {
-    const { matrix_id, shop_id } = req.query;
+    const { matrix_id } = req.query;
+    const shopIds = PERMS.scopeShops(req, req.query.shop_id);
     const conditions = [
       'p.matrix_id IS NOT NULL',
       'p.archived = false',
@@ -2057,7 +2131,7 @@ app.get('/api/sizes', async (req, res, next) => {
     const params = [];
 
     if (matrix_id) { params.push(matrix_id); conditions.push(`p.matrix_id = $${params.length}`); }
-    if (shop_id)   { params.push(shop_id);   conditions.push(`sl.shop_id = $${params.length}`); }
+    if (shopIds?.length) { params.push(shopIds); conditions.push(`sl.shop_id = ANY($${params.length})`); }
     params.push(req.tenantId); conditions.push(`p.tenant_id = $${params.length}`);
 
     const { rows } = await pool.query(`
@@ -2105,7 +2179,8 @@ app.get('/api/sizes', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/sizes/brands', async (req, res, next) => {
   try {
-    const { season, category, shop_id, date_from, date_to, exclude_nos, stock_tag } = req.query;
+    const { season, category, date_from, date_to, exclude_nos, stock_tag } = req.query;
+    const shopIds = PERMS.scopeShops(req, req.query.shop_id);
     const params = [];
 
     // Priority: ItemAttributes (exact values from Lightspeed matrix) → description parsing (fallback)
@@ -2163,10 +2238,10 @@ app.get('/api/sizes/brands', async (req, res, next) => {
     if (category) { params.push(category); catFilter = `AND p.category = $${params.length}`; }
 
     let shopFilterSL = '', shopFilterInv = '';
-    if (shop_id) {
-      params.push(shop_id);
-      shopFilterSL  = `AND sl.shop_id = $${params.length}`;
-      shopFilterInv = `AND i.shop_id  = $${params.length}`;
+    if (shopIds?.length) {
+      params.push(shopIds);
+      shopFilterSL  = `AND sl.shop_id = ANY($${params.length})`;
+      shopFilterInv = `AND i.shop_id  = ANY($${params.length})`;
     }
 
     const nosFilter = exclude_nos === '1' ? `AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')` : '';
@@ -2295,7 +2370,7 @@ app.get('/api/budget/nos', async (req, res, next) => {
   try {
     const weeks  = parseInt(req.query.weeks ?? '4', 10);
 
-    const shops = req.query.shops       ? req.query.shops.split(',').filter(Boolean)                                  : null;
+    const shops = PERMS.scopeShops(req, req.query.shops);
     const colls = req.query.collections ? req.query.collections.split(',').map(s => s.toLowerCase().trim()).filter(Boolean) : null;
     const sizes = req.query.sizes       ? req.query.sizes.split(',').filter(Boolean)                                  : null;
 
@@ -2374,19 +2449,62 @@ app.get('/api/budget/nos', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-const SEASON_RANGES = {
-  // recv_from = 4 months before season start, to catch pre-season deliveries
-  p23: { from: '2023-02-01', to: '2023-09-30', recv_from: '2022-10-01', label: 'P23 — Printemps 2023' },
-  a23: { from: '2023-09-01', to: '2024-02-28', recv_from: '2023-05-01', label: 'A23 — Automne 2023'   },
-  p24: { from: '2024-02-01', to: '2024-09-30', recv_from: '2023-10-01', label: 'P24 — Printemps 2024' },
-  a24: { from: '2024-09-01', to: '2025-02-28', recv_from: '2024-05-01', label: 'A24 — Automne 2024'   },
-  p25: { from: '2025-02-01', to: '2025-09-30', recv_from: '2024-10-01', label: 'P25 — Printemps 2025' },
-  a25: { from: '2025-09-01', to: '2026-02-28', recv_from: '2025-05-01', label: 'A25 — Automne 2025'   },
-  p26: { from: '2026-02-01', to: '2026-09-30', recv_from: '2025-10-01', label: 'P26 — Printemps 2026' },
-  a26: { from: '2026-09-01', to: '2027-02-28', recv_from: '2026-05-01', label: 'A26 — Automne 2026'   },
-  p27: { from: '2027-02-01', to: '2027-09-30', recv_from: '2026-10-01', label: 'P27 — Printemps 2027' },
-  a27: { from: '2027-09-01', to: '2028-02-28', recv_from: '2027-05-01', label: 'A27 — Automne 2027'   },
-};
+// ---------------------------------------------------------------------------
+// Season ranges — derived from the tenant's own seasons_config.
+//
+// This used to be a hardcoded constant living alongside DEFAULT_SEASONS_CONFIG,
+// which meant the app carried two independent season calendars: this one drove
+// the velocity routes, the other drove the budget, and /api/brand/:manufacturer
+// read from both in a single response. They happened to hold identical dates,
+// so nothing broke — until someone saved the Seasons form, at which point the
+// velocity charts would have silently kept the old calendar.
+//
+// Field mapping (seasons_config → the shape the call sites expect):
+//   sell_from      → from        window used for sales/velocity
+//   sell_to        → to
+//   reception_from → recv_from   (kept for shape parity; no call site reads it)
+//   label          → label
+//   tag_pattern    → tag         NEW: call sites used to interpolate the season
+//                                CODE as the product tag. tag_pattern is what
+//                                the budget already uses and what the Seasons
+//                                form actually configures.
+// ---------------------------------------------------------------------------
+async function getSeasonRanges(tenantId) {
+  const config = await requireSeasonsConfig(tenantId);
+  const ranges = {};
+  for (const season of config) {
+    if (!season?.code) continue;
+    const code = String(season.code).toLowerCase();
+    ranges[code] = {
+      from:      season.sell_from,
+      to:        season.sell_to,
+      recv_from: season.reception_from,
+      label:     season.label ?? code.toUpperCase(),
+      tag:       season.tag_pattern ?? code,
+    };
+  }
+  return ranges;
+}
+
+// Season whose selling window contains today, else the most recent one. Used
+// when a caller names no season, or names one this tenant does not have.
+function currentSeasonCode(ranges) {
+  const today = new Date().toISOString().slice(0, 10);
+  const entries = Object.entries(ranges);
+  const active = entries.find(([, r]) => r.from <= today && today <= r.to);
+  if (active) return active[0];
+  const past = entries.filter(([, r]) => r.from <= today).sort((a, b) => b[1].from.localeCompare(a[1].from));
+  return past[0]?.[0] ?? entries[0]?.[0] ?? null;
+}
+
+// The two /api/admin/*-diag routes below authenticate with X-Admin-Secret and
+// carry no tenant of their own. They accept ?tenant_id=, defaulting to the
+// first tenant on the install rather than a hardcoded name.
+async function resolveDiagTenant(req) {
+  if (req.query.tenant_id) return req.query.tenant_id;
+  const { rows } = await pool.query('SELECT id FROM tenants ORDER BY created_at LIMIT 1');
+  return rows[0]?.id ?? null;
+}
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/checkpoint — manually upsert a sync_state row
@@ -2757,7 +2875,8 @@ app.get('/api/admin/revenue-diag', async (req, res, next) => {
     const shopId = req.query.shop_id      || null;
     const tagPat = `%${tag}%`;
 
-    const season = SEASON_RANGES[tag.toLowerCase()];
+    const ranges = await getSeasonRanges(await resolveDiagTenant(req));
+    const season = ranges[tag.toLowerCase()];
     if (!season) return res.status(400).json({ error: `Tag "${tag}" not a known season code` });
 
     const seasonFrom = season.from;
@@ -2881,7 +3000,8 @@ app.get('/api/admin/season-gap-diag', async (req, res, next) => {
     const shopId  = req.query.shop_id      || null;
     const tagPat  = `%${tag}%`;
 
-    const season  = SEASON_RANGES[tag.toLowerCase()];
+    const ranges  = await getSeasonRanges(await resolveDiagTenant(req));
+    const season  = ranges[tag.toLowerCase()];
     if (!season) {
       return res.status(400).json({ error: `Tag "${tag}" n'est pas un code de saison connu.` });
     }
@@ -3513,7 +3633,14 @@ app.get('/api/admin/explain', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/shops', async (req, res, next) => {
   try {
-    const { rows } = await pool.query('SELECT shop_id, name FROM shops WHERE tenant_id = $1 ORDER BY name', [req.tenantId]);
+    // Restricted users get a filtered list: it feeds every shop selector in
+    // the UI, so an unlisted shop never becomes selectable in the first place.
+    const allowed = req.allowedShops;
+    const { rows } = allowed
+      ? await pool.query(
+          'SELECT shop_id, name FROM shops WHERE tenant_id = $1 AND shop_id = ANY($2) ORDER BY name',
+          [req.tenantId, allowed])
+      : await pool.query('SELECT shop_id, name FROM shops WHERE tenant_id = $1 ORDER BY name', [req.tenantId]);
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -3810,8 +3937,9 @@ app.put('/api/settings/nos-excluded', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/nos/urgent', async (req, res, next) => {
   try {
-    const params = req.query.shop_id ? [req.query.shop_id] : [];
-    const shopFilter = req.query.shop_id ? `AND i.shop_id = $1` : '';
+    const shopIds    = PERMS.scopeShops(req, req.query.shop_id);
+    const params     = shopIds?.length ? [shopIds] : [];
+    const shopFilter = shopIds?.length ? `AND i.shop_id = ANY($1)` : '';
     params.push(req.tenantId);
     const tidN = params.length;
 
@@ -3978,7 +4106,7 @@ app.get('/api/admin/discover', async (req, res, next) => {
 app.get('/api/budget/marque', async (req, res, next) => {
   try {
     const targetSeasonCode = (req.query.season ?? 'p26').toLowerCase();
-    const shops = req.query.shops ? req.query.shops.split(',').filter(Boolean) : null;
+    const shops = PERMS.scopeShops(req, req.query.shops);
 
     const cacheKey = JSON.stringify({ r: 'marque2', season: targetSeasonCode, shops, tid: req.tenantId });
     const hit = cacheGet(cacheKey);
@@ -3986,7 +4114,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
 
     const [tiers, seasonsConfig, budgetParams, projCfg] = await Promise.all([
       getMultiplierTiers(req.tenantId),
-      getSeasonsConfig(req.tenantId),
+      requireSeasonsConfig(req.tenantId),
       getBudgetParams(req.tenantId),
       getBudgetProjectionConfig(req.tenantId),
     ]);
@@ -4693,11 +4821,17 @@ app.get('/api/budget-plan', async (req, res, next) => {
   try {
     const season = (req.query.season ?? 'p26').toLowerCase();
     const [planRows, dropRows] = await Promise.all([
-      pool.query(
-        `SELECT manufacturer, drop_id, shop_id, planned_amount::float8 AS planned_amount
-         FROM budget_plans WHERE season_code = $1 AND tenant_id = $2`,
-        [season, req.tenantId]
-      ),
+      req.allowedShops
+        ? pool.query(
+            `SELECT manufacturer, drop_id, shop_id, planned_amount::float8 AS planned_amount
+             FROM budget_plans WHERE season_code = $1 AND tenant_id = $2 AND shop_id = ANY($3)`,
+            [season, req.tenantId, req.allowedShops]
+          )
+        : pool.query(
+            `SELECT manufacturer, drop_id, shop_id, planned_amount::float8 AS planned_amount
+             FROM budget_plans WHERE season_code = $1 AND tenant_id = $2`,
+            [season, req.tenantId]
+          ),
       pool.query(
         `SELECT manufacturer, drop_id, drop_name, drop_order
          FROM budget_plan_drops WHERE season_code = $1 AND tenant_id = $2
@@ -4730,6 +4864,12 @@ app.put('/api/budget-plan', async (req, res, next) => {
   try {
     const { season_code, manufacturer, drop_id = 'drop_1', shop_id = '__all__', planned_amount } = req.body;
     if (!season_code || !manufacturer) return res.status(400).json({ error: 'season_code and manufacturer are required' });
+    // '__all__' is a tenant-wide amount: a restricted user must not set one,
+    // since it covers shops outside their scope.
+    if (req.allowedShops && shop_id === '__all__') {
+      return res.status(403).json({ error: 'Budget global non autorisé — choisir une boutique' });
+    }
+    PERMS.assertShopAllowed(req, shop_id);
     const amount = Math.max(0, parseFloat(planned_amount ?? 0));
     const sc = season_code.toLowerCase();
     await pool.query(
@@ -4806,6 +4946,15 @@ app.delete('/api/budget-plan/brand', async (req, res, next) => {
     const { season_code, manufacturer } = req.query;
     if (!season_code || !manufacturer) return res.status(400).json({ error: 'season_code and manufacturer required' });
     const sc = season_code.toLowerCase();
+    if (req.allowedShops) {
+      // Scoped delete: wipe this brand's amounts for the caller's shops only.
+      // Drop metadata is shared across shops, so it is left in place — other
+      // shops still plan against those drops.
+      await pool.query(
+        `DELETE FROM budget_plans WHERE season_code = $1 AND manufacturer = $2 AND tenant_id = $3 AND shop_id = ANY($4)`,
+        [sc, manufacturer, req.tenantId, req.allowedShops]);
+      return res.json({ ok: true, scoped_to_shops: req.allowedShops });
+    }
     await pool.query(`DELETE FROM budget_plans      WHERE season_code = $1 AND manufacturer = $2 AND tenant_id = $3`, [sc, manufacturer, req.tenantId]);
     await pool.query(`DELETE FROM budget_plan_drops WHERE season_code = $1 AND manufacturer = $2 AND tenant_id = $3`, [sc, manufacturer, req.tenantId]);
     res.json({ ok: true });
@@ -4840,6 +4989,7 @@ app.post('/api/budget-plan/document', async (req, res, next) => {
             destination_shop_id } = req.body;
     if (!season_code || !manufacturer || !filename || !data_base64)
       return res.status(400).json({ error: 'season_code, manufacturer, filename, data_base64 are required' });
+    PERMS.assertShopAllowed(req, destination_shop_id);
     const buf = Buffer.from(data_base64, 'base64');
     const { rows } = await pool.query(
       `INSERT INTO budget_documents(tenant_id, season_code, manufacturer, drop_id, filename, content_type, file_size, data)
@@ -4946,22 +5096,22 @@ app.delete('/api/budget-plan/document/:id', async (req, res, next) => {
 app.get('/api/brand/:manufacturer', async (req, res, next) => {
   try {
     const mfr    = decodeURIComponent(req.params.manufacturer);
-    const shopId = req.query.shop_id || null;
-    const hasShop = !!shopId;
+    const shopIds = PERMS.scopeShops(req, req.query.shop_id);
+    const hasShop = !!shopIds?.length;
     const configPromise = Promise.all([getSeasonsConfig(req.tenantId), getMultiplierTiers(req.tenantId)]);
-    // p layout: [mfr, shopId?, tenantId]
-    const p      = hasShop ? [mfr, shopId, req.tenantId] : [mfr, req.tenantId];
+    // p layout: [mfr, shopIds?, tenantId]
+    const p      = hasShop ? [mfr, shopIds, req.tenantId] : [mfr, req.tenantId];
     const tIdx   = p.length; // $3 or $2
     const tenantCondP = `AND p.tenant_id = $${tIdx}`;
-    const slS    = hasShop ? 'AND sl.shop_id = $2'     : '';
-    const invJ   = hasShop ? 'AND i.shop_id  = $2'     : "AND i.shop_id != '0'";
+    const slS    = hasShop ? 'AND sl.shop_id = ANY($2)'     : '';
+    const invJ   = hasShop ? 'AND i.shop_id  = ANY($2)'     : "AND i.shop_id != '0'";
     const stCTE  = `
       st AS (
         SELECT i.item_id,
                SUM(COALESCE(i.qty_on_hand,0) + COALESCE(i.qty_on_order,0)) AS stock
         FROM   inventory i
         JOIN   shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = $${tIdx}
-        WHERE  1=1 ${hasShop ? 'AND i.shop_id = $2' : ''}
+        WHERE  1=1 ${hasShop ? 'AND i.shop_id = ANY($2)' : ''}
         GROUP  BY i.item_id
       )`;
 
@@ -4971,17 +5121,15 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     const allTime = !requestedCode; // empty → no date filter, full history
     let seasonCode, season, stFrom, stTo;
     if (!allTime) {
-      seasonCode = SEASON_RANGES[requestedCode]
-        ? requestedCode
-        : Object.entries(SEASON_RANGES).find(([, r]) =>
-            new Date(r.from) <= today && today <= new Date(r.to)
-          )?.[0] ?? 'p26';
-      season = SEASON_RANGES[seasonCode];
+      const ranges = await getSeasonRanges(req.tenantId);
+      seasonCode = ranges[requestedCode] ? requestedCode : currentSeasonCode(ranges);
+      season = ranges[seasonCode];
+      if (!season) return res.status(400).json({ error: `Saison "${requestedCode}" absente de la configuration` });
       stFrom = season.from;
       stTo   = today.toISOString().slice(0, 10) < season.to ? today.toISOString().slice(0, 10) : season.to;
     }
 
-    const seasonTag = allTime ? null : `%${seasonCode}%`;
+    const seasonTag = allTime ? null : `%${season.tag}%`;
 
     // Q6 — Transfers balance for this shop (only meaningful when shop filter active)
     // When a season is selected, filter transfers to season-tagged items only so that
@@ -4993,14 +5141,14 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     const q6Promise = hasShop
       ? pool.query(`
           SELECT
-            COALESCE(SUM(CASE WHEN t.to_shop_id   = $2 THEN t.qty_received ELSE 0 END), 0)::float8 AS received_in,
-            COALESCE(SUM(CASE WHEN t.from_shop_id = $2 THEN t.qty_received ELSE 0 END), 0)::float8 AS sent_out
+            COALESCE(SUM(CASE WHEN t.to_shop_id   = ANY($2) THEN t.qty_received ELSE 0 END), 0)::float8 AS received_in,
+            COALESCE(SUM(CASE WHEN t.from_shop_id = ANY($2) THEN t.qty_received ELSE 0 END), 0)::float8 AS sent_out
           FROM transfers t
           JOIN products p ON p.item_id = t.item_id AND t.tenant_id = p.tenant_id
           WHERE p.manufacturer ILIKE $1
             AND t.transfer_received = true
             AND t.item_id IS NOT NULL
-            AND (t.from_shop_id = $2 OR t.to_shop_id = $2)
+            AND (t.from_shop_id = ANY($2) OR t.to_shop_id = ANY($2))
             ${q6TagCond}
             ${tenantCondP}
         `, q6Params)
@@ -5009,9 +5157,9 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     // Q1 — sell-through (season date range) + revenue_12w (last 12w + season tag)
     // Param layout:
     //   allTime + no shop : $1=mfr
-    //   allTime + shop    : $1=mfr  $2=shopId
+    //   allTime + shop    : $1=mfr  $2=shopIds
     //   season + no shop  : $1=mfr  $2=stFrom  $3=stTo  $4='%tag%'
-    //   season + shop     : $1=mfr  $2=shopId  $3=stFrom $4=stTo  $5='%tag%'
+    //   season + shop     : $1=mfr  $2=shopIds  $3=stFrom $4=stTo  $5='%tag%'
     let q1Promise;
     if (allTime) {
       q1Promise = pool.query(`
@@ -5032,7 +5180,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
           ${slS}
       `, p);
     } else if (hasShop) {
-      // $1=mfr $2=shopId $3=stFrom $4=stTo $5='%tag%' $6=tenantId
+      // $1=mfr $2=shopIds $3=stFrom $4=stTo $5='%tag%' $6=tenantId
       // No date filter in WHERE — CASEs handle mode 1 (tag) and mode 2 (tag+period)
       q1Promise = pool.query(`
         SELECT
@@ -5056,10 +5204,10 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id
         WHERE p.manufacturer ILIKE $1
-          AND sl.shop_id = $2
+          AND sl.shop_id = ANY($2)
           AND sl.completed_time IS NOT NULL
           AND p.tenant_id = $6
-      `, [mfr, shopId, stFrom, stTo, seasonTag, req.tenantId]);
+      `, [mfr, shopIds, stFrom, stTo, seasonTag, req.tenantId]);
     } else {
       // $1=mfr $2=stFrom $3=stTo $4='%tag%' $5=tenantId
       // No date filter in WHERE — CASEs handle mode 1 (tag) and mode 2 (tag+period)
@@ -5108,7 +5256,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
         WHERE p.manufacturer ILIKE $1 AND p.archived = false ${tenantCondP}
       `, p);
     } else if (hasShop) {
-      // $1=mfr $2=shopId $3='%tag%' $4=tenantId
+      // $1=mfr $2=shopIds $3='%tag%' $4=tenantId
       q2Promise = pool.query(`
         SELECT
           COUNT(DISTINCT p.item_id)::int AS total_items,
@@ -5119,9 +5267,9 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
                          THEN (p.default_price - p.default_cost) / p.default_price * 100
                          ELSE NULL END), 1)::float8 AS avg_margin_pct
         FROM products p
-        LEFT JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = $2
+        LEFT JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = ANY($2)
         WHERE p.manufacturer ILIKE $1 AND p.archived = false AND p.tenant_id = $4
-      `, [mfr, shopId, seasonTag, req.tenantId]);
+      `, [mfr, shopIds, seasonTag, req.tenantId]);
     } else {
       // $1=mfr $2='%tag%' $3=tenantId
       q2Promise = pool.query(`
@@ -5328,9 +5476,9 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     // Returns params array + index map + shop conditions.
     const mkSP = (from, to, tag) => {
       if (hasShop) {
-        return { params: [mfr, shopId, from, to, tag, req.tenantId],
+        return { params: [mfr, shopIds, from, to, tag, req.tenantId],
                  i: { mfr: 1, shop: 2, from: 3, to: 4, tag: 5, tid: 6 },
-                 shopSale: 'AND sl.shop_id = $2', shopInv: 'AND inv2.shop_id = $2' };
+                 shopSale: 'AND sl.shop_id = ANY($2)', shopInv: 'AND inv2.shop_id = ANY($2)' };
       }
       return { params: [mfr, from, to, tag, req.tenantId],
                i: { mfr: 1, from: 2, to: 3, tag: 4, tid: 5 },
@@ -5340,10 +5488,10 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
     // Factory: one season's sold + stock + transfers metrics.
     // sold_cte has NO date bounds (mirrors main Q1: all tagged sales ever) so that
     // received_supplier and ST% are identical to the main KPI for the current season.
-    // Params: hasShop=[mfr,shopId,tag,tid]  no-shop=[mfr,tag,tid]
+    // Params: hasShop=[mfr,shopIds,tag,tid]  no-shop=[mfr,tag,tid]
     const histQ = (conf) => {
       const hTag = `%${conf.tag_pattern}%`;
-      const params    = hasShop ? [mfr, shopId, hTag, req.tenantId] : [mfr, hTag, req.tenantId];
+      const params    = hasShop ? [mfr, shopIds, hTag, req.tenantId] : [mfr, hTag, req.tenantId];
       const [mi, si, ti, di] = hasShop ? [1, 2, 3, 4] : [1, null, 2, 3];
       const shopSale  = hasShop ? `AND sl.shop_id = $${si}` : '';
       const shopInv2  = hasShop ? `AND inv2.shop_id = $${si}` : "AND inv2.shop_id != '0'";
@@ -5447,9 +5595,9 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
       bk.push('wk_prev');
 
       // Velocity 4 weeks (for projection)
-      const veloParams = hasShop ? [mfr, shopId, seasonTag, req.tenantId] : [mfr, seasonTag, req.tenantId];
+      const veloParams = hasShop ? [mfr, shopIds, seasonTag, req.tenantId] : [mfr, seasonTag, req.tenantId];
       const [veloTagIdx, veloTidIdx] = hasShop ? [3, 4] : [2, 3];
-      const veloShop = hasShop ? 'AND sl.shop_id = $2' : '';
+      const veloShop = hasShop ? 'AND sl.shop_id = ANY($2)' : '';
       batch2.push(isActive ? pool.query(`
         SELECT ROUND(SUM(sl.qty) / 4.0, 1)::float8 AS velo
         FROM sale_lines sl
@@ -5558,7 +5706,7 @@ app.get('/api/brand/:manufacturer', async (req, res, next) => {
 
     res.json({
       manufacturer:  mfr,
-      shop_id:       shopId,
+      shop_id:       hasShop && shopIds.length === 1 ? shopIds[0] : null,
       season_code:   allTime ? null : seasonCode,
       season_label:  allTime ? 'Toutes les saisons' : season.label,
       season_from:   allTime ? null : stFrom,
@@ -5602,12 +5750,12 @@ const _warnedTopAttrSets = new Set();
 app.get('/api/brand/:manufacturer/top-attributes', async (req, res, next) => {
   try {
     const mfr      = decodeURIComponent(req.params.manufacturer);
-    const shopId   = req.query.shop_id ?? null;
+    const shopIds  = PERMS.scopeShops(req, req.query.shop_id);
     const tenantId = req.tenantId;
 
     const params   = [tenantId, mfr];
     let   shopCond = '';
-    if (shopId) { params.push(shopId); shopCond = `AND sl.shop_id = $${params.length}`; }
+    if (shopIds?.length) { params.push(shopIds); shopCond = `AND sl.shop_id = ANY($${params.length})`; }
 
     const { rows } = await pool.query(`
       SELECT
@@ -5758,11 +5906,11 @@ app.get('/brand/:manufacturer', (req, res) => {
 app.get('/api/matrix/:matrixId', async (req, res, next) => {
   try {
     const matrixId = req.params.matrixId;
-    const shopId   = req.query.shop_id || null;
-    const hasShop  = !!shopId;
-    const shopSl   = hasShop ? 'AND sl.shop_id = $2' : '';
-    const shopInv  = hasShop ? 'AND shop_id = $2'    : '';
-    const p        = hasShop ? [matrixId, shopId, req.tenantId] : [matrixId, req.tenantId];
+    const shopIds  = PERMS.scopeShops(req, req.query.shop_id);
+    const hasShop  = !!shopIds?.length;
+    const shopSl   = hasShop ? 'AND sl.shop_id = ANY($2)' : '';
+    const shopInv  = hasShop ? 'AND shop_id = ANY($2)'    : '';
+    const p        = hasShop ? [matrixId, shopIds, req.tenantId] : [matrixId, req.tenantId];
     const tIdx     = p.length;
 
     const { rows } = await pool.query(`
@@ -5949,15 +6097,29 @@ function enrichVelocityRow(row, weeksElapsed, seasonActive) {
   };
 }
 
+// Build an interpolated shop filter for the velocity routes. These queries
+// inline their filters instead of binding parameters (see safeTenantId), so
+// the ids are re-validated as digits here — permissions live in a JSONB column
+// an operator edits by hand, and must never reach SQL unchecked. A restricted
+// user whose ids are all non-numeric gets no rows rather than every row.
+function velocityShopCond(column, shopIds) {
+  if (!shopIds?.length) return '';
+  const safe = shopIds.filter(id => /^\d+$/.test(id));
+  if (!safe.length) return 'AND false';
+  return `AND ${column} IN (${safe.map(id => `'${id}'`).join(',')})`;
+}
+
 // GET /api/velocity/brands
 app.get('/api/velocity/brands', async (req, res, next) => {
   try {
-    const seasonCode = (req.query.season ?? 'p25').toLowerCase();
-    const season     = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p25;
-    const shopId     = /^\d+$/.test(req.query.shop_id ?? '') ? req.query.shop_id : null;
-    const hasShop    = !!shopId;
-    const shopCondSL  = hasShop ? `AND sl.shop_id = '${shopId}'` : '';
-    const shopCondInv = hasShop ? `AND shop_id = '${shopId}'`    : '';
+    const ranges     = await getSeasonRanges(req.tenantId);
+    const seasonCode = (req.query.season ?? currentSeasonCode(ranges) ?? '').toLowerCase();
+    const season     = ranges[seasonCode];
+    if (!season) return res.status(400).json({ error: `Saison "${seasonCode}" absente de la configuration`, saisons_valides: Object.keys(ranges) });
+    const shopIds     = PERMS.scopeShops(req, /^\d+$/.test(req.query.shop_id ?? '') ? req.query.shop_id : null);
+    const hasShop    = !!shopIds?.length;
+    const shopCondSL  = velocityShopCond('sl.shop_id', shopIds);
+    const shopCondInv = velocityShopCond('shop_id', shopIds);
 
     const today       = new Date();
     const seasonFrom  = new Date(season.from);
@@ -5971,7 +6133,7 @@ app.get('/api/velocity/brands', async (req, res, next) => {
     const shopJoin   = hasShop ? '' : (safeTenantId ? `JOIN shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = '${safeTenantId}'` : `JOIN shops sh ON sh.shop_id = i.shop_id`);
 
     const { rows } = await pool.query(`
-      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'", tenantCond, shopJoin)}
+      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + season.tag + "%'", tenantCond, shopJoin)}
       SELECT
         manufacturer,
         COUNT(DISTINCT item_id)::int                                            AS items_count,
@@ -6001,13 +6163,15 @@ app.get('/api/velocity/brands', async (req, res, next) => {
 // GET /api/velocity/matrices
 app.get('/api/velocity/matrices', async (req, res, next) => {
   try {
-    const seasonCode   = (req.query.season ?? 'p25').toLowerCase();
-    const season       = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p25;
+    const ranges       = await getSeasonRanges(req.tenantId);
+    const seasonCode   = (req.query.season ?? currentSeasonCode(ranges) ?? '').toLowerCase();
+    const season       = ranges[seasonCode];
+    if (!season) return res.status(400).json({ error: `Saison "${seasonCode}" absente de la configuration`, saisons_valides: Object.keys(ranges) });
     const manufacturer = req.query.manufacturer || '';
-    const shopId       = /^\d+$/.test(req.query.shop_id ?? '') ? req.query.shop_id : null;
-    const hasShop      = !!shopId;
-    const shopCondSL   = hasShop ? `AND sl.shop_id = '${shopId}'` : '';
-    const shopCondInv  = hasShop ? `AND shop_id = '${shopId}'`    : '';
+    const shopIds       = PERMS.scopeShops(req, /^\d+$/.test(req.query.shop_id ?? '') ? req.query.shop_id : null);
+    const hasShop      = !!shopIds?.length;
+    const shopCondSL   = velocityShopCond('sl.shop_id', shopIds);
+    const shopCondInv  = velocityShopCond('shop_id', shopIds);
 
     const today        = new Date();
     const seasonFrom   = new Date(season.from);
@@ -6021,7 +6185,7 @@ app.get('/api/velocity/matrices', async (req, res, next) => {
     const shopJoin   = hasShop ? '' : (safeTenantId ? `JOIN shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = '${safeTenantId}'` : `JOIN shops sh ON sh.shop_id = i.shop_id`);
 
     const { rows } = await pool.query(`
-      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + seasonCode + "%'", tenantCond, shopJoin)}
+      WITH ${velocityCTEs(season.from, season.to, shopCondSL, shopCondInv, "'%" + season.tag + "%'", tenantCond, shopJoin)}
       SELECT
         matrix_key,
         -- Matrix name: strip size/colour from a non-self-referencing variant
@@ -6067,13 +6231,15 @@ app.get('/api/velocity/matrices', async (req, res, next) => {
 // GET /api/velocity/articles
 app.get('/api/velocity/articles', async (req, res, next) => {
   try {
-    const seasonCode = (req.query.season ?? 'p25').toLowerCase();
-    const season     = SEASON_RANGES[seasonCode] ?? SEASON_RANGES.p25;
+    const ranges     = await getSeasonRanges(req.tenantId);
+    const seasonCode = (req.query.season ?? currentSeasonCode(ranges) ?? '').toLowerCase();
+    const season     = ranges[seasonCode];
+    if (!season) return res.status(400).json({ error: `Saison "${seasonCode}" absente de la configuration`, saisons_valides: Object.keys(ranges) });
     const matrixId   = req.query.matrix_id || '';
-    const shopId     = /^\d+$/.test(req.query.shop_id ?? '') ? req.query.shop_id : null;
-    const hasShop    = !!shopId;
-    const shopCondSL  = hasShop ? `AND sl.shop_id = '${shopId}'` : '';
-    const shopCondInv = hasShop ? `AND shop_id = '${shopId}'`    : '';
+    const shopIds     = PERMS.scopeShops(req, /^\d+$/.test(req.query.shop_id ?? '') ? req.query.shop_id : null);
+    const hasShop    = !!shopIds?.length;
+    const shopCondSL  = velocityShopCond('sl.shop_id', shopIds);
+    const shopCondInv = velocityShopCond('shop_id', shopIds);
 
     const today        = new Date();
     const seasonFrom   = new Date(season.from);
@@ -6303,7 +6469,14 @@ app.post('/api/ai/chat', chatUpload.single('attachment'), async (req, res, next)
     const [tenantConfig, seasons, shopsResult] = await Promise.all([
       getTenantConfig(req.tenantId),
       getSeasonsConfig(req.tenantId),
-      pool.query('SELECT shop_id, name FROM shops WHERE tenant_id = $1 ORDER BY name', [req.tenantId]),
+      // Only the caller's own shops: this list is injected verbatim into the
+      // system prompt ("BOUTIQUES DISPONIBLES"), so an unlisted shop is one the
+      // model cannot name, let alone query.
+      req.allowedShops
+        ? pool.query(
+            'SELECT shop_id, name FROM shops WHERE tenant_id = $1 AND shop_id = ANY($2) ORDER BY name',
+            [req.tenantId, req.allowedShops])
+        : pool.query('SELECT shop_id, name FROM shops WHERE tenant_id = $1 ORDER BY name', [req.tenantId]),
     ]);
     const ctx = {
       pool,
@@ -6312,6 +6485,10 @@ app.post('/api/ai/chat', chatUpload.single('attachment'), async (req, res, next)
       tenantConfig,
       tenantId: req.tenantId,
       shops: shopsResult.rows,
+      // Permission scope for the tool layer. null = unrestricted, which is what
+      // every tool treats as "no filter" — behaviour is unchanged for them.
+      allowedShops: req.allowedShops,
+      allowedTabs:  req.allowedTabs,
       seasons,
       pageContext: pageContext && typeof pageContext === 'object' ? pageContext : null,
     };
@@ -6434,8 +6611,9 @@ app.get('/api/inventory-history', async (req, res, next) => {
       return res.status(404).json({ error: `Aucun snapshot pour le ${date}.`, first_date: firstDate, last_date: meta[0].last_date });
     }
 
+    const shopIds = PERMS.scopeShops(req, shop_id);
     const params = [req.tenantId, date];
-    const shopCond = shop_id ? `AND s.shop_id = $${params.push(shop_id)}` : '';
+    const shopCond = shopIds?.length ? `AND s.shop_id = ANY($${params.push(shopIds)})` : '';
     const mfrCond  = manufacturer ? `AND p.manufacturer ILIKE $${params.push('%' + manufacturer + '%')}` : '';
 
     // Aggregation dimension: by boutique (no shop), by marque (shop given), or totals only (both given)
@@ -6508,8 +6686,9 @@ app.get('/api/inventory-history/timeline', async (req, res, next) => {
       return res.status(404).json({ error: `Aucun snapshot avant le ${firstDate}.`, first_date: firstDate });
     }
 
+    const shopIds = PERMS.scopeShops(req, shop_id);
     const params = [req.tenantId, rangeFrom, rangeTo];
-    const shopCond = shop_id      ? `AND s.shop_id = $${params.push(shop_id)}` : '';
+    const shopCond = shopIds?.length ? `AND s.shop_id = ANY($${params.push(shopIds)})` : '';
     const mfrCond  = manufacturer ? `AND p.manufacturer ILIKE $${params.push('%' + manufacturer + '%')}` : '';
 
     // For monthly granularity: first sum per day, then average across days in the month.
@@ -6563,6 +6742,10 @@ app.get('/api/inventory-history/timeline', async (req, res, next) => {
 app.get('/api/accounting/brands', requireAuth, async (req, res, next) => {
   try {
     const tid = req.tenantId;
+    const shopIds  = PERMS.scopeShops(req, null);
+    const qParams  = [tid];
+    const shopSale = shopIds?.length ? `AND sl.shop_id = ANY($${qParams.push(shopIds)})` : '';
+    const shopInv  = shopIds?.length ? `AND i.shop_id  = ANY($${qParams.length})`        : '';
 
     const { rows: capRow } = await pool.query(
       `SELECT value FROM app_settings WHERE tenant_id = $1 AND key = 'cost_of_capital'`,
@@ -6581,6 +6764,7 @@ app.get('/api/accounting/brands', requireAuth, async (req, res, next) => {
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
         WHERE sl.tenant_id = $1
+          ${shopSale}
           AND sl.completed_time > now() - interval '365 days'
           AND p.manufacturer IS NOT NULL AND p.manufacturer != ''
           AND p.stub_inferred_fields IS NULL
@@ -6593,6 +6777,7 @@ app.get('/api/accounting/brands', requireAuth, async (req, res, next) => {
         FROM sale_lines sl
         JOIN products p ON p.item_id = sl.item_id AND p.tenant_id = sl.tenant_id
         WHERE sl.tenant_id = $1
+          ${shopSale}
           AND sl.completed_time > now() - interval '90 days'
           AND p.manufacturer IS NOT NULL AND p.manufacturer != ''
           AND p.stub_inferred_fields IS NULL
@@ -6606,6 +6791,7 @@ app.get('/api/accounting/brands', requireAuth, async (req, res, next) => {
         JOIN shops sh ON sh.shop_id = i.shop_id AND sh.tenant_id = i.tenant_id
         JOIN products p ON p.item_id = i.item_id AND p.tenant_id = i.tenant_id
         WHERE i.tenant_id = $1
+          ${shopInv}
           AND i.qty_on_hand > 0
           AND p.manufacturer IS NOT NULL AND p.manufacturer != ''
           AND p.archived = false
@@ -6638,7 +6824,7 @@ app.get('/api/accounting/brands', requireAuth, async (req, res, next) => {
       LEFT JOIN brand_stock    bst ON bst.manufacturer = bs.manufacturer
       LEFT JOIN brand_terms    bt  ON bt.manufacturer  = bs.manufacturer
       ORDER BY bs.cost_365 DESC
-    `, [tid]);
+    `, qParams);
 
     const brands = rows.map(r => {
       const disc    = r.discount_pct   != null ? Number(r.discount_pct)   : null;
@@ -6750,6 +6936,12 @@ app.put('/api/settings/cost-of-capital', requireAuth, async (req, res, next) => 
 // ---------------------------------------------------------------------------
 app.use((err, req, res, _next) => {
   console.error(err);
+  // Permission failures are expected outcomes, not server faults. Narrow on
+  // purpose: matching any err.status would swallow the diagnostic payload
+  // below for third-party errors that happen to carry one.
+  if (err instanceof PERMS.ForbiddenError || err instanceof SeasonsNotConfiguredError) {
+    return res.status(err.status).json({ error: err.message });
+  }
   const message = err.message || err.code || String(err) || 'Erreur interne inconnue';
   const detail  = {
     error:   message,

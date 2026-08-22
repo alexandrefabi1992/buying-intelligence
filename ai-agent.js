@@ -122,34 +122,75 @@ class ShopNotFoundError extends Error {
   }
 }
 
-async function resolveShopId(shop_id, pool, tenantId) {
-  if (!shop_id) return null;
+// Resolve a caller-supplied shop reference into the list of shop ids to filter
+// on. Always returns an array or null:
+//   null          → no filter at all (unrestricted caller, no shop requested)
+//   allowedShops  → restricted caller who named no shop: their own shops
+//   [resolved]    → one specific shop, verified to be inside the caller's scope
+//
+// A shop that exists but lies outside the caller's scope is reported as NOT
+// FOUND, not as refused: confirming its existence would leak the shop list the
+// restriction is meant to hide. For the same reason the "did you mean" list is
+// drawn only from shops the caller may see.
+async function resolveShopIds(shop_id, pool, tenantId, allowedShops = null) {
+  if (!shop_id) return allowedShops ? [...allowedShops] : null;
+
+  const scope     = allowedShops ?? null;
+  const scopeCond = scope ? 'AND shop_id = ANY($3)' : '';
+  const withScope = (params) => scope ? [...params, scope] : params;
+
+  let resolved = null;
   if (/^\d+$/.test(String(shop_id))) {
     const { rows } = await pool.query(
-      "SELECT shop_id FROM shops WHERE shop_id = $1 AND tenant_id = $2",
-      [shop_id, tenantId]
+      `SELECT shop_id FROM shops WHERE shop_id = $1 AND tenant_id = $2 ${scopeCond}`,
+      withScope([String(shop_id), tenantId])
     );
-    if (rows.length) return shop_id;
+    if (rows.length) resolved = String(rows[0].shop_id);
   } else {
     const { rows } = await pool.query(
-      "SELECT shop_id FROM shops WHERE name ILIKE $1 AND tenant_id = $2 LIMIT 1",
-      [`%${shop_id}%`, tenantId]
+      `SELECT shop_id FROM shops WHERE name ILIKE $1 AND tenant_id = $2 ${scopeCond} LIMIT 1`,
+      withScope([`%${shop_id}%`, tenantId])
     );
-    if (rows[0]) return rows[0].shop_id;
+    if (rows[0]) resolved = String(rows[0].shop_id);
   }
-  // Unknown shop — throw with suggestions so the caller can build an explicit error
+  if (resolved) return [resolved];
+
+  // Unknown (or out-of-scope) shop — throw with suggestions so the caller can
+  // build an explicit error instead of silently widening to every shop.
+  const simScope = scope ? 'AND shop_id = ANY($3)' : '';
   const [{ rows: all }, { rows: sim }] = await Promise.all([
-    pool.query("SELECT name FROM shops WHERE tenant_id = $1 ORDER BY name", [tenantId]),
+    pool.query(
+      `SELECT name FROM shops WHERE tenant_id = $1 ${scope ? 'AND shop_id = ANY($2)' : ''} ORDER BY name`,
+      scope ? [tenantId, scope] : [tenantId]),
     pool.query(`
       SELECT name, max(similarity(lower(name), lower($1))) AS sim
       FROM shops
-      WHERE tenant_id = $2
+      WHERE tenant_id = $2 ${simScope}
       GROUP BY name
       HAVING max(similarity(lower(name), lower($1))) > 0.15
       ORDER BY sim DESC LIMIT 3
-    `, [String(shop_id), tenantId]),
+    `, withScope([String(shop_id), tenantId])),
   ]);
   throw new ShopNotFoundError(shop_id, all.map(r => r.name), sim.map(r => r.name));
+}
+
+// Human-readable label for a resolved shop scope. shopIds is an array of ids
+// or null ("no filter"). Tool responses carry it so the model always states
+// which shops the numbers cover — a restricted user must never be shown
+// company-wide figures labelled as if they were their own.
+async function shopScopeLabel(shopIds, pool) {
+  if (!shopIds?.length) return 'Toutes boutiques';
+  const { rows } = await pool.query(
+    'SELECT shop_id, name FROM shops WHERE shop_id = ANY($1) ORDER BY name', [shopIds]);
+  return shopIds
+    .map(id => rows.find(r => String(r.shop_id) === String(id))?.name ?? String(id))
+    .join(' + ');
+}
+
+// Compact form of the same thing for the "filtre" echo blocks, which report
+// ids rather than names.
+function shopFilterEcho(shopIds) {
+  return shopIds?.length ? shopIds.join(',') : 'toutes';
 }
 
 // ---------------------------------------------------------------------------
@@ -248,10 +289,10 @@ async function findSimilarCategories(pool, tenantId, category) {
 // tool must return unchanged. The model then sees {erreur, filtre_invalide, ...}
 // and can suggest corrections to the user instead of presenting bogus zeros.
 // ---------------------------------------------------------------------------
-async function validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig }) {
+async function validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig, allowedShops = null }) {
   // shop_id — reuse throwing resolveShopId, convert to structured response
   if (shop_id) {
-    try { await resolveShopId(shop_id, pool, tenantId); }
+    try { await resolveShopIds(shop_id, pool, tenantId, allowedShops); }
     catch (e) {
       if (e instanceof ShopNotFoundError) {
         return {
@@ -327,10 +368,10 @@ function emptyResultResponse(filtres_appliques, message) {
 // Tool implementations
 // ---------------------------------------------------------------------------
 
-async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { pool, tenantId, budgetCache, getSeasonsConfig }) {
+async function toolGetBudgetRecommendations({ season, shops, limit = 20 }, { pool, allowedShops, tenantId, budgetCache, getSeasonsConfig }) {
   season = (season ?? 'p26').toLowerCase();
   const rawShops = shops ? shops.split(',').map(s => s.trim()).filter(Boolean) : null;
-  const shopIds  = rawShops ? (await Promise.all(rawShops.map(s => resolveShopId(s, pool, tenantId)))).filter(Boolean) : null;
+  const shopIds  = rawShops ? (await Promise.all(rawShops.map(s => resolveShopIds(s, pool, tenantId, allowedShops)))).flat().filter(Boolean) : null;
   const cacheKey = `marque:${season}:${shopIds?.join(',') ?? 'all'}`;
 
   // Try the in-memory cache first (already computed, fast)
@@ -496,10 +537,10 @@ function resolvePeriod(period) {
   return { erreur: `Période "${period}" non reconnue. Valeurs acceptées : today, yesterday, last_7_days, last_14_days, last_30_days, last_90_days, last_week, this_week, this_month, last_month, this_year, last_4_weeks, last_12_weeks, ou un objet { from: "YYYY-MM-DD", to: "YYYY-MM-DD" }.` };
 }
 
-async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, date_from, date_to, period, tags, exclude_tags, total_only = false }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig });
+async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, date_from, date_to, period, tags, exclude_tags, total_only = false }, { pool, allowedShops, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   let from = date_from, to = date_to;
   let seasonTag = null, periodLabel = null;
   let avertissementPeriode = null;
@@ -541,7 +582,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
   if (category)     { conditions.push(`p.category ILIKE $${params.length + 1}`);     params.push(`%${category}%`); }
-  if (shop_id)      { conditions.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
+  if (shop_id)      { conditions.push(`sl.shop_id = ANY($${params.length + 1})`);          params.push(shop_id); }
 
   // Season tag filter: when season is provided, restrict to items tagged with that season
   if (seasonTag) {
@@ -587,7 +628,7 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
       categorie: category,
       periode:   { de: from, a: to, label: periodeLabel },
       ...(avertissementPeriode && { avertissement_periode: avertissementPeriode }),
-      filtre:    { boutique: shop_id ?? 'toutes', saison: season ?? null },
+      filtre:    { boutique: shopFilterEcho(shop_id), saison: season ?? null },
       nb_marques_total:    nb_marques,
       nb_marques_affiches: rows.length,
       marques:   rows.map(r => ({
@@ -688,15 +729,15 @@ async function toolGetSalesAnalysis({ season, manufacturer, category, shop_id, d
   };
 }
 
-async function toolGetStockByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, tenantId, getSeasonsConfig });
+async function toolGetStockByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period }, { pool, allowedShops, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
   if (period) {
     const resolved = resolvePeriod(period);
     if (resolved?.erreur) return { erreur: resolved.erreur };
     // period is accepted but stock is always the current snapshot — no date filter applied
   }
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   const conditions = ['p.archived = false', `p.tenant_id = $${1}`];
   const params     = [tenantId];
 
@@ -709,7 +750,7 @@ async function toolGetStockByVariant({ manufacturer, size, category, genre, tags
   conditions.push(...buildTagConditions(tags, exclude_tags, params));
   if (description_search && !category) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
   if (size)    { conditions.push(buildSizeCondition(size, params)); }
-  if (shop_id) { conditions.push(`i.shop_id = $${params.length + 1}`); params.push(shop_id); }
+  if (shop_id) { conditions.push(`i.shop_id = ANY($${params.length + 1})`); params.push(shop_id); }
 
   const { rows } = await pool.query(`
     SELECT
@@ -779,10 +820,10 @@ function buildSizeCondition(size, params) {
   return `p.description ILIKE $${i}`;
 }
 
-async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period, season }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig });
+async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags, exclude_tags, description_search, shop_id, period, season }, { pool, allowedShops, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   let from, to, periodLabel = null;
 
   if (period) {
@@ -819,7 +860,7 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
   // Ignore description_search if category is already set — model tends to duplicate the type word
   if (description_search && !category) { conditions.push(`p.description ILIKE $${params.length + 1}`); params.push(`%${description_search}%`); }
   if (size)    { conditions.push(buildSizeCondition(size, params)); }
-  if (shop_id) { conditions.push(`sl.shop_id = $${params.length + 1}`); params.push(shop_id); }
+  if (shop_id) { conditions.push(`sl.shop_id = ANY($${params.length + 1})`); params.push(shop_id); }
 
   const { rows } = await pool.query(`
     SELECT
@@ -863,15 +904,15 @@ async function toolGetSalesByVariant({ manufacturer, size, category, genre, tags
   };
 }
 
-async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = false }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, tenantId, getSeasonsConfig });
+async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = false }, { pool, allowedShops, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   const conditions = ['p.archived = false', 'i.qty_on_hand > 0', `i.tenant_id = $1`];
   const params     = [tenantId];
 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
-  if (shop_id)      { conditions.push(`i.shop_id = $${params.length + 1}`);           params.push(shop_id); }
+  if (shop_id)      { conditions.push(`i.shop_id = ANY($${params.length + 1})`);           params.push(shop_id); }
   if (low_stock_only) conditions.push('i.qty_on_hand <= 2');
 
   const { rows } = await pool.query(`
@@ -891,7 +932,7 @@ async function toolGetStockLevels({ manufacturer, shop_id, low_stock_only = fals
   `, params);
 
   return {
-    filtre: { marque: manufacturer ?? 'toutes', boutique: shop_id ?? 'toutes', bas_stock: low_stock_only },
+    filtre: { marque: manufacturer ?? 'toutes', boutique: shopFilterEcho(shop_id), bas_stock: low_stock_only },
     stock: rows.map(r => ({
       marque:       r.manufacturer,
       boutique:     r.boutique,
@@ -945,10 +986,10 @@ async function toolGetPlanVsRecommended({ season }, { pool, tenantId, budgetCach
   return { saison: season, comparaison: comparison };
 }
 
-async function toolGetTopPerformers({ season, metric, order = 'desc', limit = 10, shops }, { pool, tenantId, budgetCache, getSeasonsConfig }) {
+async function toolGetTopPerformers({ season, metric, order = 'desc', limit = 10, shops }, { pool, allowedShops, tenantId, budgetCache, getSeasonsConfig }) {
   season = (season ?? 'p26').toLowerCase();
   const rawShops = shops ? shops.split(',').map(s => s.trim()).filter(Boolean) : null;
-  const shopIds  = rawShops ? (await Promise.all(rawShops.map(s => resolveShopId(s, pool, tenantId)))).filter(Boolean) : null;
+  const shopIds  = rawShops ? (await Promise.all(rawShops.map(s => resolveShopIds(s, pool, tenantId, allowedShops)))).flat().filter(Boolean) : null;
   const cacheKey = `marque:${season}:${shopIds?.join(',') ?? 'all'}`;
   const cached = budgetCache?.get(cacheKey);
 
@@ -1002,11 +1043,15 @@ async function toolGetTopPerformers({ season, metric, order = 'desc', limit = 10
   };
 }
 
-async function toolGetShopsList(_, { pool, tenantId }) {
-  const { rows } = await pool.query(
-    'SELECT shop_id, name FROM shops WHERE tenant_id = $1 ORDER BY name',
-    [tenantId]
-  );
+async function toolGetShopsList(_, { pool, tenantId, allowedShops }) {
+  // A restricted caller must not even learn the names of the other shops.
+  const { rows } = allowedShops
+    ? await pool.query(
+        'SELECT shop_id, name FROM shops WHERE tenant_id = $1 AND shop_id = ANY($2) ORDER BY name',
+        [tenantId, allowedShops])
+    : await pool.query(
+        'SELECT shop_id, name FROM shops WHERE tenant_id = $1 ORDER BY name',
+        [tenantId]);
   return { boutiques: rows.map(r => ({ id: r.shop_id, nom: r.name })) };
 }
 
@@ -1022,10 +1067,10 @@ async function toolSearchBrands({ query }, { pool, tenantId }) {
   return { resultats: rows.map(r => ({ marque: r.manufacturer, nb_articles: Number(r.nb_articles) })) };
 }
 
-async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tags, exclude_tags, season, shop_id, period, sort = 'st_desc', limit = 200 }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig });
+async function toolGetSellthroughBySize({ manufacturer, size, category, genre, tags, exclude_tags, season, shop_id, period, sort = 'st_desc', limit = 200 }, { pool, allowedShops, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   const today = new Date().toISOString().slice(0, 10);
   let from, to, periodLabel = null;
 
@@ -1084,8 +1129,8 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
 
   const shopIdx        = shop_id ? params.length + 1 : null;
   if (shop_id) params.push(shop_id);
-  const shopSaleCond   = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : "WHERE inv.shop_id != '0'";
+  const shopSaleCond   = shopIdx ? `AND sl2.shop_id = ANY($${shopIdx})` : '';
+  const shopStockWhere = shopIdx ? `WHERE inv.shop_id = ANY($${shopIdx})` : "WHERE inv.shop_id != '0'";
 
   // tenant isolation — appended once, all CTEs reference $tenantIdx
   const tenantIdx = (params.push(tenantId), params.length);
@@ -1097,8 +1142,8 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   // Transfer CTEs reuse the same shopIdx parameter.
   // When shopIdx is null, to_shop_id = NULL is always false → CTEs return 0 rows
   // → no adjustment, which is correct (transfers cancel out at company level).
-  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
-  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
+  const transferInCond  = shopIdx ? `t.to_shop_id   = ANY($${shopIdx}) AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = ANY($${shopIdx}) AND t.transfer_sent     = true` : 'false';
 
   const { rows } = await pool.query(`
     WITH sales_by_item AS (
@@ -1254,8 +1299,8 @@ async function toolGetSellthroughBySize({ manufacturer, size, category, genre, t
   };
 }
 
-async function toolGetCategories({ manufacturer }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer }, { pool, tenantId, getSeasonsConfig });
+async function toolGetCategories({ manufacturer }, { pool, allowedShops, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
   const conditions = ['p.category IS NOT NULL', "p.category != ''", 'p.archived = false', 'p.tenant_id = $1'];
   const params     = [tenantId];
@@ -1298,8 +1343,17 @@ async function toolGetCategories({ manufacturer }, { pool, tenantId, getSeasonsC
   };
 }
 
-async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1, receiving_shop_id, category, exclude_nos = false }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ category, shop_id: receiving_shop_id }, { pool, tenantId, getSeasonsConfig });
+// shop-scope: exempt — every recommendation is a (dormant shop → active shop)
+// pair, so it is inherently cross-shop. Access is therefore gated on the
+// Transfers tab rather than scoped: a restricted user who was granted that tab
+// sees all shops here (the product decision), one who was not is refused.
+async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1, receiving_shop_id, category, exclude_nos = false }, { pool, allowedShops, allowedTabs, tenantId, getSeasonsConfig }) {
+  if (allowedTabs && !allowedTabs.includes('transfers')) {
+    return { erreur: "Les recommandations de transfert ne font pas partie de vos accès." };
+  }
+  // Cross-shop by design: the receiving shop is validated against the tenant,
+  // not against the caller's shop list.
+  const invalid = await validateFilters({ category, shop_id: receiving_shop_id }, { pool, tenantId, getSeasonsConfig, allowedShops: null });
   if (invalid) return invalid;
   const params = [days_dormant, min_stock, tenantId];
   const nosFilter = exclude_nos ? "AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')" : '';
@@ -1411,10 +1465,10 @@ async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1
   };
 }
 
-async function toolGetMatrixInfo({ manufacturer, description_search, category, shop_id }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, tenantId, getSeasonsConfig });
+async function toolGetMatrixInfo({ manufacturer, description_search, category, shop_id }, { pool, allowedShops, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   const conditions = ['p.archived = false', 'p.matrix_id IS NOT NULL', 'p.tenant_id = $1'];
   const params = [tenantId];
   if (manufacturer)      { conditions.push(`p.manufacturer ILIKE $${params.length+1}`); params.push(`%${manufacturer}%`); }
@@ -1422,7 +1476,7 @@ async function toolGetMatrixInfo({ manufacturer, description_search, category, s
   if (category)          { conditions.push(`p.category     ILIKE $${params.length+1}`); params.push(`%${category}%`); }
 
   const shopJoin  = shop_id
-    ? `JOIN inventory i ON i.item_id = p.item_id AND i.tenant_id = p.tenant_id AND i.shop_id = $${params.length+1}`
+    ? `JOIN inventory i ON i.item_id = p.item_id AND i.tenant_id = p.tenant_id AND i.shop_id = ANY($${params.length+1})`
     : 'LEFT JOIN inventory i ON i.item_id = p.item_id AND i.tenant_id = p.tenant_id';
   if (shop_id) params.push(shop_id);
 
@@ -1479,10 +1533,10 @@ async function toolGetSeasonsList(_, { getSeasonsConfig }) {
   };
 }
 
-async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, tenantId, getSeasonsConfig });
+async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id }, { pool, allowedShops, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   const allSeasons = await getSeasonsConfig();
 
   if (!seasonCodes?.length) return { erreur: 'Fournir au moins une saison dans seasons (ex: ["p26", "p25"]).' };
@@ -1498,12 +1552,12 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
     const params = [s.reception_from ?? s.sell_from, s.sell_to, `%${seasonTag}%`, tenantId];
 
     if (manufacturer) { conds.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
-    if (shop_id)      { conds.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
+    if (shop_id)      { conds.push(`sl.shop_id = ANY($${params.length + 1})`);          params.push(shop_id); }
 
     const stockConds  = ['p.archived = false', `p.tags ILIKE $1`, `i.tenant_id = $2`];
     const stockParams = [`%${seasonTag}%`, tenantId];
     if (manufacturer) { stockConds.push(`p.manufacturer ILIKE $${stockParams.length + 1}`); stockParams.push(`%${manufacturer}%`); }
-    if (shop_id)      { stockConds.push(`i.shop_id = $${stockParams.length + 1}`);           stockParams.push(shop_id); }
+    if (shop_id)      { stockConds.push(`i.shop_id = ANY($${stockParams.length + 1})`);           stockParams.push(shop_id); }
 
     const [salesRes, stockRes] = await Promise.all([
       pool.query(`
@@ -1547,15 +1601,15 @@ async function toolCompareSeasons({ manufacturer, seasons: seasonCodes, shop_id 
 
   return {
     marque:      manufacturer ?? 'toutes',
-    boutique:    shop_id ?? 'toutes',
+    boutique:    shopFilterEcho(shop_id),
     comparaison: results,
   };
 }
 
-async function toolGetSalesByCategory({ season, period, date_from, date_to, manufacturer, shop_id }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig });
+async function toolGetSalesByCategory({ season, period, date_from, date_to, manufacturer, shop_id }, { pool, allowedShops, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   let from = date_from, to = date_to;
   let seasonTag = null, periodLabel = null;
   let avertissementPeriode = null;
@@ -1595,7 +1649,7 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
   const params = [from, to, tenantId];
 
   if (manufacturer) { conditions.push(`p.manufacturer ILIKE $${params.length + 1}`); params.push(`%${manufacturer}%`); }
-  if (shop_id)      { conditions.push(`sl.shop_id = $${params.length + 1}`);          params.push(shop_id); }
+  if (shop_id)      { conditions.push(`sl.shop_id = ANY($${params.length + 1})`);          params.push(shop_id); }
   if (seasonTag)    { conditions.push(`p.tags ILIKE $${params.length + 1}`);           params.push(`%${seasonTag}%`); }
 
   const { rows } = await pool.query(`
@@ -1623,7 +1677,7 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
   return {
     periode:    { de: from, a: to, label: periodeLabel },
     ...(avertissementPeriode && { avertissement_periode: avertissementPeriode }),
-    filtre:     { marque: manufacturer ?? 'toutes', boutique: shop_id ?? 'toutes', saison: season },
+    filtre:     { marque: manufacturer ?? 'toutes', boutique: shopFilterEcho(shop_id), saison: season },
     nb_categories_total:    nb_cat_total,
     nb_categories_affiches: rows.length,
     categories: rows.map(r => ({
@@ -1641,10 +1695,10 @@ async function toolGetSalesByCategory({ season, period, date_from, date_to, manu
 // get_inventory_at_date — snapshot d'inventaire à une date donnée
 // Retourne une erreur explicite si la date est antérieure au premier snapshot.
 // ---------------------------------------------------------------------------
-async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, tags, exclude_tags }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, tenantId, getSeasonsConfig });
+async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, tags, exclude_tags }, { pool, allowedShops, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
 
   const { rows: meta } = await pool.query(
     `SELECT MIN(snapshot_date)::text AS first_date, MAX(snapshot_date)::text AS last_date
@@ -1670,7 +1724,7 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, t
 
   // $1 = date, $2 = tenantId (fixed positions); dynamic filters start at $3
   const params = [date, tenantId];
-  const shopCond = shop_id      ? `AND s.shop_id = $${params.push(shop_id)}`                         : '';
+  const shopCond = shop_id      ? `AND s.shop_id = ANY($${params.push(shop_id)})`                         : '';
   const mfrCond  = manufacturer ? `AND p.manufacturer ILIKE $${params.push('%' + manufacturer + '%')}` : '';
   const catCond  = category     ? `AND p.category ILIKE $${params.push('%' + category + '%')}`         : '';
   // tags + exclude_tags share the same helper as other tools
@@ -1696,7 +1750,7 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, t
 
   const { rows: breakdown } = await pool.query(`
     SELECT
-      ${shop_id ? "COALESCE(p.manufacturer,'Sans marque') AS dimension" : "sh.name AS dimension"},
+      ${shop_id?.length === 1 ? "COALESCE(p.manufacturer,'Sans marque') AS dimension" : "sh.name AS dimension"},
       SUM(s.qty)::int                                         AS unites,
       ROUND(SUM(s.qty * COALESCE(s.unit_cost,0))::numeric,2) AS valeur_cout
     FROM inventory_snapshots s
@@ -1712,7 +1766,7 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, t
     date,
     premier_snapshot: firstDate,
     filtre: {
-      boutique:     shop_id ?? 'toutes',
+      boutique:     shopFilterEcho(shop_id),
       marque:       manufacturer ?? 'toutes',
       categorie:    category ?? null,
       tags:         normalizeTags(tags),
@@ -1725,7 +1779,7 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, t
       valeur_detail: totals[0].valeur_detail,
     },
     breakdown: breakdown.map(r => ({
-      [shop_id ? 'marque' : 'boutique']: r.dimension,
+      [shop_id?.length === 1 ? 'marque' : 'boutique']: r.dimension,
       unites: r.unites,
       valeur_cout: r.valeur_cout,
     })),
@@ -1735,8 +1789,8 @@ async function toolGetInventoryAtDate({ date, shop_id, manufacturer, category, t
 // ---------------------------------------------------------------------------
 // get_payment_terms_analysis — analyse des termes de paiement fournisseur
 // ---------------------------------------------------------------------------
-async function toolGetPaymentTermsAnalysis({ manufacturer }, { pool, tenantId, getSeasonsConfig }) {
-  const invalid = await validateFilters({ manufacturer }, { pool, tenantId, getSeasonsConfig });
+async function toolGetPaymentTermsAnalysis({ manufacturer }, { pool, allowedShops, tenantId, getSeasonsConfig }) {
+  const invalid = await validateFilters({ manufacturer }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
   const { rows: capRow } = await pool.query(
     `SELECT value FROM app_settings WHERE tenant_id = $1 AND key = 'cost_of_capital'`,
@@ -1957,11 +2011,11 @@ async function toolResolveSearchTerm({ terme }, { pool, tenantId }) {
 // toolGetMatrixSellthrough — ST complet pour un modèle précis (par matrix_id).
 // Même logique que toolGetSellthroughBySize mais filtré par matrix_id.
 // ---------------------------------------------------------------------------
-async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ shop_id, season }, { pool, tenantId, getSeasonsConfig });
+async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, allowedShops, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ shop_id, season }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
   if (!matrix_id) return { erreur: 'matrix_id is required' };
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
 
   const today = new Date().toISOString().slice(0, 10);
   let from = null, to = today, seasonTag = null;
@@ -1981,10 +2035,10 @@ async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, 
   const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
   const tagIdx  = seasonTag ? (params.push(`%${seasonTag}%`), params.length) : null;
 
-  const shopSaleCond   = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : "WHERE inv.shop_id != '0'";
-  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
-  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
+  const shopSaleCond   = shopIdx ? `AND sl2.shop_id = ANY($${shopIdx})` : '';
+  const shopStockWhere = shopIdx ? `WHERE inv.shop_id = ANY($${shopIdx})` : "WHERE inv.shop_id != '0'";
+  const transferInCond  = shopIdx ? `t.to_shop_id   = ANY($${shopIdx}) AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = ANY($${shopIdx}) AND t.transfer_sent     = true` : 'false';
   const tagCond         = tagIdx  ? `AND p.tags ILIKE $${tagIdx}`  : '';
 
   const { rows } = await pool.query(`
@@ -2100,7 +2154,7 @@ async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, 
     modele:   rows[0].matrix_description ?? rows[0].description,
     periode:  { de: from, a: to },
     saison:   season?.toUpperCase() ?? null,
-    boutique: shop_id ?? 'toutes',
+    boutique: shopFilterEcho(shop_id),
     total_recu_fournisseur: total_recu,
     total_vendu:            total_sold,
     total_stock_actuel:     total_stock,
@@ -2122,11 +2176,11 @@ async function toolGetMatrixSellthrough({ matrix_id, season, shop_id }, { pool, 
 // toolGetProductByDescription — ST agrégé par matrice pour une recherche description.
 // Utiliser quand resolved_type='description' (matrix_matches > 1).
 // ---------------------------------------------------------------------------
-async function toolGetProductByDescription({ terme, season, shop_id }, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ shop_id, season }, { pool, tenantId, getSeasonsConfig });
+async function toolGetProductByDescription({ terme, season, shop_id }, { pool, allowedShops, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ shop_id, season }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
   if (!terme) return { erreur: 'terme is required' };
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
 
   const today = new Date().toISOString().slice(0, 10);
   let from = null, to = today, seasonTag = null;
@@ -2146,8 +2200,8 @@ async function toolGetProductByDescription({ terme, season, shop_id }, { pool, g
   const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
   const tagIdx  = seasonTag ? (params.push(`%${seasonTag}%`), params.length) : null;
 
-  const shopSaleCond   = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere = shopIdx ? `AND inv.shop_id = $${shopIdx}` : "AND inv.shop_id != '0'";
+  const shopSaleCond   = shopIdx ? `AND sl2.shop_id = ANY($${shopIdx})` : '';
+  const shopStockWhere = shopIdx ? `AND inv.shop_id = ANY($${shopIdx})` : "AND inv.shop_id != '0'";
   const tagCond        = tagIdx  ? `AND p.tags ILIKE $${tagIdx}`  : '';
 
   const { rows } = await pool.query(`
@@ -2215,10 +2269,10 @@ async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, sho
   const params = [stFrom, stTo]; // $1 $2
 
   const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
-  const shopSaleCond    = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : "WHERE inv.shop_id != '0'";
-  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
-  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
+  const shopSaleCond    = shopIdx ? `AND sl2.shop_id = ANY($${shopIdx})` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = ANY($${shopIdx})` : "WHERE inv.shop_id != '0'";
+  const transferInCond  = shopIdx ? `t.to_shop_id   = ANY($${shopIdx}) AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = ANY($${shopIdx}) AND t.transfer_sent     = true` : 'false';
 
   const tenantIdx = (params.push(tenantId), params.length);
   // No p.archived=false here — archived items still have real sales (CLAUDE.md convention).
@@ -2310,10 +2364,10 @@ async function computeSeasonMetrics({ stFrom, stTo, seasonTag, manufacturer, sho
 // ---------------------------------------------------------------------------
 // toolGetBrandRanking — classement des marques par ST, revenue, stock dormant.
 // ---------------------------------------------------------------------------
-async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20, include_nos = false, manufacturer, max_st, min_st, period }, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig });
+async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20, include_nos = false, manufacturer, max_st, min_st, period }, { pool, allowedShops, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   const today = new Date().toISOString().slice(0, 10);
   limit = Math.min(Math.max(1, parseInt(limit) || 20), 50);
 
@@ -2357,10 +2411,10 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
 
   const params = [stFrom, stTo]; // $1 $2
   const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
-  const shopSaleCond    = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : "WHERE inv.shop_id != '0'";
-  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
-  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
+  const shopSaleCond    = shopIdx ? `AND sl2.shop_id = ANY($${shopIdx})` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = ANY($${shopIdx})` : "WHERE inv.shop_id != '0'";
+  const transferInCond  = shopIdx ? `t.to_shop_id   = ANY($${shopIdx}) AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = ANY($${shopIdx}) AND t.transfer_sent     = true` : 'false';
   const tenantIdx = (params.push(tenantId), params.length);
   const tagIdx  = seasonTag ? (params.push(`%${seasonTag}%`), params.length) : null;
   const tagCond = tagIdx ? `AND p.tags ILIKE $${tagIdx}` : '';
@@ -2460,11 +2514,7 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
     LIMIT $${limitIdx}
   `, params);
 
-  let shopName = 'Toutes boutiques';
-  if (shop_id) {
-    const { rows: sr } = await pool.query('SELECT name FROM shops WHERE shop_id = $1', [shop_id]);
-    shopName = sr[0]?.name ?? String(shop_id);
-  }
+  const shopName = await shopScopeLabel(shop_id, pool);
 
   const mfrLabel = manufacturer ? manufacturer : 'toutes les marques';
   const scope_produits_brand = seasonTag && !include_nos
@@ -2501,11 +2551,11 @@ async function toolGetBrandRanking({ season, shop_id, sort_by = 'st', limit = 20
 // toolGetSeasonComparison — comparaison détaillée de deux saisons.
 // Utilise computeSeasonMetrics en parallèle pour éviter la duplication SQL.
 // ---------------------------------------------------------------------------
-async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id, include_nos = false, comparable_window = true }, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, tenantId, getSeasonsConfig });
+async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id, include_nos = false, comparable_window = true }, { pool, allowedShops, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ manufacturer, shop_id }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
   if (!season1 || !season2) return { erreur: 'season1 et season2 sont obligatoires.' };
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   const today = new Date().toISOString().slice(0, 10);
   const allSeasons = await getSeasonsConfig();
 
@@ -2580,11 +2630,7 @@ async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id
     nb_articles_actifs: m1.nb_articles_actifs - m2.nb_articles_actifs,
   };
 
-  let shopName = 'Toutes boutiques';
-  if (shop_id) {
-    const { rows: sr } = await pool.query('SELECT name FROM shops WHERE shop_id = $1', [shop_id]);
-    shopName = sr[0]?.name ?? String(shop_id);
-  }
+  const shopName = await shopScopeLabel(shop_id, pool);
 
   const scope_produits_cmp = include_nos
     ? 'Toute la marque incluant NOS (tous articles vendus dans la fenêtre)'
@@ -2606,14 +2652,14 @@ async function toolGetSeasonComparison({ manufacturer, season1, season2, shop_id
 // toolGetItemsByCriteria — modèles filtrés par ST, stock, ventes, marque.
 // Agrégation au niveau matrice (matrix_id = un modèle = toutes ses variantes).
 // ---------------------------------------------------------------------------
-async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_stock, max_stock, has_sales, manufacturer, sort_by = 'st', limit = 50, period }, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig });
+async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_stock, max_stock, has_sales, manufacturer, sort_by = 'st', limit = 50, period }, { pool, allowedShops, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
   if (min_st == null && max_st == null && min_stock == null && max_stock == null && has_sales == null && !manufacturer) {
     return { erreur: 'Spécifiez au moins un critère de filtre (min_st, max_st, min_stock, max_stock, has_sales, ou manufacturer).' };
   }
 
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   const today = new Date().toISOString().slice(0, 10);
   limit = Math.min(Math.max(1, parseInt(limit) || 50), 200);
 
@@ -2652,10 +2698,10 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
 
   const params = [stFrom, stTo]; // $1 $2
   const shopIdx = shop_id ? (params.push(shop_id), params.length) : null;
-  const shopSaleCond    = shopIdx ? `AND sl2.shop_id = $${shopIdx}` : '';
-  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = $${shopIdx}` : "WHERE inv.shop_id != '0'";
-  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
-  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
+  const shopSaleCond    = shopIdx ? `AND sl2.shop_id = ANY($${shopIdx})` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id = ANY($${shopIdx})` : "WHERE inv.shop_id != '0'";
+  const transferInCond  = shopIdx ? `t.to_shop_id   = ANY($${shopIdx}) AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = ANY($${shopIdx}) AND t.transfer_sent     = true` : 'false';
   const tenantIdx = (params.push(tenantId), params.length);
   const tagIdx    = seasonTag    ? (params.push(`%${seasonTag}%`),    params.length) : null;
   const mfrIdx    = manufacturer ? (params.push(`%${manufacturer}%`), params.length) : null;
@@ -2769,11 +2815,7 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
     LIMIT $${limitIdx}
   `, params);
 
-  let shopName = 'Toutes boutiques';
-  if (shop_id) {
-    const { rows: sr } = await pool.query('SELECT name FROM shops WHERE shop_id = $1', [shop_id]);
-    shopName = sr[0]?.name ?? String(shop_id);
-  }
+  const shopName = await shopScopeLabel(shop_id, pool);
 
   const articles = rows.map(r => {
     const st = Number(r.st_pct);
@@ -2814,16 +2856,16 @@ async function toolGetItemsByCriteria({ season, shop_id, min_st, max_st, min_sto
 // ---------------------------------------------------------------------------
 async function toolGetRestockRecommendations(
   { season, shop_id, manufacturer, min_st = 70, max_semaines_couverture = null, include_nos = false, limit = 30 },
-  { pool, getSeasonsConfig, tenantId }
+  { pool, allowedShops, getSeasonsConfig, tenantId }
 ) {
   if (!season) return { erreur: 'Le paramètre "season" est obligatoire.' };
-  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig });
+  const invalid = await validateFilters({ manufacturer, shop_id, season }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
   season  = season.toLowerCase();
   limit   = Math.min(Math.max(1, parseInt(limit) || 30), 100);
   min_st  = Number(min_st ?? 70);
 
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
 
   // Season config
   const seasons = await getSeasonsConfig();
@@ -2841,22 +2883,21 @@ async function toolGetRestockRecommendations(
   const semaines_restantes = (new Date(s.sell_to) - new Date(today)) / (7 * 24 * 3600 * 1000);
 
   // Lead times and shop name in parallel
-  const [ltRes, shopRes] = await Promise.all([
+  const [ltRes, shopName] = await Promise.all([
     pool.query(`SELECT value FROM app_settings WHERE tenant_id = $1 AND key = 'nos_lead_times'`, [tenantId]),
-    shop_id ? pool.query('SELECT name FROM shops WHERE shop_id = $1', [shop_id]) : Promise.resolve({ rows: [] }),
+    shopScopeLabel(shop_id, pool),
   ]);
   const leadTimes = ltRes.rows[0]?.value ?? {};
-  const shopName  = shop_id ? (shopRes.rows[0]?.name ?? String(shop_id)) : 'Toutes boutiques';
 
   // SQL params
   const params = [stFrom, stTo]; // $1 $2
 
   const shopIdx         = shop_id ? (params.push(shop_id), params.length) : null;
-  const shopSaleCond    = shopIdx ? `AND sl2.shop_id    = $${shopIdx}` : '';
-  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id  = $${shopIdx}` : "WHERE inv.shop_id != '0'";
-  const transferInCond  = shopIdx ? `t.to_shop_id   = $${shopIdx} AND t.transfer_received = true` : 'false';
-  const transferOutCond = shopIdx ? `t.from_shop_id = $${shopIdx} AND t.transfer_sent     = true` : 'false';
-  const vel4wShopCond   = shopIdx ? `AND slv.shop_id = $${shopIdx}` : '';
+  const shopSaleCond    = shopIdx ? `AND sl2.shop_id    = ANY($${shopIdx})` : '';
+  const shopStockWhere  = shopIdx ? `WHERE inv.shop_id  = ANY($${shopIdx})` : "WHERE inv.shop_id != '0'";
+  const transferInCond  = shopIdx ? `t.to_shop_id   = ANY($${shopIdx}) AND t.transfer_received = true` : 'false';
+  const transferOutCond = shopIdx ? `t.from_shop_id = ANY($${shopIdx}) AND t.transfer_sent     = true` : 'false';
+  const vel4wShopCond   = shopIdx ? `AND slv.shop_id = ANY($${shopIdx})` : '';
 
   const tenantIdx    = (params.push(tenantId), params.length);
   const seasonTagIdx = (params.push(`%${seasonTag}%`), params.length);
@@ -3090,13 +3131,16 @@ async function toolGetRestockRecommendations(
         GROUP BY sl.item_id, sl.shop_id
       ) sl_loc ON sl_loc.item_id = p.item_id AND sl_loc.shop_id = i.shop_id
       WHERE p.matrix_id = ANY($4)
-        AND i.shop_id  != $5
+        AND i.shop_id  <> ALL($5)
+        ${allowedShops ? 'AND i.shop_id = ANY($6)' : ''}
         AND i.shop_id  != '0'
         AND i.qty_on_hand > 0
       GROUP BY p.matrix_id, i.shop_id, sh.name
       HAVING SUM(i.qty_on_hand) > 0
       ORDER BY p.matrix_id, SUM(i.qty_on_hand) DESC
-    `, [tenantId, stFrom, stTo, matrixIds, shop_id]);
+    `, allowedShops
+         ? [tenantId, stFrom, stTo, matrixIds, shop_id, allowedShops]
+         : [tenantId, stFrom, stTo, matrixIds, shop_id]);
 
     const otherMap = {};
     for (const r of stockOther) {
@@ -3155,10 +3199,10 @@ async function toolGetPricingAnalysis({
   min_lignes = 20,
   sort_by = 'taux_remise',
   limit = 25,
-}, { pool, getSeasonsConfig, tenantId }) {
-  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig });
+}, { pool, allowedShops, getSeasonsConfig, tenantId }) {
+  const invalid = await validateFilters({ manufacturer, category, shop_id, season }, { pool, tenantId, getSeasonsConfig, allowedShops });
   if (invalid) return invalid;
-  shop_id = await resolveShopId(shop_id, pool, tenantId);
+  shop_id = await resolveShopIds(shop_id, pool, tenantId, allowedShops);
   const today = new Date().toISOString().slice(0, 10);
   limit     = Math.min(Math.max(1, parseInt(limit)     || 25), 50);
   min_lignes = Math.max(1, parseInt(min_lignes) || 20);
@@ -3200,7 +3244,7 @@ async function toolGetPricingAnalysis({
   const mfrIdx      = manufacturer ? (params.push(`%${manufacturer}%`), params.length) : null;
   const catIdx      = category   ? (params.push(`%${category}%`),     params.length) : null;
 
-  const shopSaleCond = shopIdx ? `AND sl.shop_id = $${shopIdx}` : '';
+  const shopSaleCond = shopIdx ? `AND sl.shop_id = ANY($${shopIdx})` : '';
   const tagCond      = tagIdx  ? `AND p.tags ILIKE $${tagIdx}`  : '';
   const mfrCond      = mfrIdx  ? `AND p.manufacturer ILIKE $${mfrIdx}` : '';
   const catCond      = catIdx  ? `AND p.category ILIKE $${catIdx}`     : '';
@@ -3367,11 +3411,7 @@ async function toolGetPricingAnalysis({
   const ecart_marge_global     = marge_theorique_global != null
     ? Math.round((marge_theorique_global - marge_reelle_global) * 10) / 10 : null;
 
-  let shopName = 'Toutes boutiques';
-  if (shop_id) {
-    const { rows: sr } = await pool.query('SELECT name FROM shops WHERE shop_id = $1', [shop_id]);
-    shopName = sr[0]?.name ?? String(shop_id);
-  }
+  const shopName = await shopScopeLabel(shop_id, pool);
 
   const mfrLabel = manufacturer ?? 'toutes les marques';
   const scope_produits = seasonTag
@@ -3504,7 +3544,7 @@ async function executeTool(name, args, ctx) {
 
     return result;
   } catch (err) {
-    // Safety net: any tool that calls resolveShopId without going through
+    // Safety net: any tool that calls resolveShopIds without going through
     // validateFilters still gets a structured shop_id error instead of a crash.
     if (err instanceof ShopNotFoundError) {
       return {
@@ -3566,7 +3606,7 @@ RÈGLE SUR LES DATES — Distinguer MOT RELATIF ("dernier/précédent/passé/cou
   "juillet 2026" → date_from="2026-07-01", date_to="2026-07-31"
 Formats period legacy : "4y"=4 ans, "3y"=3 ans, "2y"=2 ans, "1y"=1 an, "6m"=6 mois, "3m"=3 mois, "10w"=10 semaines, "ytd"=cette année, "last_year"=l'an dernier.
 
-BOUTIQUES DISPONIBLES : ${shopNames}
+BOUTIQUES DISPONIBLES : ${shopNames}${ctx.allowedShops ? " (l'utilisateur n'a accès qu'à ces boutiques — ne jamais présenter ces chiffres comme ceux de l'entreprise entière, et ne jamais mentionner l'existence d'autres boutiques)" : ''}
 Quand l'utilisateur mentionne une boutique (même en abrégé), utilise le nom exact ci-dessus dans shop_id.
 "toutes les boutiques" ou "toutes" → ne pas filtrer par boutique (omettre shop_id).
 
@@ -3699,7 +3739,7 @@ DATE ACTUELLE : ${today}
 RÈGLE ABSOLUE SUR LES DATES : utilise TOUJOURS le paramètre "period" pour les périodes relatives.
 Correspondances : "4y"=4 ans, "3y"=3 ans, "2y"=2 ans, "1y"=1 an, "6m"=6 mois, "3m"=3 mois, "10w"=10 semaines, "ytd"=cette année, "last_year"=l'an dernier.
 
-BOUTIQUES DISPONIBLES : ${shopNames}
+BOUTIQUES DISPONIBLES : ${shopNames}${ctx.allowedShops ? " (l'utilisateur n'a accès qu'à ces boutiques — ne jamais présenter ces chiffres comme ceux de l'entreprise entière, et ne jamais mentionner l'existence d'autres boutiques)" : ''}
 Quand l'utilisateur mentionne une boutique (même en abrégé), utilise le nom exact ci-dessus dans shop_id.
 "toutes les boutiques" ou "toutes" → ne pas filtrer par boutique (omettre shop_id).
 
@@ -3783,6 +3823,8 @@ Résolution du langage naturel :
 module.exports = {
   runAgentLoop,
   runAgentLoopStream,
+  // Exported for tests: the single dispatch point every tool call goes through.
+  executeTool,
   toolGetSellthroughBySize,
   toolGetStockByVariant,
   toolGetSalesByVariant,
