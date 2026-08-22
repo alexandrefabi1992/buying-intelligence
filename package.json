@@ -15,7 +15,8 @@
     "test:sync-queue": "railway run node scripts/test-sync-queue-dedup.js",
     "test:permissions": "node tests/permissions.test.js",
     "test:shop-scope": "node tests/shop-scope.test.js",
-    "test:settings": "node tests/settings.test.js"
+    "test:settings": "node tests/settings.test.js",
+    "test:season-calendar": "node tests/season-calendar.test.js"
   },
   "dependencies": {
     "axios": "^1.7.2",

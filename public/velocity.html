@@ -36,13 +36,7 @@
     <select id="shopFilter" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
       <option value="">Toutes les boutiques</option>
     </select>
-    <select id="seasonFilter" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
-      <option value="p26">P26 — Printemps 2026</option>
-      <option value="a25">A25 — Automne 2025</option>
-      <option value="p25" selected>P25 — Printemps 2025</option>
-      <option value="a24">A24 — Automne 2024</option>
-      <option value="p24">P24 — Printemps 2024</option>
-    </select>
+    <select id="seasonFilter" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"></select>
     <div class="w-px h-5 bg-gray-200"></div>
     <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
       <button id="lang-fr" onclick="setLang('fr')" class="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 border-r border-gray-200">FR</button>
@@ -364,6 +358,54 @@ function setLang(lang) {
   }
 })();
 
+// Fill the season dropdown from the tenant's own configuration. Returns false
+// when nothing is configured, so the caller can show why the page is empty
+// instead of leaving a silently blank menu.
+async function fillSeasonSelect() {
+  const sel = document.getElementById('seasonFilter');
+  let seasons = [];
+  try {
+    const d = await authFetch('/api/settings/seasons').then(r => r.json());
+    seasons = Array.isArray(d.seasons) ? d.seasons : [];
+  } catch (_) { /* handled as "none configured" below */ }
+
+  if (!seasons.length) {
+    sel.innerHTML = '<option value="">Aucune saison configurée</option>';
+    sel.disabled = true;
+    return false;
+  }
+
+  // Most recent first, and preselect the season that is selling today.
+  const today = new Date().toISOString().slice(0, 10);
+  const ordered = [...seasons].sort((a, b) => String(b.sell_from).localeCompare(String(a.sell_from)));
+  const current = ordered.find(x => x.sell_from <= today && today <= x.sell_to) ?? ordered[0];
+  sel.innerHTML = '';
+  for (const x of ordered) {
+    const o = document.createElement('option');
+    o.value = x.code;
+    o.textContent = x.label ?? String(x.code).toUpperCase();
+    if (x.code === current.code) o.selected = true;
+    sel.appendChild(o);
+  }
+  return true;
+}
+
+function showNoSeasons() {
+  // The page never leaves its loading spinner otherwise: loadBrands() is the
+  // only thing that reveals #content.
+  document.getElementById('loader').classList.add('hidden');
+  const content = document.getElementById('content');
+  content.classList.remove('hidden');
+  content.innerHTML = '';
+  const host = content;
+  const box = document.createElement('div');
+  box.className = 'max-w-2xl mx-auto mt-6 p-5 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800';
+  box.innerHTML = "<strong>Aucune saison configurée.</strong> La vélocité se calcule par saison : " +
+                  "configurez vos saisons dans <a href='/#params' class='underline font-semibold'>Paramètres → Saisons</a> " +
+                  "pour afficher cette page.";
+  host.prepend(box);
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async () => {
   try {
@@ -376,8 +418,12 @@ function setLang(lang) {
     }
   } catch (_) {}
 
+  const hasSeasons = await fillSeasonSelect();
+
   document.getElementById('shopFilter').addEventListener('change', e => { state.shopId = e.target.value; loadBrands(); });
   document.getElementById('seasonFilter').addEventListener('change', e => { state.season = e.target.value; loadBrands(); });
+
+  if (!hasSeasons) { showNoSeasons(); return; }
 
   state.season = document.getElementById('seasonFilter').value;
   await loadBrands();

@@ -170,7 +170,12 @@
             class="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
       </div>
-      <p class="text-xs text-gray-400 mt-3">Ces exemples servent à comprendre votre format. Les saisons se configurent dans "Paramètres".</p>
+      <p class="text-xs text-gray-500 mt-3">
+        À partir de ces deux balises, un calendrier de saisons est généré automatiquement
+        (4 ans, paires printemps/automne) et enregistré dans vos paramètres.
+        <strong>Sans ces balises, les budgets ne pourront pas être calculés</strong> —
+        il faudra alors configurer les saisons manuellement dans Paramètres → Saisons.
+      </p>
     </div>
 
     <!-- STEP 6 — NOS tag -->
@@ -200,6 +205,7 @@
       <div class="text-xs font-semibold text-green-600 uppercase tracking-wider mb-2">Résumé</div>
       <h2 class="text-xl font-semibold text-gray-900 mb-6">Tout est prêt !</h2>
       <div id="summary" class="space-y-3 text-sm"></div>
+      <div id="seasons-warning" class="hidden mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800"></div>
       <div class="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
         Ces paramètres peuvent être modifiés à tout moment depuis la page de configuration.
       </div>
@@ -222,15 +228,24 @@
 
 </div><!-- end max-w -->
 
+<script src="/season-calendar.js"></script>
 <script>
 const TOTAL_STEPS = 7;
 let currentStep = 1;
 let discoverData = {};
 const config = {};
 
+// Every /api/* route requires a JWT. The wizard was calling them bare, so its
+// save silently 401'd and still reported success (fetch does not throw on an
+// HTTP error status).
+function authHeaders(extra) {
+  const token = (() => { try { return localStorage.getItem('auth_token'); } catch { return null; } })();
+  return Object.assign({}, extra || {}, token ? { Authorization: 'Bearer ' + token } : {});
+}
+
 // ── Auto-discover on load ────────────────────────────────────────────────────
-fetch('/api/admin/discover')
-  .then(r => r.json())
+fetch('/api/admin/discover', { headers: authHeaders() })
+  .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
   .then(data => {
     discoverData = data;
 
@@ -307,10 +322,16 @@ fetch('/api/admin/discover')
         document.getElementById('genre-femme').placeholder = `Ex: ${c.name}`;
     });
   })
-  .catch(() => {});
+  .catch(() => {
+    const note = document.createElement('p');
+    note.className = 'text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2';
+    note.textContent = "Détection automatique des balises indisponible — saisissez vos balises à la main.";
+    const seasonDiv = document.getElementById('season-tags-detected');
+    if (seasonDiv) seasonDiv.appendChild(note);
+  });
 
 // ── Fetch existing config ────────────────────────────────────────────────────
-fetch('/api/settings/tenant')
+fetch('/api/settings/tenant', { headers: authHeaders() })
   .then(r => r.json())
   .then(saved => {
     if (saved.boutique_name) document.getElementById('boutique-name').value = saved.boutique_name;
@@ -413,6 +434,12 @@ function buildSummary() {
     ['Valeurs genre',      config.genre_enabled === 'yes' ? `Homme="${config.genre_values?.homme}", Femme="${config.genre_values?.femme}"` : '—'],
     ['Tag saison P/É',    config.season_tag_spring || '—'],
     ['Tag saison A/H',    config.season_tag_fall   || '—'],
+    ['Calendrier saisons', (() => {
+      const cal = generatedCalendar();
+      return cal.length
+        ? `${cal.length} saisons générées (${cal[0].code} → ${cal[cal.length - 1].code})`
+        : 'Aucun — à configurer manuellement';
+    })()],
     ['Produits NOS',       config.nos_enabled === 'yes' ? `Tag: "${config.nos_tag}"` : 'Aucun'],
   ];
   document.getElementById('summary').innerHTML = rows.map(([k, v]) => `
@@ -420,6 +447,31 @@ function buildSummary() {
       <span class="w-40 text-gray-500 shrink-0">${k}</span>
       <span class="font-medium text-gray-800">${v}</span>
     </div>`).join('');
+
+  // Nothing derivable → the tenant will hit an explicit 409 on their first
+  // budget. Say so here, with somewhere to go, rather than letting them find out.
+  const warn = document.getElementById('seasons-warning');
+  if (generatedCalendar().length) {
+    warn.classList.add('hidden');
+  } else {
+    warn.classList.remove('hidden');
+    warn.innerHTML = `
+      <strong>Saisons non configurées.</strong> Les balises de l'étape 5 n'ont pas permis
+      de générer un calendrier, donc le calcul des budgets restera indisponible.
+      Revenez à l'étape 5 pour saisir une balise (ex : <code>p26</code>, <code>ss26</code>),
+      ou configurez vos saisons manuellement :
+      <a href="/#params" class="underline font-semibold">Paramètres → Saisons</a>.`;
+  }
+}
+
+// Calendar derived from the two example tags collected at step 5.
+function generatedCalendar() {
+  try {
+    return SeasonCalendar.buildSeasonCalendar({
+      springTag: config.season_tag_spring,
+      fallTag:   config.season_tag_fall,
+    });
+  } catch { return []; }
 }
 
 // ── Save ─────────────────────────────────────────────────────────────────────
@@ -427,16 +479,31 @@ async function saveConfig() {
   collectStep(TOTAL_STEPS);
   config.setup_completed = true;
   try {
-    await fetch('/api/settings/tenant', {
+    const res = await fetch('/api/settings/tenant', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(config),
     });
+    if (!res.ok) throw new Error('tenant_config: HTTP ' + res.status);
+
+    // Second write: the season calendar derived from step 5. Skipped when the
+    // tags yield nothing — we never invent a calendar the tenant did not
+    // describe; the recap already warns and points to Paramètres.
+    const seasons = generatedCalendar();
+    if (seasons.length) {
+      const r2 = await fetch('/api/settings/seasons', {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ seasons }),
+      });
+      if (!r2.ok) throw new Error('seasons_config: HTTP ' + r2.status);
+    }
+
     document.getElementById('btn-next').textContent = '✓ Sauvegardé !';
     document.getElementById('btn-next').className = 'px-8 py-3 rounded-xl bg-green-600 text-white font-semibold cursor-default';
     setTimeout(() => { window.location.href = '/'; }, 1500);
-  } catch {
-    alert('Erreur lors de la sauvegarde. Veuillez réessayer.');
+  } catch (err) {
+    alert('Erreur lors de la sauvegarde : ' + (err.message || 'réessayez.'));
   }
 }
 
