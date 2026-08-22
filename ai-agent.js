@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 
 const { createProvider, SYSTEM_PROMPT, buildSystemPrompt } = require('./ai-provider');
+const NOS = require('./lib/nos-tag');
 
 const MAX_TOOL_ROUNDS = 6; // safety limit against infinite loops
 
@@ -1347,7 +1348,7 @@ async function toolGetCategories({ manufacturer }, { pool, allowedShops, tenantI
 // pair, so it is inherently cross-shop. Access is therefore gated on the
 // Transfers tab rather than scoped: a restricted user who was granted that tab
 // sees all shops here (the product decision), one who was not is refused.
-async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1, receiving_shop_id, category, exclude_nos = false }, { pool, allowedShops, allowedTabs, tenantId, getSeasonsConfig }) {
+async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1, receiving_shop_id, category, exclude_nos = false }, { pool, allowedShops, allowedTabs, tenantId, tenantConfig, getSeasonsConfig }) {
   if (allowedTabs && !allowedTabs.includes('transfers')) {
     return { erreur: "Les recommandations de transfert ne font pas partie de vos accès." };
   }
@@ -1356,7 +1357,12 @@ async function toolGetTransferRecommendations({ days_dormant = 14, min_stock = 1
   const invalid = await validateFilters({ category, shop_id: receiving_shop_id }, { pool, tenantId, getSeasonsConfig, allowedShops: null });
   if (invalid) return invalid;
   const params = [days_dormant, min_stock, tenantId];
-  const nosFilter = exclude_nos ? "AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')" : '';
+  // Balise NOS du tenant plutôt que 'nos' en dur. Sans balise configurée il
+  // n'y a rien à exclure: la condition et son paramètre disparaissent.
+  const nos = NOS.resolveNosTag(tenantConfig);
+  const nosFilter = (exclude_nos && nos.like)
+    ? `AND (p.tags IS NULL OR p.tags NOT ILIKE $${params.push(nos.like)})`
+    : '';
   let catFilter = '';
   if (category) { params.push(`%${category}%`); catFilter = `AND p.category ILIKE $${params.length}`; }
 

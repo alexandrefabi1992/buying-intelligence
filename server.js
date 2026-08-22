@@ -19,6 +19,7 @@ const jwt     = require('jsonwebtoken');
 const { runAgentLoop, runAgentLoopStream } = require('./ai-agent');
 const PERMS            = require('./lib/permissions');
 const SETTINGS        = require('./lib/settings');
+const NOS              = require('./lib/nos-tag');
 const HELP             = require('./help-content');
 
 // Multer for chat attachments (images + PDFs, 10MB limit, in-memory)
@@ -1924,9 +1925,13 @@ app.get('/api/transfers', async (req, res, next) => {
     const minStock      = parseInt(req.query.min_stock    ?? '1',  10);
     const showDismissed = req.query.show_dismissed === '1';
     const params        = [daysDormant, minStock];
-
-    const nosFilter = req.query.exclude_nos === '1'
-      ? "AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')" : '';
+    const nos           = NOS.resolveNosTag(await getTenantConfig(req.tenantId));
+    // Rien à exclure si le tenant n'a pas de NOS: la condition disparaît, et le
+    // paramètre n'est pas lié (une requête ne doit jamais recevoir plus de
+    // paramètres qu'elle n'en référence).
+    const nosFilter = (req.query.exclude_nos === '1' && nos.like)
+      ? `AND (p.tags IS NULL OR p.tags NOT ILIKE $${params.push(nos.like)})`
+      : '';
     let catFilter = '';
     if (req.query.category) { params.push(req.query.category); catFilter = `AND p.category = $${params.length}`; }
     params.push(req.tenantId);
@@ -2244,7 +2249,10 @@ app.get('/api/sizes/brands', async (req, res, next) => {
       shopFilterInv = `AND i.shop_id  = ANY($${params.length})`;
     }
 
-    const nosFilter = exclude_nos === '1' ? `AND (p.tags IS NULL OR p.tags NOT ILIKE '%nos%')` : '';
+    const nos = NOS.resolveNosTag(await getTenantConfig(req.tenantId));
+    const nosFilter = (exclude_nos === '1' && nos.like)
+      ? `AND (p.tags IS NULL OR p.tags NOT ILIKE $${params.push(nos.like)})`
+      : '';
     params.push(req.tenantId);
     const tidN = params.length;
     const baseWhere = `p.matrix_id IS NOT NULL AND p.archived = false
@@ -2361,7 +2369,8 @@ function buildManufacturerTree(rows, refField) {
 
 // ---------------------------------------------------------------------------
 // GET /api/budget/nos — NOS buying budget by manufacturer + category drill-down
-// Filter: products where tags ILIKE '%nos%'
+// Filter: products carrying the tenant's NOS tag (tenant_config.nos_tag,
+// falling back to 'nos' for tenants that never completed onboarding).
 // Reference demand: 12-week average weekly velocity
 // Shortage: MAX(0, avg_weekly × weeks_target − current_stock) × default_cost
 // ?weeks=4 → coverage target in weeks (default 4)
@@ -2376,7 +2385,22 @@ app.get('/api/budget/nos', async (req, res, next) => {
 
     // Tenant isolation: cache key MUST include tenantId, otherwise the first
     // tenant's response poisons the cache for all others during TTL.
-    const cacheKey = JSON.stringify({ r: 'nos', tid: req.tenantId, weeks, shops, colls, sizes });
+    const nos = NOS.resolveNosTag(await getTenantConfig(req.tenantId));
+    // No NOS tag configured → there are no NOS items to budget for. Say it,
+    // instead of returning an empty table that reads like "nothing to buy".
+    if (nos.state === 'disabled') {
+      return res.json({
+        nos_configured:        false,
+        message:               NOS.NOS_DISABLED_MESSAGE,
+        weeks_target:          weeks,
+        generated_at:          new Date().toISOString(),
+        total_proposed_budget: 0,
+        manufacturer_count:    0,
+        by_manufacturer:       [],
+      });
+    }
+
+    const cacheKey = JSON.stringify({ r: 'nos', tid: req.tenantId, weeks, shops, colls, sizes, nos: nos.like });
     const hit = cacheGet(cacheKey);
     if (hit) return res.json({ ...hit, cached: true });
 
@@ -2387,6 +2411,8 @@ app.get('/api/budget/nos', async (req, res, next) => {
     if (sizes?.length) { params.push('\\y(' + sizes.join('|') + ')\\y');             sizeCond = `AND p.description ~* $${params.length}`; }
     params.push(req.tenantId);
     const tidN = params.length;
+    params.push(nos.like);
+    const nosN = params.length;
 
     const { rows } = await pool.query(`
       WITH velocity AS (
@@ -2411,7 +2437,7 @@ app.get('/api/budget/nos', async (req, res, next) => {
         FROM products p
         JOIN velocity  v ON v.item_id = p.item_id
         JOIN inventory i ON i.item_id = p.item_id AND i.shop_id = v.shop_id AND i.tenant_id = $${tidN}
-        WHERE p.tags ILIKE '%nos%'
+        WHERE p.tags ILIKE $${nosN}
           AND p.archived = false
           AND p.tenant_id = $${tidN}
           AND v.avg_weekly_units > 0
@@ -3539,6 +3565,10 @@ app.get('/api/admin/inspect-filters', async (req, res, next) => {
 
 // GET /api/admin/explain — EXPLAIN ANALYZE on the two slow budget queries
 // ---------------------------------------------------------------------------
+// nos-tag: figé volontairement. Cette route mesure des plans d'exécution via
+// EXPLAIN ANALYZE sur des requêtes représentatives; elle est cross-tenant et ne
+// dispose d'aucun req.tenantId. Rendre sa balise configurable changerait ce
+// qu'elle mesure sans rien corriger — ce n'est pas un calcul métier.
 app.get('/api/admin/explain', async (req, res, next) => {
   try {
     const nosQuery = `
@@ -3937,11 +3967,27 @@ app.put('/api/settings/nos-excluded', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.get('/api/nos/urgent', async (req, res, next) => {
   try {
+    const nos = NOS.resolveNosTag(await getTenantConfig(req.tenantId));
+    if (nos.state === 'disabled') {
+      return res.json({
+        nos_configured:    false,
+        message:           NOS.NOS_DISABLED_MESSAGE,
+        generated_at:      new Date().toISOString(),
+        default_lead_time: 8,
+        lead_times:        {},
+        count:             0,
+        total_cost:        0,
+        items:             [],
+      });
+    }
+
     const shopIds    = PERMS.scopeShops(req, req.query.shop_id);
     const params     = shopIds?.length ? [shopIds] : [];
     const shopFilter = shopIds?.length ? `AND i.shop_id = ANY($1)` : '';
     params.push(req.tenantId);
     const tidN = params.length;
+    params.push(nos.like);
+    const nosN = params.length;
 
     // Load lead times from settings
     const { rows: ltRows } = await pool.query("SELECT value FROM app_settings WHERE key = 'nos_lead_times' AND tenant_id = $1", [req.tenantId]);
@@ -3985,7 +4031,7 @@ app.get('/api/nos/urgent', async (req, res, next) => {
       JOIN inventory i ON i.item_id = v.item_id AND i.shop_id = v.shop_id AND i.tenant_id = $${tidN}
       JOIN products  p ON p.item_id = v.item_id AND p.tenant_id = $${tidN}
       JOIN shops     s ON s.shop_id = i.shop_id AND s.tenant_id = $${tidN}
-      WHERE p.tags ILIKE '%nos%'
+      WHERE p.tags ILIKE $${nosN}
         AND p.archived = false
         AND p.tenant_id = $${tidN}
         AND v.avg_weekly_units > 0
@@ -4142,11 +4188,13 @@ app.get('/api/budget/marque', async (req, res, next) => {
   try {
     const targetSeasonCode = (req.query.season ?? 'p26').toLowerCase();
     const shops = PERMS.scopeShops(req, req.query.shops);
+    const nos = NOS.resolveNosTag(await getTenantConfig(req.tenantId));
 
-    const cacheKey = JSON.stringify({ r: 'marque2', season: targetSeasonCode, shops, tid: req.tenantId });
+    // La balise NOS entre dans la clé: la changer doit invalider le budget mis
+    // en cache, pas attendre l'expiration du TTL.
+    const cacheKey = JSON.stringify({ r: 'marque2', season: targetSeasonCode, shops, tid: req.tenantId, nos: nos.like });
     const hit = cacheGet(cacheKey);
     if (hit) return res.json({ ...hit, cached: true });
-
     const [tiers, seasonsConfig, budgetParams, projCfg] = await Promise.all([
       getMultiplierTiers(req.tenantId),
       requireSeasonsConfig(req.tenantId),
@@ -4171,6 +4219,14 @@ app.get('/api/budget/marque', async (req, res, next) => {
     const baseParams     = shops?.length ? [shops, req.tenantId] : [req.tenantId];
     const tenantIdx      = baseParams.length; // $1 or $2
     const tenantCond     = `AND p.tenant_id = $${tenantIdx}`;
+    // Exclusion des NOS, partagée par les neuf requêtes ci-dessous. Le motif
+    // rejoint baseParams: chaque requête construit ses paramètres en
+    // [...baseParams, …], donc l'index reste valable partout. Un tenant sans
+    // balise NOS n'a rien à exclure — la condition et son paramètre
+    // disparaissent tous les deux.
+    const nosExcl = nos.like
+      ? `AND p.tags NOT ILIKE $${baseParams.push(nos.like)}`
+      : '';
     const shopCondSL     = shops?.length ? `AND sl.shop_id = ANY($1)` : '';
     const shopCondInv    = shops?.length ? `AND i.shop_id = ANY($1)` : '';
 
@@ -4202,7 +4258,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
       JOIN inventory i  ON i.item_id  = p.item_id
       JOIN shops     sh ON sh.shop_id = i.shop_id AND sh.tenant_id = p.tenant_id
       WHERE p.tags ILIKE $${coInvTagIdx}
-        AND p.tags NOT ILIKE '%nos%'
+        ${nosExcl}
         AND p.default_cost > 0
         ${tenantCond}
         AND p.category    NOT ILIKE 'Alt%ration%'
@@ -4229,7 +4285,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${coSalesToIdx}::date
         AND sl.completed_time IS NOT NULL
         AND p.tags ILIKE $${coSalesTagIdx}
-        AND p.tags NOT ILIKE '%nos%'
+        ${nosExcl}
         AND p.default_cost > 0
         ${tenantCond}
         AND p.category    NOT ILIKE 'Alt%ration%'
@@ -4268,7 +4324,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         FROM sale_lines sl JOIN products p ON p.item_id = sl.item_id AND sl.tenant_id = p.tenant_id
         WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${irSlFromIdx}::date
           AND sl.completed_time IS NOT NULL
-          AND p.tags ILIKE $${irSlTagIdx} AND p.tags NOT ILIKE '%nos%'
+          AND p.tags ILIKE $${irSlTagIdx} ${nosExcl}
           ${tenantCond}
           AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
           ${shopCondSL}
@@ -4284,7 +4340,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         FROM products p
         JOIN inventory i  ON i.item_id  = p.item_id
         JOIN shops     sh ON sh.shop_id = i.shop_id AND sh.tenant_id = p.tenant_id
-        WHERE p.tags ILIKE $${irInvTagIdx} AND p.tags NOT ILIKE '%nos%'
+        WHERE p.tags ILIKE $${irInvTagIdx} ${nosExcl}
           ${tenantCond}
           AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
           AND i.qty_on_hand > 0
@@ -4304,7 +4360,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
         WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${slFromIdx}::date
           AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${slToIdx}::date
           AND sl.completed_time IS NOT NULL
-          AND p.tags ILIKE $${slTagIdx} AND p.tags NOT ILIKE '%nos%'
+          AND p.tags ILIKE $${slTagIdx} ${nosExcl}
           ${tenantCond}
           AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
           ${shopCondSL}
@@ -4422,7 +4478,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
               WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${rwFromIdx}::date
                 AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${rwToIdx}::date
                 AND sl.completed_time IS NOT NULL
-                AND p.tags ILIKE $${rwTagIdx} AND p.tags NOT ILIKE '%nos%'
+                AND p.tags ILIKE $${rwTagIdx} ${nosExcl}
                 ${tenantCond}
                 AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
                 ${shopCondSL}
@@ -4462,7 +4518,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
             WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${heSoldFromIdx}::date
               AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${heSoldToIdx}::date
               AND sl.completed_time IS NOT NULL
-              AND p.tags ILIKE $${heSoldTagIdx} AND p.tags NOT ILIKE '%nos%'
+              AND p.tags ILIKE $${heSoldTagIdx} ${nosExcl}
               ${tenantCond}
               AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
               ${shopCondSL}
@@ -4481,7 +4537,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
             WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${heRecvFromIdx}::date
               AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${heRecvToIdx}::date
               AND sl.completed_time IS NOT NULL
-              AND p.tags ILIKE $${heRecvTagIdx} AND p.tags NOT ILIKE '%nos%'
+              AND p.tags ILIKE $${heRecvTagIdx} ${nosExcl}
               ${tenantCond}
               AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
               ${shopCondSL}
@@ -4517,7 +4573,7 @@ app.get('/api/budget/marque', async (req, res, next) => {
           WHERE (sl.completed_time AT TIME ZONE 'America/Toronto')::date >= $${rvFromIdx}::date
             AND (sl.completed_time AT TIME ZONE 'America/Toronto')::date <= $${rvToIdx}::date
             AND sl.completed_time IS NOT NULL
-            AND p.tags ILIKE $${rvTagIdx} AND p.tags NOT ILIKE '%nos%'
+            AND p.tags ILIKE $${rvTagIdx} ${nosExcl}
             ${tenantCond}
             AND p.category NOT ILIKE 'Alt%ration%' AND p.description NOT ILIKE '%shopify%'
             ${shopCondSL}

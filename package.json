@@ -16,7 +16,8 @@
     "test:permissions": "node tests/permissions.test.js",
     "test:shop-scope": "node tests/shop-scope.test.js",
     "test:settings": "node tests/settings.test.js",
-    "test:season-calendar": "node tests/season-calendar.test.js"
+    "test:season-calendar": "node tests/season-calendar.test.js",
+    "test:nos-tag": "node tests/nos-tag.test.js"
   },
   "dependencies": {
     "axios": "^1.7.2",
