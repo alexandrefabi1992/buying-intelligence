@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="188 199 647 647" role="img" aria-label="Buying Intelligence">
+  <!-- Trois barres croissantes, contours arrondis. Le viewBox recadre le dessin
+       pour qu'il reste lisible à 16 px, sans changer les proportions.
+       Le trait s'éclaircit en thème sombre: un favicon foncé sur une barre
+       d'onglets foncée serait invisible. Le .ico de repli reste foncé — le
+       format ne sait pas s'adapter au thème. -->
+  <style>
+    .bars { stroke: #1C2826; }
+    @media (prefers-color-scheme: dark) { .bars { stroke: #E8ECEA; } }
+  </style>
+  <g class="bars" fill="none" stroke-width="38" stroke-linejoin="round">
+    <rect x="247" y="564" width="119" height="212" rx="40" />
+    <rect x="456" y="427" width="115" height="349" rx="40" />
+    <rect x="656" y="269" width="120" height="507" rx="40" />
+  </g>
+</svg>
