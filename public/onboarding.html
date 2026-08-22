@@ -243,10 +243,42 @@ function authHeaders(extra) {
   return Object.assign({}, extra || {}, token ? { Authorization: 'Bearer ' + token } : {});
 }
 
+// Steps 2, 4, 5 and 6 each show suggestions drawn from the tenant's own
+// products. When there is nothing to show, say which of the two reasons it is
+// rather than leaving an empty row.
+const SUGGESTION_HOSTS = [
+  'categories-list',            // step 2 — categories
+  'genre-homme-suggestions',    // step 4 — genre values
+  'genre-femme-suggestions',    // step 4
+  'season-tags-detected',       // step 5 — season tags
+  'nos-tag-suggestions',        // step 6 — NOS tag
+];
+
+function noteOnSuggestionHosts(text, tone) {
+  for (const id of SUGGESTION_HOSTS) {
+    const host = document.getElementById(id);
+    if (!host || host.querySelector('.suggestion-note')) continue;
+    const note = document.createElement('p');
+    note.className = tone === 'warn'
+      ? 'suggestion-note text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2'
+      : 'suggestion-note text-xs text-gray-500';
+    note.textContent = text;
+    host.appendChild(note);
+  }
+}
+
 // ── Auto-discover on load ────────────────────────────────────────────────────
-fetch('/api/admin/discover', { headers: authHeaders() })
+// Tenant-scoped on purpose: the /api/admin variant needs ADMIN_SECRET, which a
+// browser cannot hold, so this call used to return 403 and every suggestion
+// list in the wizard stayed empty.
+fetch('/api/tenant/discover', { headers: authHeaders() })
   .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
   .then(data => {
+    if (!data.categories?.length && !data.tags?.length) {
+      noteOnSuggestionHosts(
+        "Aucune donnée produit synchronisée pour l'instant — saisissez vos valeurs à la main.", 'info');
+      return;
+    }
     discoverData = data;
 
     // Categories preview (step 2)
@@ -321,22 +353,33 @@ fetch('/api/admin/discover', { headers: authHeaders() })
       if (/femme|women|female/i.test(c.name) && !document.getElementById('genre-femme').value)
         document.getElementById('genre-femme').placeholder = `Ex: ${c.name}`;
     });
+
+    // A step whose filter matched nothing looks identical to a step that never
+    // loaded. Say which it is, per step.
+    for (const id of SUGGESTION_HOSTS) {
+      const host = document.getElementById(id);
+      if (host && !host.children.length) {
+        const note = document.createElement('p');
+        note.className = 'suggestion-note text-xs text-gray-400';
+        note.textContent = 'Rien de détecté ici — saisissez votre valeur.';
+        host.appendChild(note);
+      }
+    }
   })
   .catch(() => {
-    const note = document.createElement('p');
-    note.className = 'text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2';
-    note.textContent = "Détection automatique des balises indisponible — saisissez vos balises à la main.";
-    const seasonDiv = document.getElementById('season-tags-detected');
-    if (seasonDiv) seasonDiv.appendChild(note);
+    noteOnSuggestionHosts(
+      "Détection automatique indisponible — saisissez vos valeurs à la main.", 'warn');
   });
 
 // ── Fetch existing config ────────────────────────────────────────────────────
 fetch('/api/settings/tenant', { headers: authHeaders() })
-  .then(r => r.json())
+  .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
   .then(saved => {
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return;
     if (saved.boutique_name) document.getElementById('boutique-name').value = saved.boutique_name;
     Object.assign(config, saved);
-  });
+  })
+  .catch(() => { /* no saved config yet, or not signed in — start from blank */ });
 
 // ── Step navigation ──────────────────────────────────────────────────────────
 function showStep(n) {

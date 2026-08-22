@@ -4073,18 +4073,53 @@ app.put('/api/settings/tenant', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---------------------------------------------------------------------------
+// Product vocabulary discovery — the categories, tags and sample descriptions
+// the onboarding wizard suggests so the merchant picks their own values instead
+// of typing them blind.
+//
+// Two routes, two audiences, one query set:
+//   GET /api/admin/discover    X-Admin-Secret, every tenant at once (unchanged)
+//   GET /api/tenant/discover   JWT, the caller's own tenant only
+//
+// tenantId === null preserves the admin route's cross-tenant behaviour; any
+// other value scopes every query to that tenant.
+// ---------------------------------------------------------------------------
+async function discoverProductVocabulary(tenantId = null) {
+  const scope  = tenantId ? 'AND tenant_id = $1' : '';
+  const params = tenantId ? [tenantId] : [];
+  const [cats, tags, descSamples] = await Promise.all([
+    pool.query(`SELECT DISTINCT category, COUNT(*) as cnt FROM products WHERE category IS NOT NULL AND category != '' AND archived = false ${scope} GROUP BY category ORDER BY cnt DESC LIMIT 30`, params),
+    pool.query(`SELECT DISTINCT UNNEST(string_to_array(tags, ',')) AS tag, COUNT(*) as cnt FROM products WHERE tags IS NOT NULL AND tags != '' AND archived = false ${scope} GROUP BY tag ORDER BY cnt DESC LIMIT 50`, params),
+    pool.query(`SELECT description FROM products WHERE archived = false AND description IS NOT NULL ${scope} ORDER BY RANDOM() LIMIT 5`, params),
+  ]);
+  return {
+    categories:          cats.rows.map(r => ({ name: r.category, count: Number(r.cnt) })),
+    tags:                tags.rows.map(r => ({ tag: r.tag.trim(), count: Number(r.cnt) })).filter(r => r.tag),
+    description_samples: descSamples.rows.map(r => r.description),
+  };
+}
+
+// Deliberately cross-tenant: this is the operator's diagnostic view, and it is
+// why the helper's tenant filter is optional. Note that folding these queries
+// into discoverProductVocabulary() also removed them from scan-tenant-isolation's
+// report (the SQL now carries a conditional tenant_id), so the exemption is
+// recorded here rather than in .tenant-scan-baseline.
 app.get('/api/admin/discover', async (req, res, next) => {
   try {
-    const [cats, tags, descSamples] = await Promise.all([
-      pool.query(`SELECT DISTINCT category, COUNT(*) as cnt FROM products WHERE category IS NOT NULL AND category != '' AND archived = false GROUP BY category ORDER BY cnt DESC LIMIT 30`),
-      pool.query(`SELECT DISTINCT UNNEST(string_to_array(tags, ',')) AS tag, COUNT(*) as cnt FROM products WHERE tags IS NOT NULL AND tags != '' AND archived = false GROUP BY tag ORDER BY cnt DESC LIMIT 50`),
-      pool.query(`SELECT description FROM products WHERE archived = false AND description IS NOT NULL ORDER BY RANDOM() LIMIT 5`),
-    ]);
-    res.json({
-      categories:          cats.rows.map(r => ({ name: r.category, count: Number(r.cnt) })),
-      tags:                tags.rows.map(r => ({ tag: r.tag.trim(), count: Number(r.cnt) })),
-      description_samples: descSamples.rows.map(r => r.description),
-    });
+    res.json(await discoverProductVocabulary(null));
+  } catch (err) { next(err); }
+});
+
+// GET /api/tenant/discover — same data, scoped to the caller's tenant.
+// The onboarding wizard runs in a browser, which cannot hold ADMIN_SECRET, so
+// it could never reach the /api/admin variant: every suggestion list in the
+// wizard came back empty. Auth here is the ordinary JWT, like the rest of the
+// wizard's calls.
+app.get('/api/tenant/discover', requireAuth, async (req, res, next) => {
+  try {
+    if (!req.tenantId) return res.status(401).json({ error: 'Unauthorized' });
+    res.json(await discoverProductVocabulary(req.tenantId));
   } catch (err) { next(err); }
 });
 

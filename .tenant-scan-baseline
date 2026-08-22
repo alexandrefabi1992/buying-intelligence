@@ -55,9 +55,6 @@ server.js:3670:products,transfers
 server.js:3683:products,transfers
 server.js:3701:products,transfers
 server.js:3721:products,transfers
-server.js:4079:products
-server.js:4080:products
-server.js:4081:products
 server.js:697:users
 server.js:774:sync_state
 server.js:886:sale_lines
